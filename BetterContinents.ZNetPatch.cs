@@ -1,4 +1,4 @@
-﻿// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0).
+﻿// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and alt-biome planting (0.8.1).
 
 using System;
 using System.Collections;
@@ -277,10 +277,22 @@ public partial class BetterContinents
                     // We wait for this flag before continuing after sending the world settings, allowing the client to behave asynchronously on its end
                     bcClientInfo.readyForPeerInfo = true;
                 });
+
+                // 0.8.1: after applying the server's alt-biome placement, the client reports its hashes, so a
+                // disagreement shows in the server's log. A warning, never a kick.
+                peer.m_rpc.Register("BetterContinentsAltBiomesResult", (ZRpc rpc, int gridHash, int assignmentHash) =>
+                    AltBiomeControl.OnClientResult(peer, gridHash, assignmentHash));
             }
             else
             {
                 peer.m_rpc.Invoke("BetterContinentsServerHandshake", ModInfo.Version, WorldCache.SerializeCacheList());
+
+                // The server's alt-biome placement, applied over the client's own once its grid is built
+                // (AltBiomeControl.OnBiomeDataReady). Sent before PeerInfo, so it is here in time.
+                AltBiomeControl.ResetServerAssignment();
+                AltBiomeControl.ServerPeer = peer;
+                peer.m_rpc.Register("BetterContinentsAltBiomes", (ZRpc rpc, ZPackage assignment) =>
+                    AltBiomeControl.ReceiveServerAssignment(assignment));
 
                 peer.m_rpc.Register("BetterContinentsVersion", (ZRpc rpc, string serverVersion) =>
                 {
@@ -587,6 +599,15 @@ public partial class BetterContinents
                     }
                 }
                 yield return new WaitUntil(() => bcClientInfo.readyForPeerInfo || !peer.m_socket.IsConnected());
+
+                // Nothing about sectors or alt biomes is sent by vanilla: each peer computes its own. Send ours so
+                // the client uses the server's placement and can report whether its sector grid agrees.
+                var altBiomes = AltBiomeControl.BuildServerAssignmentPackage();
+                if (altBiomes != null && peer.m_socket.IsConnected())
+                {
+                    Log($"Sending alt-biome placement to client {bcClientInfo} (grid {AltBiomeControl.LastGridHash:x8}, assignment {AltBiomeControl.LastAssignmentHash:x8})");
+                    rpc.Invoke("BetterContinentsAltBiomes", altBiomes);
+                }
             }
 
             call_RPC_PeerInfo();

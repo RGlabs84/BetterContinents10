@@ -1,0 +1,59 @@
+GIMP Palette
+Name: Better Continents
+Columns: 8
+#
+# Better Continents biome-map and alt-biome-map colours, generated from BetterContinents.dll
+# by tools/altbiome-harness. Do not edit: change the code and run the harness.
+# Base biomes: the default biomemap.txt legend. Alt biomes: the default altbiomemap.txt palette,
+# grouped by the base biome they plant on. Pixels within 20 RGB units of a colour count as it.
+#
+# Base biomes
+  0   0   0	Biome: None
+  0 255   0	Biome: Meadows
+  0 127   0	Biome: BlackForest
+127 127   0	Biome: Swamp
+255 255 255	Biome: Mountain
+255 255   0	Biome: Plains
+127 127 127	Biome: Mistlands
+255   0   0	Biome: AshLands
+  0 255 255	Biome: DeepNorth
+  0   0 255	Biome: Ocean
+# Alt biomes: Meadows
+ 45  70  19	Alt: Dark Meadows
+173 255 218	Alt: Peaceful Meadows
+229 197  75	Alt: Dandelion Meadows
+194  24  91	Alt: Raspberry Meadows
+110 192  61	Alt: Smalltree Meadows
+204 255 172	Alt: Birch Meadows
+# Alt biomes: BlackForest
+ 44 123 118	Alt: Troll Black Forest
+111  94  50	Alt: Root Black Forest
+157 108  75	Alt: Ruin Black Forest
+ 90  82 100	Alt: Rock Black Forest
+  0  71  84	Alt: Pinetree Black Forest
+ 74  92 182	Alt: Blueberry Black Forest
+169 174  52	Alt: Kalhygge Black Forest
+# Alt biomes: Swamp
+177  51  45	Alt: Hut Swamp
+110  33  67	Alt: Bog Swamp
+ 56  43  65	Alt: Bat Swamp
+149 177 126	Alt: Abomination Swamp
+# Alt biomes: Mountain
+147 199 188	Alt: Wolf Mountain
+ 90 170 194	Alt: Drake Mountain
+182 151 175	Alt: Fortress Mountain
+# Alt biomes: Plains
+204  96  95	Alt: Lox Plains
+255 118  34	Alt: Goblin Plains
+103  30   7	Alt: Death Plains
+# Alt biomes: Mistlands
+217 159 232	Alt: Rockless Mistlands
+ 71  37 119	Alt: Trees Mistlands
+138 127 219	Alt: Swords Mistlands
+213 110 187	Alt: Hare Mistlands
+142  47 142	Alt: BroodSwarm Mistlands
+# Alt biomes: Several base biomes
+255 150 156	Alt: Mushroom
+242 163   0	Alt: Lantern
+248 225 182	Alt: Bones
+221 167 118	Alt: Menhir

@@ -1,0 +1,56 @@
+# Better Continents alt-biome legend. The image beside this file plants Valheim 1.0 alt biomes,
+# the same way biomemap.png plants base biomes. One line per planted colour:
+#
+#   <alt biome>[ + <alt biome> ...]: <colour>      plant these alt biomes where the image has this colour
+#   <alt biome>[ + <alt biome> ...]: at <x>, <z>   plant them on the whole region at world position x, z (metres)
+#   none: <colour>                                 a plain region: no alt biome, and no random one either
+#
+# Colours are RRGGBB, #RRGGBB or r,g,b. Pixels within 20 RGB units of a listed colour count as it.
+# Black (000000) and transparent pixels are unplanted: the game's own placement decides there.
+# A colour only takes over the base biomes its alt biomes belong to, so painting past a biome edge is
+# harmless: Dark Meadows painted across a meadow and its beach only changes the meadow.
+# Stack alt biomes on one region with +, or by listing the same colour on several lines.
+# Names are the game's internal names, case-insensitive (bc_altbiomes names lists them in game).
+#   *      wildcard, plants EVERY matching alt biome that fits the land, e.g. *Mistlands
+#   !Name  force an alt biome the game would refuse here (disabled, wrong base biome, incompatible)
+# Planted regions ignore the game's size, distance, height, position and neighbour rules, and count
+# toward the game's per-alt-biome maximum when it places the rest at random.
+#
+# Examples (remove the leading # to use them):
+# Dark Meadows + Lantern: 0080C0
+# none: C030F0
+# Troll Black Forest: at 2750, -1210
+#
+# Default palette, one colour per Valheim 1.0.15 alt biome (the comment is the land it plants on):
+Mushroom: FF969C               # Meadows, BlackForest
+Lantern: F2A300                # Meadows, BlackForest, Swamp, Mountain, Plains, Mistlands, DeepNorth
+Bones: F8E1B6                  # Swamp, Plains, Mistlands
+Menhir: DDA776                 # Meadows, Plains
+Dark Meadows: 2D4613           # Meadows
+Peaceful Meadows: ADFFDA       # Meadows
+Dandelion Meadows: E5C54B      # Meadows
+Raspberry Meadows: C2185B      # Meadows
+Smalltree Meadows: 6EC03D      # Meadows
+Birch Meadows: CCFFAC          # Meadows
+Troll Black Forest: 2C7B76     # BlackForest
+Root Black Forest: 6F5E32      # BlackForest
+Ruin Black Forest: 9D6C4B      # BlackForest
+Rock Black Forest: 5A5264      # BlackForest
+Pinetree Black Forest: 004754  # BlackForest
+Blueberry Black Forest: 4A5CB6 # BlackForest
+Hut Swamp: B1332D              # Swamp
+Bog Swamp: 6E2143              # Swamp
+Bat Swamp: 382B41              # Swamp
+Abomination Swamp: 95B17E      # Swamp
+Wolf Mountain: 93C7BC          # Mountain
+Drake Mountain: 5AAAC2         # Mountain
+Fortress Mountain: B697AF      # Mountain
+Lox Plains: CC605F             # Plains
+Goblin Plains: FF7622          # Plains
+Death Plains: 671E07           # Plains
+Kalhygge Black Forest: A9AE34  # BlackForest
+Rockless Mistlands: D99FE8     # Mistlands
+Trees Mistlands: 472577        # Mistlands
+Swords Mistlands: 8A7FDB       # Mistlands
+Hare Mistlands: D56EBB         # Mistlands
+BroodSwarm Mistlands: 8E2F8E   # Mistlands

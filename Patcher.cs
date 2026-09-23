@@ -1,4 +1,4 @@
-﻿// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0).
+﻿// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and alt-biome planting (0.8.1).
 
 using System.Collections;
 using System.Reflection;
@@ -35,6 +35,16 @@ public partial class BetterContinents
     // above (PatchGetBiome, PatchIsAshlands, PatchIsAshlandsFallback) can leave already-queried cells
     // returning their pre-patch answer for the rest of the session unless we clear the caches here.
     ClearWorldGeneratorBiomeCaches();
+    // EnvMan's Deep North weather test reads the biome map at the camera's x and z exactly when IsDeepnorth
+    // reads the biome map at all (PatchIsDeepnorth); every other world keeps vanilla's (x, height) call.
+    var deepNorthUsesZ = Settings.EnabledForThisWorld && Settings.HasBiomeMap;
+    if (deepNorthUsesZ != DeepNorthWeather.UseZ)
+      Log(deepNorthUsesZ
+        ? "Deep North weather: EnvMan asks IsDeepnorth at the camera's x and z (this world has a biome map)"
+        : "Deep North weather: EnvMan asks IsDeepnorth as vanilla does, at (x, camera height)");
+    DeepNorthWeather.UseZ = deepNorthUsesZ;
+    // Alt-biome grid, placement and planting state follows the settings (see AltBiomeControl.Configure).
+    AltBiomeControl.Configure();
   }
 
   // AccessTools lookups return null instead of throwing when a member can't be found; Harmony then

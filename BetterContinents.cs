@@ -1,9 +1,10 @@
-// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0).
+// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and alt-biome planting (0.8.1).
 
 using System;
 using System.Collections;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using BepInEx;
@@ -85,6 +86,21 @@ public partial class BetterContinents : BaseUnityPlugin
     public static ConfigEntry<float> ConfigHeatScale;
     public static ConfigEntry<string> ConfigHeatFile;
 
+    // Alt biomes (new-world defaults; baked into the world's settings when it is created, see
+    // AltBiomeSettings.FromConfig and ALTBIOMES.md)
+    public static ConfigEntry<string> ConfigAltBiomeFile;
+    public static ConfigEntry<string> ConfigAltBiomeMode;
+    public static ConfigEntry<string> ConfigAltBiomeGrid;
+    public static ConfigEntry<string> ConfigAltBiomeSeed;
+    public static ConfigEntry<float> ConfigAltBiomeChanceMultiplier;
+    public static ConfigEntry<float> ConfigAltBiomeAmountMultiplier;
+    public static ConfigEntry<float> ConfigAltBiomeEdgeScale;
+    public static ConfigEntry<float> ConfigAltBiomeDistanceScale;
+    public static ConfigEntry<float> ConfigAltBiomeMinThickness;
+    public static ConfigEntry<bool> ConfigAltBiomeMeanHeight;
+    public static ConfigEntry<bool> ConfigAltBiomeFixNeighbourCheck;
+    public static ConfigEntry<string> ConfigAltBiomeOverrides;
+
     public static BetterContinents instance;
 #nullable enable
     public static void SetSize(float size, float edge)
@@ -163,7 +179,7 @@ public partial class BetterContinents : BaseUnityPlugin
                     .Description("Override the save version")
                     .Default("").Bind(out ConfigOverrideVersion);
                 groupBuilder.AddValue("Directory")
-                    .Description("This directory will load automatically any existing map files matching the correct names, overriding specific files specified below. Filenames must match: heightmap.png, biomemap.png, locationmap.png, roughmap.png, forestmap.png, vegetationmap.png, spawnmap.png.")
+                    .Description("This directory will load automatically any existing map files matching the correct names, overriding specific files specified below. Filenames must match: heightmap.png, biomemap.png, locationmap.png, roughmap.png, forestmap.png, vegetationmap.png, spawnmap.png, altbiomemap.png.")
                     .Default("").Bind(out ConfigMapSourceDir);
             })
             .AddGroup("BetterContinents.Global", groupBuilder =>
@@ -312,6 +328,49 @@ public partial class BetterContinents : BaseUnityPlugin
                     .Hidden().Default(446).Bind(out NexusID);
                 groupBuilder.AddValue("SelectedPreset")
                     .Hidden().Default("Vanilla").Bind(out ConfigSelectedPreset);
+            })
+            // Must stay after Misc: section names carry the group's position ("07 BetterContinents.Misc"), so a group
+            // inserted earlier would rename every later section and reset the values stored in them. Every value
+            // here is a default for NEW worlds: it is baked into the world's settings when the world is created and
+            // never read again for that world. Change a live world with the "bc ab" console commands (debug mode).
+            .AddGroup("BetterContinents.AltBiomes", groupBuilder =>
+            {
+                groupBuilder.AddValue("Altbiomemap File")
+                    .Description("Path to an alt-biome map (altbiomemap.png). It plants Valheim 1.0 alt biomes with colours, the way the biome map plants biomes; the legend beside it (altbiomemap.txt, written with a default colour per alt biome when missing) says which colour plants what. Black and transparent pixels are left to the game.")
+                    .Default("").Bind(out ConfigAltBiomeFile);
+                groupBuilder.AddValue("Mode")
+                    .Description("Random = the game's random alt-biome placement on unplanted land (tuned by the values below) plus every planted region; PlantedOnly = only planted regions; Off = no alt biomes at all, planted ones included")
+                    .Default("Random").Range(new AcceptableValueList<string>("Random", "PlantedOnly", "Off")).Bind(out ConfigAltBiomeMode);
+                groupBuilder.AddValue("Grid")
+                    .Description("WorldEdge = alt biomes and biome-based location candidates stop at the edge of the world (World Size + Edge Size) when it is smaller than vanilla's 10500 m; Vanilla = always sample the vanilla 10500 m disc")
+                    .Default("WorldEdge").Range(new AcceptableValueList<string>("WorldEdge", "Vanilla")).Bind(out ConfigAltBiomeGrid);
+                groupBuilder.AddValue("Fixed Seed")
+                    .Description("Seed for the game's random alt-biome placement. Empty = the world seed (vanilla). A number, or any text, gives the same random alt-biome layout for this map whatever the world seed is")
+                    .Default("").Bind(out ConfigAltBiomeSeed);
+                groupBuilder.AddValue("Chance Multiplier")
+                    .Description("Multiplies every alt biome's random placement chance (vanilla 0.2, Dark Meadows 0.5)")
+                    .Default(1f).Range(0f, 10f).Bind(out ConfigAltBiomeChanceMultiplier);
+                groupBuilder.AddValue("Amount Multiplier")
+                    .Description("Multiplies every alt biome's minimum and maximum number of regions")
+                    .Default(1f).Range(0f, 10f).Bind(out ConfigAltBiomeAmountMultiplier);
+                groupBuilder.AddValue("Region Size Scale")
+                    .Description("Multiplies every alt biome's region size window (edge length). Vanilla only gives alt biomes to regions roughly 0.1-2.4 km across; hand-drawn maps with big regions usually need 2-10")
+                    .Default(1f).Range(0.1f, 50f).Bind(out ConfigAltBiomeEdgeScale);
+                groupBuilder.AddValue("Distance Scale")
+                    .Description("Multiplies every alt biome's minimum distance from the world centre (vanilla 500-2000 m) and its world bounds")
+                    .Default(1f).Range(0f, 10f).Bind(out ConfigAltBiomeDistanceScale);
+                groupBuilder.AddValue("Min Sector Thickness")
+                    .Description("Regions thinner than this (area / edge length, in 12 m cells) never get a random alt biome. 0 = vanilla. 2 filters the slivers an anti-aliased biome map leaves along its borders")
+                    .Default(0f).Range(0f, 20f).Bind(out ConfigAltBiomeMinThickness);
+                groupBuilder.AddValue("Mean Sector Height")
+                    .Description("Measure a region's average height as the mean over the whole region instead of vanilla's (lowest + highest) / 2 of its border. Helps maps whose biome paint runs out into the sea: the border is then under water and vanilla's measure sinks below the 30 m every alt biome requires")
+                    .Default(false).Bind(out ConfigAltBiomeMeanHeight);
+                groupBuilder.AddValue("Fix Neighbour Check")
+                    .Description("Use a corrected version of vanilla's require/not-neighbour test (broken in 1.0.15; no vanilla alt biome uses it, modded ones may)")
+                    .Default(false).Bind(out ConfigAltBiomeFixNeighbourCheck);
+                groupBuilder.AddValue("Overrides")
+                    .Description("Per alt biome overrides of the game's random placement: 'Name: key=value, key=value; Other Name: key=value'. A name may contain * wildcards ('*Mistlands'); '*' alone applies to all. An exact name wins over a wildcard pattern, and a pattern over '*', field by field. Keys: enabled, chance, min, max, mindist, minedge, maxedge, minheight, maxheight, ignorebounds. 'Fortress Mountain: enabled=false' keeps the game from placing Fortress Mountain at random; planted Fortress Mountain still works")
+                    .Default("").Bind(out ConfigAltBiomeOverrides);
             });
         if (ConfigLocationFile.Value == "" && ConfigSpawnFile.Value != "")
         {
@@ -321,6 +380,7 @@ public partial class BetterContinents : BaseUnityPlugin
         }
         HarmonyInstance = new Harmony("BetterContinents.Harmony");
         HarmonyInstance.PatchAll();
+        LogAltBiomePatches();
         Log("Awake");
         UI.Init();
     }
@@ -328,6 +388,35 @@ public partial class BetterContinents : BaseUnityPlugin
     public void Start()
     {
         EWD.Run();
+    }
+
+    // One line at startup that says whether the 0.8.1 world-generation fixes are bound, so a server log shows it
+    // without anyone having to load a world first.
+    private static void LogAltBiomePatches()
+    {
+        try
+        {
+            static int Count(System.Reflection.MethodBase? method)
+            {
+                if (method == null)
+                    return -1;
+                var info = Harmony.GetPatchInfo(method);
+                if (info == null)
+                    return 0;
+                return info.Prefixes.Count(p => p.owner == HarmonyInstance.Id) + info.Postfixes.Count(p => p.owner == HarmonyInstance.Id)
+                       + info.Transpilers.Count(p => p.owner == HarmonyInstance.Id) + info.Finalizers.Count(p => p.owner == HarmonyInstance.Id);
+            }
+            var grid = Count(AccessTools.Method(typeof(WorldGenerator), nameof(WorldGenerator.GetBiomeSector), [typeof(int), typeof(int), typeof(bool)]));
+            var weather = Count(AccessTools.Method(typeof(EnvMan), "UpdateEnvironment")) + Count(AccessTools.Method(typeof(EnvMan), "GetBiome"));
+            var placement = Count(AccessTools.Method(typeof(AltBiomeWorldData), nameof(AltBiomeWorldData.GenerateAltBiomes)));
+            var cache = Count(AccessTools.Method(typeof(AltBiomeWorldData), nameof(AltBiomeWorldData.TryLoadCache)))
+                        + Count(AccessTools.Method(typeof(AltBiomeWorldData), nameof(AltBiomeWorldData.SaveCache)));
+            Log($"Alt biomes: patches bound - grid clamp for resized grids (GetBiomeSector) {grid}, Deep North weather (EnvMan) {weather} with {DeepNorthWeather.RewrittenCalls} IsDeepnorth call(s) rewritten, placement (GenerateAltBiomes) {placement}, biome cache fingerprint {cache}.");
+        }
+        catch (Exception e)
+        {
+            LogWarning($"Alt biomes: could not list the bound patches: {e.Message}");
+        }
     }
 
     public void OnGUI()

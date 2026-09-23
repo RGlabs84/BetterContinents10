@@ -1,4 +1,4 @@
-﻿// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0).
+﻿// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and alt-biome planting (0.8.1).
 
 using System;
 using System.Collections.Generic;
@@ -52,6 +52,20 @@ public partial class BetterContinents
     public float EdgeSize = 500f;
     public bool FixWaterColor = true;
     public NoiseStackSettings BaseHeightNoise = new();
+    // Null = the world predates 0.8.1 (or uses no alt-biome option): vanilla alt-biome behaviour.
+    public AltBiomeSettings? AltBiomes;
+    // The DataKey.AltBiomes blob as read, kept only when a newer Better Continents wrote it (or it could not be
+    // read): it is saved back unchanged until an edit replaces it, so an older build never drops data.
+    private byte[]? AltBiomesBlobAsRead;
+
+    public AltBiomeSettings EffectiveAltBiomes => AltBiomes ?? AltBiomeSettings.Legacy;
+
+    // For live edits (console): never mutate the shared Legacy instance.
+    public AltBiomeSettings EditAltBiomes()
+    {
+      AltBiomesBlobAsRead = null;
+      return AltBiomes ??= AltBiomeSettings.Legacy.Clone();
+    }
 
     // Non-serialized
     private ImageMapFloat? HeightMap;
@@ -69,8 +83,15 @@ public partial class BetterContinents
     private ImageMapFloat? ForestMap;
     private ImageMapFloat? HeatMap;
     private ImageMapSpawn? SpawnMap;
+    // Baked alt-biome map (class per pixel, legend classes, point plants); serialized under DataKey.AltBiomeMap.
+    private ImageMapAltBiome? AltBiomeMap;
+    // The DataKey.AltBiomeMap block as read, kept only when a newer Better Continents wrote it (or it could not be
+    // read): it is saved back unchanged until the map is replaced or reloaded.
+    private byte[]? AltBiomeMapBlockAsRead;
 
     public bool HasHeightMap => HeightMap != null;
+    public bool HasAltBiomeMap => AltBiomeMap != null;
+    internal ImageMapAltBiome? AltBiomeMapData => AltBiomeMap;
     public bool HasBiomeMap => BiomeMap != null;
     public bool HasLocationMap => LocationMap != null;
     public bool HasRoughMap => RoughMap != null;
@@ -97,7 +118,8 @@ public partial class BetterContinents
                                || HasMossMap
                                || HasVegetationMap
                                || HasHeatMap
-                               || HasSpawnMap;
+                               || HasSpawnMap
+                               || HasAltBiomeMap;
     public bool ShouldHeightMapOverrideAll => HasHeightMap && HeightmapOverrideAll;
 
     public static BetterContinentsSettings Create()
@@ -137,6 +159,7 @@ public partial class BetterContinents
     private static readonly string MossFile = "mossmap.png";
     private static readonly string VegetationFile = "vegetationmap.png";
     private static readonly string SpawnFile = "spawnmap.png";
+    private static readonly string AltBiomeFile = "altbiomemap.png";
 
     private static string HeightPath(string defaultFilename, string projectDir) => GetPath(projectDir, HeightFile, defaultFilename);
     private static string BiomePath(string defaultFilename, string projectDir) => GetPath(projectDir, BiomeFile, defaultFilename);
@@ -150,6 +173,7 @@ public partial class BetterContinents
     private static string MossPath(string defaultFilename, string projectDir) => GetPath(projectDir, MossFile, defaultFilename);
     private static string VegetationPath(string defaultFilename, string projectDir) => GetPath(projectDir, VegetationFile, defaultFilename);
     private static string SpawnPath(string defaultFilename, string projectDir) => GetPath(projectDir, SpawnFile, defaultFilename);
+    private static string AltBiomePath(string defaultFilename, string projectDir) => GetPath(projectDir, AltBiomeFile, defaultFilename);
 
     private static string HeightConfigPath => HeightPath(ConfigHeightFile.Value, ConfigMapSourceDir.Value);
     private static string BiomeConfigPath => BiomePath(ConfigBiomeFile.Value, ConfigMapSourceDir.Value);
@@ -163,6 +187,7 @@ public partial class BetterContinents
     private static string MossConfigPath => MossPath(ConfigMossFile.Value, ConfigMapSourceDir.Value);
     private static string VegetationConfigPath => VegetationPath(ConfigVegetationFile.Value, ConfigMapSourceDir.Value);
     private static string SpawnConfigPath => SpawnPath(ConfigSpawnFile.Value, ConfigMapSourceDir.Value);
+    private static string AltBiomeConfigPath => AltBiomePath(ConfigAltBiomeFile.Value, ConfigMapSourceDir.Value);
 
 
     private void InitSettings(bool enabled)
@@ -228,6 +253,9 @@ public partial class BetterContinents
         HeatMapScale = ConfigHeatScale.Value;
 
         SpawnMap = ImageMapSpawn.Create(SpawnConfigPath);
+
+        AltBiomeMap = ImageMapAltBiome.Create(AltBiomeConfigPath);
+        AltBiomes = AltBiomeSettings.FromConfig();
       }
       DynamicPatch();
     }
@@ -311,6 +339,22 @@ public partial class BetterContinents
     public void SetSpawnPath(string path) => SpawnMap = ImageMapSpawn.Create(path);
     public string GetSpawnPath() => SimplePath(SpawnMap?.FilePath ?? string.Empty);
     public string ResolveSpawnPath(string path) => ResolvePath(path, SpawnFile);
+
+    public void SetAltBiomePath(string path)
+    {
+      AltBiomeMap = ImageMapAltBiome.Create(path);
+      AltBiomeMapBlockAsRead = null;
+      AltBiomeMapError = null;
+    }
+    // Attaches an already decoded map (tests and tools; the game uses SetAltBiomePath).
+    internal void SetAltBiomeMap(ImageMapAltBiome? map)
+    {
+      AltBiomeMap = map;
+      AltBiomeMapBlockAsRead = null;
+      AltBiomeMapError = null;
+    }
+    public string GetAltBiomePath() => SimplePath(AltBiomeMap?.FilePath ?? string.Empty);
+    public string ResolveAltBiomePath(string path) => ResolvePath(path, AltBiomeFile);
 
     private string SimplePath(string path)
     {
@@ -485,6 +529,13 @@ public partial class BetterContinents
         if (SpawnMap != null)
           output($"Spawnmap file ({SpawnMap.Size}) {SpawnMap.FilePath}");
         else output($"Spawnmap disabled");
+
+        if (AltBiomeMap != null)
+          AltBiomeMap.Dump(output);
+        else if (AltBiomeMapBlockAsRead != null)
+          output($"Altbiomemap unreadable by this build ({AltBiomeMapBlockAsRead.Length} bytes, kept unchanged, not planted)");
+        else output($"Altbiomemap disabled");
+        EffectiveAltBiomes.Dump(output, AltBiomes == null);
       }
       else
       {
@@ -916,6 +967,27 @@ public partial class BetterContinents
         if (!SpawnMap.LoadSourceImage()) return;
       }
       SpawnMap.CreateMap();
+    }
+
+    // Re-reads the image and its legend into a new map object. Planted sectors follow when the sectors are rebuilt,
+    // which "bc reload ab" does straight away.
+    public void ReloadAltBiomeMap()
+    {
+      if (AltBiomeMap == null) return;
+      var path = AltBiomeMap.FilePath;
+      if (!File.Exists(path))
+      {
+        if (!File.Exists(AltBiomeConfigPath)) return;
+        LogWarning($"Cannot find image {path}: Using default path from config.");
+        path = AltBiomeConfigPath;
+      }
+      var reloaded = ImageMapAltBiome.Create(path);
+      if (reloaded != null)
+      {
+        AltBiomeMap = reloaded;
+        AltBiomeMapBlockAsRead = null;
+        AltBiomeMapError = null;
+      }
     }
 
     public void LoadPrefabs(ZNetScene scene)

@@ -1,0 +1,36 @@
+<!-- Added by Wubarrk on 2026-09-22 for alt-biome planting (0.8.1). -->
+<!-- Offline checks of Better Continents' alt-biome code against the real 1.0.15 assemblies.
+     Build BetterContinents.csproj (Release) first; this references its pre-ILRepack DLL in obj/.
+     Run from this folder with "dotnet run -c Release": every check, and it regenerates ../../palettes.
+     Pass "help" after the run separator for the tools used by the dedicated-server test. -->
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <AssemblyName>AltBiomeHarness</AssemblyName>
+    <RootNamespace>AltBiomeHarness</RootNamespace>
+    <Nullable>disable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <NoWarn>$(NoWarn);MSB3277;CS8632;NU1701;MSB3243;CS1701;CS1702;CS0618</NoWarn>
+    <LibsTools>$(MSBuildThisFileDirectory)../../../libs-Tools/</LibsTools>
+    <BcDll>$(MSBuildThisFileDirectory)../../obj/Release/net4.8/BetterContinents.dll</BcDll>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="SixLabors.ImageSharp" Version="2.1.13" />
+    <!-- BetterContinents.dll is built against BepInEx's HarmonyX 0Harmony, which cannot initialise on .NET 8;
+         Lib.Harmony has the same assembly name and the API surface Better Continents touches. -->
+    <PackageReference Include="Lib.Harmony" Version="2.3.6" />
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="BetterContinents"><HintPath>$(BcDll)</HintPath></Reference>
+    <Reference Include="assembly_valheim"><HintPath>$(LibsTools)1.0/client/assembly_valheim.dll</HintPath></Reference>
+    <Reference Include="assembly_utils"><HintPath>$(LibsTools)1.0/client/assembly_utils.dll</HintPath></Reference>
+    <Reference Include="assembly_guiutils"><HintPath>$(LibsTools)1.0/client/assembly_guiutils.dll</HintPath></Reference>
+    <Reference Include="UnityEngine"><HintPath>$(LibsTools)1.0/client/UnityEngine.dll</HintPath></Reference>
+    <Reference Include="UnityEngine.CoreModule"><HintPath>$(LibsTools)1.0/client/UnityEngine.CoreModule.dll</HintPath></Reference>
+    <Reference Include="Splatform"><HintPath>$(LibsTools)1.0/client/Splatform.dll</HintPath></Reference>
+    <Reference Include="SoftReferenceableAssets"><HintPath>$(LibsTools)1.0/client/SoftReferenceableAssets.dll</HintPath></Reference>
+    <Reference Include="BepInEx"><HintPath>$(LibsTools)BepInEx.dll</HintPath></Reference>
+  </ItemGroup>
+</Project>

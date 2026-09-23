@@ -6,7 +6,7 @@
 [![Multiplayer Compatible](https://img.shields.io/badge/Multiplayer-Server_Synced-blue.svg)]()
 [![Framework](https://img.shields.io/badge/Requires-BepInEx-red.svg)]()
 [![Compatibility](https://img.shields.io/badge/Target-Valheim_1.0-brightgreen.svg)]()
-[![Version](https://img.shields.io/badge/Version-0.8.0-lightgrey.svg)]()
+[![Version](https://img.shields.io/badge/Version-0.8.1-lightgrey.svg)]()
 
 > *"The Allfather did not carve the Tenth Realm in a single stroke. With hammer and chisel, the jagged peaks were raised, deep fjords torn open, and ancient oceans poured into the abyss. Take up the chisel, Viking, and shape the continents to your will."*
 
@@ -20,6 +20,7 @@ Whether you want to import a real-world map of Earth, recreate Middle-earth, scu
 - [⚔️ Core Features](#core-features)
   - [🏔️ Precision Heightmap Layers](#precision-heightmap-layers)
   - [🌿 Handcrafted Biome Layouts](#handcrafted-biome-layouts)
+  - [🌸 Paint Alt Biomes](#paint-alt-biomes)
   - [🌲 Custom Forest Coverage](#custom-forest-coverage)
   - [📍 Absolute Location & Spawn Control](#absolute-location--spawn-control)
   - [🌊 Global Ocean & Continent Scaling](#global-ocean--continent-scaling)
@@ -58,6 +59,14 @@ Shape mountains, cliffs, and ocean trenches using standard grayscale or RGB imag
 Forget vanilla's rigid concentric circles. Draw your world's biomes by painting a simple image map ([Biome Map Guide](https://jerekuusela.github.io/BetterContinents-Docs/settings/biomemap.html)):
 * 🎨 Assign specific color keys to Meadows, Black Forest, Swamp, Mountain, Plains, Mistlands, Ashlands, and Deep North.
 * 🏝️ Paint custom islands dedicated entirely to specific biomes, or craft seamless, realistic climate transitions.
+
+<a id="paint-alt-biomes"></a>
+### 🌸 Paint Alt Biomes (new in 0.8.1)
+Valheim 1.0 layers 32 alt biomes onto regions of your world, such as Dark Meadows, Troll Black Forest, Fortress Mountain and Lox Plains. Better Continents lets you choose where they go:
+* 🖌️ Paint an alt-biome map (`altbiomemap.png`) and list its colours in a legend (`altbiomemap.txt`). Every alt biome has a default colour, and the legend is written for you when it is missing.
+* 🎯 Every painted area becomes a region of its own. Stack several alt biomes on one colour, keep an area free of alt biomes with `none`, or plant the region under a point with `at x, z`.
+* 🎲 Choose how the game places the rest: at random on unplanted land (what you planted counts toward its limits), only what you planted, or no alt biomes at all.
+* 🎨 Every release includes a palette file for Krita and GIMP (`BetterContinents.gpl`) and a printable colour chart.
 
 <a id="custom-forest-coverage"></a>
 ### 🌲 Custom Forest Coverage
@@ -143,7 +152,7 @@ Valheim 1.0 saves each world as a folder, `worlds_local/<WorldName>/`. Better Co
 <a id="configuration--console-commands"></a>
 ## ⚙️ Configuration & Console Commands
 
-Better Continents has one console command, `bc` (open the console with F5). It is a cheat command: it needs `devcommands` and runs only on the host.
+Better Continents has two console commands (open the console with F5). `bc` is for building worlds: it is a cheat command, so it needs `devcommands`, and it runs only on the host. `bc_altbiomes` works for every player.
 
 * ⌨️ `bc info` — Prints the current world's settings.
 * ⌨️ `bc reload <map>` — Reloads an image map from disk and reapplies it (`hm`, `bm`, `fom`, `lm`, `heat`, … or `all`).
@@ -151,6 +160,10 @@ Better Continents has one console command, `bc` (open the console with F5). It i
 * ⌨️ `bc scr` — Saves a screenshot of the map.
 * ⌨️ `bc show [filter]`, `bc hide [filter]`, `bc bosses` — Pins locations on the map, or removes the pins.
 * ⌨️ `bc savepreset` — Saves the current settings as a preset.
+* ⌨️ `bc ab info`, `bc ab list [filter]`, `bc ab here` — Shows what each alt biome did in this world, which regions have alt biomes, and the region you stand in.
+* ⌨️ `bc ab fn [path]`, `bc reload ab` — Sets the alt-biome map, or re-reads it and its legend from disk.
+* ⌨️ `bc ab mode [Random|PlantedOnly|Off]` — Sets how the game places the alt biomes you did not plant. `bc ab help` lists the rest: seed, chance, amount, overrides, export and more.
+* ⌨️ `bc_altbiomes [here|names|hash|list]` — For any player: the region you stand in, the alt-biome names and colours, and whether your placement agrees with the server's. `list` needs `devcommands`.
 
 ---
 
@@ -158,7 +171,8 @@ Better Continents has one console command, `bc` (open the console with F5). It i
 ## 📚 Documentation & Guides
 
 For deep dives, tutorials, and configuration references:
-* 📕 **Updated guide for Valheim 1.0.15:** `BetterContinents-Guide.pdf`, included in this package, with a clickable table of contents.
+* 📕 **The Better Continents Guide for 0.8.1:** `BetterContinents-Guide.pdf`, included in this package, with a clickable table of contents.
+* 🎨 **Colour scheme:** `BetterContinents.gpl` (a palette for Krita and GIMP with every biome and alt-biome colour) and `altbiome-palette.png` (a printable colour chart), included in this package.
 * 📖 [Full Documentation](https://jerekuusela.github.io/BetterContinents-Docs/introduction.html)
 * 🚀 [Setup & Quick Start Guide](https://jerekuusela.github.io/BetterContinents-Docs/setup-guide.html)
 * ❓ [Frequently Asked Questions (FAQ)](https://jerekuusela.github.io/BetterContinents-Docs/faq.html)
@@ -178,6 +192,6 @@ For deep dives, tutorials, and configuration references:
 <a id="license"></a>
 ## ⚖️ License
 
-* **Better Continents** is free software under the **GNU Lesser General Public License v2.1** (`LICENSE.md`). Source code: [github.com/RGlabs84/BetterContinents10](https://github.com/RGlabs84/BetterContinents10). This package includes the exact source of this release as `BetterContinents-0.8.0-source.zip`.
+* **Better Continents** is free software under the **GNU Lesser General Public License v2.1** (`LICENSE.md`). Source code: [github.com/RGlabs84/BetterContinents10](https://github.com/RGlabs84/BetterContinents10). This package includes the exact source of this release as `BetterContinents-source.zip`.
 * `BetterContinents.dll` also contains ImageSharp (Apache-2.0), five .NET libraries (MIT) and FastNoiseLite (MIT). Their notices are in `THIRD-PARTY-NOTICES.txt`.
 * `BetterContinents-Guide.pdf` is the Better Continents Guide, originally written by billw2012 and maintained by JereKuusela, updated for Valheim 1.0.15 by Wubarrk. It is licensed under the **GNU General Public License v3** (`GUIDE-LICENSE.txt`), and its source files are attached inside the PDF.

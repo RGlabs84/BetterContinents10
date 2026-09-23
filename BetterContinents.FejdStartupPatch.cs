@@ -1,4 +1,4 @@
-﻿// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0).
+﻿// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and alt-biome planting (0.8.1).
 
 using HarmonyLib;
 using TMPro;
@@ -27,6 +27,10 @@ public partial class BetterContinents
         {
             // Unpatching everything on main menu means other patches don't have to check for main menu.
             Settings.EnabledForThisWorld = false;
+            // The alt-biome map pins and the server's placement belong to the world that was just left.
+            AltBiomeReport.ForgetPins();
+            AltBiomeControl.ResetServerAssignment();
+            AltBiomeControl.ServerPeer = null;
             DynamicPatch();
         }
         private static readonly Presets presets = new();

@@ -1,4 +1,4 @@
-﻿// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0).
+﻿// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and alt-biome planting (0.8.1).
 
 using System;
 using System.Collections.Generic;
@@ -41,6 +41,8 @@ public partial class DebugUtils
         // (Terminal.cs:152), so positional bools past the action delegate are no longer safe to rely on here.
         new Terminal.ConsoleCommand("bc", "Root Better Continents command", args => RunConsoleCommand(args.FullLine.Trim()),
             isCheat: true, isNetwork: false, onlyServer: true);
+        // Read-only, and without positions unless devcommands is on, so any player can run it on a client.
+        AltBiomeCommands.Register();
         rootCommand = new Command("bc", "Better Continents", "Better Continents command").Subcommands(bc =>
         {
             bc.AddCommand("info", "Dump Info", "Prints current settings to console", _ =>
@@ -94,6 +96,13 @@ public partial class DebugUtils
                     if (BetterContinents.Settings.HasSpawnMap)
                         reload.AddCommand("spawn", "Spawnmap", "Reloads the spawnmap",
                             HeightmapCommand(_ => BetterContinents.Settings.ReloadSpawnMap()));
+                    if (BetterContinents.Settings.HasAltBiomeMap)
+                        reload.AddCommand("ab", "Altbiomemap", "Reloads the alt-biome map and its legend, replants the alt biomes and resets the zones",
+                            _ =>
+                            {
+                                BetterContinents.Settings.ReloadAltBiomeMap();
+                                ReplantAltBiomes("alt-biome map reloaded");
+                            });
                     if (BetterContinents.Settings.AnyImageMap)
                     {
                         reload.AddCommand("all", "All", "Reloads all image maps", HeightmapCommand(_ =>
@@ -111,6 +120,8 @@ public partial class DebugUtils
                             if (BetterContinents.Settings.HasVegetationMap) BetterContinents.Settings.ReloadVegetationMap();
                             if (BetterContinents.Settings.HasHeatMap) BetterContinents.Settings.ReloadHeatMap();
                             if (BetterContinents.Settings.HasSpawnMap) BetterContinents.Settings.ReloadSpawnMap();
+                            // Planted regions follow on the grid rebuild that the reset runs.
+                            if (BetterContinents.Settings.HasAltBiomeMap) BetterContinents.Settings.ReloadAltBiomeMap();
                         }));
                     }
                 });
@@ -193,6 +204,8 @@ public partial class DebugUtils
                     arg ??= WorldGenerator.instance.m_world.m_name;
                     Presets.Save(BetterContinents.Settings, arg);
                 });
+
+            AddAltBiomeCommands(bc);
 
             bc.AddGroup("g", "Global", "Global settings, get more info with 'bc g help'",
                 group =>

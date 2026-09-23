@@ -1,0 +1,412 @@
+[
+  {
+    "name": "None",
+    "kind": "biome",
+    "base_biome": "None",
+    "hex": "000000",
+    "r": 0,
+    "g": 0,
+    "b": 0
+  },
+  {
+    "name": "Meadows",
+    "kind": "biome",
+    "base_biome": "Meadows",
+    "hex": "00FF00",
+    "r": 0,
+    "g": 255,
+    "b": 0
+  },
+  {
+    "name": "BlackForest",
+    "kind": "biome",
+    "base_biome": "BlackForest",
+    "hex": "007F00",
+    "r": 0,
+    "g": 127,
+    "b": 0
+  },
+  {
+    "name": "Swamp",
+    "kind": "biome",
+    "base_biome": "Swamp",
+    "hex": "7F7F00",
+    "r": 127,
+    "g": 127,
+    "b": 0
+  },
+  {
+    "name": "Mountain",
+    "kind": "biome",
+    "base_biome": "Mountain",
+    "hex": "FFFFFF",
+    "r": 255,
+    "g": 255,
+    "b": 255
+  },
+  {
+    "name": "Plains",
+    "kind": "biome",
+    "base_biome": "Plains",
+    "hex": "FFFF00",
+    "r": 255,
+    "g": 255,
+    "b": 0
+  },
+  {
+    "name": "Mistlands",
+    "kind": "biome",
+    "base_biome": "Mistlands",
+    "hex": "7F7F7F",
+    "r": 127,
+    "g": 127,
+    "b": 127
+  },
+  {
+    "name": "AshLands",
+    "kind": "biome",
+    "base_biome": "AshLands",
+    "hex": "FF0000",
+    "r": 255,
+    "g": 0,
+    "b": 0
+  },
+  {
+    "name": "DeepNorth",
+    "kind": "biome",
+    "base_biome": "DeepNorth",
+    "hex": "00FFFF",
+    "r": 0,
+    "g": 255,
+    "b": 255
+  },
+  {
+    "name": "Ocean",
+    "kind": "biome",
+    "base_biome": "Ocean",
+    "hex": "0000FF",
+    "r": 0,
+    "g": 0,
+    "b": 255
+  },
+  {
+    "name": "Dark Meadows",
+    "kind": "alt",
+    "base_biome": "Meadows",
+    "group": "Meadows",
+    "hex": "2D4613",
+    "r": 45,
+    "g": 70,
+    "b": 19
+  },
+  {
+    "name": "Peaceful Meadows",
+    "kind": "alt",
+    "base_biome": "Meadows",
+    "group": "Meadows",
+    "hex": "ADFFDA",
+    "r": 173,
+    "g": 255,
+    "b": 218
+  },
+  {
+    "name": "Dandelion Meadows",
+    "kind": "alt",
+    "base_biome": "Meadows",
+    "group": "Meadows",
+    "hex": "E5C54B",
+    "r": 229,
+    "g": 197,
+    "b": 75
+  },
+  {
+    "name": "Raspberry Meadows",
+    "kind": "alt",
+    "base_biome": "Meadows",
+    "group": "Meadows",
+    "hex": "C2185B",
+    "r": 194,
+    "g": 24,
+    "b": 91
+  },
+  {
+    "name": "Smalltree Meadows",
+    "kind": "alt",
+    "base_biome": "Meadows",
+    "group": "Meadows",
+    "hex": "6EC03D",
+    "r": 110,
+    "g": 192,
+    "b": 61
+  },
+  {
+    "name": "Birch Meadows",
+    "kind": "alt",
+    "base_biome": "Meadows",
+    "group": "Meadows",
+    "hex": "CCFFAC",
+    "r": 204,
+    "g": 255,
+    "b": 172
+  },
+  {
+    "name": "Troll Black Forest",
+    "kind": "alt",
+    "base_biome": "BlackForest",
+    "group": "BlackForest",
+    "hex": "2C7B76",
+    "r": 44,
+    "g": 123,
+    "b": 118
+  },
+  {
+    "name": "Root Black Forest",
+    "kind": "alt",
+    "base_biome": "BlackForest",
+    "group": "BlackForest",
+    "hex": "6F5E32",
+    "r": 111,
+    "g": 94,
+    "b": 50
+  },
+  {
+    "name": "Ruin Black Forest",
+    "kind": "alt",
+    "base_biome": "BlackForest",
+    "group": "BlackForest",
+    "hex": "9D6C4B",
+    "r": 157,
+    "g": 108,
+    "b": 75
+  },
+  {
+    "name": "Rock Black Forest",
+    "kind": "alt",
+    "base_biome": "BlackForest",
+    "group": "BlackForest",
+    "hex": "5A5264",
+    "r": 90,
+    "g": 82,
+    "b": 100
+  },
+  {
+    "name": "Pinetree Black Forest",
+    "kind": "alt",
+    "base_biome": "BlackForest",
+    "group": "BlackForest",
+    "hex": "004754",
+    "r": 0,
+    "g": 71,
+    "b": 84
+  },
+  {
+    "name": "Blueberry Black Forest",
+    "kind": "alt",
+    "base_biome": "BlackForest",
+    "group": "BlackForest",
+    "hex": "4A5CB6",
+    "r": 74,
+    "g": 92,
+    "b": 182
+  },
+  {
+    "name": "Kalhygge Black Forest",
+    "kind": "alt",
+    "base_biome": "BlackForest",
+    "group": "BlackForest",
+    "hex": "A9AE34",
+    "r": 169,
+    "g": 174,
+    "b": 52
+  },
+  {
+    "name": "Hut Swamp",
+    "kind": "alt",
+    "base_biome": "Swamp",
+    "group": "Swamp",
+    "hex": "B1332D",
+    "r": 177,
+    "g": 51,
+    "b": 45
+  },
+  {
+    "name": "Bog Swamp",
+    "kind": "alt",
+    "base_biome": "Swamp",
+    "group": "Swamp",
+    "hex": "6E2143",
+    "r": 110,
+    "g": 33,
+    "b": 67
+  },
+  {
+    "name": "Bat Swamp",
+    "kind": "alt",
+    "base_biome": "Swamp",
+    "group": "Swamp",
+    "hex": "382B41",
+    "r": 56,
+    "g": 43,
+    "b": 65
+  },
+  {
+    "name": "Abomination Swamp",
+    "kind": "alt",
+    "base_biome": "Swamp",
+    "group": "Swamp",
+    "hex": "95B17E",
+    "r": 149,
+    "g": 177,
+    "b": 126
+  },
+  {
+    "name": "Wolf Mountain",
+    "kind": "alt",
+    "base_biome": "Mountain",
+    "group": "Mountain",
+    "hex": "93C7BC",
+    "r": 147,
+    "g": 199,
+    "b": 188
+  },
+  {
+    "name": "Drake Mountain",
+    "kind": "alt",
+    "base_biome": "Mountain",
+    "group": "Mountain",
+    "hex": "5AAAC2",
+    "r": 90,
+    "g": 170,
+    "b": 194
+  },
+  {
+    "name": "Fortress Mountain",
+    "kind": "alt",
+    "base_biome": "Mountain",
+    "group": "Mountain",
+    "hex": "B697AF",
+    "r": 182,
+    "g": 151,
+    "b": 175
+  },
+  {
+    "name": "Lox Plains",
+    "kind": "alt",
+    "base_biome": "Plains",
+    "group": "Plains",
+    "hex": "CC605F",
+    "r": 204,
+    "g": 96,
+    "b": 95
+  },
+  {
+    "name": "Goblin Plains",
+    "kind": "alt",
+    "base_biome": "Plains",
+    "group": "Plains",
+    "hex": "FF7622",
+    "r": 255,
+    "g": 118,
+    "b": 34
+  },
+  {
+    "name": "Death Plains",
+    "kind": "alt",
+    "base_biome": "Plains",
+    "group": "Plains",
+    "hex": "671E07",
+    "r": 103,
+    "g": 30,
+    "b": 7
+  },
+  {
+    "name": "Rockless Mistlands",
+    "kind": "alt",
+    "base_biome": "Mistlands",
+    "group": "Mistlands",
+    "hex": "D99FE8",
+    "r": 217,
+    "g": 159,
+    "b": 232
+  },
+  {
+    "name": "Trees Mistlands",
+    "kind": "alt",
+    "base_biome": "Mistlands",
+    "group": "Mistlands",
+    "hex": "472577",
+    "r": 71,
+    "g": 37,
+    "b": 119
+  },
+  {
+    "name": "Swords Mistlands",
+    "kind": "alt",
+    "base_biome": "Mistlands",
+    "group": "Mistlands",
+    "hex": "8A7FDB",
+    "r": 138,
+    "g": 127,
+    "b": 219
+  },
+  {
+    "name": "Hare Mistlands",
+    "kind": "alt",
+    "base_biome": "Mistlands",
+    "group": "Mistlands",
+    "hex": "D56EBB",
+    "r": 213,
+    "g": 110,
+    "b": 187
+  },
+  {
+    "name": "BroodSwarm Mistlands",
+    "kind": "alt",
+    "base_biome": "Mistlands",
+    "group": "Mistlands",
+    "hex": "8E2F8E",
+    "r": 142,
+    "g": 47,
+    "b": 142
+  },
+  {
+    "name": "Mushroom",
+    "kind": "alt",
+    "base_biome": "Meadows, BlackForest",
+    "group": "Several base biomes",
+    "hex": "FF969C",
+    "r": 255,
+    "g": 150,
+    "b": 156
+  },
+  {
+    "name": "Lantern",
+    "kind": "alt",
+    "base_biome": "Meadows, BlackForest, Swamp, Mountain, Plains, Mistlands, DeepNorth",
+    "group": "Several base biomes",
+    "hex": "F2A300",
+    "r": 242,
+    "g": 163,
+    "b": 0
+  },
+  {
+    "name": "Bones",
+    "kind": "alt",
+    "base_biome": "Swamp, Plains, Mistlands",
+    "group": "Several base biomes",
+    "hex": "F8E1B6",
+    "r": 248,
+    "g": 225,
+    "b": 182
+  },
+  {
+    "name": "Menhir",
+    "kind": "alt",
+    "base_biome": "Meadows, Plains",
+    "group": "Several base biomes",
+    "hex": "DDA776",
+    "r": 221,
+    "g": 167,
+    "b": 118
+  }
+]

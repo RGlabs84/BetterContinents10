@@ -1,3 +1,30 @@
+- v0.8.1
+  - Adds alt-biome planting: an alt-biome map (altbiomemap.png) plants Valheim's alt biomes with
+    colours, the way the biome map plants biomes. Its legend (altbiomemap.txt, written with a
+    default colour per alt biome when missing) says which colour plants what, and "at x, z" lines
+    plant the region under a point. Every planted area becomes a region of its own.
+  - Planted alt biomes count toward the game's per-alt-biome maximums when it places the rest at
+    random.
+  - Adds per-world alt-biome options in the new "BetterContinents.AltBiomes" config section: mode
+    (Random, PlantedOnly, Off), grid, placement seed, chance, amount, region size and distance
+    scales, region filters and per-alt-biome overrides. They are baked into each new world.
+  - New worlds stop the alt-biome grid at the edge of the world when it is inside 10500 m.
+  - Adds the "bc ab" and "bc reload ab" console commands, and "bc_altbiomes" for every player, to
+    inspect, export and change alt-biome placement.
+  - Clients use the server's alt-biome placement, and both sides log whether they agree.
+  - Fixes an index out of range error on Expand World Size worlds smaller than 10500 m, and wrong
+    alt-biome regions on larger ones.
+  - Fixes Deep North weather on worlds with a biome map following the camera height instead of
+    the map.
+  - Fixes land beyond 10500 m on worlds with the map edge drop-off disabled taking the ocean's
+    biome for terrain, vegetation and spawns.
+  - Fixes locations that accept several biomes searching the wrong biome, or one the map lacks.
+  - Fixes debug-mode map edits not reaching alt-biome regions and chunk biomes.
+  - Guards the game's biome data cache with a fingerprint, so a cache built for other settings is
+    never reused. Valheim 1.0.15 itself no longer reads that cache.
+  - Worlds that use none of the new alt-biome features are saved exactly as 0.8.0 saves them.
+    Worlds that do need 0.8.1 or later: 0.8.0 loads them without Better Continents.
+
 - v0.8.0
   - Updates the mod for Valheim 1.0.15.
   - Saves world settings in the new 1.0 chunked save format, inside the world's own folder.

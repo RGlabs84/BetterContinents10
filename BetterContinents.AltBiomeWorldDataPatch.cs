@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0).
+// Added by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and modified for alt-biome planting (0.8.1).
 
 using System.Collections.Generic;
 using System.Linq;
@@ -58,6 +58,34 @@ public partial class BetterContinents
       var points = fallback.AllPointsAboveSeaLevel.Count > 0 ? fallback.AllPointsAboveSeaLevel : fallback.AllPoints;
       __result = points[UnityEngine.Random.Range(0, points.Count)];
       return false;
+    }
+
+    // AltBiomeWorldData.RandomBiomeFromBiomes(Heightmap.Biome biome) - AltBiomeWorldData.cs:381 - picks which
+    // biome a multi-biome location looks for candidate zones in. It has three bugs (Plains returns
+    // BlackForest, the Ocean test checks the Meadows bit, and Random.Range(0, num - 1) never picks the last
+    // match), and it knows nothing of biomes a BC map omits. When its pick is outside the requested mask or
+    // absent from the map, the location can only fail there, so pick uniformly among the requested biomes the
+    // map actually has. A usable vanilla pick is kept as is, so complete maps place as before.
+    private static readonly Heightmap.Biome[] PickOrder =
+    [
+      Heightmap.Biome.Meadows, Heightmap.Biome.Swamp, Heightmap.Biome.Mountain, Heightmap.Biome.BlackForest,
+      Heightmap.Biome.Plains, Heightmap.Biome.AshLands, Heightmap.Biome.DeepNorth, Heightmap.Biome.Ocean,
+      Heightmap.Biome.Mistlands,
+    ];
+
+    [HarmonyPostfix, HarmonyPatch("RandomBiomeFromBiomes")]
+    private static void RandomBiomeFromBiomesPostfix(AltBiomeWorldData __instance, Heightmap.Biome biome, ref Heightmap.Biome __result)
+    {
+      if (!Settings.EnabledForThisWorld)
+        return;
+      if ((__result & biome) != 0 && __instance.Biomes.TryGetValue(__result, out var picked) && picked.AllPoints.Count > 0)
+        return;
+      var present = new List<Heightmap.Biome>(PickOrder.Length);
+      foreach (var candidate in PickOrder)
+        if ((biome & candidate) != 0 && __instance.Biomes.TryGetValue(candidate, out var info) && info.AllPoints.Count > 0)
+          present.Add(candidate);
+      if (present.Count > 0)
+        __result = present[UnityEngine.Random.Range(0, present.Count)];
     }
 
     // Identical shape, identical trap: Biomes[biome].Sectors is indexed without a count check.

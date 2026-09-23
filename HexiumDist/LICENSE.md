@@ -7,14 +7,15 @@ and other contributors.
 Better Continents is free software: you can redistribute it and/or modify it under the terms of
 the GNU Lesser General Public License, version 2.1, reproduced below. It is distributed WITHOUT
 ANY WARRANTY. The complete source code is at https://github.com/RGlabs84/BetterContinents10, and
-the exact source of this release is included in this package as
-BetterContinents-0.8.0-source.zip.
+the exact source of this release is included in this package as BetterContinents-source.zip.
 
 Also in this package:
 - BetterContinents.dll contains third-party code under its own licenses; see
   THIRD-PARTY-NOTICES.txt.
 - BetterContinents-Guide.pdf is licensed under the GNU General Public License, version 3; see
   GUIDE-LICENSE.txt.
+- BetterContinents.gpl and altbiome-palette.png, the colour scheme for painting biome and
+  alt-biome maps, are part of Better Continents and under the same license as the mod.
 
 --------------------------------------------------------------------------------
 

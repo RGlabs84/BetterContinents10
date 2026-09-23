@@ -1,4 +1,4 @@
-﻿// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0).
+﻿// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and alt-biome planting (0.8.1).
 
 using System;
 using System.Collections;
@@ -17,14 +17,26 @@ public static class GameUtils
 {
     public static void Reset()
     {
+        FastMinimapRegen();
+        // Valheim 1.0 takes every terrain chunk's biome from the alt-biome sector grid (HeightmapBuilder.Build
+        // reads GetBiomeSector for its corners), and that grid is only built at world load. Rebuild it from the
+        // new settings first, then reset the zones, so they regenerate against the new biomes and sectors.
+        BetterContinents.AltBiomeControl.RequestRebuild(BetterContinents.AltBiomeControl.RebuildLevel.Points, "settings changed", ResetZones);
+    }
+
+    public static void ResetZones()
+    {
         Console.instance.TryRunCommand(BetterContinents.ConfigDebugResetCommand.Value);
         foreach (var hm in Heightmap.s_heightmaps)
         {
             hm.m_buildData = null;
+            // Heightmap only ever appends to these (Heightmap.cs:434-448), so a chunk rebuilt in place would keep
+            // the sectors and alt biomes of every earlier build; SpawnSystem reads m_cornerAltBiomes.
+            hm.m_cornerBiomeList.Clear();
+            hm.m_cornerAltBiomes.Clear();
             // Poke takes the amount of frames to delay by, 1 matches the old "delayed" flag.
             hm.Poke(1);
         }
-        FastMinimapRegen();
     }
     private static int MinimapOrigTextureSize = 0;
     private static float MinimapOrigPixelSize = 0;

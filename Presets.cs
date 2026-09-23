@@ -1,4 +1,4 @@
-﻿// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0).
+﻿// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and alt-biome planting (0.8.1).
 
 using System;
 using System.Collections.Generic;
@@ -187,7 +187,13 @@ public class Presets
 
     try
     {
-      return BetterContinents.BetterContinentsSettings.Load(BetterContinents.ConfigSelectedPreset.Value);
+      var settings = BetterContinents.BetterContinentsSettings.Load(BetterContinents.ConfigSelectedPreset.Value);
+      // A preset saved before 0.8.1 (including the four shipped ones) has no alt-biome options. This is a NEW
+      // world, so it gets the new-world defaults from the config rather than the legacy behaviour that an
+      // existing world without the key keeps. A preset carries no alt-biome map unless it was saved with one.
+      if (settings.EnabledForThisWorld && settings.AltBiomes == null)
+        settings.AltBiomes = BetterContinents.AltBiomeSettings.FromConfig();
+      return settings;
     }
     catch (Exception ex)
     {

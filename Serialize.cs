@@ -1,3 +1,7 @@
+// Modified by Wubarrk on 2026-09-22 for alt-biome planting (0.8.1).
+
+using System;
+
 namespace BetterContinents;
 
 public partial class BetterContinents
@@ -69,12 +73,29 @@ public partial class BetterContinents
     VegetationMap,
     VegetationMapPath,
     SkipDefaultLocations,
+    // 0.8.1 (64-66). Each is written only when used, so a world that uses no alt-biome feature saves byte for byte
+    // as in 0.8.0. Better Continents 0.8.0 stops at any of them ("Unknown feature") and treats the world as
+    // vanilla without re-saving its settings; multiplayer already requires equal versions.
+    // AltBiomes: one length-prefixed, self-versioned blob with the world's alt-biome options (AltBiomeSettings).
+    AltBiomes,
+    // AltBiomeMap: one length-prefixed, self-versioned block with the planted alt-biome map (ImageMapAltBiome).
+    AltBiomeMap,
+    // AltBiomeMapPath: the map's file path. Disk only, like every other map path; never sent to clients.
+    AltBiomeMapPath,
   }
   public partial class BetterContinentsSettings
   {
     public const int MaxVersion = 11;
 
-    public void Serialize(ZPackage pkg, bool network)
+    // Set when a planted alt-biome map could not be read: the world load then stops (AltBiomeControl) instead of
+    // generating zones without the author's alt biomes.
+    internal string? AltBiomeMapError;
+
+    private static int BlockVersionOf(byte[] block) => block.Length >= 4 ? BitConverter.ToInt32(block, 0) : 0;
+
+    // includeAltBiomes: false leaves the alt-biome keys out. The biome cache fingerprint uses that, because the
+    // alt-biome options and map never change the biome point grid the cache holds.
+    public void Serialize(ZPackage pkg, bool network, bool includeAltBiomes = true)
     {
       if (!EnabledForThisWorld)
       {
@@ -385,6 +406,30 @@ public partial class BetterContinents
       }
       if (!FixWaterColor)
         pkg.Write((int)DataKey.FixWaterColor);
+
+      if (includeAltBiomes)
+      {
+        if (AltBiomesBlobAsRead != null)
+        {
+          pkg.Write((int)DataKey.AltBiomes);
+          pkg.Write(AltBiomesBlobAsRead);
+        }
+        else if (AltBiomes != null && !AltBiomes.IsLegacyEquivalent(WorldSize + EdgeSize))
+        {
+          pkg.Write((int)DataKey.AltBiomes);
+          pkg.Write(AltBiomes.Serialize());
+        }
+        if (AltBiomeMap != null || AltBiomeMapBlockAsRead != null)
+        {
+          pkg.Write((int)DataKey.AltBiomeMap);
+          pkg.Write(AltBiomeMapBlockAsRead ?? AltBiomeMap!.ToBlock());
+          if (!network && AltBiomeMap != null)
+          {
+            pkg.Write((int)DataKey.AltBiomeMapPath);
+            pkg.Write(AltBiomeMap.FilePath);
+          }
+        }
+      }
     }
 
     private void Deserialize(ZPackage pkg)
@@ -633,6 +678,43 @@ public partial class BetterContinents
             path = pkg.ReadString();
             if (SpawnMap != null)
               SpawnMap.FilePath = path;
+            break;
+          case DataKey.AltBiomes:
+            var altBiomeBlob = pkg.ReadByteArray();
+            try
+            {
+              AltBiomes = AltBiomeSettings.Deserialize(altBiomeBlob);
+              AltBiomesBlobAsRead = BlockVersionOf(altBiomeBlob) > AltBiomeSettings.FormatVersion ? altBiomeBlob : null;
+            }
+            catch (Exception e)
+            {
+              // The blob is length-prefixed, so the rest of the settings still load, and it is saved back unchanged.
+              LogError($"Failed to read the alt-biome settings ({e.Message}); using vanilla alt-biome behaviour. They are kept unchanged in the world's settings.");
+              AltBiomes = null;
+              AltBiomesBlobAsRead = altBiomeBlob;
+            }
+            break;
+          case DataKey.AltBiomeMap:
+            var altBiomeBlock = pkg.ReadByteArray();
+            try
+            {
+              AltBiomeMap = ImageMapAltBiome.FromBlock(altBiomeBlock);
+              AltBiomeMapBlockAsRead = BlockVersionOf(altBiomeBlock) > ImageMapAltBiome.BlockVersion ? altBiomeBlock : null;
+              AltBiomeMapError = null;
+            }
+            catch (Exception e)
+            {
+              // Kept unchanged so saving never destroys it; the world load stops (see AltBiomeMapError).
+              AltBiomeMapError = $"the alt-biome map in the world's settings cannot be read ({e.Message})";
+              LogError($"Failed to read the alt-biome map ({e.Message}). It is kept unchanged in the world's settings.");
+              AltBiomeMap = null;
+              AltBiomeMapBlockAsRead = altBiomeBlock;
+            }
+            break;
+          case DataKey.AltBiomeMapPath:
+            path = pkg.ReadString();
+            if (AltBiomeMap != null)
+              AltBiomeMap.FilePath = path;
             break;
           default:
             LogError("Failed to load the save file. Unknown feature: " + key);
