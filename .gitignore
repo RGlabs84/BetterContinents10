@@ -422,3 +422,12 @@ assets/BCAssets/Temp/
 
 # Build output from the CopyDLL target (was ../Libs before the 1.0 port)
 /dist/
+
+# Claude Code agent worktrees
+/.claude/
+
+# Hexium package build products. The tracked HexiumDist files are the package's text, icon and
+# licenses; tools/pack_hexium.py assembles the upload zip.
+/HexiumDist/*.zip
+/HexiumDist/*.pdf
+/HexiumDist/plugins/

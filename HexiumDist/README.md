@@ -34,6 +34,7 @@ Whether you want to import a real-world map of Earth, recreate Middle-earth, scu
 - [⚙️ Configuration & Console Commands](#configuration--console-commands)
 - [📚 Documentation & Guides](#documentation--guides)
 - [📜 Credits & History](#credits--history)
+- [⚖️ License](#license)
 
 </details>
 
@@ -110,13 +111,13 @@ To get the absolute most out of Better Continents, we strongly recommend pairing
 ## 🍗 Installation & Setup
 
 ### ⚡ Automated Installation (Recommended)
-Install using **Gale** or your preferred mod manager directly from [Hexium](https://valheim.hexium.gg/mods/JereKuusela/BetterContinents).
+Install using **Gale** or your preferred mod manager directly from [Hexium](https://valheim.hexium.gg/mods/Wubarrk/BetterContinents).
 
 ### 🛠️ Manual Installation
 1. Ensure **BepInEx for Valheim** is properly installed in your game directory.
 2. Download the latest `BetterContinents.dll` release.
 3. Place `BetterContinents.dll` into your `Valheim/BepInEx/plugins/` directory.
-4. Dedicated servers running custom maps must have Better Continents installed and the companion `.BetterContinents` world file placed in the `worlds_local/` directory.
+4. Dedicated servers running custom maps need Better Continents installed and the world's folder (created in the game client) in `worlds_local/`.
 
 ---
 
@@ -133,25 +134,23 @@ Better Continents uses standard image files (PNG recommended) placed in your wor
 
 <a id="sharing-maps-with-players"></a>
 ### 📡 Sharing Maps With Players
-When you create a world with Better Continents:
-1. Valheim creates the standard `.db` and `.fwl` world files in your `worlds_local` directory.
-2. Better Continents automatically creates a companion `<WorldName>.BetterContinents` file in the same directory.
-3. To share your world with players or a dedicated server, simply copy all three files:
-   - `<WorldName>.fwl`
-   - `<WorldName>.db`
-   - `<WorldName>.BetterContinents`
+Valheim 1.0 saves each world as a folder, `worlds_local/<WorldName>/`. Better Continents stores the world's settings and image maps inside that folder, in a file named `BetterContinents` (no extension).
+* To share a world with players or a dedicated server, copy the whole `<WorldName>` folder.
+* A dedicated server cannot create a Better Continents world itself: create it in the game client, then copy the folder to the server.
 
 ---
 
 <a id="configuration--console-commands"></a>
 ## ⚙️ Configuration & Console Commands
 
-Better Continents provides extensive console commands for real-time map design:
+Better Continents has one console command, `bc` (open the console with F5). It is a cheat command: it needs `devcommands` and runs only on the host.
 
-* ⌨️ `bc_ui` — Toggles the in-game world generation editor UI.
-* ⌨️ `bc_export [resolution]` — Exports the current world map to a full-resolution PNG image file.
-* ⌨️ `bc_reload` — Reloads image maps from disk without restarting the game.
-* ⌨️ `bc_info` — Displays active heightmap and noise layer settings for the current world.
+* ⌨️ `bc info` — Prints the current world's settings.
+* ⌨️ `bc reload <map>` — Reloads an image map from disk and reapplies it (`hm`, `bm`, `fom`, `lm`, `heat`, … or `all`).
+* ⌨️ `bc <group> <setting> [value]` — Reads or changes a setting, for example `bc g sl 0.55`. Groups include `g` (global), `h` (heightmap), `b` (biome map), `fo` (forest) and `st` (start position).
+* ⌨️ `bc scr` — Saves a screenshot of the map.
+* ⌨️ `bc show [filter]`, `bc hide [filter]`, `bc bosses` — Pins locations on the map, or removes the pins.
+* ⌨️ `bc savepreset` — Saves the current settings as a preset.
 
 ---
 
@@ -159,6 +158,7 @@ Better Continents provides extensive console commands for real-time map design:
 ## 📚 Documentation & Guides
 
 For deep dives, tutorials, and configuration references:
+* 📕 **Updated guide for Valheim 1.0.15:** `BetterContinents-Guide.pdf`, included in this package, with a clickable table of contents.
 * 📖 [Full Documentation](https://jerekuusela.github.io/BetterContinents-Docs/introduction.html)
 * 🚀 [Setup & Quick Start Guide](https://jerekuusela.github.io/BetterContinents-Docs/setup-guide.html)
 * ❓ [Frequently Asked Questions (FAQ)](https://jerekuusela.github.io/BetterContinents-Docs/faq.html)
@@ -172,3 +172,12 @@ For deep dives, tutorials, and configuration references:
 * 👑 Originally created by **billw2012** — the pioneer of Valheim heightmap and custom continent generation.
 * 🛠️ Maintained and expanded by **JereKuusela**.
 * ⚡ Modernized for Valheim 1.0 by **Wubarrk**.
+
+---
+
+<a id="license"></a>
+## ⚖️ License
+
+* **Better Continents** is free software under the **GNU Lesser General Public License v2.1** (`LICENSE.md`). Source code: [github.com/RGlabs84/BetterContinents10](https://github.com/RGlabs84/BetterContinents10). This package includes the exact source of this release as `BetterContinents-0.8.0-source.zip`.
+* `BetterContinents.dll` also contains ImageSharp (Apache-2.0), five .NET libraries (MIT) and FastNoiseLite (MIT). Their notices are in `THIRD-PARTY-NOTICES.txt`.
+* `BetterContinents-Guide.pdf` is the Better Continents Guide, originally written by billw2012 and maintained by JereKuusela, updated for Valheim 1.0.15 by Wubarrk. It is licensed under the **GNU General Public License v3** (`GUIDE-LICENSE.txt`), and its source files are attached inside the PDF.

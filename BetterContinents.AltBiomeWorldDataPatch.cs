@@ -1,3 +1,5 @@
+// Added by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0).
+
 using System.Collections.Generic;
 using System.Linq;
 using HarmonyLib;
