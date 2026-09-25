@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-09-22 for alt-biome planting (0.8.1).
+// Added by Wubarrk on 2026-09-22 for alt-biome planting (0.8.1), and on 2026-09-25 for version-agnostic wording (0.9.1).
 
 using System;
 using System.Collections.Generic;
@@ -214,7 +214,7 @@ internal static partial class Tests
     {
       var method = AccessTools.Method(typeof(EnvMan), name);
       var original = PatchProcessor.GetOriginalInstructions(method);
-      Check(original.Count(i => i.Calls(vanilla)) == 1, $"EnvMan.{name} (1.0.15 IL): one IsDeepnorth call");
+      Check(original.Count(i => i.Calls(vanilla)) == 1, $"EnvMan.{name} (installed IL): one IsDeepnorth call");
       int oi = original.FindIndex(i => i.Calls(vanilla));
       Check(original[oi - 1].LoadsField(fy) && original[oi - 2].opcode == local && original[oi - 3].LoadsField(fx) && original[oi - 4].opcode == local,
         $"EnvMan.{name}: it is IsDeepnorth(position.x, position.y) with position in {local} (matches the decompile)");

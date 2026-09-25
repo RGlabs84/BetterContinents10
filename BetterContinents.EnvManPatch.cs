@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-09-22 for alt-biome planting (0.8.1).
+// Added by Wubarrk on 2026-09-22 for alt-biome planting (0.8.1), and on 2026-09-25 for version-agnostic wording (0.9.1).
 
 using System.Collections.Generic;
 using System.Reflection;
@@ -13,8 +13,7 @@ public partial class BetterContinents
   // Deep North weather follows the biome map.
   //
   // Vanilla EnvMan asks WorldGenerator.IsDeepnorth with the camera's HEIGHT as the second coordinate, in both
-  // places it decides Deep North weather. 1.0.15: EnvMan.UpdateEnvironment IL_006f and EnvMan.GetBiome IL_0059
-  // (libs-Tools/1.0/DECOMPILED/assembly_valheim.decompiled.cs:96367-96368 and :96455-96456):
+  // places it decides Deep North weather, EnvMan.UpdateEnvironment and EnvMan.GetBiome:
   //
   //     bool flag  = WorldGenerator.IsAshlands(position.x, position.z);
   //     bool flag2 = WorldGenerator.IsDeepnorth(position.x, position.y);     <- y is the camera height

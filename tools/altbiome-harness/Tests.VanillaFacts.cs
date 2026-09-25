@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-09-22 for alt-biome planting (0.8.1).
+// Added by Wubarrk on 2026-09-22 for alt-biome planting (0.8.1), and on 2026-09-25 for version-agnostic wording (0.9.1).
 
 using System;
 using System.Collections.Generic;
@@ -115,8 +115,7 @@ internal static partial class Tests
     }
   }
 
-  // What the installed 1.0.15 builds actually do at world load, read from their IL (the per-type decompile in
-  // libs-Tools/Decompiled_1.0.15 shows an older body that read and wrote the cache).
+  // What the installed builds actually do at world load, read from their IL.
   private static void VanillaFacts()
   {
     var libs = Path.Combine(RepoRoot, "..", "libs-Tools", "1.0");
@@ -128,9 +127,9 @@ internal static partial class Tests
         continue;
       }
       var calls = CallsIn(dll, "AltBiomeWorldData", "VerifyBiomeData");
-      Note($"1.0.15 {side} AltBiomeWorldData.VerifyBiomeData calls: {string.Join(", ", calls)}");
+      Note($"installed {side} AltBiomeWorldData.VerifyBiomeData calls: {string.Join(", ", calls)}");
       Check(calls.SequenceEqual(new[] { "AltBiomeWorldData::RemoveCache", "AltBiomeWorldData::GenerateBiomePoints", "AltBiomeWorldData::GenerateSectors" }),
-        $"1.0.15 {side}: VerifyBiomeData deletes the biome cache and regenerates the grid on every load (never TryLoadCache or SaveCache)");
+        $"installed {side}: VerifyBiomeData deletes the biome cache and regenerates the grid on every load (never TryLoadCache or SaveCache)");
     }
     var loaded = PatchProcessor.GetOriginalInstructions(AccessTools.Method(typeof(AltBiomeWorldData), nameof(AltBiomeWorldData.VerifyBiomeData)));
     Check(loaded.Any(i => i.Calls(AccessTools.Method(typeof(AltBiomeWorldData), nameof(AltBiomeWorldData.RemoveCache), [typeof(string)])))

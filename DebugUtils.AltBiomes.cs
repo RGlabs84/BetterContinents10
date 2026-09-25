@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-09-22 for alt-biome planting (0.8.1).
+// Added by Wubarrk on 2026-09-22 for alt-biome planting (0.8.1), and on 2026-09-25 for version-agnostic wording (0.9.1).
 
 using System;
 using System.Collections.Generic;
@@ -146,7 +146,7 @@ public partial class DebugUtils
                 defaultValue: false,
                 setter: SetAltBiomeValue<bool>((s, v) => s.MeanSectorHeight = v, AltBiomeControl.RebuildLevel.Assignment),
                 getter: () => BetterContinents.Settings.EffectiveAltBiomes.MeanSectorHeight);
-            ab.AddValue("neighbourfix", "Fix neighbour check", "Use a corrected require/not-neighbour test (vanilla's is broken in 1.0.15)",
+            ab.AddValue("neighbourfix", "Fix neighbour check", "Use a corrected require/not-neighbour test (vanilla's is broken)",
                 defaultValue: false,
                 setter: SetAltBiomeValue<bool>((s, v) => s.FixNeighbourCheck = v, AltBiomeControl.RebuildLevel.Assignment),
                 getter: () => BetterContinents.Settings.EffectiveAltBiomes.FixNeighbourCheck);

@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-09-22 for alt-biome planting (0.8.1), and on 2026-09-24 for world export and import (0.9.0).
+// Added by Wubarrk on 2026-09-22 for alt-biome planting (0.8.1), and on 2026-09-24 for world export and import (0.9.0), and on 2026-09-25 for version-agnostic wording (0.9.1).
 
 using System;
 using System.Collections;
@@ -52,7 +52,7 @@ internal static partial class Tests
     ServerAssignmentTest(a, alts);
     Section("agreement hashes");
     HashTests();
-    Section("what 1.0.15 itself does with the biome cache");
+    Section("what the installed game does with the biome cache");
     VanillaFacts();
     Section("biome cache fingerprint trailer");
     CacheTests();
@@ -322,7 +322,7 @@ internal static partial class Tests
     var alts = LoadAltBiomes();
     var gameNames = alts.Select(a => a.m_name).ToList();
     Check(palette.Length == 32 && palette.Select(p => p.Name).Distinct(StringComparer.Ordinal).Count() == 32, "32 palette entries, each alt biome once");
-    Check(palette.Select(p => p.Name).SequenceEqual(gameNames, StringComparer.Ordinal), "the palette covers exactly the 32 vanilla 1.0.15 alt biomes, in the game's order");
+    Check(palette.Select(p => p.Name).SequenceEqual(gameNames, StringComparer.Ordinal), "the palette covers exactly the 32 vanilla alt biomes, in the game's order");
     var biomeMismatch = palette.Where(p => alts.First(a => a.m_name == p.Name).m_biome != p.Biomes).Select(p => p.Name).ToList();
     Check(biomeMismatch.Count == 0, "each entry's base biomes equal the game's m_biome " + string.Join(", ", biomeMismatch));
 

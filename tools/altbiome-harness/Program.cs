@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-09-22 for alt-biome planting (0.8.1).
+// Added by Wubarrk on 2026-09-22 for alt-biome planting (0.8.1), and on 2026-09-25 for version-agnostic wording (0.9.1).
 
 using System;
 using System.Collections.Generic;
@@ -17,7 +17,7 @@ namespace AltBiomeHarness;
 
 // Offline checks of Better Continents 0.8.1's alt-biome code: control's foundation (cache, grid, placement control,
 // server placement), authored's colour planting on top of it, and the three 0.8.1 fixes. It loads the real
-// pre-ILRepack BetterContinents.dll and the real Valheim 1.0.15 assemblies and runs everything that does not need
+// pre-ILRepack BetterContinents.dll and the installed Valheim assemblies and runs everything that does not need
 // the Unity engine. Anything that would reach a Unity native call (UnityEngine.Random, Debug.Log's native sink) is
 // avoided, redirected or caught.
 internal static class Program

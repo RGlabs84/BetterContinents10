@@ -1,4 +1,4 @@
-﻿// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and alt-biome planting (0.8.1), and on 2026-09-24 for world export and import (0.9.0).
+﻿// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and alt-biome planting (0.8.1), and on 2026-09-24 for world export and import (0.9.0), and on 2026-09-25 for version-agnostic wording (0.9.1).
 
 using System.Collections;
 using System.Reflection;
@@ -125,7 +125,7 @@ public partial class BetterContinents
   }
 
   // Loaded terrain keeps the grid (or none) it was built with: rebuild the zone heightmaps (distant LOD never has a
-  // grid) and let the grass read the biomes again, as the 0.7 code did before precision was switched off. In 1.0.15
+  // grid) and let the grass read the biomes again, as the 0.7 code did before precision was switched off. In Valheim 1.0
   // that is Heightmap.s_heightmaps, a delayed Poke (Regenerate in LateUpdate, like GameUtils.ResetZones) and
   // ClutterSystem.ClearAll. Only in a loaded world: at world load and in the main menu there is nothing to redo.
   private static void RegenerateLoadedTerrain()

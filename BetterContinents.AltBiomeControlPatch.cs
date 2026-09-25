@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-09-22 for alt-biome planting (0.8.1).
+// Added by Wubarrk on 2026-09-22 for alt-biome planting (0.8.1), and on 2026-09-25 for version-agnostic wording (0.9.1).
 
 using System;
 using System.Collections.Generic;
@@ -11,7 +11,7 @@ namespace BetterContinents;
 public partial class BetterContinents
 {
   // Harmony side of AltBiomeControl. Every target here is a static [HarmonyPatch] so refcheck verifies it
-  // against the real 1.0.15 assemblies (name, overload and parameter names). Each patch is inert unless
+  // against the installed game assemblies (name, overload and parameter names). Each patch is inert unless
   // Better Continents is enabled for the current world, apart from the GetBiomeSector grid clamp, which only
   // acts on a grid whose size is not vanilla's 2048 (Expand World Size resizes it).
   [HarmonyPatch(typeof(AltBiomeWorldData))]
@@ -83,7 +83,7 @@ public partial class BetterContinents
       return __exception;
     }
 
-    // Both `WorldGenerator.instance.GetSeed()` calls (IL_0005 and IL_00e6 in 1.0.15) become
+    // Both `WorldGenerator.instance.GetSeed()` calls in GenerateAltBiomes become
     // AltBiomeControl.PlacementSeed(instance): same stack shape, and the world seed unless a fixed
     // placement seed is set for a Better Continents world.
     [HarmonyTranspiler, HarmonyPatch(nameof(AltBiomeWorldData.GenerateAltBiomes))]

@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-09-22 for alt-biome planting (0.8.1).
+// Added by Wubarrk on 2026-09-22 for alt-biome planting (0.8.1), and on 2026-09-25 for version-agnostic wording (0.9.1).
 
 using System;
 using System.Collections.Generic;
@@ -182,7 +182,7 @@ internal class ImageMapAltBiome() : ImageMapBase()
       foreach (var entry in entries)
       {
         if (entry.Pattern.IndexOf('*') < 0 && !KnownVanillaNames.Contains(entry.Pattern))
-          BetterContinents.Log($"{Where()}: '{entry.Pattern}' is not a Valheim 1.0.15 alt biome name. That is fine if another mod adds it; it is checked when the world loads.");
+          BetterContinents.Log($"{Where()}: '{entry.Pattern}' is not a vanilla alt biome name. That is fine if another mod adds it; it is checked when the world loads.");
       }
 
       if (TryParsePin(valuePart, out var px, out var pz))
@@ -544,8 +544,8 @@ internal class ImageMapAltBiome() : ImageMapBase()
   private static string Inv(float v) => v.ToString("0.#", CultureInfo.InvariantCulture);
 
   #region Default palette
-  // One colour per Valheim 1.0.15 alt biome (AltBiomes_Erik.prefab, 32 entries), in the game's own list order,
-  // with the base biomes each one plants on in 1.0.15 (its m_biome). The colours keep every pair of alt-biome
+  // One colour per vanilla alt biome (AltBiomes_Erik.prefab, 32 entries), in the game's own list order,
+  // with the base biomes each one plants on (its m_biome). The colours keep every pair of alt-biome
   // colours, and every alt-biome colour and every base-biome colour of the default biome legend (black and
   // white included), more than 2 x ColorTolerance apart, so tolerant matching can never confuse two of them.
   public static readonly (string Name, string Hex, Heightmap.Biome Biomes)[] DefaultPalette =
@@ -634,7 +634,7 @@ internal class ImageMapAltBiome() : ImageMapBase()
       Line("# none: C030F0");
       Line("# Troll Black Forest: at 2750, -1210");
       Line("#");
-      Line("# Default palette, one colour per Valheim 1.0.15 alt biome (the comment is the land it plants on):");
+      Line("# Default palette, one colour per vanilla alt biome (the comment is the land it plants on):");
       int width = DefaultPalette.Max(p => p.Name.Length + 8);
       foreach (var (name, hex, biomes) in DefaultPalette)
         Line($"{name}: {hex}".PadRight(width) + " # " + BiomeList(biomes));

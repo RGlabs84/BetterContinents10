@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-09-22 for alt-biome planting (0.8.1).
+// Added by Wubarrk on 2026-09-22 for alt-biome planting (0.8.1), and on 2026-09-25 for version-agnostic wording (0.9.1).
 
 using System;
 using System.Collections.Generic;
@@ -30,7 +30,7 @@ internal static partial class Tests
     }
   }
 
-  // AltBiomeWorldData.GenerateAltBiomes (AltBiomeWorldData.cs:301-345, 1.0.15), transcribed from the decompile and
+  // AltBiomeWorldData.GenerateAltBiomes, transcribed from the decompile and
   // checked against the IL (Utils.Shuffle from assembly_utils, CanAddModifier via callvirt), with Better Continents'
   // transpiler applied (PlacementSeed in place of GetSeed). CanAddModifier is the real vanilla method with Better
   // Continents' real Harmony prefix applied.

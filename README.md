@@ -6,7 +6,7 @@
 [![Multiplayer Compatible](https://img.shields.io/badge/Multiplayer-Server_Synced-blue.svg)]()
 [![Framework](https://img.shields.io/badge/Requires-BepInEx-red.svg)]()
 [![Compatibility](https://img.shields.io/badge/Target-Valheim_1.0-brightgreen.svg)]()
-[![Version](https://img.shields.io/badge/Version-0.9.0-lightgrey.svg)]()
+[![Version](https://img.shields.io/badge/Version-0.9.1-lightgrey.svg)]()
 
 > *"The Allfather did not carve the Tenth Realm in a single stroke. With hammer and chisel, the jagged peaks were raised, deep fjords torn open, and ancient oceans poured into the abyss. Take up the chisel, Viking, and shape the continents to your will."*
 
@@ -230,11 +230,11 @@ These settings apply at once. Better Continents reads `BetterContinents.cfg` aga
 
 For deep dives, tutorials, and configuration references:
 * 📗 **Export & Import, the easy guide (PDF)** — `BetterContinents-Export-Guide.pdf`, in the [Hexium package](https://valheim.hexium.gg/mods/Wubarrk/BetterContinents): illustrated, step-by-step instructions written for first-timers: exporting a world, editing the pictures, cutting and pasting between worlds, Biome precision, and making new worlds from an export (GPL-3.0; its Markdown source is attached inside the PDF).
-* 📖 **Better Continents Guide (PDF)** — the full guide, updated for Valheim 1.0.15 and Better Continents 0.9.0: every map type and setting, the height scale and waterline maths, alt biomes and planting them with colours, and world export/import. It ships as `BetterContinents-Guide.pdf` inside the [Hexium package](https://valheim.hexium.gg/mods/Wubarrk/BetterContinents) (GPL-3.0; its Markdown source is attached inside the PDF).
-* 🤖 **Map-making, a skill for AI agents (PDF)** — `BetterContinents-AI-Skill.pdf`, in the [Hexium package](https://valheim.hexium.gg/mods/Wubarrk/BetterContinents): a stand-alone document that teaches an AI agent (Claude, Gemini or another) the whole Better Continents map-making craft for Valheim 1.0.15: what the game demands of a map, how to make one read as natural geography, the generator and checker toolkit, world export and import, and the traps. The toolkit and the Markdown source are attached inside the PDF (GPL-3.0).
-* 🚀 **Setup & Quick Start**, ❓ **FAQ**, and a chapter for every image map and every setting — all in the same guide, with a clickable table of contents. The older online docs by Jere Kuusela describe Better Continents 0.7.x (no Valheim 1.0 Deep North, no lava map, no alt-biome planting, no export); everything in them is in the PDF, updated for Valheim 1.0.15.
+* 📖 **Better Continents Guide (PDF)** — the full guide, updated for Valheim 1.0 and Better Continents 0.9.x: every map type and setting, the height scale and waterline maths, alt biomes and planting them with colours, and world export/import. It ships as `BetterContinents-Guide.pdf` inside the [Hexium package](https://valheim.hexium.gg/mods/Wubarrk/BetterContinents) (GPL-3.0; its Markdown source is attached inside the PDF).
+* 🤖 **Map-making, a skill for AI agents (PDF)** — `BetterContinents-AI-Skill.pdf`, in the [Hexium package](https://valheim.hexium.gg/mods/Wubarrk/BetterContinents): a stand-alone document that teaches an AI agent (Claude, Gemini or another) the whole Better Continents map-making craft for Valheim 1.0: what the game demands of a map, how to make one read as natural geography, the generator and checker toolkit, world export and import, and the traps. The toolkit and the Markdown source are attached inside the PDF (GPL-3.0).
+* 🚀 **Setup & Quick Start**, ❓ **FAQ**, and a chapter for every image map and every setting — all in the same guide, with a clickable table of contents. The older online docs by Jere Kuusela describe Better Continents 0.7.x (no Valheim 1.0 Deep North, no lava map, no alt-biome planting, no export); everything in them is in the PDF, updated for Valheim 1.0.
 * 🎨 [Alt biomes in Better Continents 0.8.1](ALTBIOMES.md) — planting alt biomes with colours: the legend syntax, the colour scheme, the quota rule, the commands and the log lines.
-* 🔧 [Valheim 1.0 migration notes](MIGRATE-1.0.md) — what changed for 1.0.15 and what has been verified in play.
+* 🔧 [Valheim 1.0 migration notes](MIGRATE-1.0.md) — what changed for Valheim 1.0 and what has been verified in play.
 * 💬 [Community Discord Server](https://discord.gg/3XW8ZntYzN)
 
 ---

@@ -1,4 +1,4 @@
-// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and alt-biome planting (0.8.1), and on 2026-09-24 for world export and import (0.9.0).
+// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and alt-biome planting (0.8.1), and on 2026-09-24 for world export and import (0.9.0), and on 2026-09-25 for version-agnostic wording (0.9.1).
 
 using System;
 using System.Collections;
@@ -419,7 +419,7 @@ public partial class BetterContinents : BaseUnityPlugin
                     .Description("Measure a region's average height as the mean over the whole region instead of vanilla's (lowest + highest) / 2 of its border. Helps maps whose biome paint runs out into the sea: the border is then under water and vanilla's measure sinks below the 30 m every alt biome requires")
                     .Default(false).Bind(out ConfigAltBiomeMeanHeight);
                 groupBuilder.AddValue("Fix Neighbour Check")
-                    .Description("Use a corrected version of vanilla's require/not-neighbour test (broken in 1.0.15; no vanilla alt biome uses it, modded ones may)")
+                    .Description("Use a corrected version of vanilla's require/not-neighbour test (broken in vanilla; no vanilla alt biome uses it, modded ones may)")
                     .Default(false).Bind(out ConfigAltBiomeFixNeighbourCheck);
                 groupBuilder.AddValue("Overrides")
                     .Description("Per alt biome overrides of the game's random placement: 'Name: key=value, key=value; Other Name: key=value'. A name may contain * wildcards ('*Mistlands'); '*' alone applies to all. An exact name wins over a wildcard pattern, and a pattern over '*', field by field. Keys: enabled, chance, min, max, mindist, minedge, maxedge, minheight, maxheight, ignorebounds. 'Fortress Mountain: enabled=false' keeps the game from placing Fortress Mountain at random; planted Fortress Mountain still works")

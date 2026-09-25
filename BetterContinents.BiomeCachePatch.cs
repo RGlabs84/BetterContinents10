@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-09-22 for alt-biome planting (0.8.1).
+// Added by Wubarrk on 2026-09-22 for alt-biome planting (0.8.1), and on 2026-09-25 for version-agnostic wording (0.9.1).
 
 using System;
 using System.IO;
@@ -17,9 +17,9 @@ public partial class BetterContinents
   // Continents settings file replaced, maps edited, a world copied in from another machine, a Better Continents
   // update. A stale grid means wrong terrain biomes, wrong alt biomes, and locations placed from another map's points.
   //
-  // Valheim 1.0.15 (client and dedicated server, read from their IL) no longer uses the cache at all: VerifyBiomeData
-  // is RemoveCache + GenerateBiomePoints + GenerateSectors, and nothing calls TryLoadCache or SaveCache. On 1.0.15 these
-  // two patches therefore never run. They stay as a guard for any game version that reads the cache again.
+  // Since 1.0.15 the game (client and dedicated server, read from their IL) no longer uses the cache at all: VerifyBiomeData
+  // is RemoveCache + GenerateBiomePoints + GenerateSectors, and nothing calls TryLoadCache or SaveCache. So these
+  // two patches never run. They stay as a guard for any game version that reads the cache again.
   //
   // Better Continents worlds get a fingerprint appended to the cache file - SHA-256 of the settings that shape the
   // grid, the seed, the grid geometry, and the Better Continents and game versions - and a cache whose fingerprint

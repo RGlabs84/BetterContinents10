@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-09-22 for alt-biome planting (0.8.1).
+// Added by Wubarrk on 2026-09-22 for alt-biome planting (0.8.1), and on 2026-09-25 for version-agnostic wording (0.9.1).
 
 using System;
 using System.Collections;
@@ -29,7 +29,7 @@ public partial class BetterContinents
     public const int VanillaGridSize = 2048;
     public const float VanillaPixelSize = 12f;
     public const float VanillaSampleRadius = 10500f;
-    // AltBiomeWorldData.MapSpaceToWorldSpace(0) on an unmodified 1.0.15 grid: (0 - 1024) * 12 + 6.
+    // AltBiomeWorldData.MapSpaceToWorldSpace(0) on an unmodified vanilla grid: (0 - 1024) * 12 + 6.
     private const float VanillaGridOrigin = -12282f;
 
     public enum RebuildLevel
@@ -1488,7 +1488,7 @@ public partial class BetterContinents
       {
         RuntimeRebuild = false;
       }
-      // Not written to the biome cache: 1.0.15 deletes that file and regenerates on every load (VerifyBiomeData ->
+      // Not written to the biome cache: the game deletes that file and regenerates on every load (VerifyBiomeData ->
       // RemoveCache), so it would be 20 MB written for nothing. Should a later game version read the cache again,
       // the fingerprint trailer rejects the older file for these new settings.
       world.m_biomeData = fresh;

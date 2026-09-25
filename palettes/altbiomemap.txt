@@ -21,7 +21,7 @@
 # none: C030F0
 # Troll Black Forest: at 2750, -1210
 #
-# Default palette, one colour per Valheim 1.0.15 alt biome (the comment is the land it plants on):
+# Default palette, one colour per vanilla alt biome (the comment is the land it plants on):
 Mushroom: FF969C               # Meadows, BlackForest
 Lantern: F2A300                # Meadows, BlackForest, Swamp, Mountain, Plains, Mistlands, DeepNorth
 Bones: F8E1B6                  # Swamp, Plains, Mistlands

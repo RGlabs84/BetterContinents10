@@ -21,7 +21,7 @@ Contents
 
 ## 1. Design
 
-### 1.1 How Valheim 1.0.15 decides alt biomes
+### 1.1 How Valheim 1.0 decides alt biomes
 
 Everything happens once per world load, in `AltBiomeWorldData.VerifyBiomeData`, on the server and
 on every client separately (nothing about it is sent over the network):
@@ -284,13 +284,13 @@ Then, at every world load, per 12 m grid point:
 
 ### 2.4 Colour scheme
 
-One default colour per Valheim 1.0.15 alt biome, in the game's own list order. Every pair of
+One default colour per vanilla alt biome, in the game's own list order. Every pair of
 alt-biome colours, and every alt-biome colour and every base-biome colour of the biome legend
 (black and white included), is more than 2 x 20 RGB units apart, so tolerant matching can never
 confuse two of them. The closest pairs are Rock Black Forest / Trees Mistlands (52.4) and
 Abomination Swamp / Mistlands (54.6).
 
-"Plants on" is the alt biome's `m_biome` in 1.0.15. "Game count", "Chance" and "Min. distance" are
+"Plants on" is the alt biome's `m_biome` in the game's data. "Game count", "Chance" and "Min. distance" are
 the game's own random-placement rules (`m_minAmountSpawned`-`m_maxAmountSpawned`, `m_chance`,
 `m_minDistanceFromCenter`), which the quota rule counts against.
 
@@ -345,7 +345,7 @@ alt-biome colours keep clear of:
 | DeepNorth | `00FFFF` | 0, 255, 255 |
 | Ocean | `0000FF` | 0, 0, 255 |
 
-Incompatible pairs in 1.0.15 (the game checks both directions): Birch Meadows / Menhir; Bones /
+Incompatible pairs in the game's data (the game checks both directions): Birch Meadows / Menhir; Bones /
 Peaceful Meadows; Dark Meadows / Peaceful Meadows; Rock / Root Black Forest; Rock / Pinetree Black
 Forest; Kalhygge / Root Black Forest; Hut Swamp / Bog Swamp; Wolf / Drake / Fortress Mountain (each
 pair); Lox / Goblin / Death Plains (each pair). All 32 are enabled.
@@ -367,7 +367,7 @@ new worlds, baked into the world when it is created (1.7).
 | `Distance Scale` | float | `1` | 0 to 10 | Multiplies every alt biome's minimum distance from the centre and its world position bounds. |
 | `Min Sector Thickness` | float | `0` | 0 to 20 | Regions thinner than this (area / border length, in 12 m cells) never get a random alt biome. 0 = vanilla. 2 filters the slivers an anti-aliased biome map leaves along its borders. |
 | `Mean Sector Height` | bool | `false` | | Measure a region's average height as the mean over the whole region instead of the game's `(lowest + highest) / 2` of its border. Helps maps whose biome paint runs into the sea, where the border is under water and the game's measure sinks below the 30 m every alt biome requires. |
-| `Fix Neighbour Check` | bool | `false` | | Use a corrected require/not-neighbour test. The game's is broken in 1.0.15: any required neighbour makes every region fail, and the not-neighbour test looks for the wrong biome except for Meadows and Swamp. No vanilla alt biome uses it; modded ones may. |
+| `Fix Neighbour Check` | bool | `false` | | Use a corrected require/not-neighbour test. The game's is broken: any required neighbour makes every region fail, and the not-neighbour test looks for the wrong biome except for Meadows and Swamp. No vanilla alt biome uses it; modded ones may. |
 | `Overrides` | string | *(empty)* | | Per-alt-biome overrides of the random placement, see 2.5.1. |
 
 All of these except `Altbiomemap File` affect only the game's **random** placement; planted regions
@@ -506,7 +506,7 @@ stops the world load (1.9).
 
 For each alt biome, the game's random placement runs while `planted + placed < max`, ignores the
 chance while `planted + placed < min`, and needs every region to pass `CanAddModifier`. With the
-1.0.15 data (table in 2.4):
+game's data (table in 2.4):
 
 | Planted | Fortress Mountain (1-2) | Lox Plains (0-1) | Dark Meadows (2-5) |
 |:-:|:--|:--|:--|
@@ -612,16 +612,13 @@ trailer does not match is not loaded, so the game rebuilds and rewrites it. The 
 the game's payload, where the game's reader never looks, so the file stays readable without the
 mod. A vanilla world whose cache carries a Better Continents trailer is rebuilt too.
 
-**Valheim 1.0.15 does not use the cache at all.** Its `VerifyBiomeData` is `RemoveCache`, then
+**Since 1.0.15 the game does not use the cache at all.** Its `VerifyBiomeData` is `RemoveCache`, then
 `GenerateBiomePoints`, then `GenerateSectors`, and nothing calls `TryLoadCache` or `SaveCache`
-(read from the IL of the 1.0.15 client, `assembly_valheim.dll` md5 2fb85d90..., and dedicated
-server, md5 47df8869...; also `libs-Tools/1.0/DECOMPILED/assembly_valheim.decompiled.cs:92753`).
-On 1.0.15 a grid can therefore never be stale across loads, and the two fingerprint patches bind
-but never run; they stay as a guard for any game version that reads the cache again. Note that
-`libs-Tools/Decompiled_1.0.15/assembly_valheim/` is a 1.0.12 decompile (`Version.CurrentVersion` is
-1.0.12 there), which still shows the cache.
+(read from the IL of the installed client and dedicated server; the harness checks this on every
+run). A grid can therefore never be stale across loads, and the two fingerprint patches bind but
+never run; they stay as a guard for any game version that reads the cache again.
 
-What does matter on 1.0.15 is staleness *within* a session. The game builds the grid only at world
+What does matter is staleness *within* a session. The game builds the grid only at world
 load, but Better Continents' debug commands change maps and settings live. 0.8.1 rebuilds the grid,
 regions and placement whenever they change (on a worker thread for the grid), and only then resets
 the zones; the zone reset also clears each terrain chunk's cached corner regions, which the game
@@ -637,9 +634,7 @@ bool flag  = WorldGenerator.IsAshlands(position.x, position.z);
 bool flag2 = WorldGenerator.IsDeepnorth(position.x, position.y);    // y is the camera height
 ```
 
-(1.0.15: `UpdateEnvironment` IL_006f and `GetBiome` IL_0059,
-`libs-Tools/1.0/DECOMPILED/assembly_valheim.decompiled.cs:96367-96368` and `:96455-96456`.) On a
-Better Continents world with a biome map, `IsDeepnorth` reads the biome map, so it samples the map
+On a Better Continents world with a biome map, `IsDeepnorth` reads the biome map, so it samples the map
 at (x, camera height), in the map's middle rows: a map with Deep North there gives Deep North
 weather at sea anywhere in that band of x.
 
@@ -647,8 +642,8 @@ weather at sea anywhere in that band of x.
 Continents world with a biome map, so Deep North weather follows the map as Ashlands weather
 already does, and y everywhere else, so every other world keeps the game's behaviour, bug
 included. The transpiler only rewrites the exact shape `ldloc v; ldfld Vector3::y; call
-IsDeepnorth` and warns if it finds anything else; the harness checks the shape against the real
-1.0.15 IL.
+IsDeepnorth` and warns if it finds anything else; the harness checks the shape against the installed
+game's IL.
 
 ### 3.4 Also fixed in the same pipeline
 
@@ -658,7 +653,7 @@ IsDeepnorth` and warns if it finds anything else; the harness checks the shape a
   There, and beyond a `WorldEdge` cut-off, `GetBiomeSector` now returns a plain region of the real
   biome, without alt biomes.
 * **Locations that accept several biomes.** `AltBiomeWorldData.RandomBiomeFromBiomes` picks which
-  biome such a location searches, and in 1.0.15 it returns Black Forest for Plains, tests the
+  biome such a location searches, and it returns Black Forest for Plains, tests the
   Meadows bit for Ocean, and never picks the last matching biome (`Random.Range(0, num - 1)`). On a
   Better Continents world, when its pick is outside the requested biomes or absent from the map,
   one of the requested biomes the map has is picked instead. A usable pick is kept, so complete
@@ -669,7 +664,7 @@ IsDeepnorth` and warns if it finds anything else; the harness checks the shape a
 ## 4. Testing
 
 `tools/altbiome-harness` is an offline test program. It loads the real pre-ILRepack
-`BetterContinents.dll` and the real Valheim 1.0.15 assemblies and runs everything that does not
+`BetterContinents.dll` and the installed Valheim assemblies and runs everything that does not
 need the Unity engine: settings and save format (including real 0.8.0 worlds round-tripped byte
 for byte), the legend and colour scheme, the region build against the game's own
 `GenerateSectors`, the partition, the quota rule and the three modes through a real Harmony-patched

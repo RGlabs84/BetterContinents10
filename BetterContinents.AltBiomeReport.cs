@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-09-22 for alt-biome planting (0.8.1).
+// Added by Wubarrk on 2026-09-22 for alt-biome planting (0.8.1), and on 2026-09-25 for version-agnostic wording (0.9.1).
 
 using System;
 using System.Collections.Generic;
@@ -326,7 +326,7 @@ public partial class BetterContinents
     }
 
     // The game's live alt-biome list with the default colours and the game's own rules; before a world loads,
-    // the Valheim 1.0.15 palette.
+    // the vanilla palette.
     public static List<string> Names(string filter)
     {
       var lines = new List<string>();
@@ -334,7 +334,7 @@ public partial class BetterContinents
       var all = AltBiomeList.m_altBiomes;
       if (all.Count == 0)
       {
-        lines.Add("The game's alt biome list is empty until a world is loaded. The Valheim 1.0.15 names and default colours:");
+        lines.Add("The game's alt biome list is empty until a world is loaded. The vanilla alt biome names and default colours:");
         foreach (var (name, hex, biomes) in ImageMapAltBiome.DefaultPalette)
           if (filter == "" || name.IndexOf(filter, StringComparison.OrdinalIgnoreCase) >= 0)
             lines.Add($"  {name}: {hex}  -  plants on {ImageMapAltBiome.BiomeList(biomes)}");

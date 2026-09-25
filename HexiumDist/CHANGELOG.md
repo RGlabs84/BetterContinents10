@@ -1,3 +1,12 @@
+- v0.9.1
+  - Rebuilt against Valheim 1.0.16 and re-verified: the reference check passes against the
+    1.0.16 client and dedicated server, the mod boots on a 1.0.16 dedicated server, and the
+    offline alt-biome harness passes every check. Nothing that Better Continents patches changed
+    in 1.0.16, and the game's alt-biome list is the same 32 entries.
+  - The README, ALTBIOMES.md, the config descriptions, the console output, the generated legend
+    headers and the printable colour chart no longer name a Valheim patch: they say "Valheim 1.0"
+    or "vanilla". The three guides are rebuilt as the Valheim 1.0 / Better Continents 0.9.x
+    editions, so neither a game patch nor a mod patch release needs new guides.
 - v0.9.0
   - Adds world export: it dumps the loaded world, vanilla or Better Continents, into Better
     Continents maps that rebuild it. That is a 16-bit heightmap sampled the way the game builds
