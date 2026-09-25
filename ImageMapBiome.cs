@@ -1,4 +1,4 @@
-﻿// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0).
+﻿// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0), and on 2026-09-24 for world export and import (0.9.0).
 
 using System;
 using System.Collections.Generic;
@@ -78,6 +78,10 @@ internal class ImageMapBiome() : ImageMapBase
 
     private Heightmap.Biome[] Map = [];
     private Dictionary<Heightmap.Biome, Color32> Colors = [];
+    // World export (WorldExport): the decoded map (row 0 = south, like every map after loading) and the legend
+    // colours it was decoded with (empty for a map read back from a world's settings, which stores biomes only).
+    internal Heightmap.Biome[] Biomes => Map;
+    internal IReadOnlyDictionary<Heightmap.Biome, Color32> LegendColors => Colors;
     public override bool LoadSourceImage()
     {
         if (!base.LoadSourceImage()) return false;
@@ -109,7 +113,9 @@ internal class ImageMapBiome() : ImageMapBase
             s => ParseColor32(s[1])
         );
 
-    private static readonly string DefaultColors = "None: 000000|Meadows: 00FF00|BlackForest: 007F00|Swamp: 7F7F00|Mountain: FFFFFF|Plains: FFFF00|Mistlands: 7F7F7F|AshLands: FF0000|DeepNorth: 00FFFF|Ocean: 0000FF";
+    // Internal for WorldExport, which writes biomemap.png in exactly these colours and this legend.
+    internal static readonly string DefaultColors = "None: 000000|Meadows: 00FF00|BlackForest: 007F00|Swamp: 7F7F00|Mountain: FFFFFF|Plains: FFFF00|Mistlands: 7F7F7F|AshLands: FF0000|DeepNorth: 00FFFF|Ocean: 0000FF";
+    internal static Dictionary<Heightmap.Biome, Color32> DefaultColorTable() => ParseColors(DefaultColors);
     public bool CreateMap() => CreateMap<Rgba32>();
     protected override bool LoadTextureToMap<T>(Image<T> image)
     {
@@ -154,8 +160,10 @@ internal class ImageMapBiome() : ImageMapBase
         float xd = xa - xi;
         float yd = ya - yi;
 
-        var biomes = new Heightmap.Biome[4];
-        var biomeWeights = new float[4];
+        // On the stack: GetBiome samples this for every grid point, zone corner and map pixel, from several
+        // threads at once, and two small arrays per call were millions of garbage allocations per pass.
+        Span<Heightmap.Biome> biomes = stackalloc Heightmap.Biome[4];
+        Span<float> biomeWeights = stackalloc float[4];
         SampleBiomeWeighted(xi + 0, yi + 0, (1 - xd) * (1 - yd), biomeWeights, biomes, ref numBiomes, ref topBiomeIdx);
         SampleBiomeWeighted(xi + 1, yi + 0, xd * (1 - yd), biomeWeights, biomes, ref numBiomes, ref topBiomeIdx);
         SampleBiomeWeighted(xi + 0, yi + 1, (1 - xd) * yd, biomeWeights, biomes, ref numBiomes, ref topBiomeIdx);
@@ -164,7 +172,7 @@ internal class ImageMapBiome() : ImageMapBase
         return biomes[topBiomeIdx];
     }
 
-    private void SampleBiomeWeighted(int xs, int ys, float weight, float[] biomeWeights, Heightmap.Biome[] biomes, ref int numBiomes, ref int topBiomeIdx)
+    private void SampleBiomeWeighted(int xs, int ys, float weight, Span<float> biomeWeights, Span<Heightmap.Biome> biomes, ref int numBiomes, ref int topBiomeIdx)
     {
         var biome = Map[Mathf.Clamp(ys, 0, Size - 1) * Size + Mathf.Clamp(xs, 0, Size - 1)];
         int i = 0;

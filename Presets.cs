@@ -1,4 +1,4 @@
-﻿// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and alt-biome planting (0.8.1).
+﻿// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and alt-biome planting (0.8.1), and on 2026-09-24 for world export and import (0.9.0).
 
 using System;
 using System.Collections.Generic;
@@ -35,7 +35,22 @@ public class Presets
     LoadImageMethod.Invoke(null, new object[] { tex, data, false });
   }
 
-  private static readonly string PresetsDir = Path.Combine(Utils.GetSaveDataPath(FileHelpers.FileSource.Local), "BetterContinents", "presets");
+  private static string? presetsDir;
+
+  /// <summary>&lt;save data (local)&gt;/BetterContinents/presets: every "*.BetterContinents" file there is a choice in the
+  /// New World screen. Read on first use, not at type load, so the offline harness can point it elsewhere.</summary>
+  internal static string PresetsDir
+  {
+    get => presetsDir ??= Path.Combine(Utils.GetSaveDataPath(FileHelpers.FileSource.Local), "BetterContinents", "presets");
+    set => presetsDir = value;
+  }
+
+  /// <summary>The New World screen's presets (FejdStartupPatch keeps the one instance).</summary>
+  internal static Presets? Active { get; private set; }
+
+  internal const string DisabledName = Disabled;
+  internal const string FromConfigName = FromConfig;
+
   private static AssetBundle? assetBundle;
 
   private static bool DisabledPreset => BetterContinents.ConfigSelectedPreset.Value == Disabled;
@@ -53,7 +68,53 @@ public class Presets
   private Texture2D logoIcon;
   private Texture2D settingsIcon;
 #nullable enable
-  public Presets() { Refresh(); }
+  private Texture2D? loadedIcon;
+  public Presets()
+  {
+    Active = this;
+    Refresh();
+  }
+
+  /// <summary>Awake: whenever the selected preset changes outside the dropdown (bc_import, an edit of
+  /// BetterContinents.cfg that LiveConfig reads), the dropdown shows it and lists any new preset file.</summary>
+  internal static void WatchSelection()
+  {
+    BetterContinents.ConfigSelectedPreset.SettingChanged += (_, _) =>
+    {
+      try
+      {
+        Active?.SyncSelection();
+      }
+      catch (Exception ex)
+      {
+        BetterContinents.LogWarning($"Could not update the preset dropdown: {ex.Message}");
+      }
+    };
+  }
+
+  /// <summary>Lists the presets folder again (a preset was added) and shows the selected preset. Main thread.</summary>
+  internal static void RefreshActive()
+  {
+    try
+    {
+      Active?.Refresh();
+    }
+    catch (Exception ex)
+    {
+      BetterContinents.LogWarning($"Could not refresh the preset dropdown: {ex.Message}");
+    }
+  }
+
+  // The selection changed: nothing to do when the dropdown already shows it (it made the change itself).
+  private void SyncSelection()
+  {
+    if (dropdown == null)
+      return;
+    int idx = presets.FindIndex(p => string.Equals(p, BetterContinents.ConfigSelectedPreset.Value, StringComparison.CurrentCultureIgnoreCase));
+    if (idx != -1 && idx == dropdown.value)
+      return;
+    Refresh();
+  }
 
   public void InitUI(FejdStartup __instance)
   {
@@ -110,14 +171,18 @@ public class Presets
       else
       {
         previewPanel.SetActive(true);
-        string configIconPath =
-            Path.Combine(Path.GetDirectoryName(BetterContinents.ConfigSelectedPreset.Value),
-                BetterContinents.ConfigSelectedPreset.Value.UpTo(".") + ".png");
+        // "<name>.png" beside "<name>.BetterContinents". (This took the path up to its first dot, which on Linux is
+        // the one in ~/.config, so no preset showed its picture there, nor where the user name has a dot.)
+        string configIconPath = Path.ChangeExtension(BetterContinents.ConfigSelectedPreset.Value, ".png");
+        // The previous picture goes: the preview is redrawn on every refresh now (bc_import, a config edit).
+        if (loadedIcon != null)
+          Object.Destroy(loadedIcon);
+        loadedIcon = null;
         if (File.Exists(configIconPath))
         {
           var icon = new Texture2D(2, 2);
           LoadImageCompat(icon, File.ReadAllBytes(configIconPath));
-          previewImage.texture = icon;
+          previewImage.texture = loadedIcon = icon;
         }
         else
         {
@@ -127,10 +192,13 @@ public class Presets
     }
   }
 
-  private void Refresh()
+  internal void Refresh()
   {
-    static string NameFromPath(string path) => Path.GetFileName(path).UpTo(".").AddSpacesToWords();
+    // The file name without ".BetterContinents" (UpTo(".") cut "My.World" to "My").
+    static string NameFromPath(string path) => Path.GetFileNameWithoutExtension(path).AddSpacesToWords();
 
+    // A failed listing leaves just the two built-in choices (it used to keep the old list and add them again).
+    presets = [];
     try
     {
       Directory.CreateDirectory(PresetsDir);

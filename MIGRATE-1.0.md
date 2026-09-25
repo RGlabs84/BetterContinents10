@@ -121,6 +121,10 @@ North shore instead of a short fade.
 
 - **Biome precision** stays disabled. Ported to `BiomeSector` underneath and all three Harmony
   targets resolve, but it has never been run. Reviving it should be a deliberate, tested decision.
+  *Update 2026-09-24 (0.9.0): revived. The grid now sits beside the corner array instead of in it,
+  vanilla `HeightmapBuilder.Build` runs untouched (a postfix samples the grid), and GetBiome,
+  GetBiomeColor and HaveBiome read it; see `BetterContinents.HeightmapPatch.cs` and the biome
+  precision checks in `tools/export-tests`. Not yet run in game.*
 - **Save format not bumped.** `Heightmap.Biome` numeric values are identical pre-1.0 → 1.0.15,
   and BC serialises a *bit index* rather than the enum value, so existing user maps decode
   correctly. Trap for reviewers: the new `Heightmap.BiomeIndex` enum uses *different* numbering
@@ -349,5 +353,6 @@ played, saved manually and exited cleanly; and separately a real pre-1.0 Better 
   Local and Cloud, which runs `MoveSource` and then `MoveToBackup` -> `Rename` -> `RenameDirectory`.
 - **Deep North** (`PatchIsDeepnorth`, `PatchDeepNorthWaveFade`) has not been observed live - no
   weather, painting or wave-fade check yet.
-- **Biome precision** is still disabled and still never run.
+- **Biome precision** is still disabled and still never run. *(0.9.0: re-enabled and checked
+  offline; still never run in game.)*
 - Dedicated-server *world creation* remains impossible by design; see the known gap above.

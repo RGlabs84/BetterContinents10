@@ -1,4 +1,4 @@
-// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and alt-biome planting (0.8.1).
+// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and alt-biome planting (0.8.1), and on 2026-09-24 for world export and import (0.9.0).
 
 using System;
 using System.Collections;
@@ -23,6 +23,7 @@ public partial class BetterContinents : BaseUnityPlugin
     // See the Awake function for the config descriptions
     public static ConfigEntry<int> NexusID;
     public static ConfigEntry<string> ConfigSelectedPreset;
+    public static ConfigEntry<TransferRatePreset> ConfigSettingsTransferRate;
 
     public static ConfigEntry<bool> ConfigEnabled;
 
@@ -101,6 +102,16 @@ public partial class BetterContinents : BaseUnityPlugin
     public static ConfigEntry<bool> ConfigAltBiomeFixNeighbourCheck;
     public static ConfigEntry<string> ConfigAltBiomeOverrides;
 
+    // World export (0.9.0). Unlike every group above, these apply while the game runs (LiveConfig), and Hud and Allow
+    // Export follow the server on its clients.
+    public static ConfigEntry<bool> ConfigExportHud;
+    public static ConfigEntry<bool> ConfigExportAllowed;
+    public static ConfigEntry<KeyCode> ConfigExportHudKey;
+    public static ConfigEntry<KeyCode> ConfigExportWindowKey;
+    public static ConfigEntry<int> ConfigExportSize;
+    public static ConfigEntry<float> ConfigExportHeightmapAmount;
+    public static ConfigEntry<float> ConfigExportSeaLevel;
+
     public static BetterContinents instance;
 #nullable enable
     public static void SetSize(float size, float edge)
@@ -154,10 +165,18 @@ public partial class BetterContinents : BaseUnityPlugin
 
     public static BetterContinentsSettings Settings = new();
 
+    // Unity's main thread, recorded in Awake. World import builds settings on a worker, where UnityEngine.Random and
+    // prefab lookups are off limits (ImageMapLocation, SpawnEntry).
+    private static int mainThreadId;
+
+    /// <summary>True on Unity's main thread; false on a worker, and in the offline harness (no Awake).</summary>
+    internal static bool IsMainThread => mainThreadId != 0 && Thread.CurrentThread.ManagedThreadId == mainThreadId;
+
 
     public void Awake()
     {
         instance = this;
+        mainThreadId = Thread.CurrentThread.ManagedThreadId;
 
         // Cos why...
         Application.SetStackTraceLogType(LogType.Log, StackTraceLogType.None);
@@ -165,7 +184,38 @@ public partial class BetterContinents : BaseUnityPlugin
 
         Console.SetConsoleEnabled(true);
 
-        Config.Declare()
+        DeclareConfig(Config);
+        if (ConfigLocationFile.Value == "" && ConfigSpawnFile.Value != "")
+        {
+            ConfigLocationFile.Value = ConfigSpawnFile.Value.Replace("spawnmap", "locationmap");
+            ConfigSpawnFile.Value = "";
+            Config.Save();
+        }
+        LiveConfig.Init(Config);
+        // A preset chosen outside the New World screen (bc_import, a config edit) shows there at once.
+        Presets.WatchSelection();
+        HarmonyInstance = new Harmony("BetterContinents.Harmony");
+        HarmonyInstance.PatchAll();
+        LogAltBiomePatches();
+        // 0.9.0: a modpack (or a server admin) can ship .bcworld files so players already have a big world's
+        // settings cached before they ever join (WorldCacheShare.cs; README "Sharing Maps With Players").
+        try
+        {
+            WorldCacheShare.SeedFromDisk();
+        }
+        catch (Exception e)
+        {
+            LogWarning($"World cache seeding failed: {e.Message}");
+        }
+        Log("Awake");
+        UI.Init();
+    }
+
+    // Binds every setting (Awake). Static so the offline harness binds exactly the sections, keys, defaults and ranges
+    // the game does.
+    internal static void DeclareConfig(ConfigFile config)
+    {
+        config.Declare()
             .AddGroup("BetterContinents.Debug", groupBuilder =>
             {
                 groupBuilder.AddValue("Enabled")
@@ -179,7 +229,7 @@ public partial class BetterContinents : BaseUnityPlugin
                     .Description("Override the save version")
                     .Default("").Bind(out ConfigOverrideVersion);
                 groupBuilder.AddValue("Directory")
-                    .Description("This directory will load automatically any existing map files matching the correct names, overriding specific files specified below. Filenames must match: heightmap.png, biomemap.png, locationmap.png, roughmap.png, forestmap.png, vegetationmap.png, spawnmap.png, altbiomemap.png.")
+                    .Description("This directory will load automatically any existing map files matching the correct names, overriding specific files specified below. Filenames must match: heightmap.png, biomemap.png, terrainmap.png, locationmap.png, roughmap.png, forestmap.png, heatmap.png, paintmap.png, lavamap.png, mossmap.png, vegetationmap.png, spawnmap.png, altbiomemap.png.")
                     .Default("").Bind(out ConfigMapSourceDir);
             })
             .AddGroup("BetterContinents.Global", groupBuilder =>
@@ -256,7 +306,7 @@ public partial class BetterContinents : BaseUnityPlugin
                     .Description("Path to a biomemap file to use. See the description on Nexusmods.com for the specifications (it will fail if they are not met)")
                     .Default("").Bind(out ConfigBiomeFile);
                 groupBuilder.AddValue("Biome precision")
-                    .Description("Not working! Adjusts how precisely terrain is matched to the biomemap (0 = vanilla, 1 = 3x3, 2 = 5x5, etc.)")
+                    .Description("How closely the ground follows the biome borders inside each 64 m terrain zone (ground textures, grass, vegetation and spawn points). 0 = vanilla: a zone takes its biomes from its 4 corners, so the borders follow the 64 m zone grid. 1 to 5 split every zone into (N + 1) x (N + 1) cells, with a corner every 32, 21, 16, 13 or 11 m. Works with or without a biomemap, and terrain heights do not change")
                     .Default(0).Range(0, 5).Bind(out ConfigBiomePrecision);
                 groupBuilder.AddValue("Terrainmap file")
                     .Description("Path to a terrainmap file to use. See thea description on Nexusmods.com for the specifications (it will fail if they are not met)")
@@ -328,6 +378,9 @@ public partial class BetterContinents : BaseUnityPlugin
                     .Hidden().Default(446).Bind(out NexusID);
                 groupBuilder.AddValue("SelectedPreset")
                     .Hidden().Default("Vanilla").Bind(out ConfigSelectedPreset);
+                groupBuilder.AddValue("Settings Transfer Rate")
+                    .Description("How fast this machine (the host, or a dedicated server) may push a joining player's Better Continents settings and images over their Steam connection. Valheim pins every connection to about 150 KB/s, so a large world can take over a minute to join; Vanilla leaves that rate untouched; KB256, KB384, KB512, KB768, MB1, MB1_5 and MB3 set that one connection to that fixed rate for the transfer only, then restore Valheim's own; Unlimited sets 100 MB/s (the transfer itself moves about 4 MB/s at most). Steam sends at exactly the rate set, with no congestion control, so pick one the server's upload can carry. The server's value is used; a client's own value has no effect. No effect on PlayFab (crossplay) connections, whose send rate cannot be changed.")
+                    .Default(TransferRatePreset.KB512).Bind(out ConfigSettingsTransferRate);
             })
             // Must stay after Misc: section names carry the group's position ("07 BetterContinents.Misc"), so a group
             // inserted earlier would rename every later section and reset the values stored in them. Every value
@@ -371,23 +424,44 @@ public partial class BetterContinents : BaseUnityPlugin
                 groupBuilder.AddValue("Overrides")
                     .Description("Per alt biome overrides of the game's random placement: 'Name: key=value, key=value; Other Name: key=value'. A name may contain * wildcards ('*Mistlands'); '*' alone applies to all. An exact name wins over a wildcard pattern, and a pattern over '*', field by field. Keys: enabled, chance, min, max, mindist, minedge, maxedge, minheight, maxheight, ignorebounds. 'Fortress Mountain: enabled=false' keeps the game from placing Fortress Mountain at random; planted Fortress Mountain still works")
                     .Default("").Bind(out ConfigAltBiomeOverrides);
+            })
+            // Must stay last, like AltBiomes above ("09 BetterContinents.Export"). Unlike every group before it, these
+            // values apply while the game runs: see LiveConfig, which also re-reads this file when it changes on disk.
+            .AddGroup("BetterContinents.Export", groupBuilder =>
+            {
+                groupBuilder.AddValue("Hud")
+                    .Description("Shows the world export HUD in game: a status box (Hud Hotkey) and a window (Window Hotkey) with an Export tab (the maps, their options, Start and Cancel) and an Import tab (your exports, made into New World presets). Applies at once. On a client connected to a server that runs Better Continents 0.9.0 or later, the server's value is used instead")
+                    .Default(false).Bind(out ConfigExportHud);
+                groupBuilder.AddValue("Allow Export")
+                    .Description("Whether players connected to this server may export the world (bc_export, and Start in the export HUD). The machine that runs the world always may: single player, the host, and a dedicated server's own console (where an admin's 'bc_export server' runs). Applies at once, also to connected players. On a client, the server's value is used instead of this one")
+                    .Default(true).Bind(out ConfigExportAllowed);
+                groupBuilder.AddValue("Hud Hotkey")
+                    .Description("Shows or hides the export HUD's status box (with no Shift, Ctrl or Alt held). None = no key")
+                    .Default(KeyCode.F9).Bind(out ConfigExportHudKey);
+                groupBuilder.AddValue("Window Hotkey")
+                    .Description("Opens or closes the export and import window, which frees the mouse while it is open (with no Shift, Ctrl or Alt held). None = no key")
+                    .Default(KeyCode.F7).Bind(out ConfigExportWindowKey);
+                groupBuilder.AddValue("Default Size")
+                    .Description("Pixels per side of an export when bc_export is given no size, and the export window's first choice. 2048 and up keep the alt-biome map exact; 8192 holds about half a gigabyte while it runs")
+                    .Default(4096).Range(WorldExport.MinSize, WorldExport.MaxSize).Bind(out ConfigExportSize);
+                groupBuilder.AddValue("Default Heightmap Amount")
+                    .Description("The Heightmap Amount an export encodes its heights for, unless bc_export or the window says otherwise. 2 with Sea Level 0.5 spans -30 m to 370 m with the waterline at 0.15, the encoding hand-made and generated maps use")
+                    .Default(2f).Range(0.01f, 5f).Bind(out ConfigExportHeightmapAmount);
+                groupBuilder.AddValue("Default Sea Level")
+                    .Description("The Sea Level Adjustment an export encodes its heights for, unless bc_export or the window says otherwise")
+                    .Default(0.5f).Range(0f, 1f).Bind(out ConfigExportSeaLevel);
             });
-        if (ConfigLocationFile.Value == "" && ConfigSpawnFile.Value != "")
-        {
-            ConfigLocationFile.Value = ConfigSpawnFile.Value.Replace("spawnmap", "locationmap");
-            ConfigSpawnFile.Value = "";
-            Config.Save();
-        }
-        HarmonyInstance = new Harmony("BetterContinents.Harmony");
-        HarmonyInstance.PatchAll();
-        LogAltBiomePatches();
-        Log("Awake");
-        UI.Init();
     }
 
     public void Start()
     {
         EWD.Run();
+    }
+
+    public void Update()
+    {
+        // Reloads BetterContinents.cfg on the main thread once a change on disk has settled.
+        LiveConfig.Update();
     }
 
     // One line at startup that says whether the 0.8.1 world-generation fixes are bound, so a server log shows it

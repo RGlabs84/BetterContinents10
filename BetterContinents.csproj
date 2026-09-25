@@ -1,4 +1,4 @@
-﻿<!-- Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and alt-biome planting (0.8.1). -->
+﻿<!-- Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and alt-biome planting (0.8.1), and on 2026-09-24 for world export and import (0.9.0). -->
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>net4.8</TargetFramework>
@@ -73,6 +73,11 @@
     <Reference Include="assembly_utils">
       <HintPath>..\libs-Tools\assembly_utils.dll</HintPath>
       <Publicize>true</Publicize>
+      <Private>false</Private>
+    </Reference>
+    <!-- Settings Transfer Rate (07 BetterContinents.Misc): SteamNetworkingUtils.SetConfigValue raises this connection's Steam send rate while its Better Continents settings transfer runs, then restores it. -->
+    <Reference Include="steamworks.net">
+      <HintPath>..\libs-Tools\steamworks.net.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="assembly_guiutils">

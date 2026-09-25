@@ -1,4 +1,4 @@
-﻿// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and alt-biome planting (0.8.1).
+﻿// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and alt-biome planting (0.8.1), and on 2026-09-24 for world export and import (0.9.0).
 
 using System;
 using System.Collections.Generic;
@@ -129,6 +129,18 @@ public partial class BetterContinents
       return settings;
     }
 
+    // World import (WorldImport): the settings "From Config" would give a new world if the config held these values
+    // (an export folder's export.cfg over a snapshot of the config). Unlike Create it runs on any thread: it reads no
+    // live config value and changes no Harmony patch (Create's DynamicPatch follows the loaded world's Settings, which
+    // must not move). lean drops the decoded pixels of every map a preset stores as its file bytes, which halves the
+    // memory an import holds; such settings are only good for Save.
+    internal static BetterContinentsSettings CreateForImport(ConfigValues values, bool lean)
+    {
+      var settings = new BetterContinentsSettings { EnabledForThisWorld = true };
+      settings.ReadConfig(values, lean);
+      return settings;
+    }
+
     public static BetterContinentsSettings Disabled()
     {
       var settings = new BetterContinentsSettings();
@@ -160,6 +172,33 @@ public partial class BetterContinents
     private static readonly string VegetationFile = "vegetationmap.png";
     private static readonly string SpawnFile = "spawnmap.png";
     private static readonly string AltBiomeFile = "altbiomemap.png";
+
+    // World export (WorldExport's sources/ folder): every image map this world carries, under the file name the
+    // Directory setting loads it from. The flat map is legacy (settings version 6 and older) and has no such name.
+    internal List<(string FileName, ImageMapBase Map)> LoadedImageMaps()
+    {
+      var maps = new List<(string, ImageMapBase)>();
+      void Add(string fileName, ImageMapBase? map)
+      {
+        if (map != null)
+          maps.Add((fileName, map));
+      }
+      Add(HeightFile, HeightMap);
+      Add(BiomeFile, BiomeMap);
+      Add(TerrainFile, TerrainMap);
+      Add(LocationFile, LocationMap);
+      Add(RoughFile, RoughMap);
+      Add("flatmap.png", UseRoughInvertedAsFlat ? null : FlatMap);
+      Add(ForestFile, ForestMap);
+      Add(HeatFile, HeatMap);
+      Add(PaintFile, PaintMap);
+      Add(LavaFile, LavaMap);
+      Add(MossFile, MossMap);
+      Add(VegetationFile, VegetationMap);
+      Add(SpawnFile, SpawnMap);
+      Add(AltBiomeFile, AltBiomeMap);
+      return maps;
+    }
 
     private static string HeightPath(string defaultFilename, string projectDir) => GetPath(projectDir, HeightFile, defaultFilename);
     private static string BiomePath(string defaultFilename, string projectDir) => GetPath(projectDir, BiomeFile, defaultFilename);
@@ -197,67 +236,81 @@ public partial class BetterContinents
       EnabledForThisWorld = enabled;
 
       if (EnabledForThisWorld)
-      {
-        ContinentSize = ConfigContinentSize.Value;
-        SeaLevel = ConfigSeaLevelAdjustment.Value;
-        WorldSize = ConfigWorldSize.Value;
-        EdgeSize = ConfigEdgeSize.Value;
-        FixWaterColor = ConfigFixWaterColor.Value;
-
-        HeightMapAlpha = ConfigHeightmapAlpha.Value;
-        HeightMap = ImageMapFloat.Create(HeightConfigPath, HeightMapAlpha);
-        HeightmapAmount = ConfigHeightmapAmount.Value;
-        HeightmapBlend = ConfigHeightmapBlend.Value;
-        HeightmapAdd = ConfigHeightmapAdd.Value;
-        HeightmapMask = ConfigHeightmapMask.Value;
-        HeightmapOverrideAll = ConfigHeightmapOverrideAll.Value;
-
-        BaseHeightNoise = new();
-
-        BiomeMap = ImageMapBiome.Create(BiomeConfigPath);
-
-        OceanChannelsEnabled = ConfigOceanChannelsEnabled.Value;
-        AshlandsGapEnabled = ConfigAshlandsGapEnabled.Value;
-        DeepNorthGapEnabled = ConfigDeepNorthGapEnabled.Value;
-        RiversEnabled = ConfigRiversEnabled.Value;
-
-        ForestScaleFactor = ConfigForestScale.Value;
-        ForestAmount = ConfigForestAmount.Value;
-        ForestFactorOverrideAllTrees = ConfigForestFactorOverrideAllTrees.Value;
-
-        OverrideStartPosition = ConfigOverrideStartPosition.Value;
-        StartPositionX = ConfigStartPositionX.Value;
-        StartPositionY = ConfigStartPositionY.Value;
-        SkipDefaultLocations = ConfigSkipDefaultLocations.Value;
-
-        LocationMap = ImageMapLocation.Create(LocationConfigPath);
-
-        RoughMap = ImageMapFloat.Create(RoughConfigPath, false);
-        RoughmapBlend = ConfigRoughmapBlend.Value;
-
-        ForestMap = ImageMapFloat.Create(ForestConfigPath, false);
-        ForestmapAdd = ConfigForestmapAdd.Value;
-        ForestmapMultiply = ConfigForestmapMultiply.Value;
-        MapEdgeDropoff = ConfigMapEdgeDropoff.Value;
-        MountainsAllowedAtCenter = ConfigMountainsAllowedAtCenter.Value;
-        BiomePrecision = ConfigBiomePrecision.Value;
-
-        TerrainMap = ImageMapTerrain.Create(TerrainConfigPath);
-
-        PaintMap = ImageMapPaint.Create(PaintConfigPath);
-        LavaMap = ImageMapFloat.Create(LavaConfigPath, false);
-        MossMap = ImageMapFloat.Create(MossConfigPath, false);
-        VegetationMap = ImageMapSpawn.Create(VegetationConfigPath);
-
-        HeatMap = ImageMapFloat.Create(HeatConfigPath, false);
-        HeatMapScale = ConfigHeatScale.Value;
-
-        SpawnMap = ImageMapSpawn.Create(SpawnConfigPath);
-
-        AltBiomeMap = ImageMapAltBiome.Create(AltBiomeConfigPath);
-        AltBiomes = AltBiomeSettings.FromConfig();
-      }
+        ReadConfig(ConfigValues.Live, false);
       DynamicPatch();
+    }
+
+    // Everything a new world takes from the config. ConfigValues.Live reads BetterContinents.cfg as it is now.
+    private void ReadConfig(ConfigValues c, bool lean)
+    {
+      ContinentSize = c.Get(ConfigContinentSize);
+      SeaLevel = c.Get(ConfigSeaLevelAdjustment);
+      WorldSize = c.Get(ConfigWorldSize);
+      EdgeSize = c.Get(ConfigEdgeSize);
+      FixWaterColor = c.Get(ConfigFixWaterColor);
+
+      var dir = c.Get(ConfigMapSourceDir);
+      HeightMapAlpha = c.Get(ConfigHeightmapAlpha);
+      HeightMap = ImageMapFloat.Create(HeightPath(c.Get(ConfigHeightFile), dir), HeightMapAlpha);
+      HeightmapAmount = c.Get(ConfigHeightmapAmount);
+      HeightmapBlend = c.Get(ConfigHeightmapBlend);
+      HeightmapAdd = c.Get(ConfigHeightmapAdd);
+      HeightmapMask = c.Get(ConfigHeightmapMask);
+      HeightmapOverrideAll = c.Get(ConfigHeightmapOverrideAll);
+
+      BaseHeightNoise = new();
+
+      BiomeMap = ImageMapBiome.Create(BiomePath(c.Get(ConfigBiomeFile), dir));
+
+      OceanChannelsEnabled = c.Get(ConfigOceanChannelsEnabled);
+      AshlandsGapEnabled = c.Get(ConfigAshlandsGapEnabled);
+      DeepNorthGapEnabled = c.Get(ConfigDeepNorthGapEnabled);
+      RiversEnabled = c.Get(ConfigRiversEnabled);
+
+      ForestScaleFactor = c.Get(ConfigForestScale);
+      ForestAmount = c.Get(ConfigForestAmount);
+      ForestFactorOverrideAllTrees = c.Get(ConfigForestFactorOverrideAllTrees);
+
+      OverrideStartPosition = c.Get(ConfigOverrideStartPosition);
+      StartPositionX = c.Get(ConfigStartPositionX);
+      StartPositionY = c.Get(ConfigStartPositionY);
+      SkipDefaultLocations = c.Get(ConfigSkipDefaultLocations);
+
+      LocationMap = ImageMapLocation.Create(LocationPath(c.Get(ConfigLocationFile), dir));
+
+      RoughMap = Lean(ImageMapFloat.Create(RoughPath(c.Get(ConfigRoughFile), dir), false), lean);
+      RoughmapBlend = c.Get(ConfigRoughmapBlend);
+
+      ForestMap = Lean(ImageMapFloat.Create(ForestPath(c.Get(ConfigForestFile), dir), false), lean);
+      ForestmapAdd = c.Get(ConfigForestmapAdd);
+      ForestmapMultiply = c.Get(ConfigForestmapMultiply);
+      MapEdgeDropoff = c.Get(ConfigMapEdgeDropoff);
+      MountainsAllowedAtCenter = c.Get(ConfigMountainsAllowedAtCenter);
+      BiomePrecision = c.Get(ConfigBiomePrecision);
+
+      TerrainMap = Lean(ImageMapTerrain.Create(TerrainPath(c.Get(ConfigTerrainFile), dir)), lean);
+
+      PaintMap = Lean(ImageMapPaint.Create(PaintPath(c.Get(ConfigPaintFile), dir)), lean);
+      LavaMap = Lean(ImageMapFloat.Create(LavaPath(c.Get(ConfigLavaFile), dir), false), lean);
+      MossMap = Lean(ImageMapFloat.Create(MossPath(c.Get(ConfigMossFile), dir), false), lean);
+      VegetationMap = ImageMapSpawn.Create(VegetationPath(c.Get(ConfigVegetationFile), dir));
+
+      HeatMap = Lean(ImageMapFloat.Create(HeatPath(c.Get(ConfigHeatFile), dir), false), lean);
+      HeatMapScale = c.Get(ConfigHeatScale);
+
+      SpawnMap = ImageMapSpawn.Create(SpawnPath(c.Get(ConfigSpawnFile), dir));
+
+      AltBiomeMap = ImageMapAltBiome.Create(AltBiomePath(c.Get(ConfigAltBiomeFile), dir));
+      AltBiomes = AltBiomeSettings.FromConfig(c);
+    }
+
+    // The heightmap keeps its pixels (a preset's thumbnail is drawn from it); the biome, location, vegetation, spawn
+    // and alt-biome maps are stored decoded, so they keep theirs too.
+    private static T? Lean<T>(T? map, bool lean) where T : ImageMapBase
+    {
+      if (lean)
+        map?.ReleasePixels();
+      return map;
     }
 
     #region Setters
@@ -463,12 +516,13 @@ public partial class BetterContinents
         else output($"Roughmap disabled");
 
         if (BiomeMap != null)
-        {
           output($"Biomemap file ({BiomeMap.Size}) {BiomeMap.FilePath}");
-          if (BiomePrecision > 0)
-            output($"Biome precision {BiomePrecision}");
-        }
         else output($"Biomemap disabled");
+        // Applies with or without a biome map (EffectiveBiomePrecision, BiomePrecisionGrid).
+        var precision = Mathf.Clamp(BiomePrecision, 0, BiomePrecisionGrid.MaxPrecision);
+        output(precision > 0
+          ? $"Biome precision {precision}: the ground follows the biomes on {precision + 1} x {precision + 1} cells per 64 m terrain zone ({64f / (precision + 1):0.#} m)"
+          : "Biome precision 0: the ground takes its biomes from the 4 corners of each 64 m terrain zone (vanilla)");
 
         if (TerrainMap != null)
         {
@@ -560,10 +614,14 @@ public partial class BetterContinents
       return Load(new ZPackage(binaryReader.ReadBytes(count)));
     }
 
-    public void Save(string path)
+    public void Save(string path) => Save(path, false);
+
+    // currentFormat: the newest settings format whatever Override version says (a preset is only a container; the
+    // world made from it is saved in the configured format anyway).
+    internal void Save(string path, bool currentFormat)
     {
       var zpackage = new ZPackage();
-      Serialize(zpackage, false);
+      Serialize(zpackage, false, true, currentFormat ? MaxVersion : null);
 
       byte[] binaryData = zpackage.GetArray();
       Directory.CreateDirectory(Path.GetDirectoryName(path));

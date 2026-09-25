@@ -1,4 +1,6 @@
-﻿using System;
+﻿// Modified by Wubarrk on 2026-09-24 for world export and import (0.9.0).
+
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
@@ -76,6 +78,10 @@ public static class UI
             }
           }
         });
+
+      // The world export HUD (F9 status box, F7 window). Registered here, like the callbacks above, because this
+      // handler clears every callback on each scene change.
+      ExportHud.Register();
     };
   }
 

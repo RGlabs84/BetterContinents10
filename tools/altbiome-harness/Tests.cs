@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-09-22 for alt-biome planting (0.8.1).
+// Added by Wubarrk on 2026-09-22 for alt-biome planting (0.8.1), and on 2026-09-24 for world export and import (0.9.0).
 
 using System;
 using System.Collections;
@@ -72,6 +72,8 @@ internal static partial class Tests
     QuotaTests(alts);
     Section("modes: Random, PlantedOnly, Off");
     ModeTests(alts);
+    Section("world export (0.9.0): heightmap encode/decode round trip");
+    ExportMathTests();
 
     System.Console.WriteLine();
     System.Console.WriteLine($"{Checks - Failures}/{Checks} checks passed ({(DateTime.Now - started).TotalSeconds:0} s)");

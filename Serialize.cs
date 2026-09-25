@@ -1,4 +1,4 @@
-// Modified by Wubarrk on 2026-09-22 for alt-biome planting (0.8.1).
+// Modified by Wubarrk on 2026-09-22 for alt-biome planting (0.8.1), and on 2026-09-24 for world export and import (0.9.0).
 
 using System;
 
@@ -94,15 +94,16 @@ public partial class BetterContinents
     private static int BlockVersionOf(byte[] block) => block.Length >= 4 ? BitConverter.ToInt32(block, 0) : 0;
 
     // includeAltBiomes: false leaves the alt-biome keys out. The biome cache fingerprint uses that, because the
-    // alt-biome options and map never change the biome point grid the cache holds.
-    public void Serialize(ZPackage pkg, bool network, bool includeAltBiomes = true)
+    // alt-biome options and map never change the biome point grid the cache holds. formatVersion: the settings format
+    // to write; null takes Override version from the config (the newest format when it is empty).
+    public void Serialize(ZPackage pkg, bool network, bool includeAltBiomes = true, int? formatVersion = null)
     {
       if (!EnabledForThisWorld)
       {
         pkg.Write(-1);
         return;
       }
-      var version = int.TryParse(ConfigOverrideVersion.Value, out var v) ? v : MaxVersion;
+      var version = formatVersion ?? (int.TryParse(ConfigOverrideVersion.Value, out var v) ? v : MaxVersion);
       pkg.Write(version);
       if (version < 11)
       {

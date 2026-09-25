@@ -1,4 +1,6 @@
-﻿using System;
+﻿// Modified by Wubarrk on 2026-09-24 for world export and import (0.9.0).
+
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -56,6 +58,8 @@ abstract class ImageMapColor() : ImageMapBase()
         BetterContinents.Log($"Time to calculate colors from {FilePath}: {st.ElapsedMilliseconds} ms");
         return true;
     }
+
+    internal override void ReleasePixels() => Map = [];
 
     protected virtual void ParseColors()
     {

@@ -1,4 +1,6 @@
-﻿using System;
+﻿// Modified by Wubarrk on 2026-09-24 for world export and import (0.9.0).
+
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -41,6 +43,11 @@ internal class ImageMapSpawn() : ImageMapBase
   private byte[] Map = [];
   private readonly List<Color32> Colors = [];
   private readonly List<SpawnEntry> Entries = [];
+  // World export (WorldExport): the legend index per pixel (row 0 = south, 255 = nothing) and the legend itself,
+  // index 0 being the hardcoded white "none". Enough to write the map back out when the source image is gone.
+  internal byte[] Indices => Map;
+  internal IReadOnlyList<Color32> LegendColors => Colors;
+  internal IReadOnlyList<SpawnEntry> LegendEntries => Entries;
 
 
   public override bool LoadSourceImage()
@@ -198,7 +205,8 @@ internal class SpawnEntry
     Data = data;
     // On world load, ZNetScene is not loaded yet and will be handled later.
     // On image reload, ZNetScene is already loaded.
-    if (ZNetScene.instance)
+    // A world import reads the legend on a worker, where prefab names cannot be read; its preset stores only the text.
+    if (BetterContinents.IsMainThread && ZNetScene.instance)
       LoadPrefabs(ZNetScene.instance);
   }
 

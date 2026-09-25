@@ -1,4 +1,6 @@
-﻿using System;
+﻿// Modified by Wubarrk on 2026-09-24 for world export and import (0.9.0).
+
+using System;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -98,6 +100,12 @@ internal abstract class ImageMapBase()
       return false;
     }
     return true;
+  }
+
+  // World import (BetterContinentsSettings.CreateForImport): drops the decoded pixels of a map whose settings store
+  // only SourceData, so a preset build does not hold every map at once. The map cannot be sampled afterwards.
+  internal virtual void ReleasePixels()
+  {
   }
 
   public virtual void SerializeLegacy(ZPackage pkg, int version, bool network)

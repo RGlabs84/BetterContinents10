@@ -1,4 +1,4 @@
-﻿// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and alt-biome planting (0.8.1).
+﻿// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and alt-biome planting (0.8.1), and on 2026-09-24 for world export and import (0.9.0).
 
 using System;
 using System.Collections.Generic;
@@ -43,6 +43,11 @@ public partial class DebugUtils
             isCheat: true, isNetwork: false, onlyServer: true);
         // Read-only, and without positions unless devcommands is on, so any player can run it on a client.
         AltBiomeCommands.Register();
+        // Any player too, gated by WorldExport.Allowed; "bc_export server" reaches a dedicated server's own world.
+        WorldExportCommands.Register();
+        // Any player, in the main menu too (InitTerminal runs when the menu's console wakes): it reads local folders and
+        // writes the player's own presets and config only.
+        WorldImportCommands.Register();
         rootCommand = new Command("bc", "Better Continents", "Better Continents command").Subcommands(bc =>
         {
             bc.AddCommand("info", "Dump Info", "Prints current settings to console", _ =>
@@ -206,6 +211,7 @@ public partial class DebugUtils
                 });
 
             AddAltBiomeCommands(bc);
+            AddExportCommands(bc);
 
             bc.AddGroup("g", "Global", "Global settings, get more info with 'bc g help'",
                 group =>
@@ -349,9 +355,17 @@ public partial class DebugUtils
                     }),
                     getter: () => BetterContinents.Settings.GetBiomePath());
 
-                group.AddValue("p", "Biome precision", "How precisely the terrain matches the biomemap",
+                group.AddValue("p", "Biome precision", "How closely the ground follows the biome borders inside each 64 m zone: 0 = vanilla (the zone's 4 corners), 1-5 = (N + 1) x (N + 1) cells per zone",
                     defaultValue: 0, minValue: 0, maxValue: 5,
-                    setter: SetHeightmapValue<int>(value => BetterContinents.Settings.BiomePrecision = value),
+                    // Precision changes how a zone samples the biomes, not the biomes, so no minimap, noise or alt-biome
+                    // rebuild: DynamicPatch rebuilds the loaded terrain and grass, and the zone reset places the
+                    // vegetation again.
+                    setter: value =>
+                    {
+                        BetterContinents.Settings.BiomePrecision = value;
+                        DynamicPatch();
+                        GameUtils.ResetZones();
+                    },
                     getter: () => BetterContinents.Settings.BiomePrecision);
             });
             bc.AddGroup("terrain", "Terrainmap", "Terrainmap settings, get more info with 'bc param terrain help'",

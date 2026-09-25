@@ -1,4 +1,4 @@
-﻿// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and alt-biome planting (0.8.1).
+﻿// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and alt-biome planting (0.8.1), and on 2026-09-24 for world export and import (0.9.0).
 
 using System;
 using System.Collections;
@@ -8,7 +8,9 @@ using System.Linq;
 using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
+using System.Runtime.InteropServices;
 using HarmonyLib;
+using Steamworks;
 using UnityEngine;
 
 namespace BetterContinents;
@@ -54,6 +56,10 @@ public partial class BetterContinents
         [HarmonyPrefix, HarmonyPatch(nameof(ZNet.SetServer))]
         private static void SetServerPrefix(bool server, World world)
         {
+            // A new session: no connection of the last one is current any more, and no server has sent its export
+            // settings yet (LiveConfig).
+            ClientInfo.Clear();
+            LiveConfig.ClearServerValues();
             if (server)
             {
                 var settings = ResolveWorldSettingsPath(world);
@@ -163,14 +169,33 @@ public partial class BetterContinents
 
         private static string ServerVersion = "";
 
-        private static class WorldCache
+        // 0.9.0: internal (not private) and WorldCachePath overridable, so a shareable ".bcworld" file
+        // (WorldCacheShare) can read and write this same on-disk cache, and so the offline tests can point it at a
+        // temp directory. The default is computed lazily (not in a field initializer): Utils.GetSaveDataPath needs
+        // a running game, and a field initializer would run - and throw - the instant anything touches this class,
+        // including a test that only wants to set the override before ever reading the default.
+        internal static class WorldCache
         {
-            private static readonly string WorldCachePath = Path.Combine(Utils.GetSaveDataPath(FileHelpers.FileSource.Local), "BetterContinents", "cache");
-            private static string GetCachePath(string id) => Path.Combine(WorldCachePath, id + ".bc");
+            private static string? worldCachePathOverride;
 
-            public static void Add(ZPackage package)
+            internal static string WorldCachePath
             {
-                var filePath = GetCachePath(PackageID(package));
+                get => worldCachePathOverride ??= Path.Combine(Utils.GetSaveDataPath(FileHelpers.FileSource.Local), "BetterContinents", "cache");
+                set => worldCachePathOverride = value;
+            }
+
+            internal static string GetCachePath(string id) => Path.Combine(WorldCachePath, id + ".bc");
+
+            // 0.9.0: the id of the settings package behind the world this client is currently in - set by the
+            // client-side receive/LoadFromCache handlers below, so "bc_cache export" knows which cache entry is
+            // "the current world". Null on the host/dedicated server (which always re-serializes fresh instead) and
+            // until a client has one (still downloading, a fresh connection, or a world that doesn't use the mod).
+            internal static string? CurrentId;
+
+            public static string Add(ZPackage package)
+            {
+                var id = PackageID(package);
+                var filePath = GetCachePath(id);
                 if (File.Exists(filePath))
                 {
                     LogError($"{filePath} already exists in cache, this shouldn't happen! Deleting the file...");
@@ -180,6 +205,7 @@ public partial class BetterContinents
                 Directory.CreateDirectory(Path.GetDirectoryName(filePath));
                 File.WriteAllBytes(filePath + ".tmp", package.GetArray());
                 File.Move(filePath + ".tmp", filePath);
+                return id;
             }
 
             private static List<string> GetCacheList() =>
@@ -216,6 +242,10 @@ public partial class BetterContinents
 
                 return false;
             }
+
+            // 0.9.0: is id already in THIS machine's cache on disk (no handshake list involved) - what
+            // "bc_cache import" and the plugin-tree seed scan skip duplicates with.
+            internal static bool CacheItemExists(string id) => File.Exists(GetCachePath(id));
 
             public static ZPackage LoadCacheItem(string id) => new(File.ReadAllBytes(GetCachePath(id)));
 
@@ -285,6 +315,11 @@ public partial class BetterContinents
             }
             else
             {
+                // 0.9.0: a fresh connection means a (possibly different) world; forget which cache entry was
+                // "current" until this connection's own handshake or download says otherwise (LoadFromCache /
+                // ReceivedSettings below) - otherwise a stale id from the last server could get exported under
+                // this world's name.
+                WorldCache.CurrentId = null;
                 peer.m_rpc.Invoke("BetterContinentsServerHandshake", ModInfo.Version, WorldCache.SerializeCacheList());
 
                 // The server's alt-biome placement, applied over the client's own once its grid is built
@@ -293,6 +328,11 @@ public partial class BetterContinents
                 AltBiomeControl.ServerPeer = peer;
                 peer.m_rpc.Register("BetterContinentsAltBiomes", (ZRpc rpc, ZPackage assignment) =>
                     AltBiomeControl.ReceiveServerAssignment(assignment));
+
+                // 0.9.0: the server's export HUD and Allow Export values (LiveConfig), sent when our PeerInfo arrives
+                // there and again whenever they change on the server. They apply until this connection ends.
+                LiveConfig.ClearServerValues();
+                peer.m_rpc.Register(LiveConfig.Rpc, (ZRpc rpc, ZPackage values) => LiveConfig.ReceiveServerValues(values));
 
                 peer.m_rpc.Register("BetterContinentsVersion", (ZRpc rpc, string serverVersion) =>
                 {
@@ -383,6 +423,7 @@ public partial class BetterContinents
             }
 
             Settings = loadTask.Result;
+            WorldCache.CurrentId = id;
             DynamicPatch();
             Settings.Dump();
 
@@ -413,8 +454,10 @@ public partial class BetterContinents
                 {
                     var settingsPkg = new ZPackage(SettingsReceiveBuffer);
                     var settings = BetterContinentsSettings.Load(settingsPkg);
-                    WorldCache.Add(settingsPkg);
-                    return settings;
+                    // 0.9.0: Add's return is this package's id - the same one a join check computes - remembered
+                    // as "the current world" below, once we're back on the main thread.
+                    var id = WorldCache.Add(settingsPkg);
+                    return (settings, id);
                 });
 
                 try
@@ -436,7 +479,8 @@ public partial class BetterContinents
                     yield break;
                 }
 
-                Settings = loadingTask.Result;
+                Settings = loadingTask.Result.settings;
+                WorldCache.CurrentId = loadingTask.Result.id;
                 DynamicPatch();
                 Settings.Dump();
 
@@ -464,12 +508,21 @@ public partial class BetterContinents
         }
 
 
-        [HarmonyPostfix, HarmonyPatch(nameof(ZNet.ClearPlayerData))]
-        private static void ClearPlayerData(ZNetPeer peer)
+        // A client's entry leaves ClientInfo when its connection ends. Upstream 0.7.31 hooked ZNet.ClearPlayerData for
+        // this, but vanilla also calls that from RPC_ServerHandshake (ZNet.cs:889-895), for the game's own handshake that
+        // every client sends straight after "BetterContinentsServerHandshake" (ZNet.OnNewConnection). The entry was gone
+        // before the client's PeerInfo, so SendSettings never found its version and a world that uses Better Continents
+        // turned the client away as having "an old version of Better Continents, or none". ZNet.Disconnect
+        // (ZNet.cs:1239-1248) is the end of a connection, and it still calls ClearPlayerData first.
+        [HarmonyPostfix, HarmonyPatch(nameof(ZNet.Disconnect))]
+        private static void DisconnectPostfix(ZNet __instance, ZNetPeer peer)
         {
             var bcClientInfo = ClientInfo.FirstOrDefault(c => c.peer == peer);
             if (bcClientInfo != null)
                 ClientInfo.Remove(bcClientInfo);
+            // A client leaving its server stops following the server's export settings.
+            if (!__instance.IsServer() && peer != null && peer.m_server)
+                LiveConfig.ClearServerValues();
         }
 
         [HarmonyPrefix, HarmonyPatch(nameof(ZNet.RPC_Error))]
@@ -479,6 +532,88 @@ public partial class BetterContinents
             {
                 LastConnectionError = $"Better Continents: local mod version doesn't match the servers (local one is {ModInfo.Version}, server one is unknown)";
                 error = (int)ZNet.ConnectionStatus.ErrorConnectFailed;
+            }
+        }
+
+        // Settings Transfer Rate (07 BetterContinents.Misc, ConfigSettingsTransferRate): Valheim pins every Steam
+        // connection to a 150 KB/s send rate (ZSteamSocket.RegisterGlobalCallbacks sets SendRateMin and SendRateMax
+        // to 153600 bytes/s), and the transfer below drains at whatever rate the connection allows, so an 11.8 MB
+        // world took 93 s to join over Steam sockets. This raises SendRateMax for one connection while its transfer
+        // runs (below, in SendSettings), then restores it. Read only on the sending side (this machine is the host
+        // or the dedicated server): a client's own value has no effect, and a PlayFab (crossplay) connection cannot
+        // be changed at all (ZPlayFabSocket, not ZSteamSocket).
+        private const int VanillaSteamSendRate = 153600;
+        private static bool LoggedPlayFabTransferRateNotice;
+
+        // The low-level change. False means nothing was touched (not a Steam connection, the connection is already
+        // gone, or Steam refused the change) and never throws for those cases; callers still wrap it, since the
+        // Steam API can throw for other reasons (a torn-down connection handle reused elsewhere, for instance).
+        private static bool TrySetSteamSendRate(ISocket socket, int bytesPerSecond)
+        {
+            if (socket is not ZSteamSocket steam || steam.m_con == HSteamNetConnection.Invalid)
+                return false;
+            var handle = GCHandle.Alloc(bytesPerSecond, GCHandleType.Pinned);
+            try
+            {
+                // Per-connection scope is k_ESteamNetworkingConfig_Connection, verified against
+                // libs-Tools/steamworks.net.dll's own metadata (Connection = 4, NOT k_ESteamNetworkingConfig_ListenSocket
+                // = 3, which an earlier draft of this fix used and which would have applied the override to the wrong
+                // scope object and done nothing). Scope object is this one connection's handle.
+                var scopeObj = new IntPtr((long)steam.m_con.m_HSteamNetConnection);
+                // A dedicated server talks to Steam through the game-server interfaces (its own assembly_valheim makes
+                // its sockets with SteamGameServerNetworkingSockets), and there the client-side SteamNetworkingUtils
+                // wrapper throws "Steamworks is not initialized." - seen 2026-09-25 on the local 1.0.15 server, where
+                // the transfer then fell back to Valheim's own rate. A player hosting from the game uses the client
+                // interfaces. Underneath it is the same ISteamNetworkingUtils and the same connection handle, so the
+                // override is the same call either way; the other interface is tried if the expected one refuses.
+                bool dedicated = ZNet.instance != null && ZNet.instance.IsDedicated();
+                try
+                {
+                    return SetSendRate(dedicated, scopeObj, handle.AddrOfPinnedObject(), bytesPerSecond);
+                }
+                catch (InvalidOperationException)
+                {
+                    return SetSendRate(!dedicated, scopeObj, handle.AddrOfPinnedObject(), bytesPerSecond);
+                }
+            }
+            finally
+            {
+                handle.Free();
+            }
+        }
+
+        // GameNetworkingSockets has no adaptive bandwidth (its header: SendRateMin and SendRateMax "should always be
+        // set to the same value, to have deterministic behavior"): a connection sends at its minimum, and vanilla pins
+        // both to 153600 (ZSteamSocket.RegisterGlobalCallbacks). Raising only the maximum changed nothing - seen
+        // 2026-09-25, 11.8 MB still took 78 s after the override was accepted - so both are set, the maximum first
+        // when raising and the minimum first when lowering, so the minimum never sits above the maximum.
+        private static bool SetSendRate(bool gameServer, IntPtr connection, IntPtr value, int bytesPerSecond)
+        {
+            bool raising = bytesPerSecond > VanillaSteamSendRate;
+            var first = raising ? ESteamNetworkingConfigValue.k_ESteamNetworkingConfig_SendRateMax : ESteamNetworkingConfigValue.k_ESteamNetworkingConfig_SendRateMin;
+            var second = raising ? ESteamNetworkingConfigValue.k_ESteamNetworkingConfig_SendRateMin : ESteamNetworkingConfigValue.k_ESteamNetworkingConfig_SendRateMax;
+            return SetConfig(gameServer, first, connection, value) & SetConfig(gameServer, second, connection, value);
+        }
+
+        private static bool SetConfig(bool gameServer, ESteamNetworkingConfigValue which, IntPtr connection, IntPtr value) => gameServer
+            ? SteamGameServerNetworkingUtils.SetConfigValue(which, ESteamNetworkingConfigScope.k_ESteamNetworkingConfig_Connection, connection,
+                ESteamNetworkingConfigDataType.k_ESteamNetworkingConfig_Int32, value)
+            : SteamNetworkingUtils.SetConfigValue(which, ESteamNetworkingConfigScope.k_ESteamNetworkingConfig_Connection, connection,
+                ESteamNetworkingConfigDataType.k_ESteamNetworkingConfig_Int32, value);
+
+        // Puts this connection's send rate back to vanilla once the transfer ends, times out, or is abandoned. Safe
+        // to call even if the peer disconnected mid-transfer: its connection is simply gone, which is not an error,
+        // so any exception here is only logged (at Unity's Log level, not Warning/Error).
+        private static void RestoreSteamSendRate(ZRpc rpc, string why)
+        {
+            try
+            {
+                if (!TrySetSteamSendRate(rpc.GetSocket(), VanillaSteamSendRate))
+                    Log($"Steam send rate restore ({why}): nothing to restore (the connection is already closed, or the rate was never raised).");
+            }
+            catch (Exception e)
+            {
+                Log($"Steam send rate restore skipped ({why}): {e.Message}");
             }
         }
 
@@ -495,7 +630,7 @@ public partial class BetterContinents
             if (peer == null)
             {
                 Log($"Couldn't find peer for rpc");
-                rpc.Invoke("Error", ZNet.ConnectionStatus.ErrorConnectFailed);
+                rpc.Invoke("Error", (int)ZNet.ConnectionStatus.ErrorConnectFailed);
                 yield break;
             }
 
@@ -527,7 +662,7 @@ public partial class BetterContinents
                 if (bcClientInfo?.version == null)
                 {
                     Log($"Client info not found, client has an old version of Better Continents, or none!");
-                    rpc.Invoke("Error", ZNet.ConnectionStatus.ErrorConnectFailed);
+                    rpc.Invoke("Error", (int)ZNet.ConnectionStatus.ErrorConnectFailed);
                     ZNet.instance.Disconnect(peer);
                     yield break;
                 }
@@ -569,6 +704,36 @@ public partial class BetterContinents
 
                     const int SendChunkSize = 128 * 1024;
 
+                    // Settings Transfer Rate: read only here, on the sending side. See TrySetSteamSendRate above.
+                    var transferRate = ConfigSettingsTransferRate?.Value ?? TransferRate.Default;
+                    int? rateBytesPerSecond = TransferRate.BytesPerSecond(transferRate);
+                    Log($"Settings transfer rate: {TransferRate.Describe(transferRate)} (server setting)");
+                    bool rateRaised = false;
+                    if (rateBytesPerSecond.HasValue)
+                    {
+                        if (rpc.GetSocket() is ZSteamSocket)
+                        {
+                            try
+                            {
+                                rateRaised = TrySetSteamSendRate(rpc.GetSocket(), rateBytesPerSecond.Value);
+                                if (!rateRaised)
+                                    Log("Could not raise the Steam send rate for this connection; sending at Valheim's own rate.");
+                            }
+                            catch (Exception e)
+                            {
+                                LogWarning($"Could not raise the Steam send rate for this connection ({e.Message}); sending at Valheim's own rate.");
+                            }
+                        }
+                        else if (!LoggedPlayFabTransferRateNotice)
+                        {
+                            // Not spammed per connection: a crossplay server would otherwise log this on every join.
+                            LoggedPlayFabTransferRateNotice = true;
+                            Log("Settings Transfer Rate cannot be raised on this connection (not Steam, e.g. PlayFab/crossplay); sending at Valheim's own rate.");
+                        }
+                    }
+                    float transferStartedAt = Time.realtimeSinceStartup;
+                    int nextProgressLogAt = Mathf.Max(settingsData.Length / 10, 1);
+
                     for (int sentBytes = 0; sentBytes < settingsData.Length;)
                     {
                         int packetSize = Mathf.Min(settingsData.Length - sentBytes, SendChunkSize);
@@ -586,17 +751,28 @@ public partial class BetterContinents
                         }
 
                         sentBytes += packetSize;
-                        Log($"Sent {sentBytes} of {settingsData.Length} bytes");
+                        if (sentBytes >= nextProgressLogAt || sentBytes == settingsData.Length)
+                        {
+                            Log($"Sent {sentBytes} of {settingsData.Length} bytes");
+                            nextProgressLogAt += Mathf.Max(settingsData.Length / 10, 1);
+                        }
                         float timeout = Time.time + 30;
-                        yield return new WaitUntil(() => rpc.GetSocket().GetSendQueueSize() < SendChunkSize || Time.time > timeout);
+                        // Keep up to two chunks in flight (Steam's own send buffer is 512 KiB) instead of draining to one.
+                        yield return new WaitUntil(() => rpc.GetSocket().GetSendQueueSize() < 2 * SendChunkSize || Time.time > timeout);
                         if (Time.time > timeout)
                         {
                             Log($"Timed out sending config to client {bcClientInfo} after 30 seconds, disconnecting them");
-                            peer.m_rpc.Invoke("Error", ZNet.ConnectionStatus.ErrorConnectFailed);
+                            if (rateRaised)
+                                RestoreSteamSendRate(rpc, "transfer timed out");
+                            peer.m_rpc.Invoke("Error", (int)ZNet.ConnectionStatus.ErrorConnectFailed);
                             ZNet.instance.Disconnect(peer);
                             yield break;
                         }
                     }
+                    if (rateRaised)
+                        RestoreSteamSendRate(rpc, "transfer done");
+                    float transferSeconds = Mathf.Max(Time.realtimeSinceStartup - transferStartedAt, 0.001f);
+                    Log($"Settings sent: {settingsData.Length} bytes in {transferSeconds:F1} s ({settingsData.Length / transferSeconds / 1024f:F0} KB/s)");
                 }
                 yield return new WaitUntil(() => bcClientInfo.readyForPeerInfo || !peer.m_socket.IsConnected());
 
@@ -613,8 +789,40 @@ public partial class BetterContinents
             call_RPC_PeerInfo();
         }
 
+        // 0.9.0: the server's Hud and Allow Export (LiveConfig) to one client that runs Better Continents. Clients
+        // older than 0.9.0 have no handler, and ZRpc drops an unknown RPC without a word.
+        private static bool SendLiveConfig(BCClientInfo? client)
+        {
+            if (client?.version == null || client.peer?.m_rpc == null)
+                return false;
+            client.peer.m_rpc.Invoke(LiveConfig.Rpc, LiveConfig.ServerPackage());
+            return true;
+        }
+
+        // ... and to every connected one, when they change on this server.
+        internal static void SendLiveConfigToAll()
+        {
+            var net = ZNet.instance;
+            if (net == null || !net.IsServer())
+                return;
+            var peers = net.GetPeers();
+            int sent = 0;
+            foreach (var client in ClientInfo)
+            {
+                if (client.peer != null && peers.Contains(client.peer) && SendLiveConfig(client))
+                    sent++;
+            }
+            Log($"Sent the export settings to {sent} connected Better Continents client(s).");
+        }
+
         public static void RPC_PeerInfoRedirect(ZRpc rpc, ZPackage pkg, Action call_RPC_PeerInfo)
         {
+            // Every client that runs Better Continents learns the server's export settings, whether or not this world
+            // uses Better Continents: exporting a vanilla world is as useful as exporting one of ours.
+            var peer = ZNet.instance.GetPeer(rpc);
+            if (peer != null)
+                SendLiveConfig(ClientInfo.FirstOrDefault(c => c.peer == peer));
+
             if (Settings.EnabledForThisWorld)
             {
                 Log($"Sending settings now");

@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-09-22 for alt-biome planting (0.8.1).
+// Added by Wubarrk on 2026-09-22 for alt-biome planting (0.8.1), and on 2026-09-24 for world export and import (0.9.0).
 
 using System;
 using System.Collections.Generic;
@@ -392,26 +392,29 @@ public partial class BetterContinents
       return s;
     }
 
-    public static AltBiomeSettings FromConfig()
+    public static AltBiomeSettings FromConfig() => FromConfig(ConfigValues.Live);
+
+    // From the given config values (a world import reads an export.cfg over a snapshot of the config).
+    internal static AltBiomeSettings FromConfig(ConfigValues c)
     {
       var s = new AltBiomeSettings
       {
-        Mode = ParseEnum(ConfigAltBiomeMode.Value, AltBiomeMode.Random),
-        Grid = ParseEnum(ConfigAltBiomeGrid.Value, AltBiomeGridMode.WorldEdge),
-        FixNeighbourCheck = ConfigAltBiomeFixNeighbourCheck.Value,
-        MeanSectorHeight = ConfigAltBiomeMeanHeight.Value,
-        MinSectorThickness = Math.Max(0f, ConfigAltBiomeMinThickness.Value),
-        ChanceMultiplier = Math.Max(0f, ConfigAltBiomeChanceMultiplier.Value),
-        AmountMultiplier = Math.Max(0f, ConfigAltBiomeAmountMultiplier.Value),
-        EdgeScale = Math.Max(0.01f, ConfigAltBiomeEdgeScale.Value),
-        DistanceScale = Math.Max(0f, ConfigAltBiomeDistanceScale.Value),
+        Mode = ParseEnum(c.Get(ConfigAltBiomeMode), AltBiomeMode.Random),
+        Grid = ParseEnum(c.Get(ConfigAltBiomeGrid), AltBiomeGridMode.WorldEdge),
+        FixNeighbourCheck = c.Get(ConfigAltBiomeFixNeighbourCheck),
+        MeanSectorHeight = c.Get(ConfigAltBiomeMeanHeight),
+        MinSectorThickness = Math.Max(0f, c.Get(ConfigAltBiomeMinThickness)),
+        ChanceMultiplier = Math.Max(0f, c.Get(ConfigAltBiomeChanceMultiplier)),
+        AmountMultiplier = Math.Max(0f, c.Get(ConfigAltBiomeAmountMultiplier)),
+        EdgeScale = Math.Max(0.01f, c.Get(ConfigAltBiomeEdgeScale)),
+        DistanceScale = Math.Max(0f, c.Get(ConfigAltBiomeDistanceScale)),
       };
-      if (TryParseSeed(ConfigAltBiomeSeed.Value, out var seed))
+      if (TryParseSeed(c.Get(ConfigAltBiomeSeed), out var seed))
       {
         s.UseFixedSeed = true;
         s.Seed = seed;
       }
-      if (!TryParseOverrides(ConfigAltBiomeOverrides.Value, s.Overrides, out var error))
+      if (!TryParseOverrides(c.Get(ConfigAltBiomeOverrides), s.Overrides, out var error))
         LogError($"Alt Biomes / Overrides config: {error}");
       return s;
     }

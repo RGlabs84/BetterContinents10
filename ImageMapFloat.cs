@@ -1,4 +1,6 @@
-﻿using System;
+﻿// Modified by Wubarrk on 2026-09-24 for world export and import (0.9.0).
+
+using System;
 using System.Diagnostics;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
@@ -68,6 +70,12 @@ internal class ImageMapFloat : ImageMapBase
         BetterContinents.Log($"Time to process {FilePath}: {sw.ElapsedMilliseconds} ms");
 
         return true;
+    }
+
+    internal override void ReleasePixels()
+    {
+        Map = [];
+        AlphaMap = [];
     }
 
     public float GetValue(float x, float y)

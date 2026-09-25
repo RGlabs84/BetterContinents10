@@ -1,8 +1,9 @@
-﻿// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and alt-biome planting (0.8.1).
+﻿// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and alt-biome planting (0.8.1), and on 2026-09-24 for world export and import (0.9.0).
 
 using System.Collections;
 using System.Reflection;
 using HarmonyLib;
+using UnityEngine;
 
 namespace BetterContinents;
 
@@ -81,51 +82,75 @@ public partial class BetterContinents
     (CachedBiomeAreasField.GetValue(null) as IDictionary)?.Clear();
     (CachedBiomesField.GetValue(null) as IDictionary)?.Clear();
   }
+
+  // Biome precision (BiomePrecisionGrid, in HeightmapPatch). HeightmapBuilder.Build, which runs on the game's builder
+  // thread, is patched once at load and follows BiomePrecisionGrid.Active; the readers are patched here, on the main
+  // thread, which is the only thread that calls them. Heightmap.GetBiomeColor belongs to PatchBiomeColor, shared with
+  // the terrain map.
   private static int HeightmapGetBiomePatched = 0;
-  private static void PatchHeightmap()
+  internal static void PatchHeightmap()
   {
-    var precision = Settings.EnabledForThisWorld ? Settings.BiomePrecision : 0;
+    var precision = EffectiveBiomePrecision(Settings);
     if (precision == HeightmapGetBiomePatched)
       return;
-    Log($"Note: Biome precision feature doesn't work at the moment.");
+    var getBiome = AccessTools.Method(typeof(Heightmap), nameof(Heightmap.GetBiome), [typeof(Vector3), typeof(float), typeof(bool)]);
+    var getBiomePatch = AccessTools.Method(typeof(BetterContinents), nameof(GetBiomePatch));
+    var haveBiome = AccessTools.Method(typeof(Heightmap), nameof(Heightmap.HaveBiome), [typeof(Heightmap.Biome)]);
+    var haveBiomePatch = AccessTools.Method(typeof(BetterContinents), nameof(HaveBiomePatch));
+    if (!EnsurePatchTargetFound(getBiome, "Heightmap.GetBiome(Vector3,float,bool)") || !EnsurePatchTargetFound(haveBiome, "Heightmap.HaveBiome(Biome)"))
+      return;
+    // New builds sample at the new precision from here on. A heightmap keeps the grid it was built with (a grid
+    // records its own size) until the rebuild below replaces it; with precision off no grid is read at all.
+    BiomePrecisionGrid.Active = precision;
+    if (precision == 0)
+    {
+      Log("Biome precision off: each 64 m terrain zone takes its biomes from its 4 corners (vanilla)");
+      HarmonyInstance.Unpatch(getBiome, getBiomePatch);
+      HarmonyInstance.Unpatch(haveBiome, haveBiomePatch);
+      BiomePrecisionGrid.Clear();
+    }
+    else
+    {
+      if (HeightmapGetBiomePatched == 0)
+      {
+        // CreateProcessor rather than Patch(..., prefix:): the same call in BepInEx's HarmonyX and in the Lib.Harmony
+        // that the offline tests (tools/export-tests) run this method on.
+        HarmonyInstance.CreateProcessor(getBiome).AddPrefix(getBiomePatch).Patch();
+        HarmonyInstance.CreateProcessor(haveBiome).AddPostfix(haveBiomePatch).Patch();
+      }
+      Log($"Biome precision {precision}: each 64 m terrain zone follows the biomes on {precision + 1} x {precision + 1} cells ({64f / (precision + 1):0.#} m)");
+    }
     HeightmapGetBiomePatched = precision;
-    return;
-    /*
-    var method1 = AccessTools.Method(typeof(Heightmap), nameof(Heightmap.GetBiome));
-    var patch1 = AccessTools.Method(typeof(BetterContinents), nameof(GetBiomePatch));
-    var method2 = AccessTools.Method(typeof(HeightmapBuilder), nameof(HeightmapBuilder.Build));
-    var patch2 = AccessTools.Method(typeof(BetterContinents), nameof(BuildPatch));
-    var method3 = AccessTools.Method(typeof(Heightmap), nameof(Heightmap.GetBiomeColor), [typeof(float), typeof(float)]);
-    var patch3 = AccessTools.Method(typeof(BetterContinents), nameof(GetBiomeColorPatch));
-    if (HeightmapGetBiomePatched > 0)
-    {
-      Log("Unpatching Heightmap.GetBiome");
-      HarmonyInstance.Unpatch(method1, patch1);
-      HarmonyInstance.Unpatch(method2, patch2);
-      HarmonyInstance.Unpatch(method3, patch3);
-      HeightmapGetBiomePatched = 0;
-    }
-    if (precision > 0)
-    {
-      Log($"Patching Heightmap.GetBiome with precision {precision}");
-      HarmonyInstance.Patch(method1, prefix: new(patch1));
-      HarmonyInstance.Patch(method2, prefix: new(patch2));
-      HarmonyInstance.Patch(method3, prefix: new(patch3));
-      HeightmapGetBiomePatched = precision;
-    }
-    foreach (Heightmap hm in Heightmap.Instances)
-    {
-      hm.m_buildData = null;
-      hm.Regenerate();
-    }
-    ClutterSystem.instance?.ClearAll();
-    */
+    RegenerateLoadedTerrain();
   }
 
-  private static bool BiomeColorPatched = false;
-  private static void PatchBiomeColor()
+  // Loaded terrain keeps the grid (or none) it was built with: rebuild the zone heightmaps (distant LOD never has a
+  // grid) and let the grass read the biomes again, as the 0.7 code did before precision was switched off. In 1.0.15
+  // that is Heightmap.s_heightmaps, a delayed Poke (Regenerate in LateUpdate, like GameUtils.ResetZones) and
+  // ClutterSystem.ClearAll. Only in a loaded world: at world load and in the main menu there is nothing to redo.
+  private static void RegenerateLoadedTerrain()
   {
-    var toPatch = Settings.EnabledForThisWorld && Settings.HasTerrainMap;
+    if (!ZoneSystem.instance)
+      return;
+    int rebuilt = 0;
+    foreach (var hm in Heightmap.s_heightmaps)
+    {
+      hm.m_buildData = null;
+      hm.Poke(1);
+      rebuilt++;
+    }
+    var clutter = ClutterSystem.instance;
+    if (clutter)
+      clutter.ClearAll();
+    Log($"Biome precision: rebuilding {rebuilt} loaded terrain zone(s) and the grass");
+  }
+
+  // Heightmap.GetBiomeColor(float, float) has one prefix for both features that use it, the terrain map and biome
+  // precision (GetBiomeColorPatch picks per vertex), so neither can unpatch the other.
+  private static bool BiomeColorPatched = false;
+  internal static void PatchBiomeColor()
+  {
+    var toPatch = Settings.EnabledForThisWorld && (Settings.HasTerrainMap || EffectiveBiomePrecision(Settings) > 0);
     if (toPatch == BiomeColorPatched)
       return;
     var method = AccessTools.Method(typeof(Heightmap), nameof(Heightmap.GetBiomeColor), [typeof(float), typeof(float)]);
@@ -141,7 +166,7 @@ public partial class BetterContinents
     if (toPatch)
     {
       Log("Patching Heightmap.GetBiomeColor");
-      HarmonyInstance.Patch(method, prefix: new(patch));
+      HarmonyInstance.CreateProcessor(method).AddPrefix(patch).Patch();
       BiomeColorPatched = true;
     }
   }

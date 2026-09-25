@@ -1,4 +1,6 @@
-﻿using System;
+﻿// Modified by Wubarrk on 2026-09-24 for world export and import (0.9.0).
+
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -42,6 +44,9 @@ internal class ImageMapLocation() : ImageMapBase()
     }
     public Dictionary<string, List<Vector2>> RemainingAreas = [];
     private Dictionary<string, Color32> Colors = [];
+    // World export (WorldExport): the legend this map was decoded with (empty for a map read back from a world's
+    // settings, which stores the chosen positions only).
+    internal IReadOnlyDictionary<string, Color32> LegendColors => Colors;
 
     public override bool LoadSourceImage()
     {
@@ -149,7 +154,8 @@ internal class ImageMapLocation() : ImageMapBase()
         }
     }
 
-    private static readonly string DefaultColors = "StartTemple: 255,0,0|Eikthyrnir: 255,153,0|GDKing: 0,255,0|GoblinKing: 255,255,0|Bonemass: 0,255,255|Dragonqueen: 74,134,232|Vendor_BlackForest: 0,0,255|AbandonedLogCabin02: 230,184,175|AbandonedLogCabin03: 230,184,175|AbandonedLogCabin04: 230,184,175|TrollCave02: 201,218,248|Crypt2: 255,242,204|Crypt3: 255,242,204|Crypt4: 255,242,204|SunkenCrypt4: 69,129,142|Dolmen03: 255,229,153|Dolmen01: 255,229,153|Dolmen02: 255,229,153|Ruin3: 221,126,107|StoneTower1: 204,65,37|StoneTower3: 204,65,37|MountainGrave01: 106,168,79|Grave1: 127,96,96|InfestedTree01: 182,215,168|WoodHouse1: 109,158,235|WoodHouse10: 109,158,235|WoodHouse11: 109,158,235|WoodHouse12: 109,158,235|WoodHouse13: 109,158,235|WoodHouse2: 109,158,235|WoodHouse3: 109,158,235|WoodHouse4: 109,158,235|WoodHouse5: 109,158,235|WoodHouse6: 109,158,235|WoodHouse7: 109,158,235|WoodHouse8: 109,158,235|WoodHouse9: 109,158,235|StoneHouse3: 118,165,175|StoneHouse4: 118,165,175|Meteorite: 147,196,125|StoneTowerRuins04: 166,28,0|StoneTowerRuins05: 166,28,0|SwampRuin1: 19,79,92|SwampRuin2: 19,79,92|Ruin1: 39,78,19|Ruin2: 39,78,19|DrakeLorestone: 133,32,12|Runestone_Boars: 91,15,0|Runestone_Draugr: 79,204,204|Runestone_Greydwarfs: 234,153,153|Runestone_Meadows: 224,102,102|Runestone_Mountains: 204,0,0|Runestone_Plains: 153,0,0|Runestone_Swamps: 102,0,0|ShipSetting01: 208,224,227|ShipWreck01: 252,229,205|ShipWreck02: 252,229,205|ShipWreck03: 252,229,205|ShipWreck04: 252,229,205|GoblinCamp2: 191,144,0|DrakeNest01: 255,217,102|FireHole: 241,194,50|Greydwarf_camp1: 217,228,211|StoneCircle: 162,196,201|StoneHenge1: 249,203,156|StoneHenge2: 249,203,156|StoneHenge3: 249,203,156|StoneHenge4: 249,203,156|StoneHenge5: 249,203,156|StoneHenge6: 249,203,156|StoneTowerRuins03: 246,178,107|StoneTowerRuins07: 246,178,107|StoneTowerRuins08: 246,178,107|StoneTowerRuins09: 246,178,107|StoneTowerRuins10: 246,178,107|SwampHut5: 230,145,56|SwampHut1: 230,145,56|SwampHut2: 230,145,56|SwampHut3: 230,145,56|SwampHut4: 230,145,56|Waymarker01: 164,195,244|Waymarker02: 164,195,244|MountainWell1: 56,118,29|SwampWell1: 12,52,61|WoodFarm1: 180,95,6|WoodVillage1: 120,63,4|Mistlands_DvergrBossEntrance1: 153,0,255|Hildir_camp: 255,105,180";
+    // Internal for WorldExport, which gives each location its default colour here where it is not shared.
+    internal static readonly string DefaultColors = "StartTemple: 255,0,0|Eikthyrnir: 255,153,0|GDKing: 0,255,0|GoblinKing: 255,255,0|Bonemass: 0,255,255|Dragonqueen: 74,134,232|Vendor_BlackForest: 0,0,255|AbandonedLogCabin02: 230,184,175|AbandonedLogCabin03: 230,184,175|AbandonedLogCabin04: 230,184,175|TrollCave02: 201,218,248|Crypt2: 255,242,204|Crypt3: 255,242,204|Crypt4: 255,242,204|SunkenCrypt4: 69,129,142|Dolmen03: 255,229,153|Dolmen01: 255,229,153|Dolmen02: 255,229,153|Ruin3: 221,126,107|StoneTower1: 204,65,37|StoneTower3: 204,65,37|MountainGrave01: 106,168,79|Grave1: 127,96,96|InfestedTree01: 182,215,168|WoodHouse1: 109,158,235|WoodHouse10: 109,158,235|WoodHouse11: 109,158,235|WoodHouse12: 109,158,235|WoodHouse13: 109,158,235|WoodHouse2: 109,158,235|WoodHouse3: 109,158,235|WoodHouse4: 109,158,235|WoodHouse5: 109,158,235|WoodHouse6: 109,158,235|WoodHouse7: 109,158,235|WoodHouse8: 109,158,235|WoodHouse9: 109,158,235|StoneHouse3: 118,165,175|StoneHouse4: 118,165,175|Meteorite: 147,196,125|StoneTowerRuins04: 166,28,0|StoneTowerRuins05: 166,28,0|SwampRuin1: 19,79,92|SwampRuin2: 19,79,92|Ruin1: 39,78,19|Ruin2: 39,78,19|DrakeLorestone: 133,32,12|Runestone_Boars: 91,15,0|Runestone_Draugr: 79,204,204|Runestone_Greydwarfs: 234,153,153|Runestone_Meadows: 224,102,102|Runestone_Mountains: 204,0,0|Runestone_Plains: 153,0,0|Runestone_Swamps: 102,0,0|ShipSetting01: 208,224,227|ShipWreck01: 252,229,205|ShipWreck02: 252,229,205|ShipWreck03: 252,229,205|ShipWreck04: 252,229,205|GoblinCamp2: 191,144,0|DrakeNest01: 255,217,102|FireHole: 241,194,50|Greydwarf_camp1: 217,228,211|StoneCircle: 162,196,201|StoneHenge1: 249,203,156|StoneHenge2: 249,203,156|StoneHenge3: 249,203,156|StoneHenge4: 249,203,156|StoneHenge5: 249,203,156|StoneHenge6: 249,203,156|StoneTowerRuins03: 246,178,107|StoneTowerRuins07: 246,178,107|StoneTowerRuins08: 246,178,107|StoneTowerRuins09: 246,178,107|StoneTowerRuins10: 246,178,107|SwampHut5: 230,145,56|SwampHut1: 230,145,56|SwampHut2: 230,145,56|SwampHut3: 230,145,56|SwampHut4: 230,145,56|Waymarker01: 164,195,244|Waymarker02: 164,195,244|MountainWell1: 56,118,29|SwampWell1: 12,52,61|WoodFarm1: 180,95,6|WoodVillage1: 120,63,4|Mistlands_DvergrBossEntrance1: 153,0,255|Hildir_camp: 255,105,180";
     public bool CreateMap() => CreateMap<Rgba32>();
     protected override bool LoadTextureToMap<T>(Image<T> image)
     {
@@ -225,7 +231,7 @@ internal class ImageMapLocation() : ImageMapBase()
                     }
 
                     // Just select the actual position from the area now, there is no point delaying this until later
-                    var position = area[UnityEngine.Random.Range(0, area.Count)];
+                    var position = area[PickIndex(area.Count)];
                     areas.Add(position);
                     BetterContinents.Log($"Found #{ColorUtility.ToHtmlStringRGB(color)} area of {area.Count} size at {x}, {Size - y}, selected position {position.x}, {position.y}");
                 }
@@ -241,7 +247,7 @@ internal class ImageMapLocation() : ImageMapBase()
             {
                 foreach (var position in colorPositions.Value)
                 {
-                    var location = locations[UnityEngine.Random.Range(0, locations.Count)].Key;
+                    var location = locations[PickIndex(locations.Count)].Key;
                     if (!RemainingAreas.TryGetValue(location, out var positions))
                     {
                         positions = [];
@@ -262,6 +268,13 @@ internal class ImageMapLocation() : ImageMapBase()
 
         return true;
     }
+
+    // UnityEngine.Random is main-thread only, and a world import decodes this map on a worker (WorldImport), where a
+    // thread's own System.Random picks instead. On the main thread the pick is exactly as before. An exported location
+    // map has one pixel and one legend name per colour, so its picks are all certain anyway.
+    [ThreadStatic] private static System.Random? workerRandom;
+    private static int PickIndex(int count) =>
+        BetterContinents.IsMainThread ? UnityEngine.Random.Range(0, count) : (workerRandom ??= new System.Random()).Next(count);
 
     public Vector2? FindSpawn(string spawn)
     {
