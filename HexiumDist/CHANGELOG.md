@@ -1,3 +1,18 @@
+- v0.9.2
+  - Works with ZenMap and no-map worlds. Better Continents drew the minimap on background threads and
+    let the game carry on before the drawing was done, and the game hands the map to other mods at that
+    moment. ZenMap copies it there to build the biome-hidden map it shows at cartography tables, so on a
+    Better Continents world the tables showed meadows, plains and low ground as sea and the rest as
+    noise. The map is now finished before the game carries on, so cartography tables and admin maps on
+    no-map worlds show the real land and sea, as crafted parchment maps already did.
+  - The minimap is still drawn on several threads, now on every CPU core (up to 16) instead of four.
+    The loading screen waits for it, as it does for vanilla's single-threaded drawing, which takes longer.
+  - Mods that hook the game's map drawing now run once, on the finished map. Before, they ran twice, the
+    first time on an empty map.
+  - If drawing the map on several threads fails, the error is logged and the game draws the map itself.
+    Before, a failed thread was ignored and part of the map stayed empty.
+  - No world needs changing: every player's game redraws the map each time it joins. On a world that uses
+    Better Continents the server and every player must run the same version, so update them together.
 - v0.9.1
   - Rebuilt against Valheim 1.0.16 and re-verified: the reference check passes against the
     1.0.16 client and dedicated server, the mod boots on a 1.0.16 dedicated server, and the

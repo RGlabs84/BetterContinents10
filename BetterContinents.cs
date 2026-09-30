@@ -1,4 +1,4 @@
-// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and alt-biome planting (0.8.1), and on 2026-09-24 for world export and import (0.9.0), and on 2026-09-25 for version-agnostic wording (0.9.1).
+// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and alt-biome planting (0.8.1), and on 2026-09-24 for world export and import (0.9.0), and on 2026-09-25 for version-agnostic wording (0.9.1), and on 2026-09-27 for map mod compatibility (0.9.2).
 
 using System;
 using System.Collections;
@@ -518,69 +518,75 @@ public partial class BetterContinents : BaseUnityPlugin
         // prefix collapsed six biomes onto the red forest channel, which drew Swamp, Mountain
         // and Mistlands as Black Forest and threw away the Ashlands and underwater gradients.
 
-        // Some map mods may do stuff after generation which won't work with async.
-        // So do one "fake" generate call to trigger those.
-        static bool DoFakeGenerate = false;
+        // The map must be finished by the time GenerateWorldMap returns, as vanilla's is. Minimap.Update calls
+        // LoadMapData straight after it, and map mods take the map at those two points: ZenMap's LoadMapData
+        // postfix copies the three textures to build its biome-hidden map for cartography tables, and other
+        // mods' GenerateWorldMap postfixes read them the moment the call returns. Up to 0.9.1 the work ran as a
+        // background task and this returned at once, so all of those saw empty textures (on a Better Continents
+        // world, ZenMap's tables showed meadows and plains as sea and the rest as noise), and a second "fake"
+        // call was needed to run other mods' postfixes again once the map was ready. The work still runs on
+        // several threads; the main thread now waits for it. The game shows its loading screen at this point,
+        // and vanilla's own single-threaded generation blocks it for longer.
+        private static bool ThreadedGenerationFailed;
+
         [HarmonyPrefix, HarmonyPatch(nameof(Minimap.GenerateWorldMap))]
         private static bool GenerateWorldMapPrefix(Minimap __instance)
         {
-            if (DoFakeGenerate)
-            {
-                DoFakeGenerate = false;
-                return false;
-            }
-            __instance.StartCoroutine(GenerateWorldMapMT(__instance));
-            return false;
-        }
-
-        private static IEnumerator GenerateWorldMapMT(Minimap map)
-        {
-            Log($"Generating minimap textures multi-threaded ...");
-            // The vanilla GenerateWorldMap is skipped, so the cache has to be invalidated here instead.
-            // Otherwise an interrupted generation leaves a cache that still passes the seed and version checks.
-            Minimap.DeleteMapTextureData(ZNet.World.m_name);
-            int halfSize = map.m_textureSize / 2;
-            float halfSizeF = map.m_pixelSize / 2f;
-            var mapPixels = new Color32[map.m_textureSize * map.m_textureSize];
-            var forestPixels = new Color32[map.m_textureSize * map.m_textureSize];
-            var heightPixels = new Color[map.m_textureSize * map.m_textureSize];
-            var cachedHeights = new float[map.m_textureSize * map.m_textureSize];
-            int progress = 0;
-            var task = Task.Run(() =>
-            {
-                GameUtils.SimpleParallelFor(4, 0, map.m_textureSize, i =>
-                {
-                    for (int j = 0; j < map.m_textureSize; j++)
-                    {
-                        float wx = (j - halfSize) * map.m_pixelSize + halfSizeF;
-                        float wy = (i - halfSize) * map.m_pixelSize + halfSizeF;
-                        var biome = WorldGenerator.instance.GetBiome(wx, wy);
-                        float biomeHeight = WorldGenerator.instance.GetBiomeHeight(biome, wx, wy, out _);
-                        mapPixels[i * map.m_textureSize + j] = map.GetPixelColor(biome);
-                        forestPixels[i * map.m_textureSize + j] = map.GetMaskColor(wx, wy, biomeHeight, biome);
-                        // Alpha 0, not the 1 the three-argument Color constructor gives: vanilla
-                        // fills this array by assigning .r onto a default Color, so its alpha is 0.
-                        heightPixels[i * map.m_textureSize + j] = new Color(biomeHeight, 0f, 0f, 0f);
-                        cachedHeights[i * map.m_textureSize + j] = biomeHeight;
-                    }
-                    // Updated every row, because every pixel is pointless for a percentage.
-                    Interlocked.Increment(ref progress);
-                });
-            });
-
+            // After one failure, vanilla draws the map for the rest of the session. Minimap.Update calls
+            // GenerateWorldMap every frame until a call succeeds, and retrying the threaded version there would
+            // redo the whole map and log the same error on every frame.
+            if (ThreadedGenerationFailed)
+                return true;
             try
             {
-                UI.Add("GeneratingMinimap", () =>
-                {
-                    int percentProgress = (int)(100 * ((float)progress / map.m_textureSize));
-                    UI.DisplayMessage($"Better Continents: generating minimap {percentProgress}% ...");
-                });
-                yield return new WaitUntil(() => task.IsCompleted);
+                GenerateWorldMapMT(__instance);
+                return false;
             }
-            finally
+            catch (Exception e)
             {
-                UI.Remove("GeneratingMinimap");
+                // Up to 0.9.1 a failed worker was ignored, and the rows it never reached stayed empty on the map.
+                ThreadedGenerationFailed = true;
+                LogError($"Multi-threaded minimap generation failed, so the game draws the map itself: {e}");
+                return true;
             }
+        }
+
+        private static void GenerateWorldMapMT(Minimap map)
+        {
+            var stopwatch = Stopwatch.StartNew();
+            int size = map.m_textureSize;
+            // The loading screen waits for this, so use the whole CPU; vanilla uses one core.
+            int threads = Math.Max(1, Math.Min(16, Environment.ProcessorCount));
+            Log($"Generating minimap textures multi-threaded ({size} x {size}, {threads} threads) ...");
+            // The vanilla GenerateWorldMap is skipped, so the cache has to be invalidated here instead.
+            // Otherwise a failed generation leaves a cache that still passes the seed and version checks.
+            Minimap.DeleteMapTextureData(ZNet.World.m_name);
+            int halfSize = size / 2;
+            float halfPixel = map.m_pixelSize / 2f;
+            var mapPixels = new Color32[size * size];
+            var forestPixels = new Color32[size * size];
+            var heightPixels = new Color[size * size];
+            var cachedHeights = new float[size * size];
+            var worldGenerator = WorldGenerator.instance;
+            // SimpleParallelFor waits for every worker and throws an AggregateException if any of them failed,
+            // which the prefix turns into vanilla's generation.
+            GameUtils.SimpleParallelFor(threads, 0, size, i =>
+            {
+                float wy = (i - halfSize) * map.m_pixelSize + halfPixel;
+                for (int j = 0; j < size; j++)
+                {
+                    float wx = (j - halfSize) * map.m_pixelSize + halfPixel;
+                    var biome = worldGenerator.GetBiome(wx, wy);
+                    float biomeHeight = worldGenerator.GetBiomeHeight(biome, wx, wy, out _);
+                    int index = i * size + j;
+                    mapPixels[index] = map.GetPixelColor(biome);
+                    forestPixels[index] = map.GetMaskColor(wx, wy, biomeHeight, biome);
+                    // Alpha 0, not the 1 the three-argument Color constructor gives: vanilla
+                    // fills this array by assigning .r onto a default Color, so its alpha is 0.
+                    heightPixels[index] = new Color(biomeHeight, 0f, 0f, 0f);
+                    cachedHeights[index] = biomeHeight;
+                }
+            });
 
             map.m_forestMaskTexture.SetPixels32(forestPixels);
             map.m_forestMaskTexture.Apply();
@@ -589,16 +595,12 @@ public partial class BetterContinents : BaseUnityPlugin
             map.m_heightTexture.SetPixels(heightPixels);
             map.m_heightTexture.Apply();
 
-            Log($"Finished generating minimap textures multi-threaded ...");
+            Log($"Finished generating minimap textures multi-threaded in {stopwatch.ElapsedMilliseconds} ms");
             if (FileHelpers.LocalStorageSupport == LocalStorageSupport.Supported)
             {
                 // This also writes the meta file with the world seed and the cache version.
                 map.SaveMapTextureDataToDisk(forestPixels, mapPixels, cachedHeights);
             }
-            // Some map mods may do stuff after generation which won't work with async.
-            // So do one "fake" generate call to trigger those.
-            DoFakeGenerate = true;
-            map.GenerateWorldMap();
         }
     }
 

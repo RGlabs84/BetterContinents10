@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-09-24 for world export and import (0.9.0).
+// Added by Wubarrk on 2026-09-24 for world export and import (0.9.0), and on 2026-09-27 for map mod compatibility (0.9.2).
 
 // Offline checks of Better Continents 0.9.0's live config (LiveConfig), its RPC package, the export gate and the
 // configured export defaults. Loads the real pre-ILRepack BetterContinents.dll, the game's assemblies and BepInEx.
@@ -81,6 +81,7 @@ internal static class Program
       SectionNumbers();
       TransferRateTests();
       failures += CacheTests.Run();
+      failures += MinimapTests.Run();
     }
     catch (Exception e)
     {

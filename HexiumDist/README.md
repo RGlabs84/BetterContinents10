@@ -6,7 +6,7 @@
 [![Multiplayer Compatible](https://img.shields.io/badge/Multiplayer-Server_Synced-blue.svg)]()
 [![Framework](https://img.shields.io/badge/Requires-BepInEx-red.svg)]()
 [![Compatibility](https://img.shields.io/badge/Target-Valheim_1.0-brightgreen.svg)]()
-[![Version](https://img.shields.io/badge/Version-0.9.1-lightgrey.svg)]()
+[![Version](https://img.shields.io/badge/Version-0.9.2-lightgrey.svg)]()
 
 > *"The Allfather did not carve the Tenth Realm in a single stroke. With hammer and chisel, the jagged peaks were raised, deep fjords torn open, and ancient oceans poured into the abyss. Take up the chisel, Viking, and shape the continents to your will."*
 
@@ -29,6 +29,7 @@ Whether you want to import a real-world map of Earth, recreate Middle-earth, scu
   - [💾 World File Sharing & Presets](#world-file-sharing--presets)
   - [📤 Export a World to Maps](#export-a-world-to-maps)
   - [📥 Make a World From an Export](#make-a-world-from-an-export)
+  - [🧭 Map Mods & No-Map Worlds](#map-mods--no-map-worlds)
 - [📦 Recommended Companion Mods](#recommended-companion-mods)
 - [🍗 Installation & Setup](#installation--setup)
 - [🛠️ How World Generation Works](#how-world-generation-works)
@@ -129,6 +130,13 @@ Three ways, from the easiest:
 3. **To keep editing, the config.** `bc_import <number> config` copies the folder's `export.cfg` into `BetterContinents.cfg` (your old file is kept beside it) and selects the preset "From Config", so every new world reads the PNGs as they are at that moment. Pasting `export.cfg` at the end of `BetterContinents.cfg` yourself does the same, with no restart.
 
 A world that already exists keeps the maps it was created with. For step-by-step instructions written for first-timers, see `BetterContinents-Export-Guide.pdf` in the package.
+
+<a id="map-mods--no-map-worlds"></a>
+### 🧭 Map Mods & No-Map Worlds (new in 0.9.2)
+* 🗺️ The minimap is finished before the game hands it to other mods. It is still drawn on several CPU cores at once; the loading screen simply waits for it, as it does for vanilla's own map.
+* 📜 **ZenMap:** cartography tables with hidden biomes and the admin map show the real land and sea, as crafted parchment maps already did. Before 0.9.2, ZenMap copied the map before Better Continents had drawn it, so the tables showed meadows and plains as sea.
+* 🕯️ **No-map worlds:** mods that show players a map only at a table or on a parchment, or give admins their map back, get the finished map on every join.
+* 🧩 Any mod that reads, copies or restyles the minimap when it loads sees the finished map, and mods that hook the game's map drawing run once, after it is done.
 
 ---
 
