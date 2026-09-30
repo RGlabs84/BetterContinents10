@@ -1,7 +1,8 @@
-﻿// Modified by Wubarrk on 2026-09-24 for world export and import (0.9.0).
+﻿// Modified by Wubarrk on 2026-09-24 for world export and import (0.9.0), and on 2026-09-29 for Expand World Data biomes (0.9.3).
 
 using System;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using SixLabors.ImageSharp;
@@ -115,6 +116,30 @@ internal abstract class ImageMapBase()
     pkg.Write(SourceData);
   }
 
+  // ParseColor32 for legends, which report a bad colour instead of reading it as transparent black: false for
+  // anything that is not a hex colour or at least three comma-separated numbers from 0 to 255 (a fourth is alpha).
+  protected static bool TryParseColor32(string color, out Color32 result)
+  {
+    result = default;
+    color = color.Trim();
+    var split = color.Split(',');
+    if (split.Length == 1)
+    {
+      if (!SixLabors.ImageSharp.Color.TryParseHex(color, out var hex))
+        return false;
+      Rgba32 rgba = hex;
+      result = new Color32(rgba.R, rgba.G, rgba.B, rgba.A);
+      return true;
+    }
+    if (split.Length < 3)
+      return false;
+    var parts = new byte[] { 0, 0, 0, 255 };
+    for (int i = 0; i < Math.Min(split.Length, 4); i++)
+      if (!byte.TryParse(split[i].Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out parts[i]))
+        return false;
+    result = new Color32(parts[0], parts[1], parts[2], parts[3]);
+    return true;
+  }
   protected static Color32 ParseColor32(string color)
   {
     var rgba = ParseRGBA(color);

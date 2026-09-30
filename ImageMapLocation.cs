@@ -1,4 +1,4 @@
-﻿// Modified by Wubarrk on 2026-09-24 for world export and import (0.9.0).
+﻿// Modified by Wubarrk on 2026-09-24 for world export and import (0.9.0), and on 2026-09-29 for Expand World Data locations (0.9.3).
 
 using System;
 using System.Collections.Generic;
@@ -79,12 +79,37 @@ internal class ImageMapLocation() : ImageMapBase()
         }
         return true;
     }
-    private static Dictionary<string, Color32> ParseColors(string colors) => colors.Split('|')
-        .Select(s => s.Trim().Split(':')).Where(s => s.Length == 2)
-        .ToDictionary(
-            s => s[0].Trim(),
-            s => ParseColor32(s[1].Trim())
-        );
+    // "Name: colour" entries separated by '|'; a line starting with '#' is a comment. The name is everything before
+    // the last ':' (a colour has none), so Expand World Data's "Name:Alias" locations are kept; before 0.9.3 they were
+    // dropped without a word. A name listed twice keeps its last colour, and a colour that does not parse skips only
+    // its entry; before, either discarded the whole legend for the default one.
+    private static Dictionary<string, Color32> ParseColors(string colors)
+    {
+        var result = new Dictionary<string, Color32>();
+        foreach (var entry in colors.Split('|'))
+        {
+            if (ImageMapBiome.IsBlankOrComment(entry))
+                continue;
+            var line = entry.Trim();
+            int colon = line.LastIndexOf(':');
+            var name = colon > 0 ? line.Substring(0, colon).Trim() : "";
+            var colour = colon > 0 ? line.Substring(colon + 1).Trim() : "";
+            if (name == "")
+            {
+                BetterContinents.LogError($"Location colors: \"{line}\" is not \"name: colour\" (start a note with #), skipped.");
+                continue;
+            }
+            if (!TryParseColor32(colour, out var parsed))
+            {
+                BetterContinents.LogError($"Location colors: invalid colour {colour} for {name} (a hex colour like FF0000, or r,g,b), skipped.");
+                continue;
+            }
+            if (result.ContainsKey(name))
+                BetterContinents.LogWarning($"Location colors: {name} is listed more than once; its last colour is used.");
+            result[name] = parsed;
+        }
+        return result;
+    }
 
     public override void SerializeLegacy(ZPackage pkg, int version, bool network)
     {

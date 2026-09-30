@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-09-22 for alt-biome planting (0.8.1).
+// Added by Wubarrk on 2026-09-22 for alt-biome planting (0.8.1), and on 2026-09-29 for Expand World Data biomes (0.9.3).
 
 using System;
 using System.Collections.Generic;
@@ -59,8 +59,9 @@ public partial class BetterContinents
     private sealed class Resolved
     {
       public readonly List<PlantedAltBiome> Mods = [];
-      // Indexed by Heightmap.BiomeIndex: does this key take over land of that biome at all?
-      public readonly bool[] Claims = new bool[(int)Heightmap.BiomeIndex.Count];
+      // Indexed by the biome's index (ImageMapBiome.ToSafeIndex, Expand World Data's biomes included): does this key
+      // take over land of that biome at all?
+      public readonly bool[] Claims = new bool[ImageMapBiome.BiomeIndexCount];
     }
 
     // One provider per baked map object, so a warning is given once per map per session and a reloaded map
@@ -127,7 +128,7 @@ public partial class BetterContinents
         }
         for (int b = 1; b < rc.Claims.Length; b++)
         {
-          var biome = ((Heightmap.BiomeIndex)b).ToBiome();
+          var biome = ImageMapBiome.ToSafeBiome(b);
           // A colour only takes over the base biomes its alt biomes can change. Disabled alt biomes and alt
           // biomes of another base biome count only when forced.
           rc.Claims[b] = def.IsNone || rc.Mods.Any(t => t.Force || (t.AltBiome.m_enabled && (t.AltBiome.m_biome & biome) != 0));
@@ -151,7 +152,7 @@ public partial class BetterContinents
       if (key <= 0 || key >= r.Length || r[key] is not { } rc)
         return false;
       int index = ImageMapBiome.ToSafeIndex(biome);
-      return index > 0 && rc.Claims[index];
+      return index > 0 && index < rc.Claims.Length && rc.Claims[index];
     }
 
     public IReadOnlyList<PlantedAltBiome> GetAltBiomes(int key)

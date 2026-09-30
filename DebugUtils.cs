@@ -1,4 +1,4 @@
-﻿// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and alt-biome planting (0.8.1), and on 2026-09-24 for world export and import (0.9.0).
+﻿// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and alt-biome planting (0.8.1), and on 2026-09-24 for world export and import (0.9.0), and on 2026-09-29 for Expand World Data biomes (0.9.3).
 
 using System;
 using System.Collections.Generic;
@@ -345,13 +345,13 @@ public partial class DebugUtils
                     setter: SetHeightmapValue<string>(path =>
                     {
                         var fullPath = BetterContinents.Settings.ResolveBiomePath(path);
-                        BetterContinents.Settings.SetBiomePath(fullPath);
-                        if (BetterContinents.Settings.HasBiomeMap)
+                        var applied = BetterContinents.Settings.SetBiomePath(fullPath);
+                        if (applied)
                             Console.instance.Print($"<color=#ffa500>Biomemap enabled!</color>");
                         else if (string.IsNullOrEmpty(path))
                             Console.instance.Print($"<color=#ff0000>Biomemap disabled!</color>");
                         else
-                            Console.instance.Print($"<color=#ff0000>ERROR: Path {path} not found!</color>");
+                            Console.instance.Print($"<color=#ff0000>ERROR: {path} was not loaded (not found, or its legend has errors: see the log). The world keeps its current biome map.</color>");
                     }),
                     getter: () => BetterContinents.Settings.GetBiomePath());
 

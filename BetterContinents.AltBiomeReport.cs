@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-09-22 for alt-biome planting (0.8.1), and on 2026-09-25 for version-agnostic wording (0.9.1).
+// Added by Wubarrk on 2026-09-22 for alt-biome planting (0.8.1), and on 2026-09-25 for version-agnostic wording (0.9.1), and on 2026-09-29 for Expand World Data biomes (0.9.3).
 
 using System;
 using System.Collections.Generic;
@@ -27,7 +27,10 @@ public partial class BetterContinents
     {
       if (mask == Heightmap.Biome.None)
         return "None";
-      var names = RealBiomes.Where(b => (mask & b) != 0).Select(b => b.ToString()).ToList();
+      // Vanilla's biomes in the usual order, then Expand World Data's by its names.
+      var names = RealBiomes.Where(b => (mask & b) != 0).Select(b => b.ToString())
+        .Concat(Enumerable.Range(0, 32).Select(bit => (Heightmap.Biome)(int)(1u << bit))
+          .Where(b => (mask & b) != 0 && !ImageMapBiome.IsVanillaBiome(b) && ImageMapBiome.IsValidBiome(b)).Select(ImageMapBiome.BiomeName)).ToList();
       return names.Count == 0 ? ((int)mask).ToString(CultureInfo.InvariantCulture) : string.Join("|", names);
     }
 
@@ -76,18 +79,20 @@ public partial class BetterContinents
           : AltBiomeControl.LastPartitionSummary != "" ? AltBiomeControl.LastPartitionSummary : "uses the game's own regions (point plants only)"));
 
       var absent = new List<string>();
-      foreach (var biome in RealBiomes)
+      // Vanilla's biomes, then any Expand World Data added that the grid holds.
+      var added = data.Sectors.Select(x => x.Biome).Where(b => b != Heightmap.Biome.None && !ImageMapBiome.IsVanillaBiome(b)).Distinct().OrderBy(ImageMapBiome.ToSafeIndex);
+      foreach (var biome in RealBiomes.Concat(added))
       {
         var sectors = data.Sectors.Where(x => x.Biome == biome).ToList();
         int area = sectors.Sum(x => AltBiomeControl.GetInfo(x).Area);
         if (area == 0)
         {
-          absent.Add(biome.ToString());
+          absent.Add(ImageMapBiome.BiomeName(biome));
           continue;
         }
         if (AltBiomeControl.IsGlobal(biome) && sectors.Count == 1)
         {
-          lines.Add($"Alt biomes: {biome}: one world-wide sector, edge {sectors[0].EdgeCount}, centre ({F(sectors[0].Center.x)}, {F(sectors[0].Center.y)})");
+          lines.Add($"Alt biomes: {ImageMapBiome.BiomeName(biome)}: one world-wide sector, edge {sectors[0].EdgeCount}, centre ({F(sectors[0].Center.x)}, {F(sectors[0].Center.y)})");
           continue;
         }
         int tiny = sectors.Count(x => x.EdgeCount < 20);
@@ -95,7 +100,7 @@ public partial class BetterContinents
         int maxEdge = sectors.Count > 0 ? sectors.Max(x => x.EdgeCount) : 0;
         int biomeWithAlt = sectors.Count(x => x.AltBiomes.Count > 0);
         int planted = sectors.Count(IsPlanted);
-        lines.Add($"Alt biomes: {biome}: {sectors.Count} regions ({tiny} tiny < 20 edge, {thin} sliver-thin), largest edge {maxEdge}, {biomeWithAlt} with alt biomes"
+        lines.Add($"Alt biomes: {ImageMapBiome.BiomeName(biome)}: {sectors.Count} regions ({tiny} tiny < 20 edge, {thin} sliver-thin), largest edge {maxEdge}, {biomeWithAlt} with alt biomes"
                   + (planted > 0 ? $", {planted} planted" : ""));
       }
       if (absent.Count > 0)
@@ -238,7 +243,7 @@ public partial class BetterContinents
       var alts = sector.AltBiomes.Count > 0 ? string.Join(", ", sector.AltBiomes.Select(a => a.m_name)) : "no alt biome";
       // Both measures, so an author can see when the vanilla one is dragged down by an underwater border.
       var height = $"h {F(sector.HeightAvg)} (mean {F(info.MeanHeight)})";
-      return $"#{info.Id} {sector.Biome} [{PlantingOf(sector)}] centre ({F(sector.Center.x)}, {F(sector.Center.y)}) edge {sector.EdgeCount} area {info.Area} thick {F(info.Thickness(sector))} {height} dist {F(sector.DistanceFromCenter)} -> {alts}";
+      return $"#{info.Id} {ImageMapBiome.BiomeName(sector.Biome)} [{PlantingOf(sector)}] centre ({F(sector.Center.x)}, {F(sector.Center.y)}) edge {sector.EdgeCount} area {info.Area} thick {F(info.Thickness(sector))} {height} dist {F(sector.DistanceFromCenter)} -> {alts}";
     }
 
     // No filter: sectors with alt biomes. "all": every sector. "planted": planted regions. Otherwise a biome name
@@ -259,7 +264,7 @@ public partial class BetterContinents
         sectors = data.Sectors.Where(IsPlanted);
       else if (filter.Equals("random", StringComparison.OrdinalIgnoreCase))
         sectors = data.Sectors.Where(x => x.AltBiomes.Count > 0 && !IsPlanted(x));
-      else if (Enum.TryParse<Heightmap.Biome>(filter, true, out var biome) && ImageMapBiome.IsValidBiome(biome) && biome != Heightmap.Biome.None)
+      else if (ImageMapBiome.TryParseBiome(filter, out var biome) && biome != Heightmap.Biome.None)
         sectors = data.Sectors.Where(x => x.Biome == biome);
       else
         sectors = data.Sectors.Where(x => x.AltBiomes.Any(a => (a.m_name ?? "").IndexOf(filter, StringComparison.OrdinalIgnoreCase) >= 0));
@@ -286,12 +291,12 @@ public partial class BetterContinents
       var biome = WorldGenerator.instance.GetBiome(position);
       if (!AltBiomeControl.Info.ContainsKey(sector))
       {
-        lines.Add($"No grid sector here: {sector.Biome} without alt biomes (outside the sampled area, or biome data not ready).");
+        lines.Add($"No grid sector here: {ImageMapBiome.BiomeName(sector.Biome)} without alt biomes (outside the sampled area, or biome data not ready).");
         return lines;
       }
       lines.Add($"Here ({F(position.x)}, {F(position.z)}): " + DescribeSector(sector));
       if (sector.Biome != biome)
-        lines.Add($"Note: the grid says {sector.Biome} but the biome map says {biome} here (a 12 m grid cell on a border).");
+        lines.Add($"Note: the grid says {ImageMapBiome.BiomeName(sector.Biome)} but the biome map says {ImageMapBiome.BiomeName(biome)} here (a 12 m grid cell on a border).");
       if (!AltBiomeControl.WorldEnabled)
         return lines;
       foreach (var alt in AltBiomeList.m_altBiomes.Where(a => (a.m_biome & sector.Biome) != 0))
@@ -386,20 +391,6 @@ public partial class BetterContinents
     // The pins belong to a minimap that no longer exists.
     public static void ForgetPins() => Pins.Clear();
 
-    private static readonly Dictionary<Heightmap.Biome, Color32> BiomeColors = new()
-    {
-      // Better Continents' default biome map colours (ImageMapBiome.DefaultColors), so an export lines up
-      // with the author's own biome map.
-      { Heightmap.Biome.Meadows, new Color32(0, 255, 0, 255) },
-      { Heightmap.Biome.BlackForest, new Color32(0, 127, 0, 255) },
-      { Heightmap.Biome.Swamp, new Color32(127, 127, 0, 255) },
-      { Heightmap.Biome.Mountain, new Color32(255, 255, 255, 255) },
-      { Heightmap.Biome.Plains, new Color32(255, 255, 0, 255) },
-      { Heightmap.Biome.Mistlands, new Color32(127, 127, 127, 255) },
-      { Heightmap.Biome.AshLands, new Color32(255, 0, 0, 255) },
-      { Heightmap.Biome.DeepNorth, new Color32(0, 255, 255, 255) },
-      { Heightmap.Biome.Ocean, new Color32(0, 0, 255, 255) },
-    };
 
     // An alt biome's tint in the export: its default legend colour, or a stable hash colour for modded ones.
     private static Color32 AltColor(string name)
@@ -424,12 +415,15 @@ public partial class BetterContinents
       var txt = Path.Combine(dir, $"altbiomes-{stamp}.txt");
       int size = data.Size;
       var pixels = new Color32[size * size];
+      // The world export's biome colours (the default biome map legend, and one of its own for each biome Expand
+      // World Data adds), so an export lines up with the author's own biome map.
+      var biomeColors = ImageMapBiome.ExportColorTable();
       for (int y = 0; y < size; y++)
       {
         for (int x = 0; x < size; x++)
         {
           var sector = data.PointSectors[x, y];
-          Color32 c = sector != null && BiomeColors.TryGetValue(sector.Biome, out var bc) ? bc : new Color32(0, 0, 0, 255);
+          Color32 c = sector != null && biomeColors.TryGetValue(sector.Biome, out var bc) ? bc : new Color32(0, 0, 0, 255);
           if (sector != null && sector.AltBiomes.Count > 0)
             c = Color32.Lerp(c, AltColor(sector.AltBiomes[0].m_name), 0.7f);
           if (sector != null && IsPlanted(sector) && ((x + y) & 7) == 0)

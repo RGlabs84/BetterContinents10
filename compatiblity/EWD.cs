@@ -1,4 +1,4 @@
-// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0).
+// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0), and on 2026-09-29 for Expand World Data biomes (0.9.3).
 
 using System;
 using System.Reflection;
@@ -12,10 +12,21 @@ public class EWD
   public const string GUID = "expand_world_data";
   private static Assembly? Assembly;
   private static MethodInfo? SetSize;
+  // Expand World Data's biome names (BiomeManager.TryGetBiome / TryGetDisplayName): the biomes it adds from its
+  // expand_biomes yaml, by name, in both directions. It also patches Enum.TryParse and Enum.GetName for biomes, but
+  // asking it directly does not depend on those patches reaching Better Continents' own calls.
+  private delegate bool TryGetBiomeHandler(string name, out Heightmap.Biome biome);
+  private delegate bool TryGetDisplayNameHandler(Heightmap.Biome biome, out string name);
+  private static TryGetBiomeHandler? TryGetBiomeByName;
+  private static TryGetDisplayNameHandler? TryGetBiomeDisplayName;
+  // Expand World Data's minimap height (Api.GetMinimapHeight: a biome's mapColorMultiplier above the water level). It
+  // applies it by transpiling Minimap.GenerateWorldMap, which Better Continents replaces with its own drawing.
+  private static volatile Func<float, Heightmap.Biome, float>? MinimapHeightFunc;
   public static void Run()
   {
     if (!Chainloader.PluginInfos.TryGetValue(GUID, out var info)) return;
     Assembly = info.Instance.GetType().Assembly;
+    BindBiomeNames();
     var type = Assembly.GetType("ExpandWorldData.WorldInfo");
     if (type == null)
     {
@@ -40,6 +51,106 @@ public class EWD
       return;
     }
     BetterContinents.Log("\"Expand World Data\" detected. Applying compatibility.");
+  }
+
+  // Internal for the offline tests, which load Expand World Data's assembly without BepInEx's chainloader.
+  internal static void BindBiomeNames(Assembly assembly)
+  {
+    Assembly = assembly;
+    BindBiomeNames();
+  }
+
+  private static void BindBiomeNames()
+  {
+    TryGetBiomeByName = null;
+    TryGetBiomeDisplayName = null;
+    MinimapHeightFunc = null;
+    var manager = Assembly?.GetType("ExpandWorldData.BiomeManager");
+    try
+    {
+      var api = Assembly?.GetType("ExpandWorldData.Api");
+      var minimapHeight = api == null ? null : AccessTools.Method(api, "GetMinimapHeight", [typeof(float), typeof(Heightmap.Biome)]);
+      if (minimapHeight != null && minimapHeight.ReturnType == typeof(float))
+        MinimapHeightFunc = (Func<float, Heightmap.Biome, float>)Delegate.CreateDelegate(typeof(Func<float, Heightmap.Biome, float>), minimapHeight);
+      else
+        BetterContinents.LogWarning("EWD compatibility: Api.GetMinimapHeight not found (Expand World Data may have changed its API); the minimap keeps unscaled heights.");
+    }
+    catch (Exception ex)
+    {
+      MinimapHeightFunc = null;
+      BetterContinents.LogWarning($"EWD compatibility: failed to bind Api.GetMinimapHeight ({ex.Message}); the minimap keeps unscaled heights.");
+    }
+    try
+    {
+      var byName = manager == null ? null : AccessTools.Method(manager, "TryGetBiome", [typeof(string), typeof(Heightmap.Biome).MakeByRefType()]);
+      var byBiome = manager == null ? null : AccessTools.Method(manager, "TryGetDisplayName", [typeof(Heightmap.Biome), typeof(string).MakeByRefType()]);
+      if (byName != null)
+        TryGetBiomeByName = (TryGetBiomeHandler)Delegate.CreateDelegate(typeof(TryGetBiomeHandler), byName);
+      if (byBiome != null)
+        TryGetBiomeDisplayName = (TryGetDisplayNameHandler)Delegate.CreateDelegate(typeof(TryGetDisplayNameHandler), byBiome);
+    }
+    catch (Exception ex)
+    {
+      TryGetBiomeByName = null;
+      TryGetBiomeDisplayName = null;
+      BetterContinents.LogWarning($"EWD compatibility: failed to bind BiomeManager's biome names ({ex.Message}); biome maps accept its biomes only where Enum.TryParse does.");
+      return;
+    }
+    if (TryGetBiomeByName == null || TryGetBiomeDisplayName == null)
+      BetterContinents.LogWarning("EWD compatibility: BiomeManager.TryGetBiome or TryGetDisplayName not found (Expand World Data may have changed its API); biome maps accept its biomes only where Enum.TryParse does.");
+  }
+
+  // The biome Expand World Data knows by this name (its own and vanilla's, any case), if it is installed.
+  public static bool TryGetBiome(string name, out Heightmap.Biome biome)
+  {
+    biome = Heightmap.Biome.None;
+    if (TryGetBiomeByName == null) return false;
+    try
+    {
+      return TryGetBiomeByName(name, out biome);
+    }
+    catch (Exception)
+    {
+      biome = Heightmap.Biome.None;
+      return false;
+    }
+  }
+
+  // Expand World Data's name for a biome, if it is installed and knows the biome.
+  public static bool TryGetName(Heightmap.Biome biome, out string name)
+  {
+    name = "";
+    if (TryGetBiomeDisplayName == null) return false;
+    try
+    {
+      return TryGetBiomeDisplayName(biome, out name) && !string.IsNullOrEmpty(name);
+    }
+    catch (Exception)
+    {
+      name = "";
+      return false;
+    }
+  }
+
+  // The height the minimap shows for a biome: Expand World Data's scaled height if it is installed, else the height.
+  // Called from the minimap's worker threads; if it ever throws, it is logged once and not called again.
+  public static float MinimapHeight(float height, Heightmap.Biome biome)
+  {
+    var func = MinimapHeightFunc;
+    if (func == null) return height;
+    try
+    {
+      return func(height, biome);
+    }
+    catch (Exception ex)
+    {
+      if (MinimapHeightFunc != null)
+      {
+        MinimapHeightFunc = null;
+        BetterContinents.LogWarning($"EWD compatibility: Api.GetMinimapHeight failed ({ex.Message}); the minimap keeps unscaled heights from here on.");
+      }
+      return height;
+    }
   }
 
   public static void RefreshSize(float worldRadius, float worldTotalRadius, float worldStretch, float biomeStretch)

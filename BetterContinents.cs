@@ -1,4 +1,4 @@
-// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and alt-biome planting (0.8.1), and on 2026-09-24 for world export and import (0.9.0), and on 2026-09-25 for version-agnostic wording (0.9.1), and on 2026-09-27 for map mod compatibility (0.9.2).
+// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and alt-biome planting (0.8.1), and on 2026-09-24 for world export and import (0.9.0), and on 2026-09-25 for version-agnostic wording (0.9.1), and on 2026-09-27 for map mod compatibility (0.9.2), and on 2026-09-29 for Expand World Data biomes (0.9.3).
 
 using System;
 using System.Collections;
@@ -455,7 +455,24 @@ public partial class BetterContinents : BaseUnityPlugin
 
     public void Start()
     {
-        EWD.Run();
+        // Each on its own: an optional integration must never stop the biome table from being read.
+        try
+        {
+            EWD.Run();
+        }
+        catch (Exception e)
+        {
+            LogError($"EWD compatibility failed: {e}");
+        }
+        try
+        {
+            // After every plugin's Awake, where Expand World Data patches the game's biome conversions.
+            ImageMapBiome.RefreshBiomeTable();
+        }
+        catch (Exception e)
+        {
+            LogError($"Reading the game's biomes failed; biome maps use the vanilla biomes only: {e}");
+        }
     }
 
     public void Update()
@@ -581,6 +598,9 @@ public partial class BetterContinents : BaseUnityPlugin
                     int index = i * size + j;
                     mapPixels[index] = map.GetPixelColor(biome);
                     forestPixels[index] = map.GetMaskColor(wx, wy, biomeHeight, biome);
+                    // Expand World Data's minimap height for the biome, applied where its transpiler applies it in
+                    // vanilla's loop: after the mask colour, which keeps the unscaled height.
+                    biomeHeight = EWD.MinimapHeight(biomeHeight, biome);
                     // Alpha 0, not the 1 the three-argument Color constructor gives: vanilla
                     // fills this array by assigning .r onto a default Color, so its alpha is 0.
                     heightPixels[index] = new Color(biomeHeight, 0f, 0f, 0f);

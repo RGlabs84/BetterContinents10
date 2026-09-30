@@ -1,4 +1,4 @@
-﻿// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and alt-biome planting (0.8.1), and on 2026-09-24 for world export and import (0.9.0), and on 2026-09-25 for version-agnostic wording (0.9.1).
+﻿// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and alt-biome planting (0.8.1), and on 2026-09-24 for world export and import (0.9.0), and on 2026-09-25 for version-agnostic wording (0.9.1), and on 2026-09-29 for Expand World Data biomes (0.9.3).
 
 using System.Collections;
 using System.Reflection;
@@ -435,7 +435,10 @@ public partial class BetterContinents
     if (toPatch)
     {
       Log("Patching WorldGenerator.GetBiome");
-      HarmonyInstance.Patch(method, prefix: new(patch));
+      // After Expand World Data's prefix, which answers from its own world yaml and skips the original: every prefix
+      // runs and the last to set the result wins, so the biome map overrides it wherever it has a biome, and a None
+      // pixel leaves its answer.
+      HarmonyInstance.Patch(method, prefix: new(patch, after: [EWD.GUID]));
       GetBiomePatched = true;
     }
   }
@@ -600,7 +603,9 @@ public partial class BetterContinents
     if (toPatch)
     {
       Log("Patching WorldGenerator.IsAshlands");
-      HarmonyInstance.Patch(method, prefix: new(patch, Priority.VeryHigh));
+      // After Expand World Data's prefix (its world yaml), as GetBiome: a priority does not stop a later prefix
+      // from setting the result again.
+      HarmonyInstance.Patch(method, prefix: new(patch, Priority.VeryHigh, after: [EWD.GUID]));
       IsAshlandsPatched = true;
     }
   }
@@ -623,7 +628,7 @@ public partial class BetterContinents
     if (toPatch)
     {
       Log("Patching WorldGenerator.IsAshlands (no heat map)");
-      HarmonyInstance.Patch(method, prefix: new(patch, Priority.VeryHigh));
+      HarmonyInstance.Patch(method, prefix: new(patch, Priority.VeryHigh, after: [EWD.GUID]));
       IsAshlandsFallbackPatched = true;
     }
   }

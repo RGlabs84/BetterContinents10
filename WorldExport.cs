@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-09-24 for world export and import (0.9.0).
+// Added by Wubarrk on 2026-09-24 for world export and import (0.9.0), and on 2026-09-29 for Expand World Data biomes (0.9.3).
 
 using System;
 using System.Collections;
@@ -662,7 +662,8 @@ public static class WorldExport
     private long ClippedLow, ClippedHigh, RingClipped;
     private float MinMetres = float.NaN, MaxMetres = float.NaN;
     private long LavaCells, MossCells;
-    private readonly long[] BiomePixels = new long[(int)Heightmap.BiomeIndex.Count];
+    // Per biome index, Expand World Data's biomes included.
+    private readonly long[] BiomePixels = new long[ImageMapBiome.BiomeIndexCount];
     private long UnknownBiomePixels;
     private long ForestClippedLow, ForestClippedHigh;
     private long HeatPixels, HeatClipped;
@@ -1126,8 +1127,9 @@ public static class WorldExport
     private IEnumerable BiomePass()
     {
       int n = Size;
-      var table = ImageMapBiome.DefaultColorTable();
-      var colours = new Rgb24[(int)Heightmap.BiomeIndex.Count];
+      // The default legend's colours, and a colour of its own for each biome Expand World Data adds.
+      var table = ImageMapBiome.ExportColorTable();
+      var colours = new Rgb24[ImageMapBiome.BiomeIndexCount];
       foreach (var kv in table)
         colours[ImageMapBiome.ToSafeIndex(kv.Key)] = new Rgb24(kv.Value.r, kv.Value.g, kv.Value.b);
       Rgb24[]? pixels = new Rgb24[n * n];
@@ -1156,7 +1158,10 @@ public static class WorldExport
       foreach (var step in Write("biomemap.png", W(0.3), 3L * n * n, p =>
                {
                  WorldExportPng.SaveRgb24(p, pixels!, n);
-                 WorldExportPng.WriteText(Path.Combine(Dir, "biomemap.txt"), ImageMapBiome.DefaultColors.Split('|'));
+                 // The default legend, plus the added biomes this world has, by the names Expand World Data reads.
+                 var legend = table.Where(kv => ImageMapBiome.IsVanillaBiome(kv.Key) || BiomePixels[ImageMapBiome.ToSafeIndex(kv.Key)] > 0)
+                   .ToDictionary(kv => kv.Key, kv => kv.Value);
+                 WorldExportPng.WriteText(Path.Combine(Dir, "biomemap.txt"), ImageMapBiome.LegendLines(legend));
                }, "biomemap.txt"))
         yield return step;
       pixels = null;
@@ -1828,10 +1833,15 @@ public static class WorldExport
           }
         case ImageMapBiome biome:
           {
-            var colours = biome.LegendColors.Count > 0 ? biome.LegendColors : ImageMapBiome.DefaultColorTable();
-            var legend = colours.Select(kv => $"{kv.Key}: {kv.Value.r},{kv.Value.g},{kv.Value.b},{kv.Value.a}").ToList();
+            var colours = ImageMapBiome.ExportLegend(biome.LegendColors, biome.Biomes);
+            var legend = colours.Select(kv => $"{ImageMapBiome.BiomeName(kv.Key)}: {kv.Value.r},{kv.Value.g},{kv.Value.b},{kv.Value.a}").ToList();
             if (ext != null)
+            {
               Original(ext);
+              // The original picture keeps the colours of legend entries this game could not read (a biome Expand
+              // World Data adds, exported where it is not installed): write them back as they were.
+              legend.AddRange(biome.UnresolvedLegend.Select(u => $"{u.Name}: {u.Color.r},{u.Color.g},{u.Color.b},{u.Color.a}"));
+            }
             else
             {
               int size = biome.Size;
@@ -2248,7 +2258,7 @@ public static class WorldExport
       var biomes = new WorldExportJson.Obj();
       for (int k = 1; k < BiomePixels.Length; k++)
         if (BiomePixels[k] > 0)
-          biomes.Add(((Heightmap.BiomeIndex)k).ToString(), BiomePixels[k]);
+          biomes.Add(ImageMapBiome.BiomeName(ImageMapBiome.ToSafeBiome(k)), BiomePixels[k]);
       var m = new WorldExportJson.Obj
       {
         { "format", Format },

@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-09-22 for alt-biome planting (0.8.1), and on 2026-09-25 for version-agnostic wording (0.9.1).
+// Added by Wubarrk on 2026-09-22 for alt-biome planting (0.8.1), and on 2026-09-25 for version-agnostic wording (0.9.1), and on 2026-09-29 for Expand World Data biomes (0.9.3).
 
 using System;
 using System.Collections;
@@ -136,6 +136,10 @@ public partial class BetterContinents
     // ---------------------------------------------------------------------------------------------------
     internal static void BeforeVerifyBiomeData(World world)
     {
+      // The grid about to be built holds only the biomes the game lists now (Expand World Data's, from its yaml as
+      // loaded for this world): the biome map reads any other as None, or the grid would throw on it.
+      ImageMapBiome.RefreshUsableBiomes();
+      Settings.WarnUnusableBiomes();
       Configure();
       Warned.Clear();
       LastFailure = null;
@@ -176,8 +180,13 @@ public partial class BetterContinents
     }
 
     // Plain sectors (no alt biomes) for positions the grid does not describe. Shared with the biome
-    // precision code in HeightmapPatch.
-    internal static BiomeSector PlainSector(Heightmap.Biome biome) => PlainSectors[ImageMapBiome.ToSafeIndex(biome)];
+    // precision code in HeightmapPatch. None's for a biome the game cannot index here.
+    internal static BiomeSector PlainSector(Heightmap.Biome biome)
+    {
+      var sectors = PlainSectors;
+      int index = ImageMapBiome.ToSafeIndex(biome);
+      return index < sectors.Length ? sectors[index] : sectors[0];
+    }
 
     internal static bool IsGlobal(Heightmap.Biome biome) =>
       biome == Heightmap.Biome.AshLands || biome == Heightmap.Biome.DeepNorth || biome == Heightmap.Biome.Ocean;
@@ -828,11 +837,11 @@ public partial class BetterContinents
           continue;
         if (!planting.Claims(p.Key, sector.Biome))
         {
-          WarnOnce("point:" + where, $"Alt biomes: the point plant at {where} ({planting.DescribeKey(p.Key)}) lands on {sector.Biome}, which none of its alt biomes can change; it is ignored.");
+          WarnOnce("point:" + where, $"Alt biomes: the point plant at {where} ({planting.DescribeKey(p.Key)}) lands on {ImageMapBiome.BiomeName(sector.Biome)}, which none of its alt biomes can change; it is ignored.");
           continue;
         }
         if (IsGlobal(sector.Biome) && !PartitionKeys.ContainsKey(sector))
-          WarnOnce("pointglobal:" + where, $"Alt biomes: the point plant at {where} ({planting.DescribeKey(p.Key)}) lands on {sector.Biome}, which the game treats as ONE world-wide region: it applies to all unplanted {sector.Biome}. Paint the area instead to plant only part of it.");
+          WarnOnce("pointglobal:" + where, $"Alt biomes: the point plant at {where} ({planting.DescribeKey(p.Key)}) lands on {ImageMapBiome.BiomeName(sector.Biome)}, which the game treats as ONE world-wide region: it applies to all unplanted {ImageMapBiome.BiomeName(sector.Biome)}. Paint the area instead to plant only part of it.");
         if (!Pinned.TryGetValue(sector, out var list))
           Pinned[sector] = list = [];
         if (!list.Contains(p.Key))
@@ -1047,12 +1056,12 @@ public partial class BetterContinents
     }
 
     // What the vanilla loop evidently means: every biome in m_requireNeighbor must border the sector, and
-    // no biome in m_notNeighbor may.
+    // no biome in m_notNeighbor may (Expand World Data's biomes included).
     internal static bool NeighboursOk(BiomeSector sector, AltBiome modifier)
     {
-      for (int i = 1; i < (int)Heightmap.BiomeIndex.Count; i++)
+      for (int i = 1; i < ImageMapBiome.BiomeIndexCount; i++)
       {
-        var biome = ((Heightmap.BiomeIndex)i).ToBiome();
+        var biome = ImageMapBiome.ToSafeBiome(i);
         if ((modifier.m_requireNeighbor & biome) != 0 && !sector.Neighbors.Any(n => n.Biome == biome))
           return false;
         if ((modifier.m_notNeighbor & biome) != 0 && sector.Neighbors.Any(n => n.Biome == biome))

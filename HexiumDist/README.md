@@ -6,7 +6,7 @@
 [![Multiplayer Compatible](https://img.shields.io/badge/Multiplayer-Server_Synced-blue.svg)]()
 [![Framework](https://img.shields.io/badge/Requires-BepInEx-red.svg)]()
 [![Compatibility](https://img.shields.io/badge/Target-Valheim_1.0-brightgreen.svg)]()
-[![Version](https://img.shields.io/badge/Version-0.9.2-lightgrey.svg)]()
+[![Version](https://img.shields.io/badge/Version-0.9.3-lightgrey.svg)]()
 
 > *"The Allfather did not carve the Tenth Realm in a single stroke. With hammer and chisel, the jagged peaks were raised, deep fjords torn open, and ancient oceans poured into the abyss. Take up the chisel, Viking, and shape the continents to your will."*
 
@@ -67,6 +67,7 @@ Forget vanilla's rigid concentric circles. Draw your world's biomes by painting 
 * 🎨 Assign specific color keys to Meadows, Black Forest, Swamp, Mountain, Plains, Mistlands, Ashlands, and Deep North.
 * 🏝️ Paint custom islands dedicated entirely to specific biomes, or craft seamless, realistic climate transitions.
 * 🎯 **Biome precision** (working again in 0.9.0): set `Biome precision` from 1 to 5 and the ground follows your biome borders inside every 64 m terrain zone, on a grid of up to 6 x 6 cells (11 m), instead of only at the zone's corners. Ground textures, grass, vegetation and spawn points follow; heights do not change. 0 is vanilla.
+* 🧬 **Expand World Data biomes** (working again in 0.9.3): name the biomes Expand World Data adds in the biome map's legend (`biomemap.txt`) as its `expand_biomes.yaml` does, for example `DeadWastes: 8B4513`. Give each one a `terrain` in the yaml (without one Expand World Data leaves its ground flat under water). Install Expand World Data wherever the world is played, with the same yaml, and add new biomes at its end: it numbers them in that order, and the world stores the number.
 
 <a id="paint-alt-biomes"></a>
 ### 🌸 Paint Alt Biomes (new in 0.8.1)

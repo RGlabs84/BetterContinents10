@@ -1,3 +1,44 @@
+- v0.9.3
+  - Works with Expand World Data's biomes again. A biome map's legend (biomemap.txt) names them the way
+    Expand World Data's expand_biomes yaml does, for example "DeadWastes: 8B4513", in any case. Since
+    0.8.0 Better Continents accepted only the ten vanilla biome names: such a line was reported as
+    "Invalid biome name", the whole legend fell back to the default colours, and the added biome's area
+    became whichever biome's default colour was nearest (often Mistlands).
+  - Legend names may be written as the game shows them, with spaces, underscores or hyphens ("Black
+    Forest", "deep_north"). A legend line Better Continents cannot use (a name that is no biome here, a
+    colour that does not parse, or a line that is not "name: colour") is reported and skipped, and the rest
+    of the legend still applies: the pixels of a skipped name's colour are left to the default generation
+    (None) instead of becoming the nearest other biome, and a vanilla biome whose colour does not parse
+    keeps its default colour. Lines starting with # are comments. Before, one such line threw the whole
+    legend away for the default colours.
+  - bc reload bm and bc b fn keep the world's biome map when the new picture or legend has an error, and
+    say so. Before, a legend error reloaded the picture with the default colours (a wrong path switched the
+    biome map off), and the next save kept the damage.
+  - Expand World Data's biomes survive world saves and the settings a server sends to its players. A
+    world made with Better Continents 0.7.x and Expand World Data biomes loads with them again, unless a
+    0.8 or 0.9 version has saved it since: those versions erased them. There, reload the biome map from
+    its picture (bc reload bm) and the next save keeps it.
+  - The rest of Better Continents handles them too: Biome precision, alt-biome planting, location
+    placement, the minimap (including Expand World Data's per-biome map heights, which Better Continents'
+    own map drawing skipped), the "bc ab" report, and world export, which gives each added biome a colour
+    of its own and names it in biomemap.txt.
+  - Expand World Data numbers its biomes in the order its expand_biomes yaml lists them, and a Better
+    Continents world stores that number. Install it wherever the world is played, with the same yaml,
+    and add new biomes at the end. Where a world's biome map holds a biome Expand World Data does not
+    define now (not installed, or its yaml changed), the default generation decides and the log says so;
+    the map keeps the biome for when it is defined again. Before, such a biome would have stopped the
+    world from loading.
+  - Give each added biome a terrain in the expand_biomes yaml (for example "terrain: Plains"): its ground
+    is then that biome's. Without one Expand World Data gives it vanilla's default ground, flat and 30 m
+    under water, with or without Better Continents; only a heightmap with Override All hides that.
+  - Where a biome map or heat map says what a place is, it now wins over Expand World Data's world yaml
+    in every case: Expand World Data's Ashlands test could override the heat map, so Ashlands there had no
+    lava heat or Ashlands weather.
+  - locationmap.txt keeps Expand World Data's "Name:Alias" locations, which were dropped without a word;
+    a location listed twice keeps its last colour, and a colour that does not parse skips only its line
+    (before, both threw the whole legend away). Other mods' locations already worked by name.
+  - On a world that uses Better Continents the server and every player must run the same version, so update
+    them together, and install Expand World Data on all of them when its biomes are in the biome map.
 - v0.9.2
   - Works with ZenMap and no-map worlds. Better Continents drew the minimap on background threads and
     let the game carry on before the drawing was done, and the game hands the map to other mods at that

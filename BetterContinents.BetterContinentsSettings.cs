@@ -1,4 +1,4 @@
-﻿// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and alt-biome planting (0.8.1), and on 2026-09-24 for world export and import (0.9.0).
+﻿// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and alt-biome planting (0.8.1), and on 2026-09-24 for world export and import (0.9.0), and on 2026-09-29 for Expand World Data biomes (0.9.3).
 
 using System;
 using System.Collections.Generic;
@@ -93,6 +93,8 @@ public partial class BetterContinents
     public bool HasAltBiomeMap => AltBiomeMap != null;
     internal ImageMapAltBiome? AltBiomeMapData => AltBiomeMap;
     public bool HasBiomeMap => BiomeMap != null;
+    // Before the alt-biome grid is built: says which of the map's biomes the world cannot use now (ImageMapBiome.Usable).
+    internal void WarnUnusableBiomes() => BiomeMap?.WarnUnusable();
     public bool HasLocationMap => LocationMap != null;
     public bool HasRoughMap => RoughMap != null;
     public bool HasFlatMap => FlatMap != null;
@@ -349,7 +351,35 @@ public partial class BetterContinents
 
     public string ResolveHeightPath(string path) => ResolvePath(path, HeightFile);
 
-    public void SetBiomePath(string path) => BiomeMap = ImageMapBiome.Create(path);
+    // bc b fn: an empty path switches the biome map off. Any other path replaces the world's map only if its picture
+    // and legend read cleanly; otherwise the world keeps its map (before 0.9.3 a wrong path or a legend error replaced
+    // it, and the next save kept the damage). True when the new map is in use.
+    public bool SetBiomePath(string path)
+    {
+      if (string.IsNullOrEmpty(path))
+      {
+        BiomeMap = null;
+        return false;
+      }
+      var map = ImageMapBiome.Create(path);
+      if (!UsableReload(map, path))
+        return false;
+      BiomeMap = map;
+      return true;
+    }
+    private bool UsableReload(ImageMapBiome? map, string path)
+    {
+      if (map != null && map.LegendErrors == 0)
+      {
+        ImageMapBiome.RefreshUsableBiomes();
+        map.WarnUnusable();
+        return true;
+      }
+      LogError(map == null
+        ? $"The biome map {path} could not be read: the world keeps its current biome map."
+        : $"The legend of {path} has errors (see above): the world keeps its current biome map. Fix the legend and reload.");
+      return false;
+    }
     public string GetBiomePath() => SimplePath(BiomeMap?.FilePath ?? string.Empty);
     public string ResolveBiomePath(string path) => ResolvePath(path, BiomeFile);
 
@@ -867,17 +897,20 @@ public partial class BetterContinents
       HeightMap.CreateMap(HeightMapAlpha);
     }
 
+    // bc reload bm: reads the picture and legend again into a new map, which replaces the world's only if both read
+    // cleanly (before 0.9.3 a legend error reloaded the picture with the default colours, and the next save kept it).
     public void ReloadBiomeMap()
     {
       if (BiomeMap == null) return;
-      if (!BiomeMap.LoadSourceImage())
+      var path = BiomeMap.FilePath;
+      if (!File.Exists(path) && File.Exists(BiomeConfigPath))
       {
-        if (!File.Exists(BiomeConfigPath) || File.Exists(BiomeMap.FilePath)) return;
-        LogWarning($"Cannot find image {BiomeMap.FilePath}: Using default path from config.");
-        BiomeMap.FilePath = BiomeConfigPath;
-        if (!BiomeMap.LoadSourceImage()) return;
+        LogWarning($"Cannot find image {path}: Using default path from config.");
+        path = BiomeConfigPath;
       }
-      BiomeMap.CreateMap();
+      var map = ImageMapBiome.Create(path);
+      if (UsableReload(map, path))
+        BiomeMap = map;
     }
 
     public void ReloadLocationMap()

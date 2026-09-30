@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and modified for alt-biome planting (0.8.1).
+// Added by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and modified for alt-biome planting (0.8.1), and on 2026-09-29 for Expand World Data biomes (0.9.3).
 
 using System.Collections.Generic;
 using System.Linq;
@@ -39,7 +39,7 @@ public partial class BetterContinents
     private static void ReportOnce(Heightmap.Biome biome, string what)
     {
       if (Reported.Add(biome))
-        LogWarning($"The biome map has no {biome}, so no {what} exist for it. Locations that require {biome} will be skipped.");
+        LogWarning($"The biome map has no {ImageMapBiome.BiomeName(biome)}, so no {what} exist for it. Locations that require {ImageMapBiome.BiomeName(biome)} will be skipped.");
     }
 
     [HarmonyPrefix, HarmonyPatch("GetRandomPointByBiome")]
@@ -65,7 +65,8 @@ public partial class BetterContinents
     // BlackForest, the Ocean test checks the Meadows bit, and Random.Range(0, num - 1) never picks the last
     // match), and it knows nothing of biomes a BC map omits. When its pick is outside the requested mask or
     // absent from the map, the location can only fail there, so pick uniformly among the requested biomes the
-    // map actually has. A usable vanilla pick is kept as is, so complete maps place as before.
+    // map actually has (vanilla's biomes, then the grid's others: Expand World Data's). A usable vanilla pick is kept
+    // as is, so complete maps place as before.
     private static readonly Heightmap.Biome[] PickOrder =
     [
       Heightmap.Biome.Meadows, Heightmap.Biome.Swamp, Heightmap.Biome.Mountain, Heightmap.Biome.BlackForest,
@@ -81,7 +82,8 @@ public partial class BetterContinents
       if ((__result & biome) != 0 && __instance.Biomes.TryGetValue(__result, out var picked) && picked.AllPoints.Count > 0)
         return;
       var present = new List<Heightmap.Biome>(PickOrder.Length);
-      foreach (var candidate in PickOrder)
+      var added = __instance.Biomes.Keys.Where(b => b != Heightmap.Biome.None && !ImageMapBiome.IsVanillaBiome(b) && ImageMapBiome.IsValidBiome(b)).OrderBy(b => (uint)b);
+      foreach (var candidate in PickOrder.Concat(added))
         if ((biome & candidate) != 0 && __instance.Biomes.TryGetValue(candidate, out var info) && info.AllPoints.Count > 0)
           present.Add(candidate);
       if (present.Count > 0)
