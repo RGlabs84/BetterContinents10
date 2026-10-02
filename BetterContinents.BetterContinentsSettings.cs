@@ -1,4 +1,4 @@
-﻿// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and alt-biome planting (0.8.1), and on 2026-09-24 for world export and import (0.9.0), and on 2026-09-29 for Expand World Data biomes (0.9.3).
+﻿// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and alt-biome planting (0.8.1), and on 2026-09-24 for world export and import (0.9.0), and on 2026-09-29 for Expand World Data biomes (0.9.3), and on 2026-10-02 for export folders used as the Directory (0.9.4).
 
 using System;
 using System.Collections.Generic;
@@ -237,8 +237,9 @@ public partial class BetterContinents
 
       EnabledForThisWorld = enabled;
 
+      // A Directory that holds an export.cfg (a world export) brings the settings its maps were encoded for.
       if (EnabledForThisWorld)
-        ReadConfig(ConfigValues.Live, false);
+        ReadConfig(WorldImport.DirectoryValues() ?? ConfigValues.Live, false);
       DynamicPatch();
     }
 

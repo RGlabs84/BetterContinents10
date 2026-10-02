@@ -1,3 +1,17 @@
+- v0.9.4
+  - A world export loads correctly when the Directory setting points at it. Setting only Directory to an
+    export folder and creating the world with "From Config" loaded the maps but not the settings in the
+    folder's export.cfg, so the world kept BetterContinents.cfg's own: at the default Heightmap Amount of 1
+    the heightmap, stored for Heightmap Amount 2, put the waterline twice as high and a vanilla world came
+    back almost all ocean (reported from the Valheim Worlds discord). The forest came out wrong too, and the
+    game placed its own locations and random alt biomes beside the exported ones.
+  - Now a new world made with "From Config" takes the export.cfg of the Directory along with its maps, the
+    way a preset import does. Its settings win over BetterContinents.cfg for the keys it lists: edit
+    export.cfg, or delete it, to use your own. Directory stays where BetterContinents.cfg points, so a moved
+    export still loads, and BetterContinents.cfg itself is not changed. The log names every setting the
+    export changed. A folder without export.cfg (hand-made maps) loads exactly as before, and presets and
+    existing worlds are not affected.
+  - An export's README.txt and export.cfg describe this as a fourth way to make a world from it.
 - v0.9.3
   - Works with Expand World Data's biomes again. A biome map's legend (biomemap.txt) names them the way
     Expand World Data's expand_biomes yaml does, for example "DeadWastes: 8B4513", in any case. Since

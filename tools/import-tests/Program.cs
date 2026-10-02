@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-09-24 for world export and import (0.9.0).
+// Added by Wubarrk on 2026-09-24 for world export and import (0.9.0), and modified on 2026-10-02 for export folders used as the Directory (0.9.4).
 
 // Offline checks of Better Continents 0.9.0's world import (WorldImport). A synthetic export folder is written with
 // ImageSharp and made into a New World preset by the real builder, on a worker thread as in the game, then read back with
@@ -99,6 +99,7 @@ internal static class Program
       NoConfig();
       BrokenMaps();
       ConfigWay(folder, preset);
+      DirectoryWay(folder, preset);
       Listing(folder);
       ExportStep();
     }
@@ -479,6 +480,76 @@ internal static class Program
     File.Copy(o.Backup!, cfgPath, true);
     cfg.Reload();
     C(BC.ConfigHeightmapAmount.Value == 1f && BC.ConfigBiomePrecision.Value == 0 && BC.ConfigMapSourceDir.Value == "", "copying the backup back restores the old settings");
+  }
+
+  // ---- an export folder as the Directory -----------------------------------------------------------------------------
+
+  // The share of the heightmap above the water plane, the way a new world built from these settings would have it.
+  static float LandShare(BC.BetterContinentsSettings s)
+  {
+    var hm = Map<ImageMapFloat>(s, "heightmap.png");
+    int land = 0, all = 0;
+    for (int y = 0; y < N; y += 2)
+      for (int x = 0; x < N; x += 2)
+      {
+        all++;
+        if (WorldExportMath.ValueToMetres(hm.GetValue(x / (N - 1f), y / (N - 1f)), s.HeightmapAmount, s.SeaLevel) > WorldExportMath.WaterLevel)
+          land++;
+      }
+    return (float)land / all;
+  }
+
+  static void DirectoryWay(string folder, string preset)
+  {
+    Section("an export folder as the Directory, 'From Config' (0.9.4: export.cfg comes with it)");
+    var fileBefore = File.ReadAllText(cfgPath);
+    var before = ConfigState();
+    C(BC.ConfigHeightmapAmount.Value == 1f && BC.ConfigMapSourceDir.Value == "", "the config starts at the defaults (Heightmap Amount 1, no Directory)");
+    C(WorldImport.DirectoryValues() == null, "no Directory: the config is read as it is");
+
+    // The bug report: only Directory set. Before 0.9.4 the world read the export's pixels at the config's amount.
+    BC.ConfigMapSourceDir.Value = folder;
+    var bare = BC.BetterContinentsSettings.CreateForImport(ConfigValues.Snapshot(cfg, []), lean: false);
+    lock (LogHandler.Lines) LogHandler.Lines.Clear();
+    var values = WorldImport.DirectoryValues();
+    C(values != null, "Directory with an export.cfg: its values are used");
+    var s = BC.BetterContinentsSettings.CreateForImport(values!, lean: false);
+    var fromPreset = BC.BetterContinentsSettings.Load(preset);
+    C(s.HeightmapAmount == 2.5f && Mathf.Abs(s.SeaLevel - 0.45f) < 1e-5f && s.BiomePrecision == 3 && s.WorldSize == 9000f && s.HeatMapScale == 12f
+      && s.ForestmapMultiply == 0f && s.ForestmapAdd == 1f && s.SkipDefaultLocations && s.AltBiomes?.Mode == BC.AltBiomeMode.PlantedOnly,
+      $"the new world gets the export's settings (amount {s.HeightmapAmount}, sea level {s.SeaLevel}, precision 3, world 9000, heat 12, forest 0/1, skip locations, PlantedOnly)");
+    C(s.HeightmapAmount == fromPreset.HeightmapAmount && s.SeaLevel == fromPreset.SeaLevel && s.BiomePrecision == fromPreset.BiomePrecision
+      && s.WorldSize == fromPreset.WorldSize && s.EdgeSize == fromPreset.EdgeSize && s.MapEdgeDropoff == fromPreset.MapEdgeDropoff
+      && s.ForestScaleFactor == fromPreset.ForestScaleFactor && s.HeatMapScale == fromPreset.HeatMapScale
+      && s.LoadedImageMaps().Select(m => m.FileName).SequenceEqual(fromPreset.LoadedImageMaps().Select(m => m.FileName)),
+      "the same settings and maps as the export's preset");
+    float bareLand = LandShare(bare), land = LandShare(s), presetLand = LandShare(fromPreset);
+    C(land == presetLand && land > 0.2f, $"land as the preset has it ({land:P1} of the map, preset {presetLand:P1})");
+    C(bareLand < land * 0.5f, $"while the config alone drowned it ({bareLand:P1} land at amount {bare.HeightmapAmount}): the reported bug");
+    C(LogHandler.Has("holds a world export") && LogHandler.Has("Heightmap Amount = 2.5 (BetterContinents.cfg: 1)"),
+      "the log says the export's settings are used, and which differ from the config");
+    C(LogHandler.Has("ignored [99 Nonsense] Bogus"), "and which export.cfg lines it ignored");
+    C(ConfigState().Where(kv => kv.Key != BC.ConfigMapSourceDir).All(kv => Equals(before[kv.Key], kv.Value)), "no config value changed");
+
+    // A moved export: export.cfg still names the folder it was written in.
+    var moved = Path.Combine(work, "elsewhere", "moved export");
+    Directory.CreateDirectory(moved);
+    foreach (var f in Directory.GetFiles(folder))
+      File.Copy(f, Path.Combine(moved, Path.GetFileName(f)), true);
+    BC.ConfigMapSourceDir.Value = moved;
+    var m = BC.BetterContinentsSettings.CreateForImport(WorldImport.DirectoryValues()!, lean: false);
+    C(m.HeightmapAmount == 2.5f && m.HasHeightMap && Map<ImageMapFloat>(m, "heightmap.png").FilePath.StartsWith(moved),
+      "a moved export loads its maps from where it is now, not where export.cfg was written");
+
+    // Hand-made maps (no export.cfg): the config's settings, as before.
+    BC.ConfigMapSourceDir.Value = Path.Combine(work, "elsewhere", "My hand-made maps");
+    C(WorldImport.DirectoryValues() == null, "a Directory without export.cfg: the config is read as it is");
+    BC.ConfigMapSourceDir.Value = Path.Combine(work, "does not exist");
+    C(WorldImport.DirectoryValues() == null, "a Directory that does not exist: the config is read as it is");
+
+    BC.ConfigMapSourceDir.Value = "";
+    cfg.Save();
+    C(File.ReadAllText(cfgPath) == fileBefore, "BetterContinents.cfg is as it was");
   }
 
   // ---- the folder list and bc_import's names ------------------------------------------------------------------------

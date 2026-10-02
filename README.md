@@ -6,7 +6,7 @@
 [![Multiplayer Compatible](https://img.shields.io/badge/Multiplayer-Server_Synced-blue.svg)]()
 [![Framework](https://img.shields.io/badge/Requires-BepInEx-red.svg)]()
 [![Compatibility](https://img.shields.io/badge/Target-Valheim_1.0-brightgreen.svg)]()
-[![Version](https://img.shields.io/badge/Version-0.9.3-lightgrey.svg)]()
+[![Version](https://img.shields.io/badge/Version-0.9.4-lightgrey.svg)]()
 
 > *"The Allfather did not carve the Tenth Realm in a single stroke. With hammer and chisel, the jagged peaks were raised, deep fjords torn open, and ancient oceans poured into the abyss. Take up the chisel, Viking, and shape the continents to your will."*
 
@@ -117,7 +117,7 @@ Under the hood, Better Continents integrates a high-performance [FastNoiseLite](
 ### 📤 Export a World to Maps (new in 0.9.0)
 Turn the world you are standing in, vanilla or Better Continents, into Better Continents image maps that rebuild it, ready to edit in any image editor:
 * 🗺️ A 16-bit heightmap sampled the way the game builds its terrain, plus biome, location, forest, heat, alt-biome, lava, moss and ground-paint maps with their legends, and an `export.cfg` holding the settings that load them.
-* 🗂️ Every export also makes a New World preset named after the world and the time, so you can create a world from it straight away. A `README.txt` in the folder explains every file and the three ways to load it, step by step.
+* 🗂️ Every export also makes a New World preset named after the world and the time, so you can create a world from it straight away. A `README.txt` in the folder explains every file and the ways to load it, step by step.
 * 📐 Heights are encoded for Heightmap Amount 2 and Sea Level 0.5 unless you choose otherwise: -30 m to 370 m, with the waterline at 0.15. That is the encoding hand-made and generated maps use, so the two can be cut and pasted into each other.
 * ⏱️ It runs in the background while you play, and a cancelled export removes its partial files and its preset.
 * 🖥️ Start it from the console (`bc_export`) or from the export HUD: a small status box (F9) and a window (F7) with every map explained, a size and time estimate, and a summary of the last export, modelled on Wubarrk's Eye.
@@ -125,10 +125,11 @@ Turn the world you are standing in, vanilla or Better Continents, into Better Co
 
 <a id="make-a-world-from-an-export"></a>
 ### 📥 Make a World From an Export (new in 0.9.0)
-Three ways, from the easiest:
+Four ways, from the easiest:
 1. **Pick the preset.** In the main menu choose Start Game, pick your character and press Start, then New World; pick the export's preset (`<world> <date> <time>`) in the Better Continents box, and press Done. The preset is a copy of the folder as exported: it keeps working if you move or delete the folder.
 2. **After editing the PNGs, `bc_import`.** Open the console (F5) in the main menu or in a world and type `bc_import`: it remakes the preset from your newest export as it is now and selects it. `bc_import list` numbers every export, and `bc_import 3`, `bc_import <world>` or `bc_import <folder>` picks one, including any folder of maps you made yourself. The export window's **Import** tab does the same with buttons.
 3. **To keep editing, the config.** `bc_import <number> config` copies the folder's `export.cfg` into `BetterContinents.cfg` (your old file is kept beside it) and selects the preset "From Config", so every new world reads the PNGs as they are at that moment. Pasting `export.cfg` at the end of `BetterContinents.cfg` yourself does the same, with no restart.
+4. **Or point `Directory` at the folder** (since 0.9.4). Set `Directory` in `BetterContinents.cfg` to the export folder and create the world with "From Config": the folder's `export.cfg` comes with the maps and wins over your own settings for the keys it lists (edit or delete it to use your own; the log lists what it changed). Before 0.9.4 only the maps came, so at the default Heightmap Amount of 1 the world came out almost all ocean.
 
 A world that already exists keeps the maps it was created with. For step-by-step instructions written for first-timers, see `BetterContinents-Export-Guide.pdf` in the package.
 

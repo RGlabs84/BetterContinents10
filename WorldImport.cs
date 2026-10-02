@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-09-24 for world export and import (0.9.0).
+// Added by Wubarrk on 2026-09-24 for world export and import (0.9.0), and modified on 2026-10-02 for export folders used as the Directory (0.9.4).
 
 using System;
 using System.Collections;
@@ -542,6 +542,49 @@ public static class WorldImport
     if (!plan.HadConfig)
       plan.Notes.Add("There is no export.cfg in the folder, so every setting but Directory comes from your BetterContinents.cfg.");
     return plan;
+  }
+
+  /// <summary>Main thread, when a new world is made "From Config": the values it reads when Directory is a folder with an
+  /// export.cfg in it (a world export), i.e. export.cfg laid over the config the way an import's preset is built, with
+  /// Directory kept as the config has it. An export's pixels are only right with the settings they were encoded for
+  /// (Heightmap Amount 2 puts the waterline at 0.15; the default 1 drowns all but the peaks). Null when Directory is empty
+  /// or has no export.cfg: then the config is read as it is.</summary>
+  internal static ConfigValues? DirectoryValues()
+  {
+    if (ConfigMapSourceDir == null)
+      return null;
+    var dir = ConfigMapSourceDir.Value;
+    if (string.IsNullOrWhiteSpace(dir))
+      return null;
+    string[] lines;
+    try
+    {
+      var cfgPath = Path.Combine(dir!.Trim(), ConfigFileName);
+      if (!File.Exists(cfgPath))
+        return null;
+      lines = File.ReadAllLines(cfgPath);
+    }
+    catch (Exception e)
+    {
+      LogWarning($"Directory: cannot read {ConfigFileName} in {dir}, so the new world uses BetterContinents.cfg as it is: {e.Message}");
+      return null;
+    }
+    var config = PluginConfig();
+    var ignored = new List<string>();
+    var overrides = Overrides(config, ParseConfig(lines), [], ignored);
+    overrides[ConfigMapSourceDir] = dir;
+    overrides[ConfigEnabled] = true;
+    var changed = overrides.Where(kv => !Equals(kv.Key.BoxedValue, kv.Value))
+      .Select(kv => $"[{kv.Key.Definition.Section}] {kv.Key.Definition.Key} = {TomlTypeConverter.ConvertToString(kv.Value, kv.Key.SettingType)} "
+                    + $"(BetterContinents.cfg: {kv.Key.GetSerializedValue()})")
+      .ToList();
+    Log($"Directory {dir} holds a world export, so the new world uses its {ConfigFileName} over BetterContinents.cfg: "
+        + (changed.Count == 0 ? "every setting it lists already matches." : $"{changed.Count} setting(s) differ from your config."));
+    foreach (var line in changed)
+      Log("  " + line);
+    foreach (var line in ignored)
+      LogWarning($"  {ConfigFileName}: ignored {line}");
+    return ConfigValues.Snapshot(config, overrides);
   }
 
   /// <summary>Any thread: builds the settings a new world would get from the plan, and writes the preset and its picture.

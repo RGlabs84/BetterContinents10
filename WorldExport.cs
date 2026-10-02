@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-09-24 for world export and import (0.9.0), and on 2026-09-29 for Expand World Data biomes (0.9.3).
+// Added by Wubarrk on 2026-09-24 for world export and import (0.9.0), and on 2026-09-29 for Expand World Data biomes (0.9.3), and on 2026-10-02 for export folders used as the Directory (0.9.4).
 
 using System;
 using System.Collections;
@@ -2038,6 +2038,8 @@ public static class WorldExport
       l.Add($"##  3. To keep editing the PNGs: type   bc_import {ImportArg} config");
       l.Add("##     or paste every line of this file at the END of BepInEx/config/BetterContinents.cfg (a later line wins) and");
       l.Add("##     save it. Better Continents reads the change at once; create the world with the preset \"From Config\".");
+      l.Add("##     Or set only Directory to this folder: a new world made \"From Config\" then reads this file too, and its");
+      l.Add("##     settings win over BetterContinents.cfg. The maps are only right with them (Heightmap Amount above all).");
       l.Add("## Only NEW worlds use these settings. A world that exists keeps the maps it was created with.");
       return l;
     }
@@ -2184,6 +2186,10 @@ public static class WorldExport
       l.Add("        and selects the preset \"From Config\". Or paste export.cfg at the END of that file yourself and save");
       l.Add("        it: Better Continents reads the file again within a second, with no restart.");
       l.Add("     2. Every New World you then create with \"From Config\" reads the PNGs in this folder as they are then.");
+      l.Add("     Setting only Directory in BetterContinents.cfg to this folder works too: a new world made with \"From Config\"");
+      l.Add("     then also takes the settings in export.cfg, which win over BetterContinents.cfg (edit export.cfg, or delete");
+      l.Add("     it, to use your own). Without them the heights are read at the wrong scale: at the default Heightmap Amount");
+      l.Add("     of 1 nearly the whole world is under water.");
       l.Add("");
       l.Add("  A world that already exists keeps the maps it was created with. With the same seed, vegetation, fine lava");
       l.Add("  detail and the random layout of things come out closest to the exported world.");
@@ -2195,6 +2201,8 @@ public static class WorldExport
           l.Add($"  {name,-17} {what}");
       }
       Entry("heightmap.png", $"How high the ground is (16-bit grey): black {Inv(floor, "0.#")} m, white {Inv(ceiling, "0.#")} m, the sea (30 m) {Inv(wl, "0.####")}.");
+      if (Written.Contains("heightmap.png"))
+        l.Add($"  {"",-17} Only right at Heightmap Amount {Inv(O.HeightmapAmount)} and Sea Level Adjustment {Inv(O.SeaLevel)} (export.cfg sets both).");
       Entry("biomemap.png", "Which biome is where, in Better Continents' biome colours (biomemap.txt lists them).");
       Entry("locationmap.png", "One dot per location: start temple, bosses, traders, dungeons (locationmap.txt names the colours).");
       Entry("forestmap.png", ForestWritten && O.ForestExact
