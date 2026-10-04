@@ -2,6 +2,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using Splatform;
@@ -112,30 +113,60 @@ public partial class BetterContinents
     public bool AnyImageMap => MapKind.All.Any(kind => kind.Has(this));
     public bool ShouldHeightMapOverrideAll => HasHeightMap && HeightmapOverrideAll;
 
+    // ---- a new world's settings ---------------------------------------------------------------------------------------
+    // A new world takes its settings once, when it is first saved (WorldPatch), from the preset chosen in the New World
+    // screen (Presets.LoadActivePreset):
+    //   Disabled        Better Continents is off for the world.
+    //   a preset file   the settings saved in it, maps and all, at the settings version it was saved with, so a preset
+    //                   makes the world it always made. One saved before alt biomes (0.8.1) takes the config's alt-biome
+    //                   options, as a new world does.
+    //   From Config     BetterContinents.cfg as it is now (Create). When Directory is a world export (it holds an
+    //                   export.cfg), the settings in export.cfg win over the config's (WorldImport.DirectoryValues), and
+    //                   the maps span the world the way they spanned the exported one (WorldImport.ExportVersion).
+    // bc_import makes a preset by the From Config rule, from a snapshot of the config with the folder's export.cfg over it
+    // (CreateForImport). A world made either way gets the newest settings version (12), unless an export says otherwise
+    // or, From Config, Override version names an older one (NewWorldVersion).
+
     public static BetterContinentsSettings Create()
     {
-      var settings = new BetterContinentsSettings();
-      settings.InitSettings(ConfigEnabled.Value);
+      Log($"Init settings for new world");
+      var settings = new BetterContinentsSettings { EnabledForThisWorld = ConfigEnabled.Value };
+      if (settings.EnabledForThisWorld)
+        settings.FromConfig(WorldImport.DirectoryValues() ?? ConfigValues.Live, overridable: true, lean: false);
       return settings;
     }
 
     // World import (WorldImport): the settings "From Config" would give a new world if the config held these values
     // (an export folder's export.cfg over a snapshot of the config). Unlike Create it runs on any thread: it reads no
-    // live config value and changes no Harmony patch (Create's DynamicPatch follows the loaded world's Settings, which
-    // must not move). lean drops the decoded pixels of every map a preset stores as its file bytes, which halves the
+    // live config value. lean drops the decoded pixels of every map a preset stores as its file bytes, which halves the
     // memory an import holds; such settings are only good for Save.
     internal static BetterContinentsSettings CreateForImport(ConfigValues values, bool lean)
     {
-      var settings = new BetterContinentsSettings { EnabledForThisWorld = true, Version = NewWorldVersion(values, overridable: false) };
-      settings.ReadConfig(values, lean);
+      var settings = new BetterContinentsSettings { EnabledForThisWorld = true };
+      settings.FromConfig(values, overridable: false, lean);
       return settings;
     }
 
-    public static BetterContinentsSettings Disabled()
+    public static BetterContinentsSettings Disabled() => new() { EnabledForThisWorld = false };
+
+    private void FromConfig(ConfigValues values, bool overridable, bool lean)
     {
-      var settings = new BetterContinentsSettings();
-      settings.InitSettings(false);
-      return settings;
+      Version = NewWorldVersion(values, overridable);
+      ReadConfig(values, lean);
+      WarnHeightmapRecord();
+    }
+
+    // A world export's heightmap.png says which Heightmap Amount and Sea Level Adjustment its heights are encoded for
+    // (HeightmapRecord). Read with others, its land sits higher or lower than it did in the exported world.
+    private void WarnHeightmapRecord()
+    {
+      if (HeightMap?.Record is not { } record || record.Matches(HeightmapAmount, SeaLevel))
+        return;
+      LogWarning(string.Format(CultureInfo.InvariantCulture,
+        "{0} was made by a world export for Heightmap Amount {1} and Sea Level Adjustment {2}, but this new world reads it at "
+        + "Heightmap Amount {3} and Sea Level Adjustment {4}, so its land is not at the heights it was made for. The export's "
+        + "export.cfg has the settings it needs.",
+        string.IsNullOrEmpty(HeightMap.FilePath) ? "The heightmap" : HeightMap.FilePath, record.Amount, record.SeaLevel, HeightmapAmount, SeaLevel));
     }
 
     private static string GetPath(string projectDir, string projectDirFileName, string defaultFileName)
@@ -158,22 +189,6 @@ public partial class BetterContinents
         if (kind.Listed(this) is { } map)
           maps.Add((kind.FileName, map));
       return maps;
-    }
-
-    private void InitSettings(bool enabled)
-    {
-      Log($"Init settings for new world");
-
-      EnabledForThisWorld = enabled;
-
-      // A Directory that holds an export.cfg (a world export) brings the settings its maps were encoded for.
-      if (EnabledForThisWorld)
-      {
-        var values = WorldImport.DirectoryValues() ?? ConfigValues.Live;
-        Version = NewWorldVersion(values, overridable: true);
-        ReadConfig(values, false);
-      }
-      DynamicPatch();
     }
 
     // Everything a new world takes from the config. ConfigValues.Live reads BetterContinents.cfg as it is now. Every
@@ -336,6 +351,8 @@ public partial class BetterContinents
         {
           output($"Heightmap file ({HeightMap.Size}) {HeightMap.FilePath}");
           output($"Heightmap amount {HeightmapAmount}, blend {HeightmapBlend}, add {HeightmapAdd}, mask {HeightmapMask}");
+          if (HeightMap.Record is { } record)
+            output($"Heightmap made by a world export for Heightmap Amount {record.Amount}, Sea Level Adjustment {record.SeaLevel}");
           if (HeightMapAlpha)
             output(HeightmapAlphaMode == ImageMapFloat.HeightAlpha.Blend
               ? "Heightmap alpha: full precision, blended with the game's own terrain by the alpha"

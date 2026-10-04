@@ -211,6 +211,8 @@ internal static class EndToEnd
 
     // Heights through ImageMapFloat, against the zone blend.
     var hm = ImageMapFloat.Create(File.ReadAllBytes(Path.Combine(dir, "heightmap.png")), false)!;
+    Program.C(hm.Record is { } record && record.Amount == o.HeightmapAmount && record.SeaLevel == o.SeaLevel,
+      $"heightmap.png records the settings its heights are encoded for (Heightmap Amount {hm.Record?.Amount}, Sea Level Adjustment {hm.Record?.SeaLevel})");
     float worst = 0f;
     for (int r = 0; r < n; r += 3)
       for (int c = 0; c < n; c += 3)

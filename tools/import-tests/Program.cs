@@ -103,6 +103,7 @@ internal static class Program
       Listing(folder);
       ExportStep();
       WorldSizeVersions();
+      NewWorlds();
     }
     catch (Exception e)
     {
@@ -785,6 +786,42 @@ internal static class Program
       "Directory set to the 0.9 export: the new world is a version 11 one");
     BC.ConfigMapSourceDir.Value = fresh;
     C(WorldImport.DirectoryValues()!.SettingsVersion == null, "Directory set to the 0.10 export: a new world's version");
+    BC.ConfigMapSourceDir.Value = "";
+  }
+
+  // ---- a new world's settings: the From Config rule, and the heightmap's record ------------------------------------
+
+  static void NewWorlds()
+  {
+    Section("a new world From Config, and a heightmap that records the settings it was made for");
+    BC.ConfigMapSourceDir.Value = "";
+    var fromConfig = BC.BetterContinentsSettings.Create();
+    C(fromConfig.EnabledForThisWorld == BC.ConfigEnabled.Value && fromConfig.Version == 12 && fromConfig.HeightmapAmount == BC.ConfigHeightmapAmount.Value,
+      "Create (From Config) builds the settings from the config, at version 12, and patches nothing (it runs offline)");
+    var off = BC.BetterContinentsSettings.Disabled();
+    C(!off.EnabledForThisWorld && off.Version == 0, "Disabled: Better Continents off");
+
+    // A heightmap a world export wrote, copied into a folder of its own, read at the config's Heightmap Amount.
+    var dir = Path.Combine(root, "Recorded", "maps");
+    Directory.CreateDirectory(dir);
+    var px = new L16[64 * 64];
+    for (int i = 0; i < px.Length; i++)
+      px[i] = new L16((ushort)(i * 16));
+    WorldExportPng.SaveHeightmap(Path.Combine(dir, "heightmap.png"), px, 64, new HeightmapRecord(2f, 0.5f));
+    BC.ConfigMapSourceDir.Value = dir;
+    lock (LogHandler.Lines) LogHandler.Lines.Clear();
+    var loose = BC.BetterContinentsSettings.Create();
+    C(loose.HasHeightMap && loose.HeightmapAmount == 1f && LogHandler.Has("was made by a world export for Heightmap Amount 2 and Sea Level Adjustment 0.5")
+      && LogHandler.Has("reads it at Heightmap Amount 1"),
+      "made for Heightmap Amount 2, read at 1: the log says so, and what it was made for");
+    var info = new List<string>();
+    loose.Dump(info.Add);
+    C(info.Any(l => l.Contains("Heightmap made by a world export for Heightmap Amount 2")), "bc info says what it was made for");
+    BC.ConfigHeightmapAmount.Value = 2f;
+    lock (LogHandler.Lines) LogHandler.Lines.Clear();
+    BC.BetterContinentsSettings.Create();
+    C(!LogHandler.Has("was made by a world export"), "read at the Amount it was made for: nothing to say");
+    BC.ConfigHeightmapAmount.Value = 1f;
     BC.ConfigMapSourceDir.Value = "";
   }
 }

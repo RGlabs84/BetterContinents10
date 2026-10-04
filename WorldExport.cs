@@ -949,7 +949,7 @@ public static class WorldExport
 
       if (heights != null)
       {
-        foreach (var step in Write("heightmap.png", W(0.5), 2L * n * n, p => WorldExportPng.SaveL16(p, heights!, n)))
+        foreach (var step in Write("heightmap.png", W(0.5), 2L * n * n, p => WorldExportPng.SaveHeightmap(p, heights!, n, new HeightmapRecord(O.HeightmapAmount, O.SeaLevel))))
           yield return step;
         heights = null;
         HeightsWritten = true;
@@ -2450,6 +2450,45 @@ public static class WorldExport
 // PNG and text output. ImageSharp (merged into the plugin) writes the 16-bit maps Unity's encoder cannot. The pixel
 // arrays are wrapped, not copied, and every file goes to <name>.tmp first and is renamed when complete, so a crash
 // never leaves a half-written map under a name Better Continents would load.
+// The settings a world export's heightmap.png is encoded for, kept in the PNG itself (a text chunk, which image editors
+// show and often keep): the heights only come out right at this Heightmap Amount and Sea Level Adjustment. A new world
+// that loads the file with other values says so in the log (BetterContinentsSettings.WarnHeightmapRecord).
+internal sealed class HeightmapRecord(float amount, float seaLevel)
+{
+  public const string Keyword = "BetterContinents";
+  private const string AmountKey = "Heightmap Amount", SeaLevelKey = "Sea Level Adjustment";
+
+  public readonly float Amount = amount;
+  public readonly float SeaLevel = seaLevel;
+
+  public string Text => string.Format(CultureInfo.InvariantCulture, "{0} = {1:R}; {2} = {3:R}", AmountKey, Amount, SeaLevelKey, SeaLevel);
+
+  // Whether a world with these settings reads the heights as they were written.
+  public bool Matches(float amount, float seaLevel) => Mathf.Abs(amount - Amount) < 1e-4f && Mathf.Abs(seaLevel - SeaLevel) < 1e-4f;
+
+  // The record among a PNG's text chunks, if one is there.
+  public static HeightmapRecord? From(IEnumerable<PngTextData> texts)
+  {
+    foreach (var text in texts)
+    {
+      if (text.Keyword != Keyword)
+        continue;
+      float? amount = null, seaLevel = null;
+      foreach (var part in text.Value.Split(';'))
+      {
+        var kv = part.Split('=');
+        if (kv.Length != 2 || !float.TryParse(kv[1].Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out var value))
+          continue;
+        if (kv[0].Trim() == AmountKey) amount = value;
+        else if (kv[0].Trim() == SeaLevelKey) seaLevel = value;
+      }
+      if (amount is { } a && seaLevel is { } s)
+        return new HeightmapRecord(a, s);
+    }
+    return null;
+  }
+}
+
 internal static class WorldExportPng
 {
   private static PngEncoder Encoder(PngColorType type, PngBitDepth depth) => new()
@@ -2463,18 +2502,31 @@ internal static class WorldExportPng
 
   public static void SaveL16(string path, L16[] pixels, int size) => Save(path, pixels, size, Encoder(PngColorType.Grayscale, PngBitDepth.Bit16));
 
+  // 16-bit grey, with the settings its heights are encoded for: the one text chunk an export writes (still no gAMA or
+  // pHYs).
+  public static void SaveHeightmap(string path, L16[] pixels, int size, HeightmapRecord record)
+  {
+    var encoder = Encoder(PngColorType.Grayscale, PngBitDepth.Bit16);
+    encoder.ChunkFilter = PngChunkFilter.ExcludeAll & ~PngChunkFilter.ExcludeTextChunks;
+    Save(path, pixels, size, encoder, record);
+  }
+
   public static void SaveL8(string path, L8[] pixels, int size) => Save(path, pixels, size, Encoder(PngColorType.Grayscale, PngBitDepth.Bit8));
 
   public static void SaveRgb24(string path, Rgb24[] pixels, int size) => Save(path, pixels, size, Encoder(PngColorType.Rgb, PngBitDepth.Bit8));
 
   public static void SaveRgba32(string path, Rgba32[] pixels, int size) => Save(path, pixels, size, Encoder(PngColorType.RgbWithAlpha, PngBitDepth.Bit8));
 
-  private static void Save<T>(string path, T[] pixels, int size, PngEncoder encoder) where T : unmanaged, IPixel<T>
+  private static void Save<T>(string path, T[] pixels, int size, PngEncoder encoder, HeightmapRecord? record = null) where T : unmanaged, IPixel<T>
   {
     var tmp = path + ".tmp";
     using (var image = ISImage.WrapMemory(ISConfiguration.Default, new Memory<T>(pixels), size, size))
     using (var stream = File.Create(tmp))
+    {
+      if (record != null)
+        SixLabors.ImageSharp.MetadataExtensions.GetPngMetadata(image.Metadata).TextData.Add(new PngTextData(HeightmapRecord.Keyword, record.Text, "", ""));
       image.Save(stream, encoder);
+    }
     Replace(tmp, path);
   }
 

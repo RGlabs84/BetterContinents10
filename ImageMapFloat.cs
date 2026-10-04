@@ -71,6 +71,9 @@ internal class ImageMapFloat : ImageMapBase
     private float[] Map = [];
     private float[] AlphaMap = [];
 
+    // What a world export wrote into its heightmap.png: the settings its heights are encoded for. Null for any other map.
+    public HeightmapRecord? Record { get; private set; }
+
     public bool CreateMap(bool alpha) => CreateMap(alpha ? HeightAlpha.Legacy : HeightAlpha.None);
     public bool CreateMap(HeightAlpha alpha) => alpha switch
     {
@@ -84,6 +87,7 @@ internal class ImageMapFloat : ImageMapBase
         var sw = new Stopwatch();
         sw.Start();
         Map = LoadPixels(image, pixel => pixel.ToVector4().X);
+        Record = HeightmapRecord.From(SixLabors.ImageSharp.MetadataExtensions.GetPngMetadata(image.Metadata).TextData);
         // Only a blending heightmap (La32) keeps its alpha: the legacy one (La16) was never read.
         if (image is Image<La32> img)
             AlphaMap = LoadPixels(img, pixel => pixel.A / 65535f);

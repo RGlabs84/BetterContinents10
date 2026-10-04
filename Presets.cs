@@ -1,4 +1,4 @@
-﻿// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and alt-biome planting (0.8.1), and on 2026-09-24 for world export and import (0.9.0).
+﻿// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and alt-biome planting (0.8.1), and on 2026-09-24 for world export and import (0.9.0), and on 2026-10-04 for the unifying refactor (0.10.0).
 
 using System;
 using System.Collections.Generic;
@@ -235,6 +235,8 @@ public class Presets
     UpdatePreview();
   }
 
+  // A new world's settings, from the preset chosen in the New World screen. The rules for each choice are written out
+  // once, above BetterContinentsSettings.Create.
   public static BetterContinents.BetterContinentsSettings LoadActivePreset()
   {
     if (DisabledPreset)

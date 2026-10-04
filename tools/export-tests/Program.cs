@@ -72,6 +72,7 @@ internal static class Program
       Tests.Math();
       Tests.HeightRoundTrip(work);
       AlphaTest.Run();
+      RecordTest.Run(work);
       Tests.EightBitRoundTrip(work);
       Tests.BiomeRoundTrip(work);
       Tests.AltBiomeRoundTrip(work);
