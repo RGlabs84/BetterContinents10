@@ -570,25 +570,6 @@ public partial class BetterContinents
         mask.a = MossMap.GetValue(wx, wz);
 
     }
-    public void ApplyLavaMap(float x, float z, Heightmap.Biome biome, ref Color mask)
-    {
-      var wx = Normalize(x);
-      var wz = Normalize(z);
-      if (PaintMap != null && PaintMap.TryGetValue(wx, wz, out var paint))
-      {
-        mask.r = paint.r;
-        mask.g = paint.g;
-        mask.b = paint.b;
-        if (paint.a != 1f)
-          mask.a = paint.a;
-      }
-        ;
-      if (LavaMap != null && biome == Heightmap.Biome.AshLands)
-        mask.a = LavaMap.GetValue(wx, wz);
-      else if (MossMap != null && biome == Heightmap.Biome.Mistlands)
-        mask.a = MossMap.GetValue(wx, wz);
-
-    }
 
     private Dictionary<ZoneSystem.ZoneVegetation, Heightmap.Biome> EnabledVegetation = [];
     public void ApplyVegetationMap(Vector3 position, List<ZoneSystem.ZoneVegetation> vegetation)

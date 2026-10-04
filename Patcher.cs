@@ -1,8 +1,11 @@
-﻿// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and alt-biome planting (0.8.1), and on 2026-09-24 for world export and import (0.9.0), and on 2026-09-25 for version-agnostic wording (0.9.1), and on 2026-09-29 for Expand World Data biomes (0.9.3), and on 2026-10-04 for the vegetation twin guard (0.10.0).
+﻿// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and alt-biome planting (0.8.1), and on 2026-09-24 for world export and import (0.9.0), and on 2026-09-25 for version-agnostic wording (0.9.1), and on 2026-09-29 for Expand World Data biomes (0.9.3), and on 2026-10-04 for the vegetation twin guard and the unifying refactor (0.10.0).
 
 using System;
 using System.Collections;
+using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using HarmonyLib;
 using UnityEngine;
 
@@ -10,35 +13,26 @@ namespace BetterContinents;
 
 public partial class BetterContinents
 {
+  // Switches Better Continents' Harmony patches to match the world's settings (Settings): at world load, when the
+  // settings change, and back off in the main menu. Most patches are simply on or off (Toggle, declared below in the
+  // order they are switched); biome precision, the base height version and the world size are more than that.
   public static void DynamicPatch()
   {
     PatchHeightmap();
     PatchBiomeColor();
     PatchGetBaseHeight();
-    PatchGetBiomeHeight();
-    PatchGetBiome();
-    PatchAddRivers();
-    PatchForestFactorPrefix();
-    PatchForestFactorPostfix();
-    PatchHeatPrefix();
+    foreach (var toggle in TogglesBeforeWorldSize)
+      toggle.Update(Settings);
     PatchWorldSize();
-    PatchAshlandGap();
-    PatchDeepNorthGap();
-    PatchIsAshlands();
-    PatchIsAshlandsFallback();
-    PatchIsDeepnorth();
-    PatchDeepNorthWaveFade();
-    PatchGetAshlandsHeight();
-    PatchColorTransition();
-    PatchVegetation();
-    PatchSpawnMap();
+    foreach (var toggle in TogglesAfterWorldSize)
+      toggle.Update(Settings);
     // WorldGenerator caches GetBiome/GetBiomeArea results per grid cell for the lifetime of the
     // WorldGenerator instance (only cleared in its constructor). Any biome-affecting patch toggled
-    // above (PatchGetBiome, PatchIsAshlands, PatchIsAshlandsFallback) can leave already-queried cells
+    // above (GetBiome, IsAshlands, IsAshlands without a heat map) can leave already-queried cells
     // returning their pre-patch answer for the rest of the session unless we clear the caches here.
     ClearWorldGeneratorBiomeCaches();
     // EnvMan's Deep North weather test reads the biome map at the camera's x and z exactly when IsDeepnorth
-    // reads the biome map at all (PatchIsDeepnorth); every other world keeps vanilla's (x, height) call.
+    // reads the biome map at all (the IsDeepnorth toggle); every other world keeps vanilla's (x, height) call.
     var deepNorthUsesZ = Settings.EnabledForThisWorld && Settings.HasBiomeMap;
     if (deepNorthUsesZ != DeepNorthWeather.UseZ)
       Log(deepNorthUsesZ
@@ -83,6 +77,252 @@ public partial class BetterContinents
     (CachedBiomeAreasField.GetValue(null) as IDictionary)?.Clear();
     (CachedBiomesField.GetValue(null) as IDictionary)?.Clear();
   }
+
+  // ---- toggles: patches that are on exactly while a condition on the world's settings holds --------------------------
+
+  private enum HookKind { Prefix, Postfix, Transpiler }
+
+  // One patch method on one game method. priority and after are the HarmonyMethod's, when it needs them.
+  private sealed class Hook(Func<MethodBase?> target, string targetDescription, Type patchType, string patchName, HookKind kind,
+      int priority = -1, string[]? after = null)
+  {
+    public readonly Func<MethodBase?> Target = target;
+    public readonly string TargetDescription = targetDescription;
+    public readonly HookKind Kind = kind;
+    public MethodInfo Patch() => AccessTools.Method(patchType, patchName);
+    public HarmonyMethod Method(MethodInfo patch) =>
+      priority == -1 && after == null ? new HarmonyMethod(patch) : new HarmonyMethod(patch, priority, after: after);
+  }
+
+  private sealed class Toggle(string name, Func<BetterContinentsSettings, bool> wanted, params Hook[] hooks)
+  {
+    // "Patching <Name>" / "Unpatching <Name>" in the log.
+    public readonly string Name = name;
+    // PatchProcessor rather than Harmony.Patch: the call that is the same in BepInEx's HarmonyX and in the Lib.Harmony
+    // the offline tests (tools/export-tests) run it on.
+    public bool ViaProcessor { get; init; }
+    // When set, a failure is logged after this text and leaves the patches off, instead of stopping DynamicPatch.
+    public string? FailureMessage { get; init; }
+    public bool Applied { get; private set; }
+
+    public bool Wanted(BetterContinentsSettings settings) => wanted(settings);
+
+    public void Update(BetterContinentsSettings settings)
+    {
+      var toPatch = wanted(settings);
+      if (toPatch == Applied)
+        return;
+      var targets = new MethodBase[hooks.Length];
+      var patches = new MethodInfo[hooks.Length];
+      for (int i = 0; i < hooks.Length; i++)
+      {
+        targets[i] = hooks[i].Target()!;
+        patches[i] = hooks[i].Patch();
+      }
+      for (int i = 0; i < hooks.Length; i++)
+        if (!EnsurePatchTargetFound(targets[i], hooks[i].TargetDescription))
+          return;
+      if (Applied)
+      {
+        Log("Unpatching " + Name);
+        Unpatch(targets, patches);
+        Applied = false;
+      }
+      if (!toPatch)
+        return;
+      Log("Patching " + Name);
+      if (FailureMessage == null)
+      {
+        Apply(targets, patches);
+        return;
+      }
+      try
+      {
+        Apply(targets, patches);
+      }
+      catch (Exception e)
+      {
+        LogError(FailureMessage + e.Message);
+        try
+        {
+          Unpatch(targets, patches);
+        }
+        catch (Exception)
+        {
+          // Nothing was applied.
+        }
+      }
+    }
+
+    private static void Unpatch(MethodBase[] targets, MethodInfo[] patches)
+    {
+      for (int i = 0; i < targets.Length; i++)
+        HarmonyInstance.Unpatch(targets[i], patches[i]);
+    }
+
+    // One Harmony call per game method, with all of its patch methods.
+    private void Apply(MethodBase[] targets, MethodInfo[] patches)
+    {
+      foreach (var target in targets.Distinct())
+      {
+        HarmonyMethod? prefix = null, postfix = null, transpiler = null;
+        for (int i = 0; i < hooks.Length; i++)
+        {
+          if (targets[i] != target)
+            continue;
+          var method = hooks[i].Method(patches[i]);
+          switch (hooks[i].Kind)
+          {
+            case HookKind.Prefix: prefix = method; break;
+            case HookKind.Postfix: postfix = method; break;
+            default: transpiler = method; break;
+          }
+        }
+        if (ViaProcessor)
+          PatchViaProcessor(target, prefix, postfix, transpiler);
+        else
+          PatchDirectly(target, prefix, postfix, transpiler);
+      }
+      Applied = true;
+    }
+
+    // Each Harmony call in a method of its own, compiled only when it is called: the offline tests' Lib.Harmony has no
+    // Harmony.Patch with HarmonyX's extra parameter, and must not meet that call while compiling the processor path.
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static void PatchViaProcessor(MethodBase target, HarmonyMethod? prefix, HarmonyMethod? postfix, HarmonyMethod? transpiler)
+    {
+      var processor = HarmonyInstance.CreateProcessor(target);
+      if (prefix != null) processor.AddPrefix(prefix);
+      if (postfix != null) processor.AddPostfix(postfix);
+      if (transpiler != null) processor.AddTranspiler(transpiler);
+      processor.Patch();
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static void PatchDirectly(MethodBase target, HarmonyMethod? prefix, HarmonyMethod? postfix, HarmonyMethod? transpiler) =>
+      HarmonyInstance.Patch(target, prefix: prefix, postfix: postfix, transpiler: transpiler);
+  }
+
+  private static Hook OnWorldGenerator(string method, Type[]? arguments, string patch, HookKind kind, int priority = -1, string[]? after = null) =>
+    new(() => arguments == null ? AccessTools.Method(typeof(WorldGenerator), method) : AccessTools.Method(typeof(WorldGenerator), method, arguments),
+      "WorldGenerator." + method + (arguments == null ? "" : $"({string.Join(",", arguments.Select(a => a == typeof(float) ? "float" : a == typeof(bool) ? "bool" : a.Name))})"),
+      typeof(WorldGeneratorPatch), patch, kind, priority, after);
+
+  // Heightmap.GetBiomeColor(float, float) has one prefix for both features that use it, the terrain map and biome
+  // precision (GetBiomeColorPatch picks per vertex), so neither can unpatch the other.
+  private static readonly Toggle BiomeColor = new("Heightmap.GetBiomeColor",
+    s => s.EnabledForThisWorld && (s.HasTerrainMap || EffectiveBiomePrecision(s) > 0),
+    new Hook(() => AccessTools.Method(typeof(Heightmap), nameof(Heightmap.GetBiomeColor), [typeof(float), typeof(float)]),
+      "Heightmap.GetBiomeColor(float,float)", typeof(BetterContinents), nameof(GetBiomeColorPatch), HookKind.Prefix))
+  { ViaProcessor = true };
+  internal static void PatchBiomeColor() => BiomeColor.Update(Settings);
+
+  // WorldGenerator.GetBiomeHeight: five postfixes, chosen by whether the world paints the ground (a paint, lava, moss
+  // or vegetation map), whether its heightmap overrides everything, and whether it has a rough map.
+  private static bool Paints(BetterContinentsSettings s) => s.HasPaintMap || s.HasLavaMap || s.HasMossMap || s.HasVegetationMap;
+
+  // In the order DynamicPatch switches them, before and after the world size.
+  private static readonly Toggle[] TogglesBeforeWorldSize =
+  [
+    new("WorldGenerator.GetBiomeHeight with rough",
+      s => s.EnabledForThisWorld && !Paints(s) && !s.ShouldHeightMapOverrideAll && s.HasRoughMap,
+      OnWorldGenerator(nameof(WorldGenerator.GetBiomeHeight), null, nameof(WorldGeneratorPatch.GetBiomeHeightWithRough), HookKind.Postfix)),
+    new("WorldGenerator.GetBiomeHeight with rough and paint",
+      s => s.EnabledForThisWorld && Paints(s) && !s.ShouldHeightMapOverrideAll && s.HasRoughMap,
+      OnWorldGenerator(nameof(WorldGenerator.GetBiomeHeight), null, nameof(WorldGeneratorPatch.GetBiomeHeightWithRoughPaint), HookKind.Postfix)),
+    new("WorldGenerator.GetBiomeHeight with height",
+      s => s.EnabledForThisWorld && !Paints(s) && s.ShouldHeightMapOverrideAll,
+      OnWorldGenerator(nameof(WorldGenerator.GetBiomeHeight), null, nameof(WorldGeneratorPatch.GetBiomeHeightWithHeight), HookKind.Postfix)),
+    new("WorldGenerator.GetBiomeHeight with height and paint",
+      s => s.EnabledForThisWorld && Paints(s) && s.ShouldHeightMapOverrideAll,
+      OnWorldGenerator(nameof(WorldGenerator.GetBiomeHeight), null, nameof(WorldGeneratorPatch.GetBiomeHeightWithHeightPaint), HookKind.Postfix)),
+    new("WorldGenerator.GetBiomeHeight with paint",
+      s => s.EnabledForThisWorld && Paints(s),
+      OnWorldGenerator(nameof(WorldGenerator.GetBiomeHeight), null, nameof(WorldGeneratorPatch.GetBiomeHeightWithPaint), HookKind.Postfix)),
+    // After Expand World Data's prefix, which answers from its own world yaml and skips the original: every prefix runs
+    // and the last to set the result wins, so the biome map overrides it wherever it has a biome, and a None pixel
+    // leaves its answer.
+    new("WorldGenerator.GetBiome",
+      s => s.EnabledForThisWorld && s.HasBiomeMap,
+      OnWorldGenerator(nameof(WorldGenerator.GetBiome), [typeof(float), typeof(float), typeof(float), typeof(bool)],
+        nameof(WorldGeneratorPatch.GetBiomePrefix), HookKind.Prefix, after: [EWD.GUID])),
+    new("WorldGenerator.AddRivers",
+      s => s.EnabledForThisWorld && !s.RiversEnabled,
+      OnWorldGenerator(nameof(WorldGenerator.AddRivers), null, nameof(WorldGeneratorPatch.AddRiversPrefix), HookKind.Prefix)),
+    new("WorldGenerator.GetForestFactor prefix",
+      s => s.EnabledForThisWorld && s.ForestScale != 1f,
+      OnWorldGenerator(nameof(WorldGenerator.GetForestFactor), null, nameof(WorldGeneratorPatch.GetForestFactorPrefix), HookKind.Prefix)),
+    new("WorldGenerator.GetForestFactor postfix",
+      s => s.EnabledForThisWorld && (s.HasForestMap || s.ForestAmountOffset != 0f),
+      OnWorldGenerator(nameof(WorldGenerator.GetForestFactor), null, nameof(WorldGeneratorPatch.GetForestFactorPostfix), HookKind.Postfix)),
+    new("WorldGenerator.GetAshlandsOceanGradient prefix",
+      s => s.EnabledForThisWorld && s.HasHeatMap && s.HeatMapScale > 0f,
+      OnWorldGenerator(nameof(WorldGenerator.GetAshlandsOceanGradient), [typeof(float), typeof(float)],
+        nameof(WorldGeneratorPatch.GetAshlandsOceanGradientPrefix), HookKind.Prefix)),
+  ];
+
+  private static readonly Toggle[] TogglesAfterWorldSize =
+  [
+    // Hardcoded gaps don't work well when the whole world layout is changed (WorldGeneratorPatch.DisableGap).
+    new("WorldGenerator.CreateAshlandsGap",
+      s => s.EnabledForThisWorld && !s.AshlandsGapEnabled,
+      OnWorldGenerator(nameof(WorldGenerator.CreateAshlandsGap), null, nameof(WorldGeneratorPatch.DisableGap), HookKind.Prefix)),
+    new("WorldGenerator.CreateDeepNorthGap",
+      s => s.EnabledForThisWorld && !s.DeepNorthGapEnabled,
+      OnWorldGenerator(nameof(WorldGenerator.CreateDeepNorthGap), null, nameof(WorldGeneratorPatch.DisableGap), HookKind.Prefix)),
+    // After Expand World Data's prefix (its world yaml), as GetBiome: a priority does not stop a later prefix from
+    // setting the result again.
+    new("WorldGenerator.IsAshlands",
+      s => s.EnabledForThisWorld && s.HasHeatMap && s.HeatMapScale > 0f,
+      OnWorldGenerator(nameof(WorldGenerator.IsAshlands), null, nameof(WorldGeneratorPatch.IsAshlandsPrefix), HookKind.Prefix, Priority.VeryHigh, [EWD.GUID])),
+    new("WorldGenerator.IsAshlands (no heat map)",
+      s => s.EnabledForThisWorld && s.HasBiomeMap && (!s.HasHeatMap || s.HeatMapScale == 0f),
+      OnWorldGenerator(nameof(WorldGenerator.IsAshlands), null, nameof(WorldGeneratorPatch.IsAshlandsFallbackPrefix), HookKind.Prefix, Priority.VeryHigh, [EWD.GUID])),
+    // Valheim 1.0 made Deep North a real biome with its own terrain, weather and snow behaviour, but vanilla still
+    // decides where it IS from a hardcoded geographic test (WorldGenerator.IsDeepnorth). That test feeds EnvMan's
+    // weather selection, TerrainComp's snow-vs-cultivate painting, stream placement and vanilla's own GetBiome
+    // fallback - none of which consult the biome map. Without this, a biome map that moves Deep North produces Deep
+    // North terrain that still has the wrong weather and paints the wrong ground when cultivated. This mirrors the
+    // IsAshlands fallback; there is no heat-map condition because heat is Ashlands-only.
+    new("WorldGenerator.IsDeepnorth",
+      s => s.EnabledForThisWorld && s.HasBiomeMap,
+      OnWorldGenerator(nameof(WorldGenerator.IsDeepnorth), null, nameof(WorldGeneratorPatch.IsDeepnorthPrefix), HookKind.Prefix, Priority.VeryHigh)),
+    // Follows IsDeepnorth: the wave fade uses the same hardcoded Deep North circle, so a biome map that moves the biome
+    // has to move the calm water with it, or the sea stays flat over open ocean and choppy in the new Deep North.
+    new("WorldGenerator.DeepNorthWaveFade",
+      s => s.EnabledForThisWorld && s.HasBiomeMap,
+      OnWorldGenerator(nameof(WorldGenerator.DeepNorthWaveFade), null, nameof(WorldGeneratorPatch.DeepNorthWaveFadePrefix), HookKind.Prefix, Priority.VeryHigh)),
+    // Mossmap is not needed as it doesn't apply to Ashlands.
+    new("WorldGenerator.GetAshlandsHeight",
+      s => s.EnabledForThisWorld && (s.HasPaintMap || s.HasLavaMap),
+      OnWorldGenerator(nameof(WorldGenerator.GetAshlandsHeight), null, nameof(WorldGeneratorPatch.GetAshlandsHeight), HookKind.Postfix)),
+    // Every Better Continents world: the vegetation map and the twin guard (VegetationTwins) share these patches, so a
+    // failure (another mod's rewrite of PlaceVegetation) must not stop the patches after this one.
+    new("ZoneSystem.PlaceVegetation (vegetation map, twin guard)",
+      s => s.EnabledForThisWorld,
+      new Hook(() => AccessTools.Method(typeof(ZoneSystem), nameof(ZoneSystem.PlaceVegetation)), "ZoneSystem.PlaceVegetation",
+        typeof(ZoneSystemPatch), nameof(ZoneSystemPatch.PlaceVegetationPrefix), HookKind.Prefix),
+      new Hook(() => AccessTools.Method(typeof(ZoneSystem), nameof(ZoneSystem.PlaceVegetation)), "ZoneSystem.PlaceVegetation",
+        typeof(ZoneSystemPatch), nameof(ZoneSystemPatch.PlaceVegetationPostfix), HookKind.Postfix),
+      new Hook(() => AccessTools.Method(typeof(ZoneSystem), nameof(ZoneSystem.PlaceVegetation)), "ZoneSystem.PlaceVegetation",
+        typeof(ZoneSystemPatch), nameof(ZoneSystemPatch.PlaceVegetationSaveCurrent), HookKind.Transpiler),
+      new Hook(() => AccessTools.Method(typeof(ZoneSystem), nameof(ZoneSystem.InsideClearArea)), "ZoneSystem.InsideClearArea",
+        typeof(ZoneSystemPatch), nameof(ZoneSystemPatch.InsideClearAreaPostfix), HookKind.Postfix))
+    { FailureMessage = "Could not patch ZoneSystem.PlaceVegetation, so the vegetation map and the twin guard are off: " },
+    new("SpawnSystem.UpdateSpawnList",
+      s => s.EnabledForThisWorld && s.HasSpawnMap,
+      new Hook(() => AccessTools.Method(typeof(SpawnSystem), nameof(SpawnSystem.UpdateSpawnList)), "SpawnSystem.UpdateSpawnList",
+        typeof(SpawnSystemPatch), nameof(SpawnSystemPatch.UpdateSpawnListEnable), HookKind.Prefix),
+      new Hook(() => AccessTools.Method(typeof(SpawnSystem), nameof(SpawnSystem.UpdateSpawnList)), "SpawnSystem.UpdateSpawnList",
+        typeof(SpawnSystemPatch), nameof(SpawnSystemPatch.UpdateSpawnListDisable), HookKind.Postfix)),
+  ];
+
+  // The toggles these settings want on, by name (the offline tests compare it with the rules as they were written
+  // out one by one before the unifying refactor).
+  internal static IEnumerable<string> WantedToggles(BetterContinentsSettings settings) =>
+    new[] { BiomeColor }.Concat(TogglesBeforeWorldSize).Concat(TogglesAfterWorldSize).Where(t => t.Wanted(settings)).Select(t => t.Name);
+
+  // ---- the three that are more than on or off -------------------------------------------------------------------------
 
   // Biome precision (BiomePrecisionGrid, in HeightmapPatch). HeightmapBuilder.Build, which runs on the game's builder
   // thread, is patched once at load and follows BiomePrecisionGrid.Active; the readers are patched here, on the main
@@ -144,32 +384,6 @@ public partial class BetterContinents
     if (clutter)
       clutter.ClearAll();
     Log($"Biome precision: rebuilding {rebuilt} loaded terrain zone(s) and the grass");
-  }
-
-  // Heightmap.GetBiomeColor(float, float) has one prefix for both features that use it, the terrain map and biome
-  // precision (GetBiomeColorPatch picks per vertex), so neither can unpatch the other.
-  private static bool BiomeColorPatched = false;
-  internal static void PatchBiomeColor()
-  {
-    var toPatch = Settings.EnabledForThisWorld && (Settings.HasTerrainMap || EffectiveBiomePrecision(Settings) > 0);
-    if (toPatch == BiomeColorPatched)
-      return;
-    var method = AccessTools.Method(typeof(Heightmap), nameof(Heightmap.GetBiomeColor), [typeof(float), typeof(float)]);
-    var patch = AccessTools.Method(typeof(BetterContinents), nameof(GetBiomeColorPatch));
-    if (!EnsurePatchTargetFound(method, "Heightmap.GetBiomeColor(float,float)"))
-      return;
-    if (BiomeColorPatched)
-    {
-      Log("Unpatching Heightmap.GetBiomeColor");
-      HarmonyInstance.Unpatch(method, patch);
-      BiomeColorPatched = false;
-    }
-    if (toPatch)
-    {
-      Log("Patching Heightmap.GetBiomeColor");
-      HarmonyInstance.CreateProcessor(method).AddPrefix(patch).Patch();
-      BiomeColorPatched = true;
-    }
   }
 
   private static int GetBaseHeightPatched = 0;
@@ -244,163 +458,6 @@ public partial class BetterContinents
     }
   }
 
-  // Three different patches for different cases.
-  private static bool GetBiomeHeightWithRoughPatched = false;
-  private static bool GetBiomeHeightWithRoughPaintPatched = false;
-  private static bool GetBiomeHeightWithHeightPatched = false;
-  private static bool GetBiomeHeightWithHeightPaintPatched = false;
-  private static bool GetBiomeHeightWithPaintPatched = false;
-
-
-  private static void PatchGetBiomeHeight()
-  {
-    var toHeightPaintPatch = Settings.EnabledForThisWorld;
-    var toHeightPatch = Settings.EnabledForThisWorld;
-    var toRoughPaintPatch = Settings.EnabledForThisWorld;
-    var toRoughPatch = Settings.EnabledForThisWorld;
-    var toPaintPatch = Settings.EnabledForThisWorld;
-    if (Settings.HasPaintMap || Settings.HasLavaMap || Settings.HasMossMap || Settings.HasVegetationMap)
-    {
-      toHeightPatch = false;
-      toRoughPatch = false;
-    }
-    else
-    {
-      toHeightPaintPatch = false;
-      toRoughPaintPatch = false;
-      toPaintPatch = false;
-    }
-    if (Settings.ShouldHeightMapOverrideAll)
-    {
-      toRoughPaintPatch = false;
-      toRoughPatch = false;
-    }
-    else
-    {
-      toHeightPaintPatch = false;
-      toHeightPatch = false;
-    }
-    if (!Settings.HasRoughMap)
-    {
-      toRoughPaintPatch = false;
-      toRoughPatch = false;
-    }
-
-    var method = AccessTools.Method(typeof(WorldGenerator), nameof(WorldGenerator.GetBiomeHeight));
-    // 5 different patches depending what is needed.
-    var patchRough = AccessTools.Method(typeof(WorldGeneratorPatch), nameof(WorldGeneratorPatch.GetBiomeHeightWithRough));
-    var patchRoughPaint = AccessTools.Method(typeof(WorldGeneratorPatch), nameof(WorldGeneratorPatch.GetBiomeHeightWithRoughPaint));
-    var patchHeight = AccessTools.Method(typeof(WorldGeneratorPatch), nameof(WorldGeneratorPatch.GetBiomeHeightWithHeight));
-    var patchHeightPaint = AccessTools.Method(typeof(WorldGeneratorPatch), nameof(WorldGeneratorPatch.GetBiomeHeightWithHeightPaint));
-    var patchPeint = AccessTools.Method(typeof(WorldGeneratorPatch), nameof(WorldGeneratorPatch.GetBiomeHeightWithPaint));
-
-    if (!EnsurePatchTargetFound(method, "WorldGenerator.GetBiomeHeight"))
-      return;
-
-    if (toRoughPatch != GetBiomeHeightWithRoughPatched)
-    {
-      if (GetBiomeHeightWithRoughPatched)
-      {
-        Log("Unpatching WorldGenerator.GetBiomeHeight with rough");
-        HarmonyInstance.Unpatch(method, patchRough);
-        GetBiomeHeightWithRoughPatched = false;
-      }
-      if (toRoughPatch)
-      {
-        Log("Patching WorldGenerator.GetBiomeHeight with rough");
-        HarmonyInstance.Patch(method, postfix: new(patchRough));
-        GetBiomeHeightWithRoughPatched = true;
-      }
-    }
-    if (toRoughPaintPatch != GetBiomeHeightWithRoughPaintPatched)
-    {
-      if (GetBiomeHeightWithRoughPaintPatched)
-      {
-        Log("Unpatching WorldGenerator.GetBiomeHeight with rough and paint");
-        HarmonyInstance.Unpatch(method, patchRoughPaint);
-        GetBiomeHeightWithRoughPaintPatched = false;
-      }
-      if (toRoughPaintPatch)
-      {
-        Log("Patching WorldGenerator.GetBiomeHeight with rough and paint");
-        HarmonyInstance.Patch(method, postfix: new(patchRoughPaint));
-        GetBiomeHeightWithRoughPaintPatched = true;
-      }
-    }
-    if (toHeightPatch != GetBiomeHeightWithHeightPatched)
-    {
-      if (GetBiomeHeightWithHeightPatched)
-      {
-        Log("Unpatching WorldGenerator.GetBiomeHeight with height");
-        HarmonyInstance.Unpatch(method, patchHeight);
-        GetBiomeHeightWithHeightPatched = false;
-      }
-      if (toHeightPatch)
-      {
-        Log("Patching WorldGenerator.GetBiomeHeight with height");
-        HarmonyInstance.Patch(method, postfix: new(patchHeight));
-        GetBiomeHeightWithHeightPatched = true;
-      }
-    }
-    if (toHeightPaintPatch != GetBiomeHeightWithHeightPaintPatched)
-    {
-      if (GetBiomeHeightWithHeightPaintPatched)
-      {
-        Log("Unpatching WorldGenerator.GetBiomeHeight with height and paint");
-        HarmonyInstance.Unpatch(method, patchHeightPaint);
-        GetBiomeHeightWithHeightPaintPatched = false;
-      }
-      if (toHeightPaintPatch)
-      {
-        Log("Patching WorldGenerator.GetBiomeHeight with height and paint");
-        HarmonyInstance.Patch(method, postfix: new(patchHeightPaint));
-        GetBiomeHeightWithHeightPaintPatched = true;
-      }
-    }
-    if (toPaintPatch != GetBiomeHeightWithPaintPatched)
-    {
-      if (GetBiomeHeightWithPaintPatched)
-      {
-        Log("Unpatching WorldGenerator.GetBiomeHeight with paint");
-        HarmonyInstance.Unpatch(method, patchPeint);
-        GetBiomeHeightWithPaintPatched = false;
-      }
-      if (toPaintPatch)
-      {
-        Log("Patching WorldGenerator.GetBiomeHeight with paint");
-        HarmonyInstance.Patch(method, postfix: new(patchPeint));
-        GetBiomeHeightWithPaintPatched = true;
-      }
-    }
-
-  }
-
-  private static bool GetAshlandsHeightPatched = false;
-
-  private static void PatchGetAshlandsHeight()
-  {
-    // Mossmap is not needed as it doesn't apply to Ashlands.
-    var toPatch = Settings.EnabledForThisWorld && (Settings.HasPaintMap || Settings.HasLavaMap);
-    if (toPatch == GetAshlandsHeightPatched)
-      return;
-    var method = AccessTools.Method(typeof(WorldGenerator), nameof(WorldGenerator.GetAshlandsHeight));
-    var patch = AccessTools.Method(typeof(WorldGeneratorPatch), nameof(WorldGeneratorPatch.GetAshlandsHeight));
-    if (!EnsurePatchTargetFound(method, "WorldGenerator.GetAshlandsHeight"))
-      return;
-    if (GetAshlandsHeightPatched)
-    {
-      Log("Unpatching WorldGenerator.GetAshlandsHeight");
-      HarmonyInstance.Unpatch(method, patch);
-      GetAshlandsHeightPatched = false;
-    }
-    if (toPatch)
-    {
-      Log("Patching WorldGenerator.GetAshlandsHeight");
-      HarmonyInstance.Patch(method, postfix: new(patch));
-      GetAshlandsHeightPatched = true;
-    }
-  }
-
   private static void PatchWorldSize()
   {
     if (!Settings.EnabledForThisWorld)
@@ -415,380 +472,5 @@ public partial class BetterContinents
       WorldSizeHelper.PatchWorldSize(HarmonyInstance, 10000f, 500f);
     else
       WorldSizeHelper.PatchWorldSize(HarmonyInstance, Settings.WorldSize, Settings.EdgeSize);
-  }
-
-  private static bool GetBiomePatched = false;
-  private static void PatchGetBiome()
-  {
-    var toPatch = Settings.EnabledForThisWorld && Settings.HasBiomeMap;
-    if (toPatch == GetBiomePatched)
-      return;
-    var method = AccessTools.Method(typeof(WorldGenerator), nameof(WorldGenerator.GetBiome), [typeof(float), typeof(float), typeof(float), typeof(bool)]);
-    var patch = AccessTools.Method(typeof(WorldGeneratorPatch), nameof(WorldGeneratorPatch.GetBiomePrefix));
-    if (!EnsurePatchTargetFound(method, "WorldGenerator.GetBiome(float,float,float,bool)"))
-      return;
-    if (GetBiomePatched)
-    {
-      Log("Unpatching WorldGenerator.GetBiome");
-      HarmonyInstance.Unpatch(method, patch);
-      GetBiomePatched = false;
-    }
-    if (toPatch)
-    {
-      Log("Patching WorldGenerator.GetBiome");
-      // After Expand World Data's prefix, which answers from its own world yaml and skips the original: every prefix
-      // runs and the last to set the result wins, so the biome map overrides it wherever it has a biome, and a None
-      // pixel leaves its answer.
-      HarmonyInstance.Patch(method, prefix: new(patch, after: [EWD.GUID]));
-      GetBiomePatched = true;
-    }
-  }
-  private static bool AddRiversPAtched = false;
-  private static void PatchAddRivers()
-  {
-    var toPatch = Settings.EnabledForThisWorld && !Settings.RiversEnabled;
-    if (toPatch == AddRiversPAtched)
-      return;
-    var method = AccessTools.Method(typeof(WorldGenerator), nameof(WorldGenerator.AddRivers));
-    var patch = AccessTools.Method(typeof(WorldGeneratorPatch), nameof(WorldGeneratorPatch.AddRiversPrefix));
-    if (!EnsurePatchTargetFound(method, "WorldGenerator.AddRivers"))
-      return;
-    if (AddRiversPAtched)
-    {
-      Log("Unpatching WorldGenerator.AddRivers");
-      HarmonyInstance.Unpatch(method, patch);
-      AddRiversPAtched = false;
-    }
-    if (toPatch)
-    {
-      Log("Patching WorldGenerator.AddRivers");
-      HarmonyInstance.Patch(method, prefix: new(patch));
-      AddRiversPAtched = true;
-    }
-  }
-  private static bool ForestFactorPrefixPatched = false;
-  private static void PatchForestFactorPrefix()
-  {
-    var toPatch = Settings.EnabledForThisWorld && Settings.ForestScale != 1f;
-    if (toPatch == ForestFactorPrefixPatched)
-      return;
-    var method = AccessTools.Method(typeof(WorldGenerator), nameof(WorldGenerator.GetForestFactor));
-    var patch = AccessTools.Method(typeof(WorldGeneratorPatch), nameof(WorldGeneratorPatch.GetForestFactorPrefix));
-    if (!EnsurePatchTargetFound(method, "WorldGenerator.GetForestFactor"))
-      return;
-    if (ForestFactorPrefixPatched)
-    {
-      Log("Unpatching WorldGenerator.GetForestFactor prefix");
-      HarmonyInstance.Unpatch(method, patch);
-      ForestFactorPrefixPatched = false;
-    }
-    if (toPatch)
-    {
-      Log("Patching WorldGenerator.GetForestFactor prefix");
-      HarmonyInstance.Patch(method, prefix: new(patch));
-      ForestFactorPrefixPatched = true;
-    }
-  }
-  private static bool ForestFactorPostfixPatched = false;
-  private static void PatchForestFactorPostfix()
-  {
-    var toPatch = Settings.EnabledForThisWorld && (Settings.HasForestMap || Settings.ForestAmountOffset != 0f);
-    if (toPatch == ForestFactorPostfixPatched)
-      return;
-    var method = AccessTools.Method(typeof(WorldGenerator), nameof(WorldGenerator.GetForestFactor));
-    var patch = AccessTools.Method(typeof(WorldGeneratorPatch), nameof(WorldGeneratorPatch.GetForestFactorPostfix));
-    if (!EnsurePatchTargetFound(method, "WorldGenerator.GetForestFactor"))
-      return;
-    if (ForestFactorPostfixPatched)
-    {
-      Log("Unpatching WorldGenerator.GetForestFactor postfix");
-      HarmonyInstance.Unpatch(method, patch);
-      ForestFactorPostfixPatched = false;
-    }
-    if (toPatch)
-    {
-      Log("Patching WorldGenerator.GetForestFactor postfix");
-      HarmonyInstance.Patch(method, postfix: new(patch));
-      ForestFactorPostfixPatched = true;
-    }
-  }
-
-  private static bool HeatPrefixPatched = false;
-  private static void PatchHeatPrefix()
-  {
-    var toPatch = Settings.EnabledForThisWorld && Settings.HasHeatMap && Settings.HeatMapScale > 0f;
-    if (toPatch == HeatPrefixPatched)
-      return;
-    var method = AccessTools.Method(typeof(WorldGenerator), nameof(WorldGenerator.GetAshlandsOceanGradient), [typeof(float), typeof(float)]);
-    var patch = AccessTools.Method(typeof(WorldGeneratorPatch), nameof(WorldGeneratorPatch.GetAshlandsOceanGradientPrefix));
-    if (!EnsurePatchTargetFound(method, "WorldGenerator.GetAshlandsOceanGradient(float,float)"))
-      return;
-    if (HeatPrefixPatched)
-    {
-      Log("Unpatching WorldGenerator.GetAshlandsOceanGradient prefix");
-      HarmonyInstance.Unpatch(method, patch);
-      HeatPrefixPatched = false;
-    }
-    if (toPatch)
-    {
-      Log("Patching WorldGenerator.GetAshlandsOceanGradient prefix");
-      HarmonyInstance.Patch(method, prefix: new(patch));
-      HeatPrefixPatched = true;
-    }
-  }
-  private static bool AshlandsGapPatched = false;
-
-  private static void PatchAshlandGap()
-  {
-    var toPatch = Settings.EnabledForThisWorld && !Settings.AshlandsGapEnabled;
-    if (toPatch == AshlandsGapPatched)
-      return;
-    var method = AccessTools.Method(typeof(WorldGenerator), nameof(WorldGenerator.CreateAshlandsGap));
-    var patch = AccessTools.Method(typeof(WorldGeneratorPatch), nameof(WorldGeneratorPatch.DisableGap));
-    if (!EnsurePatchTargetFound(method, "WorldGenerator.CreateAshlandsGap"))
-      return;
-    if (AshlandsGapPatched)
-    {
-      Log("Unpatching WorldGenerator.CreateAshlandsGap");
-      HarmonyInstance.Unpatch(method, patch);
-      AshlandsGapPatched = false;
-    }
-    if (toPatch)
-    {
-      Log("Patching WorldGenerator.CreateAshlandsGap");
-      HarmonyInstance.Patch(method, prefix: new(patch));
-      AshlandsGapPatched = true;
-    }
-  }
-
-  private static bool DeepNorthGapPatched = false;
-  private static void PatchDeepNorthGap()
-  {
-    var toPatch = Settings.EnabledForThisWorld && !Settings.DeepNorthGapEnabled;
-    if (toPatch == DeepNorthGapPatched)
-      return;
-    var method = AccessTools.Method(typeof(WorldGenerator), nameof(WorldGenerator.CreateDeepNorthGap));
-    var patch = AccessTools.Method(typeof(WorldGeneratorPatch), nameof(WorldGeneratorPatch.DisableGap));
-    if (!EnsurePatchTargetFound(method, "WorldGenerator.CreateDeepNorthGap"))
-      return;
-    if (DeepNorthGapPatched)
-    {
-      Log("Unpatching WorldGenerator.CreateDeepNorthGap");
-      HarmonyInstance.Unpatch(method, patch);
-      DeepNorthGapPatched = false;
-    }
-    if (toPatch)
-    {
-      Log("Patching WorldGenerator.CreateDeepNorthGap");
-      HarmonyInstance.Patch(method, prefix: new(patch));
-      DeepNorthGapPatched = true;
-    }
-  }
-
-  private static bool IsAshlandsPatched = false;
-  private static void PatchIsAshlands()
-  {
-    var toPatch = Settings.EnabledForThisWorld && Settings.HasHeatMap && Settings.HeatMapScale > 0f;
-    if (toPatch == IsAshlandsPatched)
-      return;
-    var method = AccessTools.Method(typeof(WorldGenerator), nameof(WorldGenerator.IsAshlands));
-    var patch = AccessTools.Method(typeof(WorldGeneratorPatch), nameof(WorldGeneratorPatch.IsAshlandsPrefix));
-    if (!EnsurePatchTargetFound(method, "WorldGenerator.IsAshlands"))
-      return;
-    if (IsAshlandsPatched)
-    {
-      Log("Unpatching WorldGenerator.IsAshlands");
-      HarmonyInstance.Unpatch(method, patch);
-      IsAshlandsPatched = false;
-    }
-    if (toPatch)
-    {
-      Log("Patching WorldGenerator.IsAshlands");
-      // After Expand World Data's prefix (its world yaml), as GetBiome: a priority does not stop a later prefix
-      // from setting the result again.
-      HarmonyInstance.Patch(method, prefix: new(patch, Priority.VeryHigh, after: [EWD.GUID]));
-      IsAshlandsPatched = true;
-    }
-  }
-  private static bool IsAshlandsFallbackPatched = false;
-  private static void PatchIsAshlandsFallback()
-  {
-    var toPatch = Settings.EnabledForThisWorld && Settings.HasBiomeMap && (!Settings.HasHeatMap || Settings.HeatMapScale == 0f);
-    if (toPatch == IsAshlandsFallbackPatched)
-      return;
-    var method = AccessTools.Method(typeof(WorldGenerator), nameof(WorldGenerator.IsAshlands));
-    var patch = AccessTools.Method(typeof(WorldGeneratorPatch), nameof(WorldGeneratorPatch.IsAshlandsFallbackPrefix));
-    if (!EnsurePatchTargetFound(method, "WorldGenerator.IsAshlands"))
-      return;
-    if (IsAshlandsFallbackPatched)
-    {
-      Log("Unpatching WorldGenerator.IsAshlands (no heat map)");
-      HarmonyInstance.Unpatch(method, patch);
-      IsAshlandsFallbackPatched = false;
-    }
-    if (toPatch)
-    {
-      Log("Patching WorldGenerator.IsAshlands (no heat map)");
-      HarmonyInstance.Patch(method, prefix: new(patch, Priority.VeryHigh, after: [EWD.GUID]));
-      IsAshlandsFallbackPatched = true;
-    }
-  }
-  private static bool IsDeepnorthPatched = false;
-  // Valheim 1.0 made Deep North a real biome with its own terrain, weather and snow behaviour, but vanilla
-  // still decides where it IS from a hardcoded geographic test (WorldGenerator.IsDeepnorth). That test feeds
-  // EnvMan's weather selection, TerrainComp's snow-vs-cultivate painting, stream placement and vanilla's own
-  // GetBiome fallback - none of which consult the biome map. Without this, a biome map that moves Deep North
-  // produces Deep North terrain that still has the wrong weather and paints the wrong ground when cultivated.
-  // This mirrors PatchIsAshlandsFallback; there is no heat-map condition because heat is Ashlands-only.
-  private static void PatchIsDeepnorth()
-  {
-    var toPatch = Settings.EnabledForThisWorld && Settings.HasBiomeMap;
-    if (toPatch == IsDeepnorthPatched)
-      return;
-    var method = AccessTools.Method(typeof(WorldGenerator), nameof(WorldGenerator.IsDeepnorth));
-    var patch = AccessTools.Method(typeof(WorldGeneratorPatch), nameof(WorldGeneratorPatch.IsDeepnorthPrefix));
-    if (!EnsurePatchTargetFound(method, "WorldGenerator.IsDeepnorth"))
-      return;
-    if (IsDeepnorthPatched)
-    {
-      Log("Unpatching WorldGenerator.IsDeepnorth");
-      HarmonyInstance.Unpatch(method, patch);
-      IsDeepnorthPatched = false;
-    }
-    if (toPatch)
-    {
-      Log("Patching WorldGenerator.IsDeepnorth");
-      HarmonyInstance.Patch(method, prefix: new(patch, Priority.VeryHigh));
-      IsDeepnorthPatched = true;
-    }
-  }
-  private static bool DeepNorthWaveFadePatched = false;
-  // Follows PatchIsDeepnorth: the wave fade uses the same hardcoded Deep North circle, so a biome map that
-  // moves the biome has to move the calm water with it, or the sea stays flat over open ocean and choppy in
-  // the new Deep North.
-  private static void PatchDeepNorthWaveFade()
-  {
-    var toPatch = Settings.EnabledForThisWorld && Settings.HasBiomeMap;
-    if (toPatch == DeepNorthWaveFadePatched)
-      return;
-    var method = AccessTools.Method(typeof(WorldGenerator), nameof(WorldGenerator.DeepNorthWaveFade));
-    var patch = AccessTools.Method(typeof(WorldGeneratorPatch), nameof(WorldGeneratorPatch.DeepNorthWaveFadePrefix));
-    if (!EnsurePatchTargetFound(method, "WorldGenerator.DeepNorthWaveFade"))
-      return;
-    if (DeepNorthWaveFadePatched)
-    {
-      Log("Unpatching WorldGenerator.DeepNorthWaveFade");
-      HarmonyInstance.Unpatch(method, patch);
-      DeepNorthWaveFadePatched = false;
-    }
-    if (toPatch)
-    {
-      Log("Patching WorldGenerator.DeepNorthWaveFade");
-      HarmonyInstance.Patch(method, prefix: new(patch, Priority.VeryHigh));
-      DeepNorthWaveFadePatched = true;
-    }
-  }
-  private static bool IsVegetationPatched = false;
-  // Every Better Continents world: the vegetation map and the twin guard (VegetationTwins) share these patches.
-  private static void PatchVegetation()
-  {
-    var toPatch = Settings.EnabledForThisWorld;
-    if (toPatch == IsVegetationPatched)
-      return;
-    var method = AccessTools.Method(typeof(ZoneSystem), nameof(ZoneSystem.PlaceVegetation));
-    var prefixPatch = AccessTools.Method(typeof(ZoneSystemPatch), nameof(ZoneSystemPatch.PlaceVegetationPrefix));
-    var postfixPatch = AccessTools.Method(typeof(ZoneSystemPatch), nameof(ZoneSystemPatch.PlaceVegetationPostfix));
-    var transpilerPatch = AccessTools.Method(typeof(ZoneSystemPatch), nameof(ZoneSystemPatch.PlaceVegetationSaveCurrent));
-    var clearAreaMethod = AccessTools.Method(typeof(ZoneSystem), nameof(ZoneSystem.InsideClearArea));
-    var clearAreaPatch = AccessTools.Method(typeof(ZoneSystemPatch), nameof(ZoneSystemPatch.InsideClearAreaPostfix));
-    if (!EnsurePatchTargetFound(method, "ZoneSystem.PlaceVegetation") || !EnsurePatchTargetFound(clearAreaMethod, "ZoneSystem.InsideClearArea"))
-      return;
-    if (IsVegetationPatched)
-    {
-      Log("Unpatching ZoneSystem.PlaceVegetation (vegetation map, twin guard)");
-      HarmonyInstance.Unpatch(method, prefixPatch);
-      HarmonyInstance.Unpatch(method, postfixPatch);
-      HarmonyInstance.Unpatch(method, transpilerPatch);
-      HarmonyInstance.Unpatch(clearAreaMethod, clearAreaPatch);
-      IsVegetationPatched = false;
-    }
-    if (toPatch)
-    {
-      Log("Patching ZoneSystem.PlaceVegetation (vegetation map, twin guard)");
-      // Every world now, so a failure (another mod's rewrite of PlaceVegetation) must not stop the patches after this one.
-      try
-      {
-        HarmonyInstance.Patch(method, prefix: new(prefixPatch), postfix: new(postfixPatch), transpiler: new(transpilerPatch));
-        HarmonyInstance.Patch(clearAreaMethod, postfix: new(clearAreaPatch));
-        IsVegetationPatched = true;
-      }
-      catch (Exception e)
-      {
-        LogError($"Could not patch ZoneSystem.PlaceVegetation, so the vegetation map and the twin guard are off: {e.Message}");
-        try
-        {
-          HarmonyInstance.Unpatch(method, prefixPatch);
-          HarmonyInstance.Unpatch(method, postfixPatch);
-          HarmonyInstance.Unpatch(method, transpilerPatch);
-        }
-        catch (Exception)
-        {
-          // Nothing was applied.
-        }
-      }
-    }
-  }
-  private static void PatchColorTransition()
-  {
-    /*
-  private static bool ColorTransitionPatched = false;
-    var toPatch = Settings.EnabledForThisWorld && Settings.FixWaterColor;
-    if (toPatch == ColorTransitionPatched)
-      return;
-    var methodStart = AccessTools.Method(typeof(Player), nameof(Player.AddKnownBiome));
-    var methodEnd = AccessTools.Method(typeof(Player), nameof(Player.OnSpawned));
-    var patchStart = AccessTools.Method(typeof(WaterColor), nameof(WaterColor.StartColorTransition));
-    var patchEnd = AccessTools.Method(typeof(WaterColor), nameof(WaterColor.ResetColorTransition));
-    if (ColorTransitionPatched)
-    {
-      Log("Unpatching WorldGenerator.GetAshlandsOceanGradient prefix");
-      HarmonyInstance.Unpatch(methodStart, patchStart);
-      HarmonyInstance.Unpatch(methodEnd, patchEnd);
-      ColorTransitionPatched = false;
-    }
-    if (toPatch)
-    {
-      Log("Patching WorldGenerator.GetAshlandsOceanGradient prefix");
-      HarmonyInstance.Patch(methodStart, postfix: new(patchStart));
-      HarmonyInstance.Patch(methodEnd, postfix: new(patchEnd));
-      ColorTransitionPatched = true;
-    }
-    */
-  }
-
-  private static bool IsSpawnMapPatched = false;
-  private static void PatchSpawnMap()
-  {
-    var toPatch = Settings.EnabledForThisWorld && Settings.HasSpawnMap;
-    if (toPatch == IsSpawnMapPatched)
-      return;
-    var method = AccessTools.Method(typeof(SpawnSystem), nameof(SpawnSystem.UpdateSpawnList));
-    var prefixPatch = AccessTools.Method(typeof(SpawnSystemPatch), nameof(SpawnSystemPatch.UpdateSpawnListEnable));
-    var postfixPatch = AccessTools.Method(typeof(SpawnSystemPatch), nameof(SpawnSystemPatch.UpdateSpawnListDisable));
-    if (!EnsurePatchTargetFound(method, "SpawnSystem.UpdateSpawnList"))
-      return;
-    if (IsSpawnMapPatched)
-    {
-      Log("Unpatching SpawnSystem.UpdateSpawnList");
-      HarmonyInstance.Unpatch(method, prefixPatch);
-      HarmonyInstance.Unpatch(method, postfixPatch);
-      IsSpawnMapPatched = false;
-    }
-    if (toPatch)
-    {
-      Log("Patching SpawnSystem.UpdateSpawnList");
-      HarmonyInstance.Patch(method, prefix: new(prefixPatch), postfix: new(postfixPatch));
-      IsSpawnMapPatched = true;
-    }
   }
 }

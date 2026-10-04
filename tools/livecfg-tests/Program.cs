@@ -80,6 +80,7 @@ internal static class Program
       Reload(cfg);
       SectionNumbers();
       MapKinds();
+      PatchToggles();
       TransferRateTests();
       failures += CacheTests.Run();
       failures += MinimapTests.Run();
@@ -325,6 +326,109 @@ internal static class Program
     int from = text.IndexOf("standard name: ", StringComparison.Ordinal) + "standard name: ".Length, to = text.IndexOf(" (and the legends", StringComparison.Ordinal);
     var listed = from > 15 && to > from ? text.Substring(from, to - from).Split(", ") : [];
     C(listed.SequenceEqual(named.Select(k => k.FileName)), $"the Directory setting lists them in their order: {string.Join(", ", listed)}");
+  }
+
+  // The patch toggles (Patcher.cs) are a table since the unifying refactor; this is how the separate Patch* methods
+  // decided before it, written out the same way, so the table must want exactly what they wanted, in the same order.
+  static List<string> TogglesAsWrittenBefore(BC.BetterContinentsSettings s)
+  {
+    var r = new List<string>();
+    bool on = s.EnabledForThisWorld;
+    if (on && (s.HasTerrainMap || BC.EffectiveBiomePrecision(s) > 0)) r.Add("Heightmap.GetBiomeColor");
+    var toHeightPaintPatch = on;
+    var toHeightPatch = on;
+    var toRoughPaintPatch = on;
+    var toRoughPatch = on;
+    var toPaintPatch = on;
+    if (s.HasPaintMap || s.HasLavaMap || s.HasMossMap || s.HasVegetationMap)
+    {
+      toHeightPatch = false;
+      toRoughPatch = false;
+    }
+    else
+    {
+      toHeightPaintPatch = false;
+      toRoughPaintPatch = false;
+      toPaintPatch = false;
+    }
+    if (s.ShouldHeightMapOverrideAll)
+    {
+      toRoughPaintPatch = false;
+      toRoughPatch = false;
+    }
+    else
+    {
+      toHeightPaintPatch = false;
+      toHeightPatch = false;
+    }
+    if (!s.HasRoughMap)
+    {
+      toRoughPaintPatch = false;
+      toRoughPatch = false;
+    }
+    if (toRoughPatch) r.Add("WorldGenerator.GetBiomeHeight with rough");
+    if (toRoughPaintPatch) r.Add("WorldGenerator.GetBiomeHeight with rough and paint");
+    if (toHeightPatch) r.Add("WorldGenerator.GetBiomeHeight with height");
+    if (toHeightPaintPatch) r.Add("WorldGenerator.GetBiomeHeight with height and paint");
+    if (toPaintPatch) r.Add("WorldGenerator.GetBiomeHeight with paint");
+    if (on && s.HasBiomeMap) r.Add("WorldGenerator.GetBiome");
+    if (on && !s.RiversEnabled) r.Add("WorldGenerator.AddRivers");
+    if (on && s.ForestScale != 1f) r.Add("WorldGenerator.GetForestFactor prefix");
+    if (on && (s.HasForestMap || s.ForestAmountOffset != 0f)) r.Add("WorldGenerator.GetForestFactor postfix");
+    if (on && s.HasHeatMap && s.HeatMapScale > 0f) r.Add("WorldGenerator.GetAshlandsOceanGradient prefix");
+    if (on && !s.AshlandsGapEnabled) r.Add("WorldGenerator.CreateAshlandsGap");
+    if (on && !s.DeepNorthGapEnabled) r.Add("WorldGenerator.CreateDeepNorthGap");
+    if (on && s.HasHeatMap && s.HeatMapScale > 0f) r.Add("WorldGenerator.IsAshlands");
+    if (on && s.HasBiomeMap && (!s.HasHeatMap || s.HeatMapScale == 0f)) r.Add("WorldGenerator.IsAshlands (no heat map)");
+    if (on && s.HasBiomeMap) r.Add("WorldGenerator.IsDeepnorth");
+    if (on && s.HasBiomeMap) r.Add("WorldGenerator.DeepNorthWaveFade");
+    if (on && (s.HasPaintMap || s.HasLavaMap)) r.Add("WorldGenerator.GetAshlandsHeight");
+    // Every Better Continents world since the twin guard (0.9.4: with a vegetation map only).
+    if (on) r.Add("ZoneSystem.PlaceVegetation (vegetation map, twin guard)");
+    if (on && s.HasSpawnMap) r.Add("SpawnSystem.UpdateSpawnList");
+    return r;
+  }
+
+  static void PatchToggles()
+  {
+    Section("patch toggles");
+    var maps = new (string Field, Type Type)[]
+    {
+      ("HeightMap", typeof(ImageMapFloat)), ("BiomeMap", typeof(ImageMapBiome)), ("TerrainMap", typeof(ImageMapTerrain)),
+      ("PaintMap", typeof(ImageMapPaint)), ("LavaMap", typeof(ImageMapFloat)), ("MossMap", typeof(ImageMapFloat)),
+      ("VegetationMap", typeof(ImageMapSpawn)), ("LocationMap", typeof(ImageMapLocation)), ("RoughMap", typeof(ImageMapFloat)),
+      ("FlatMap", typeof(ImageMapFloat)), ("ForestMap", typeof(ImageMapFloat)), ("HeatMap", typeof(ImageMapFloat)),
+      ("SpawnMap", typeof(ImageMapSpawn)), ("AltBiomeMap", typeof(ImageMapAltBiome)),
+    };
+    var fields = maps.Select(m => (Field: typeof(BC.BetterContinentsSettings).GetField(m.Field, BindingFlags.NonPublic | BindingFlags.Instance)!, m.Type)).ToArray();
+    var rng = new System.Random(4);
+    int same = 0, cases = 20000;
+    string? first = null;
+    for (int i = 0; i < cases; i++)
+    {
+      var s = new BC.BetterContinentsSettings
+      {
+        EnabledForThisWorld = rng.Next(8) != 0,
+        HeightmapOverrideAll = rng.Next(2) == 0,
+        BiomePrecision = rng.Next(-2, 7),
+        RiversEnabled = rng.Next(3) != 0,
+        ForestScale = rng.Next(3) == 0 ? 0.5f + (float)rng.NextDouble() : 1f,
+        ForestAmountOffset = rng.Next(3) == 0 ? (float)rng.NextDouble() - 0.5f : 0f,
+        HeatMapScale = rng.Next(3) == 0 ? 0f : 10f * (float)rng.NextDouble(),
+        AshlandsGapEnabled = rng.Next(2) == 0,
+        DeepNorthGapEnabled = rng.Next(2) == 0,
+      };
+      foreach (var (field, type) in fields)
+        if (rng.Next(3) == 0)
+          field.SetValue(s, RuntimeHelpers.GetUninitializedObject(type));
+      var before = TogglesAsWrittenBefore(s);
+      var now = BC.WantedToggles(s).ToList();
+      if (before.SequenceEqual(now))
+        same++;
+      else
+        first ??= $"case {i}: before [{string.Join(", ", before)}], now [{string.Join(", ", now)}]";
+    }
+    C(same == cases, $"the toggle table wants what the Patch* methods wanted, in their order, for {cases} random settings ({same} the same){(first != null ? "; first difference: " + first : "")}");
   }
 
   static void TransferRateTests()
