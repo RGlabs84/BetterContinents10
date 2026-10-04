@@ -113,14 +113,22 @@ public partial class BetterContinents : BaseUnityPlugin
 
     public static BetterContinents instance;
 #nullable enable
+    // Expand World Size calls this by reflection (its compatibility/BetterContinents.cs) with its own world size: the
+    // size Better Continents' maps then span.
     public static void SetSize(float size, float edge)
     {
         Log($"Received world size {size} and edge size {edge}");
-        TotalRadius = size + edge;
-        TotalSize = TotalRadius * 2f;
-        WorldRadius = size;
+        var geometry = new WorldGeometry(size, edge);
+        Geometry = geometry;
+        TotalRadius = geometry.TotalRadius;
+        TotalSize = geometry.TotalSize;
+        WorldRadius = geometry.WorldRadius;
         WorldGeneratorPatch.ApplyNoiseSettings();
     }
+    // The size Better Continents' maps span (WorldGeometry): vanilla's, or Expand World Size's. It can be swapped on
+    // another thread, so a reader takes it once and uses that.
+    internal static volatile WorldGeometry Geometry = WorldGeometry.Vanilla;
+    // The same size, for other mods that read these fields; Better Continents itself reads Geometry.
     public static float TotalRadius = 10500f;
     public static float TotalSize = TotalRadius * 2f;
     public static float WorldRadius = 10000f;
@@ -149,9 +157,8 @@ public partial class BetterContinents : BaseUnityPlugin
     public const string ConfigFileName = "BetterContinents";
     public static string GetWorldBCFile(string worldName, FileHelpers.FileSource fileSource) =>
       SaveSystem.GetWorldsSaveRootPath(fileSource) + "/" + worldName + "/" + ConfigFileName;
-    private static readonly Vector2 Half = Vector2.one * 0.5f;
-    private static float Normalize(float x) => Mathf.Clamp(x / TotalSize + 0.5f, 0f, 1f);
-    private static Vector2 NormalizedToWorld(Vector2 p) => (p - Half) * TotalSize;
+    private static float Normalize(float x) => Geometry.Normalize(x);
+    private static Vector2 NormalizedToWorld(Vector2 p) => Geometry.NormalizedToWorld(p);
 
     public static void Log(string msg) => Debug.Log($"[BetterContinents] {msg}");
     public static void LogError(string msg) => Debug.LogError($"[BetterContinents] {msg}");

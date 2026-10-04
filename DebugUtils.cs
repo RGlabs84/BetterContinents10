@@ -730,12 +730,13 @@ public partial class DebugUtils
     {
         var tex = new Texture2D(size, size);
         var pixels = new Color32[size * size];
+        float totalRadius = BetterContinents.Geometry.TotalRadius;
         GameUtils.SimpleParallelFor(4, 0, size, y =>
         {
-            float yp = 2f * (y / (float)size - 0.5f) * BetterContinents.TotalRadius;
+            float yp = 2f * (y / (float)size - 0.5f) * totalRadius;
             for (int x = 0; x < size; ++x)
             {
-                float xp = 2f * (x / (float)size - 0.5f) * BetterContinents.TotalRadius;
+                float xp = 2f * (x / (float)size - 0.5f) * totalRadius;
                 byte val = (byte)Mathf.Clamp((int)(noiseFn(xp, yp) * 255f), 0, 255);
                 pixels[y * size + x] = new Color32(val, val, val, byte.MaxValue);
             }

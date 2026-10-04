@@ -66,9 +66,10 @@ public partial class BetterContinents
     {
       WorldEnabled = Settings.EnabledForThisWorld;
       Active = Settings.EffectiveAltBiomes;
-      ExternalGrid = DetectExternalGrid();
+      var size = Geometry;
+      ExternalGrid = DetectExternalGrid(size);
       CutoffRadius = 0f;
-      SampledRadius = ExternalGrid ? TotalRadius : VanillaSampleRadius;
+      SampledRadius = ExternalGrid ? size.TotalRadius : VanillaSampleRadius;
       FallbackActive = false;
       CustomEligibility = false;
       Planting = null;
@@ -76,7 +77,7 @@ public partial class BetterContinents
         return;
       if (!ExternalGrid)
       {
-        // Better Continents alone never moves its maps: TotalRadius only changes when Expand World Size calls
+        // Better Continents alone never moves its maps: Geometry only changes when Expand World Size calls
         // SetSize, in which case EWS owns the grid (ExternalGrid). So here the content always spans the vanilla
         // 10500 m disc, and "World Size" only moves the edge of the world. When that edge is inside the disc,
         // WorldEdge stops sampling at it. With the drop-off disabled there is no edge to stop at.
@@ -104,9 +105,9 @@ public partial class BetterContinents
 
     // Expand World Size retargets MapSpaceToWorldSpace / WorldSpaceToMapSpace / GenerateBiomePoints itself and
     // pushes its radius into BC through SetSize. When either is visible, the grid geometry is not ours.
-    private static bool DetectExternalGrid()
+    private static bool DetectExternalGrid(WorldGeometry size)
     {
-      if (TotalRadius != VanillaSampleRadius)
+      if (size.TotalRadius != VanillaSampleRadius)
         return true;
       try
       {
@@ -367,7 +368,7 @@ public partial class BetterContinents
     {
       int size = data.Size;
       var keys = new int[size * size];
-      float total = TotalSize;
+      float total = Geometry.TotalSize;
       GameUtils.SimpleParallelFor(4, 0, size, y =>
       {
         float mapY = AltBiomeWorldData.MapSpaceToWorldSpace(y) / total + 0.5f;

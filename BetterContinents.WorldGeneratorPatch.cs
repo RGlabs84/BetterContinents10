@@ -1,4 +1,4 @@
-﻿// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0).
+﻿// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0), and on 2026-10-04 for the unifying refactor (0.10.0).
 
 using System.Collections.Generic;
 using System.Linq;
@@ -68,7 +68,7 @@ public partial class BetterContinents
 
         public static void ApplyNoiseSettings()
         {
-            BaseHeightNoise = new NoiseStack(TotalSize, currentSeed, Settings.BaseHeightNoise);
+            BaseHeightNoise = new NoiseStack(Geometry.TotalSize, currentSeed, Settings.BaseHeightNoise);
         }
 
         // wx, wy are [-10500, 10500]
@@ -123,19 +123,20 @@ public partial class BetterContinents
         }
         private static float GetBaseHeightV1(float wx, float wy, float ___m_offset0, float ___m_offset1, float ___m_minMountainDistance)
         {
+            var size = Geometry;
             float distance = Utils.Length(wx, wy);
 
             // The base map x, y coordinates in 0..1 range
-            float mapX = Normalize(wx);
-            float mapY = Normalize(wy);
+            float mapX = size.Normalize(wx);
+            float mapY = size.Normalize(wy);
 
             wx *= Settings.GlobalScale;
             wy *= Settings.GlobalScale;
 
             float WarpScale = 0.001f * Settings.RidgeScale;
 
-            float warpX = (Mathf.PerlinNoise(wx * WarpScale, wy * WarpScale) - 0.5f) * TotalRadius;
-            float warpY = (Mathf.PerlinNoise(wx * WarpScale + 2f, wy * WarpScale + 3f) - 0.5f) * TotalRadius;
+            float warpX = (Mathf.PerlinNoise(wx * WarpScale, wy * WarpScale) - 0.5f) * size.TotalRadius;
+            float warpY = (Mathf.PerlinNoise(wx * WarpScale + 2f, wy * WarpScale + 3f) - 0.5f) * size.TotalRadius;
 
             wx += 100000f + ___m_offset0;
             wy += 100000f + ___m_offset1;
@@ -176,17 +177,7 @@ public partial class BetterContinents
             }
 
             // Edge of the world
-            if (distance > WorldRadius)
-            {
-                float t = Utils.LerpStep(WorldRadius, TotalRadius, distance);
-                finalHeight = Mathf.Lerp(finalHeight, -0.2f, t);
-                var edge = TotalRadius - 10;
-                if (distance > edge)
-                {
-                    float t2 = Utils.LerpStep(edge, TotalRadius, distance);
-                    finalHeight = Mathf.Lerp(finalHeight, -2f, t2);
-                }
-            }
+            finalHeight = size.DropOff(finalHeight, distance);
             if (distance < ___m_minMountainDistance && finalHeight > 0.28f && !Settings.ShouldHeightMapOverrideAll)
             {
                 float t3 = Mathf.Clamp01((finalHeight - 0.28f) / 0.099999994f);
@@ -197,19 +188,20 @@ public partial class BetterContinents
 
         private static float GetBaseHeightV2(float wx, float wy, float ___m_offset0, float ___m_offset1, float ___m_minMountainDistance)
         {
+            var size = Geometry;
             float distance = Utils.Length(wx, wy);
 
             // The base map x, y coordinates in 0..1 range
-            float mapX = Normalize(wx);
-            float mapY = Normalize(wy);
+            float mapX = size.Normalize(wx);
+            float mapY = size.Normalize(wy);
 
             wx *= Settings.GlobalScale;
             wy *= Settings.GlobalScale;
 
             float WarpScale = 0.001f * Settings.RidgeScale;
 
-            float warpX = (Mathf.PerlinNoise(wx * WarpScale, wy * WarpScale) - 0.5f) * TotalRadius;
-            float warpY = (Mathf.PerlinNoise(wx * WarpScale + 2f, wy * WarpScale + 3f) - 0.5f) * TotalRadius;
+            float warpX = (Mathf.PerlinNoise(wx * WarpScale, wy * WarpScale) - 0.5f) * size.TotalRadius;
+            float warpY = (Mathf.PerlinNoise(wx * WarpScale + 2f, wy * WarpScale + 3f) - 0.5f) * size.TotalRadius;
 
             wx += 100000f + ___m_offset0;
             wy += 100000f + ___m_offset1;
@@ -249,17 +241,8 @@ public partial class BetterContinents
             }
 
             // Edge of the world
-            if (!Settings.DisableMapEdgeDropoff && distance > WorldRadius)
-            {
-                float t = Utils.LerpStep(WorldRadius, TotalRadius, distance);
-                finalHeight = Mathf.Lerp(finalHeight, -0.2f, t);
-                var edge = TotalRadius - 10;
-                if (distance > edge)
-                {
-                    float t2 = Utils.LerpStep(edge, TotalRadius, distance);
-                    finalHeight = Mathf.Lerp(finalHeight, -2f, t2);
-                }
-            }
+            if (!Settings.DisableMapEdgeDropoff)
+                finalHeight = size.DropOff(finalHeight, distance);
 
             // Avoid mountains in the center
             if (!Settings.MountainsAllowedAtCenter && distance < ___m_minMountainDistance && finalHeight > 0.28f)
@@ -272,11 +255,12 @@ public partial class BetterContinents
 
         private static float GetBaseHeightV3(float wx, float wy, float ___m_minMountainDistance)
         {
+            var size = Geometry;
             float distance = Utils.Length(wx, wy);
 
             // The base map x, y coordinates in 0..1 range
-            float mapX = Normalize(wx);
-            float mapY = Normalize(wy);
+            float mapX = size.Normalize(wx);
+            float mapY = size.Normalize(wy);
 
             float baseHeight = Settings.ApplyHeightmap(mapX, mapY, 0f);
             float finalHeight = BaseHeightNoise?.Apply(wx, wy, baseHeight) ?? baseHeight;
@@ -284,17 +268,8 @@ public partial class BetterContinents
             finalHeight += Settings.SeaLevelAdjustment;
 
             // Edge of the world
-            if (!Settings.DisableMapEdgeDropoff && distance > WorldRadius)
-            {
-                float t = Utils.LerpStep(WorldRadius, TotalRadius, distance);
-                finalHeight = Mathf.Lerp(finalHeight, -0.2f, t);
-                var edge = TotalRadius - 10;
-                if (distance > edge)
-                {
-                    float t2 = Utils.LerpStep(edge, TotalRadius, distance);
-                    finalHeight = Mathf.Lerp(finalHeight, -2f, t2);
-                }
-            }
+            if (!Settings.DisableMapEdgeDropoff)
+                finalHeight = size.DropOff(finalHeight, distance);
 
             // Avoid mountains in the center
             if (!Settings.MountainsAllowedAtCenter && distance < ___m_minMountainDistance && finalHeight > 0.28f)

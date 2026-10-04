@@ -470,7 +470,8 @@ public static class WorldExport
   public static Vector2Int PixelOf(Vector3 worldPos, int size)
   {
     size = Mathf.Max(2, size);
-    return new Vector2Int(WorldExportMath.WorldToPixel(worldPos.x, size, TotalSize), WorldExportMath.WorldZToFileRow(worldPos.z, size, TotalSize));
+    float total = Geometry.TotalSize;
+    return new Vector2Int(WorldExportMath.WorldToPixel(worldPos.x, size, total), WorldExportMath.WorldZToFileRow(worldPos.z, size, total));
   }
 
   /// <summary>Human-readable state, one line each, for the console commands.</summary>
@@ -695,9 +696,10 @@ public static class WorldExport
       Settings = BetterContinents.Settings;
       BcWorld = Settings.EnabledForThisWorld;
       Size = O.Size;
-      Total = TotalSize;
-      WorldR = WorldRadius;
-      TotalR = TotalRadius;
+      var geometry = Geometry;
+      Total = geometry.TotalSize;
+      WorldR = geometry.WorldRadius;
+      TotalR = geometry.TotalRadius;
       Sla = WorldExportMath.SeaLevelAdjustment(O.SeaLevel);
       EdgeDropoff = O.EdgeDropoff ?? (!BcWorld || Settings.MapEdgeDropoff);
       OnServer = ZNet.instance.IsServer();
