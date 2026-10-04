@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-09-24 for world export and import (0.9.0).
+// Added by Wubarrk on 2026-09-24 for world export and import (0.9.0), and modified on 2026-10-04 for the unifying refactor (0.10.0).
 
 using System;
 using System.Collections;
@@ -128,7 +128,7 @@ internal static class TerrainTest
           float d = Mathf.Sqrt(wx * wx + wz * wz);
           if (d > 10000f)
             M.TryUndoEdgeDropoff(fh, d, 10000f, 10500f, out fh);
-          var want = M.ValueToUShort((fh + 0.15f) / 2f, out _);
+          var want = M.ValueToUShort((fh + 0.15f) / o.HeightmapAmount, out _);
           int i = r * n + c;
           if (heights[i].PackedValue != want) bad++;
           var corners4 = new[] { b0, b1, b2, b3 };

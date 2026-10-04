@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-09-24 for world export and import (0.9.0), and on 2026-09-27 for map mod compatibility (0.9.2).
+// Added by Wubarrk on 2026-09-24 for world export and import (0.9.0), and on 2026-09-27 for map mod compatibility (0.9.2), and modified on 2026-10-04 for the unifying refactor (0.10.0).
 
 // Offline checks of Better Continents 0.9.0's live config (LiveConfig), its RPC package, the export gate and the
 // configured export defaults. Loads the real pre-ILRepack BetterContinents.dll, the game's assemblies and BepInEx.
@@ -145,7 +145,7 @@ internal static class Program
     Section("binding the Export group");
     // Before binding: the built-in defaults.
     var builtIn = WorldExport.Options.Default();
-    C(builtIn.Size == 4096 && builtIn.HeightmapAmount == 2f && builtIn.SeaLevel == 0.5f, $"unbound config: Options.Default() is the built-in 4096 / 2 / 0.5 ({builtIn.Size} / {builtIn.HeightmapAmount} / {builtIn.SeaLevel})");
+    C(builtIn.Size == 4096 && builtIn.HeightmapAmount == 1f && builtIn.SeaLevel == 0.5f, $"unbound config: Options.Default() is the built-in 4096 / 1 / 0.5 ({builtIn.Size} / {builtIn.HeightmapAmount} / {builtIn.SeaLevel})");
     var path = Path.Combine(work, "BetterContinents.cfg");
     var cfg = new ConfigFile(path, true);
     const string S = "09 BetterContinents.Export";
@@ -154,14 +154,15 @@ internal static class Program
     BC.ConfigExportHudKey = cfg.Bind(S, "Hud Hotkey", KeyCode.F9, "hud key");
     BC.ConfigExportWindowKey = cfg.Bind(S, "Window Hotkey", KeyCode.F7, "window key");
     BC.ConfigExportSize = cfg.Bind(S, "Default Size", 4096, new ConfigDescription("size", new AcceptableValueRange<int>(WorldExport.MinSize, WorldExport.MaxSize)));
-    BC.ConfigExportHeightmapAmount = cfg.Bind(S, "Default Heightmap Amount", 2f, new ConfigDescription("amount", new AcceptableValueRange<float>(0.01f, 5f)));
+    // The schema's own default (1 since the unifying refactor), so this binding is the game's.
+    BC.ConfigExportHeightmapAmount = cfg.Bind(S, "Default Heightmap Amount", SettingsSchema.ExportHeightmapAmount.Default, new ConfigDescription("amount", new AcceptableValueRange<float>(0.01f, 5f)));
     BC.ConfigExportSeaLevel = cfg.Bind(S, "Default Sea Level", 0.5f, new ConfigDescription("sea", new AcceptableValueRange<float>(0f, 1f)));
     var text = File.ReadAllText(path);
     C(text.Contains("[09 BetterContinents.Export]") && text.Contains("Window Hotkey = F7") && text.Contains("Hud Hotkey = F9"), "the file carries the section and the KeyCode values by name");
     LiveConfig.Init(cfg);
     C(LogHandler.Has("Watching " + path), "Init starts the file watcher and says so");
     var d = WorldExport.Options.Default();
-    C(d.Size == 4096 && d.HeightmapAmount == 2f && d.SeaLevel == 0.5f, "bound config at its defaults: Options.Default() unchanged");
+    C(d.Size == 4096 && d.HeightmapAmount == 1f && d.SeaLevel == 0.5f, "bound config at its defaults: Options.Default() unchanged");
     C(WorldExport.Allowed() && LiveConfig.ExportBlockedReason() == null, "not connected anywhere: export allowed (the machine runs its own world)");
     return cfg;
   }
@@ -220,7 +221,7 @@ internal static class Program
     var edited = text.Replace("Hud = false", "Hud = true")
                      .Replace("Window Hotkey = F7", "Window Hotkey = F10")
                      .Replace("Default Size = 4096", "Default Size = 2048")
-                     .Replace("Default Heightmap Amount = 2", "Default Heightmap Amount = 3");
+                     .Replace("Default Heightmap Amount = 1", "Default Heightmap Amount = 3");
     C(edited != text && edited.Contains("Hud = true") && edited.Contains("Default Size = 2048") && edited.Contains("Default Heightmap Amount = 3"), "test edit prepared");
     File.WriteAllText(path, edited);
     // Right after the write: nothing yet (debounced).
@@ -282,8 +283,8 @@ internal static class Program
   {
     Section("config section numbering");
     // ConfigHelpers numbers groups in declaration order; the Export group must come tenth (09), after AltBiomes (08).
-    var src = File.ReadAllText("/home/rohan/WubarrkCODING/BetterContinents10/BetterContinents.cs");
-    var groups = System.Text.RegularExpressions.Regex.Matches(src, "\\.AddGroup\\(\"([^\"]+)\"").Select(m => m.Groups[1].Value).ToList();
+    // Every setting is declared in SettingsSchema (since the unifying refactor), group by group in file order.
+    var groups = SettingsSchema.Groups.Select(g => g.Name).ToList();
     C(groups.Count == 10 && groups[8] == "BetterContinents.AltBiomes" && groups[9] == "BetterContinents.Export", $"Awake declares 10 groups, Export last: {string.Join(", ", groups.Select((g, i) => $"{i:00} {g}"))}");
     var path = Path.Combine(Path.GetTempPath(), "bc-sections-" + Environment.ProcessId + ".cfg");
     try

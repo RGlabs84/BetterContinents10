@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-10-04 for the unifying refactor.
+// Added by Wubarrk on 2026-10-04 for the unifying refactor (0.10.0).
 
 // Reference ("golden") checks for the unifying refactor. They record what Better Continents does today - the config it
 // binds, the bytes it saves a world's settings as (every format, disk and network), what "bc info" prints, what every

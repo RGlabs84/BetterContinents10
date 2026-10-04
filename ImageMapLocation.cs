@@ -1,4 +1,4 @@
-﻿// Modified by Wubarrk on 2026-09-24 for world export and import (0.9.0), and on 2026-09-29 for Expand World Data locations (0.9.3).
+﻿// Modified by Wubarrk on 2026-09-24 for world export and import (0.9.0), and on 2026-09-29 for Expand World Data locations (0.9.3), and on 2026-10-04 for the unifying refactor (0.10.0).
 
 using System;
 using System.Collections.Generic;
@@ -50,15 +50,8 @@ internal class ImageMapLocation() : ImageMapBase()
 
     public override bool LoadSourceImage()
     {
-        if (Path.GetExtension(FilePath) == ".png" && !File.Exists(FilePath))
-        {
-            var legacyFile = Path.Combine(Path.GetDirectoryName(FilePath), "spawnmap.png");
-            if (File.Exists(legacyFile))
-            {
-                BetterContinents.Log($"Renaming legacy spawnmap.png to {FilePath}");
-                File.Move(legacyFile, FilePath);
-            }
-        }
+        // spawnmap.png is the creature spawn map (ImageMapSpawn) since 0.7.x: a missing location map is no longer looked
+        // for under that name, and nothing beside it is renamed.
         if (!base.LoadSourceImage()) return false;
         var path = Path.Combine(Path.GetDirectoryName(FilePath), Path.GetFileNameWithoutExtension(FilePath) + ".txt");
         if (!File.Exists(path))

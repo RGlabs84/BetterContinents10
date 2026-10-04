@@ -1,4 +1,4 @@
-﻿// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and alt-biome planting (0.8.1), and on 2026-09-24 for world export and import (0.9.0), and on 2026-09-29 for Expand World Data biomes (0.9.3).
+﻿// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and alt-biome planting (0.8.1), and on 2026-09-24 for world export and import (0.9.0), and on 2026-09-29 for Expand World Data biomes (0.9.3), and on 2026-10-04 for the unifying refactor (0.10.0).
 
 using System;
 using System.Collections.Generic;
@@ -216,54 +216,7 @@ public partial class DebugUtils
             bc.AddGroup("g", "Global", "Global settings, get more info with 'bc g help'",
                 group =>
                 {
-                    group.AddValue("skipdefaultlocations", "Skip default locations",
-                        "Whether to skip default location placement",
-                        defaultValue: false,
-                        setter: SetHeightmapValue<bool>(value => BetterContinents.Settings.SkipDefaultLocations = value),
-                        getter: () => BetterContinents.Settings.SkipDefaultLocations);
-                    group.AddValue("worldsize", "World size", "World radius in meters",
-                        defaultValue: 10000f, minValue: 0f, maxValue: 1000000f,
-                        setter: SetHeightmapValue<float>(value => BetterContinents.Settings.WorldSize = value),
-                        getter: () => BetterContinents.Settings.WorldSize);
-                    group.AddValue("edgesize", "Edge size", "Edge size in meters",
-                        defaultValue: 500f, minValue: 0f, maxValue: 1000000f,
-                        setter: SetHeightmapValue<float>(value => BetterContinents.Settings.EdgeSize = value),
-                        getter: () => BetterContinents.Settings.EdgeSize);
-                    group.AddValue("fixwatercolor", "Fix water color",
-                        "Whether to fix the water color",
-                        defaultValue: true,
-                        setter: SetHeightmapValue<bool>(value => BetterContinents.Settings.FixWaterColor = value),
-                        getter: () => BetterContinents.Settings.FixWaterColor);
-                    group.AddValue("cs", "Continent size adjustment", "Continent size adjustment",
-                        defaultValue: 0.5f, minValue: 0, maxValue: 1,
-                        setter: SetHeightmapValue<float>(value => BetterContinents.Settings.ContinentSize = value),
-                        getter: () => BetterContinents.Settings.ContinentSize);
-                    group.AddValue("sl", "Sea level adjustment", "Sea level adjustment",
-                        defaultValue: 0.5f, minValue: 0, maxValue: 1,
-                        setter: SetHeightmapValue<float>(value => BetterContinents.Settings.SeaLevel = value),
-                        getter: () => BetterContinents.Settings.SeaLevel);
-                    group.AddValue("r", "Rivers", "Whether rivers are enabled",
-                        defaultValue: true,
-                        setter: SetHeightmapValue<bool>(value => BetterContinents.Settings.RiversEnabled = value),
-                        getter: () => BetterContinents.Settings.RiversEnabled);
-                    group.AddValue("ag", "Ashlands Gap", "Whether The Ashlands ocean gap is enabled",
-                        defaultValue: false,
-                        setter: SetHeightmapValue<bool>(value => BetterContinents.Settings.AshlandsGapEnabled = value),
-                        getter: () => BetterContinents.Settings.AshlandsGapEnabled);
-                    group.AddValue("ng", "Deep North Gap", "Whether The Deep North ocean gap is enabled",
-                        defaultValue: false,
-                        setter: SetHeightmapValue<bool>(value => BetterContinents.Settings.DeepNorthGapEnabled = value),
-                        getter: () => BetterContinents.Settings.DeepNorthGapEnabled);
-                    group.AddValue("me", "Map edge drop off", "Whether the map drops away at the boundary",
-                        defaultValue: true,
-                        setter: SetHeightmapValue<bool>(value => BetterContinents.Settings.MapEdgeDropoff = value),
-                        getter: () => BetterContinents.Settings.MapEdgeDropoff);
-                    group.AddValue("mc", "Allow mountains in center",
-                        "Whether the center of the map (usually the spawn area), is flattened",
-                        defaultValue: false,
-                        setter: SetHeightmapValue<bool>(value =>
-                            BetterContinents.Settings.MountainsAllowedAtCenter = value),
-                        getter: () => BetterContinents.Settings.MountainsAllowedAtCenter);
+                    AddSettings(group, "g");
                 });
 
             bc.AddGroup("h", "Heightmap", "Heightmap settings, get more info with 'bc param h help'",
@@ -284,35 +237,7 @@ public partial class DebugUtils
                                 Console.instance.Print($"<color=#ff0000>ERROR: Path {path} not found!</color>");
                         }),
                         getter: () => BetterContinents.Settings.GetHeightPath());
-                    group.AddValue("ov", "Heightmap Override All",
-                        "Causes the terrain to conform to the heightmap, ignoring biome specific variance",
-                        defaultValue: false,
-                        setter: SetHeightmapValue<bool>(value =>
-                            BetterContinents.Settings.HeightmapOverrideAll = value),
-                        getter: () => BetterContinents.Settings.HeightmapOverrideAll);
-                    group.AddValue("am", "Heightmap Amount", "Heightmap amount",
-                        defaultValue: 1f, minValue: 0, maxValue: 5,
-                        setter: SetHeightmapValue<float>(value =>
-                            BetterContinents.Settings.HeightmapAmount = value),
-                        getter: () => BetterContinents.Settings.HeightmapAmount);
-                    group.AddValue("bl", "Heightmap Blend", "Heightmap blend",
-                        defaultValue: 1f, minValue: 0, maxValue: 1,
-                        setter: SetHeightmapValue<float>(value => BetterContinents.Settings.HeightmapBlend = value),
-                        getter: () => BetterContinents.Settings.HeightmapBlend);
-                    group.AddValue("ad", "Heightmap Add", "Heightmap add",
-                        defaultValue: 0f, minValue: -1, maxValue: 1,
-                        setter: SetHeightmapValue<float>(value => BetterContinents.Settings.HeightmapAdd = value),
-                        getter: () => BetterContinents.Settings.HeightmapAdd);
-                    group.AddValue("ma", "Heightmap Mask", "Heightmap mask",
-                        defaultValue: 0f, minValue: 0, maxValue: 1,
-                        setter: SetHeightmapValue<float>(value => BetterContinents.Settings.HeightmapMask = value),
-                        getter: () => BetterContinents.Settings.HeightmapMask);
-                    group.AddValue("alpha", "Heightmap Alpha",
-                        "Enables alpha channel to blend vanilla terrain with the heightmap",
-                        defaultValue: false,
-                        setter: SetHeightmapValue<bool>(value =>
-                            BetterContinents.Settings.HeightMapAlpha = value),
-                        getter: () => BetterContinents.Settings.HeightMapAlpha);
+                    AddSettings(group, "h");
                 });
 
             bc.AddGroup("r", "Roughmap", "Roughmap settings, get more info with 'bc param r help'", group =>
@@ -332,10 +257,7 @@ public partial class DebugUtils
                             Console.instance.Print($"<color=#ff0000>ERROR: Path {path} not found!</color>");
                     }),
                     getter: () => BetterContinents.Settings.GetRoughPath());
-                group.AddValue("bl", "Roughmap Blend", "Roughmap blend",
-                    defaultValue: 1f, minValue: 0, maxValue: 1,
-                    setter: SetHeightmapValue<float>(value => BetterContinents.Settings.RoughmapBlend = value),
-                    getter: () => BetterContinents.Settings.RoughmapBlend);
+                AddSettings(group, "r");
             });
             bc.AddGroup("b", "Biomemap", "Biomemap settings, get more info with 'bc param b help'", group =>
             {
@@ -355,18 +277,7 @@ public partial class DebugUtils
                     }),
                     getter: () => BetterContinents.Settings.GetBiomePath());
 
-                group.AddValue("p", "Biome precision", "How closely the ground follows the biome borders inside each 64 m zone: 0 = vanilla (the zone's 4 corners), 1-5 = (N + 1) x (N + 1) cells per zone",
-                    defaultValue: 0, minValue: 0, maxValue: 5,
-                    // Precision changes how a zone samples the biomes, not the biomes, so no minimap, noise or alt-biome
-                    // rebuild: DynamicPatch rebuilds the loaded terrain and grass, and the zone reset places the
-                    // vegetation again.
-                    setter: value =>
-                    {
-                        BetterContinents.Settings.BiomePrecision = value;
-                        DynamicPatch();
-                        GameUtils.ResetZones();
-                    },
-                    getter: () => BetterContinents.Settings.BiomePrecision);
+                AddSettings(group, "b");
             });
             bc.AddGroup("terrain", "Terrainmap", "Terrainmap settings, get more info with 'bc param terrain help'",
                 group =>
@@ -514,29 +425,10 @@ public partial class DebugUtils
                     }),
                     getter: () => BetterContinents.Settings.GetHeatPath());
 
-                group.AddValue("sc", "Heatmap Scale", "Heatmap scale",
-                    defaultValue: 10f, minValue: 0f, maxValue: 100f,
-                    setter: SetHeightmapValue<float>(value => BetterContinents.Settings.HeatMapScale = value),
-                    getter: () => BetterContinents.Settings.HeatMapScale);
+                AddSettings(group, "heat");
             });
             bc.AddGroup("fo", "Forest", "Forest settings, get more info with 'bc param fo help'", group =>
             {
-                group.AddValue("sc", "Forest Scale", "Forest scale",
-                    defaultValue: 0.5f, minValue: 0f, maxValue: 1f,
-                    setter: SetHeightmapValue<float>(value => BetterContinents.Settings.ForestScaleFactor = value),
-                    getter: () => BetterContinents.Settings.ForestScaleFactor);
-                group.AddValue("am", "Forest Amount", "Forest amount",
-                    defaultValue: 0.5f, minValue: 0f, maxValue: 1f,
-                    setter: SetHeightmapValue<float>(value => BetterContinents.Settings.ForestAmount = value),
-                    getter: () => BetterContinents.Settings.ForestAmount);
-                group.AddValue("ffo", "Forest Factor Override All", "Forest factor override all trees",
-                    setter: SetHeightmapValue<bool>(value =>
-                    {
-                        BetterContinents.Settings.ForestFactorOverrideAllTrees = value;
-                        Console.instance.Print(
-                            "<color=#ffa500>NOTE: You need to reload the world to apply this change to the forest factor override!</color>");
-                    }),
-                    getter: () => BetterContinents.Settings.ForestFactorOverrideAllTrees);
                 group.AddValue("fn", "Forestmap Filename",
                     "Sets forestmap filename (full path, directory or file name)",
                     defaultValue: string.Empty,
@@ -552,14 +444,7 @@ public partial class DebugUtils
                             Console.instance.Print($"<color=#ff0000>ERROR: Path {path} not found!</color>");
                     }),
                     getter: () => BetterContinents.Settings.GetForestPath());
-                group.AddValue("mu", "Forestmap Multiply", "Forestmap multiply",
-                    defaultValue: 1f, minValue: 0f, maxValue: 1f,
-                    setter: SetHeightmapValue<float>(value => BetterContinents.Settings.ForestmapMultiply = value),
-                    getter: () => BetterContinents.Settings.ForestmapMultiply);
-                group.AddValue("add", "Forestmap Add", "Forestmap add",
-                    defaultValue: 0f, minValue: 0f, maxValue: 1f,
-                    setter: SetHeightmapValue<float>(value => BetterContinents.Settings.ForestmapAdd = value),
-                    getter: () => BetterContinents.Settings.ForestmapAdd);
+                AddSettings(group, "fo");
             });
             // bc.AddGroup("ri", "ridge settings, get more info with 'bc param ri help'", 
             // subcmd =>
@@ -575,24 +460,7 @@ public partial class DebugUtils
             bc.AddGroup("st", "Start Position", "Start position settings, get more info with 'bc param st help'",
                 group =>
                 {
-                    group.AddValue("os", "Override Start Position", "Overrides the start position",
-                        setter: SetHeightmapValue<bool>(value =>
-                            BetterContinents.Settings.OverrideStartPosition = value),
-                        getter: () => BetterContinents.Settings.OverrideStartPosition);
-                    group.AddValue("x", "Start Position X", "Start position x",
-                        defaultValue: 1f, minValue: 0f, maxValue: 1f,
-                        setter: SetHeightmapValue<float>(value =>
-                        {
-                            BetterContinents.Settings.StartPositionX = value;
-                        }),
-                        getter: () => BetterContinents.Settings.StartPositionX);
-                    group.AddValue("y", "Start Position Y", "Start position y",
-                        defaultValue: 1f, minValue: 0f, maxValue: 1f,
-                        setter: SetHeightmapValue<float>(value =>
-                        {
-                            BetterContinents.Settings.StartPositionY = value;
-                        }),
-                        getter: () => BetterContinents.Settings.StartPositionY);
+                    AddSettings(group, "st");
                 });
 
             void AddNoiseCommands(Command.SubcommandBuilder group, NoiseStackSettings.NoiseSettings settings,
@@ -943,6 +811,42 @@ public partial class DebugUtils
             // }
         });
         CommandWrapper.Register("bc", args => GetAutoComplete());
+    }
+
+    // The plain values of a console group, from their definitions in SettingsSchema: the console's default, range and help
+    // are the config's own, so the two can never disagree.
+    private static void AddSettings(Command.SubcommandBuilder group, string name)
+    {
+        foreach (var setting in SettingsSchema.Console(name))
+        {
+            switch (setting)
+            {
+                case SettingDef<float> f: AddSetting(group, f); break;
+                case SettingDef<int> i: AddSetting(group, i); break;
+                case SettingDef<bool> b: AddSetting(group, b); break;
+                case SettingDef<string> s: AddSetting(group, s); break;
+                default: throw new NotSupportedException($"bc {name} {setting.ConsoleName}: no console value for {setting.ValueType.Name}");
+            }
+        }
+    }
+
+    private static void AddSetting<T>(Command.SubcommandBuilder group, SettingDef<T> setting) where T : IComparable
+    {
+        Action<T> set = setting.OnLiveChange == LiveChange.Precision
+            // Precision changes how a zone samples the biomes, not the biomes, so no minimap, noise or alt-biome rebuild:
+            // DynamicPatch rebuilds the loaded terrain and grass, and the zone reset places the vegetation again.
+            ? value =>
+            {
+                setting.Set(BetterContinents.Settings, value);
+                DynamicPatch();
+                GameUtils.ResetZones();
+            }
+            : SetHeightmapValue<T>(value => setting.Set(BetterContinents.Settings, value));
+        Func<T> get = () => setting.Get(BetterContinents.Settings);
+        if (setting.Limits is { } limits)
+            group.AddValue(setting.ConsoleName, setting.ConsoleLabel, setting.Description, setting.Default, limits.Min, limits.Max, set, get);
+        else
+            group.AddValue(setting.ConsoleName, setting.ConsoleLabel, setting.Description, setting.Default, set, get);
     }
 
     private static List<string> GetAutoComplete()

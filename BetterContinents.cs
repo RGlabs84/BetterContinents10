@@ -1,4 +1,4 @@
-// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and alt-biome planting (0.8.1), and on 2026-09-24 for world export and import (0.9.0), and on 2026-09-25 for version-agnostic wording (0.9.1), and on 2026-09-27 for map mod compatibility (0.9.2), and on 2026-09-29 for Expand World Data biomes (0.9.3).
+// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and alt-biome planting (0.8.1), and on 2026-09-24 for world export and import (0.9.0), and on 2026-09-25 for version-agnostic wording (0.9.1), and on 2026-09-27 for map mod compatibility (0.9.2), and on 2026-09-29 for Expand World Data biomes (0.9.3), and on 2026-10-04 for the unifying refactor (0.10.0).
 
 using System;
 using System.Collections;
@@ -24,16 +24,15 @@ public partial class BetterContinents : BaseUnityPlugin
     public static ConfigEntry<int> NexusID;
     public static ConfigEntry<string> ConfigSelectedPreset;
     public static ConfigEntry<TransferRatePreset> ConfigSettingsTransferRate;
+    public static ConfigEntry<int> ConfigFileVersion;
 
     public static ConfigEntry<bool> ConfigEnabled;
 
     public static ConfigEntry<float> ConfigContinentSize;
     public static ConfigEntry<float> ConfigSeaLevelAdjustment;
-    public static ConfigEntry<bool> ConfigOceanChannelsEnabled;
     public static ConfigEntry<bool> ConfigAshlandsGapEnabled;
     public static ConfigEntry<float> ConfigWorldSize;
     public static ConfigEntry<float> ConfigEdgeSize;
-    public static ConfigEntry<bool> ConfigFixWaterColor;
 
     public static ConfigEntry<bool> ConfigDeepNorthGapEnabled;
 
@@ -185,12 +184,7 @@ public partial class BetterContinents : BaseUnityPlugin
         Console.SetConsoleEnabled(true);
 
         DeclareConfig(Config);
-        if (ConfigLocationFile.Value == "" && ConfigSpawnFile.Value != "")
-        {
-            ConfigLocationFile.Value = ConfigSpawnFile.Value.Replace("spawnmap", "locationmap");
-            ConfigSpawnFile.Value = "";
-            Config.Save();
-        }
+        SettingsSchema.Migrate();
         LiveConfig.Init(Config);
         // A preset chosen outside the New World screen (bc_import, a config edit) shows there at once.
         Presets.WatchSelection();
@@ -212,246 +206,8 @@ public partial class BetterContinents : BaseUnityPlugin
     }
 
     // Binds every setting (Awake). Static so the offline harness binds exactly the sections, keys, defaults and ranges
-    // the game does.
-    internal static void DeclareConfig(ConfigFile config)
-    {
-        config.Declare()
-            .AddGroup("BetterContinents.Debug", groupBuilder =>
-            {
-                groupBuilder.AddValue("Enabled")
-                    .Description("Whether this mod is enabled")
-                    .Default(true).Bind(out ConfigEnabled);
-                groupBuilder.AddValue("Debug Mode")
-                    .Description("Automatically reveals the full map on respawn, enables cheat mode, and debug mode, for debugging purposes").Bind(out ConfigDebugModeEnabled);
-                groupBuilder.AddValue("Debug Reset Command")
-                    .Description("Upgrade World command to execute when reloading images.").Default("zones_reset start").Bind(out ConfigDebugResetCommand);
-                groupBuilder.AddValue("Override version")
-                    .Description("Override the save version")
-                    .Default("").Bind(out ConfigOverrideVersion);
-                groupBuilder.AddValue("Directory")
-                    .Description("This directory will load automatically any existing map files matching the correct names, overriding specific files specified below. Filenames must match: heightmap.png, biomemap.png, terrainmap.png, locationmap.png, roughmap.png, forestmap.png, heatmap.png, paintmap.png, lavamap.png, mossmap.png, vegetationmap.png, spawnmap.png, altbiomemap.png.")
-                    .Default("").Bind(out ConfigMapSourceDir);
-            })
-            .AddGroup("BetterContinents.Global", groupBuilder =>
-            {
-                groupBuilder.AddValue("Skip Default Locations")
-                  .Description("Skips the default location placement. Spawn temple and location map are still placed.").Bind(out ConfigSkipDefaultLocations);
-                groupBuilder.AddValue("Continent Size")
-                    .Description("Continent size")
-                    .Default(0.5f).Range(0f, 1f).Bind(out ConfigContinentSize);
-                groupBuilder.AddValue("World Size")
-                    .Description("World radius in meter")
-                    .Default(10000f).Bind(out ConfigWorldSize);
-                groupBuilder.AddValue("Edge Size")
-                    .Description("Edge size in meters")
-                    .Default(500f).Bind(out ConfigEdgeSize);
-                groupBuilder.AddValue("Fix Water Color")
-                    .Description("Whether to fix the water color")
-                    .Default(true).Bind(out ConfigFixWaterColor);
-                groupBuilder.AddValue("Sea Level Adjustment")
-                    .Description("Modify sea level, which changes the land:sea ratio")
-                    .Default(0.5f).Range(0f, 1f).Bind(out ConfigSeaLevelAdjustment);
-                groupBuilder.AddValue("Ocean Channels")
-                    .Description("Whether ocean channels should be enabled or not (useful to disable when using height map for instance)")
-                    .Default(true).Bind(out ConfigOceanChannelsEnabled);
-                groupBuilder.AddValue("Ashlands Gap")
-                    .Description("Whether to add the Ashlands ocean gap (usually custom maps don't need this)")
-                    .Default(false).Bind(out ConfigAshlandsGapEnabled);
-                groupBuilder.AddValue("Deep North Gap")
-                    .Description("Whether to add the Deep North ocean gap (usually custom maps don't need this)")
-                    .Default(false).Bind(out ConfigDeepNorthGapEnabled);
-                groupBuilder.AddValue("Rivers")
-                    .Description("Whether rivers should be enabled or not")
-                    .Default(true).Bind(out ConfigRiversEnabled);
-                groupBuilder.AddValue("Map Edge Drop-off")
-                    .Description("Whether the map should drop off at the edges or not (consequences unknown!)")
-                    .Default(true).Bind(out ConfigMapEdgeDropoff);
-                groupBuilder.AddValue("Mountains Allowed At Center")
-                    .Description("Whether the map should allow mountains to occur at the map center (if you have default spawn then you should keep this unchecked)")
-                    .Default(false).Bind(out ConfigMountainsAllowedAtCenter);
-            })
-            .AddGroup("BetterContinents.Heightmap", groupBuilder =>
-            {
-                groupBuilder.AddValue("Heightmap File")
-                    .Description("Path to a heightmap file to use. See the description on Nexusmods.com for the specifications (it will fail if they are not met)")
-                    .Default("").Bind(out ConfigHeightFile);
-                groupBuilder.AddValue("Heightmap Amount")
-                    .Description("Multiplier of the height value from the heightmap file (more than 1 leads to higher max height than vanilla, good results are not guaranteed)")
-                    .Default(1f).Range(0f, 5f).Bind(out ConfigHeightmapAmount);
-                groupBuilder.AddValue("Heightmap Blend")
-                    .Description("How strongly to blend the heightmap file into the final result")
-                    .Default(1f).Range(0f, 1f).Bind(out ConfigHeightmapBlend);
-                groupBuilder.AddValue("Heightmap Add")
-                    .Description("How strongly to add the heightmap file to the final result (usually you want to blend it instead)")
-                    .Default(0f).Range(-1f, 1f).Bind(out ConfigHeightmapAdd);
-                groupBuilder.AddValue("Heightmap Mask")
-                    .Description("How strongly to apply the heightmap as a mask on normal height generation (i.e. it limits maximum height to the height of the mask)")
-                    .Default(0f).Range(0f, 1f).Bind(out ConfigHeightmapMask);
-                groupBuilder.AddValue("Heightmap Override All")
-                    .Description("All other aspects of the height calculation will be disabled, so the world will perfectly conform to your heightmap")
-                    .Default(true).Bind(out ConfigHeightmapOverrideAll);
-                groupBuilder.AddValue("Heightmap Alpha")
-                    .Description("Enables alpha channel for the heightmap file to blend vanilla generation with the heightmap")
-                    .Default(false).Bind(out ConfigHeightmapAlpha);
-                groupBuilder.AddValue("Roughmap File")
-                    .Description("Path to a roughmap file to use. See the description on Nexusmods.com for the specifications (it will fail if they are not met)")
-                    .Default("").Bind(out ConfigRoughFile);
-                groupBuilder.AddValue("Roughmap Blend")
-                    .Description("How strongly to apply the roughmap file")
-                    .Default(1f).Range(0f, 1f).Bind(out ConfigRoughmapBlend);
-            })
-            .AddGroup("BetterContinents.Biomemap", groupBuilder =>
-            {
-                groupBuilder.AddValue("Biomemap File")
-                    .Description("Path to a biomemap file to use. See the description on Nexusmods.com for the specifications (it will fail if they are not met)")
-                    .Default("").Bind(out ConfigBiomeFile);
-                groupBuilder.AddValue("Biome precision")
-                    .Description("How closely the ground follows the biome borders inside each 64 m terrain zone (ground textures, grass, vegetation and spawn points). 0 = vanilla: a zone takes its biomes from its 4 corners, so the borders follow the 64 m zone grid. 1 to 5 split every zone into (N + 1) x (N + 1) cells, with a corner every 32, 21, 16, 13 or 11 m. Works with or without a biomemap, and terrain heights do not change")
-                    .Default(0).Range(0, 5).Bind(out ConfigBiomePrecision);
-                groupBuilder.AddValue("Terrainmap file")
-                    .Description("Path to a terrainmap file to use. See thea description on Nexusmods.com for the specifications (it will fail if they are not met)")
-                    .Default("").Bind(out ConfigTerrainFile);
-            })
-            .AddGroup("BetterContinents.Forest", groupBuilder =>
-            {
-                groupBuilder.AddValue("Forest Scale")
-                    .Description("Scales forested/cleared area size")
-                    .Default(1f).Range(0f, 10f).Bind(out ConfigForestScale);
-                groupBuilder.AddValue("Forest Amount")
-                    .Description("Adjusts how much forest there is, relative to clearings")
-                    .Default(0.5f).Range(0f, 1f).Bind(out ConfigForestAmount);
-                groupBuilder.AddValue("Forest Factor Overrides All Trees")
-                    .Description("Trees in all biomes will be affected by forest factor (both procedural and from forestmap)")
-                    .Default(false).Bind(out ConfigForestFactorOverrideAllTrees);
-                groupBuilder.AddValue("Forestmap File")
-                    .Description("Path to a forestmap file to use. See the description on Nexusmods.com for the specifications (it will fail if they are not met)")
-                    .Default("").Bind(out ConfigForestFile);
-                groupBuilder.AddValue("Forestmap Multiply")
-                    .Description("How strongly to scale the vanilla forest factor by the forestmap")
-                    .Default(1f).Range(0f, 1f).Bind(out ConfigForestmapMultiply);
-                groupBuilder.AddValue("Forestmap Add")
-                    .Description("How strongly to add the forestmap directly to the vanilla forest factor")
-                    .Default(1f).Range(0f, 1f).Bind(out ConfigForestmapAdd);
-            })
-            .AddGroup("BetterContinents.StartPosition", groupBuilder =>
-            {
-                groupBuilder.AddValue("Override Start Position")
-                    .Description("Whether to override the start position using the values provided (warning: will disable all validation of the position)")
-                    .Default(false).Bind(out ConfigOverrideStartPosition);
-                groupBuilder.AddValue("Start Position X")
-                    .Description("Start position override X value, in ranges -10500 to 10500")
-                    .Default(0f).Range(-10500f, 10500f).Bind(out ConfigStartPositionX);
-                groupBuilder.AddValue("Start Position Y")
-                    .Description("Start position override Y value, in ranges -10500 to 10500")
-                    .Default(0f).Range(-10500f, 10500f).Bind(out ConfigStartPositionY);
-            })
-            .AddGroup("BetterContinents.Maps", groupBuilder =>
-            {
-                groupBuilder.AddValue("Locationmap File")
-                    .Description("Path to a locationmap file to use. See the description on Nexusmods.com for the specifications (it will fail if they are not met)")
-                    .Default("").Bind(out ConfigLocationFile);
-                groupBuilder.AddValue("Spawnmap File")
-                .Description("Legay path to a locationmap file to use. See the description on Nexusmods.com for the specifications (it will fail if they are not met)")
-                .Default("").Bind(out ConfigSpawnFile);
-                groupBuilder.AddValue("Vegetationmap File")
-                      .Description("Path to a vegetationmap file to use.")
-                      .Default("").Bind(out ConfigVegetationFile);
-                groupBuilder.AddValue("Paintmap File")
-                .Description("Path to a paintmap file to use.")
-                .Default("").Bind(out ConfigPaintFile);
-                groupBuilder.AddValue("Lavamap File")
-                   .Description("Path to a lavamap file to use.")
-                   .Default("").Bind(out ConfigLavaFile);
-                groupBuilder.AddValue("Mossmap File")
-                 .Description("Path to a mossmap file to use.")
-                 .Default("").Bind(out ConfigMossFile);
-                groupBuilder.AddValue("Heatmap File")
-                  .Description("Path to a heatmap file to use.")
-                  .Default("").Bind(out ConfigHeatFile);
-                groupBuilder.AddValue("Heatmap Scale")
-                    .Description("Multiplies the heatmap color value. Most heat effects cap at 1 value.")
-                    .Default(10f).Range(0f, 100f).Bind(out ConfigHeatScale);
-            })
-            .AddGroup("BetterContinents.Misc", groupBuilder =>
-            {
-                groupBuilder.AddValue("NexusID")
-                    .Hidden().Default(446).Bind(out NexusID);
-                groupBuilder.AddValue("SelectedPreset")
-                    .Hidden().Default("Vanilla").Bind(out ConfigSelectedPreset);
-                groupBuilder.AddValue("Settings Transfer Rate")
-                    .Description("How fast this machine (the host, or a dedicated server) may push a joining player's Better Continents settings and images over their Steam connection. Valheim pins every connection to about 150 KB/s, so a large world can take over a minute to join; Vanilla leaves that rate untouched; KB256, KB384, KB512, KB768, MB1, MB1_5 and MB3 set that one connection to that fixed rate for the transfer only, then restore Valheim's own; Unlimited sets 100 MB/s (the transfer itself moves about 4 MB/s at most). Steam sends at exactly the rate set, with no congestion control, so pick one the server's upload can carry. The server's value is used; a client's own value has no effect. No effect on PlayFab (crossplay) connections, whose send rate cannot be changed.")
-                    .Default(TransferRatePreset.KB512).Bind(out ConfigSettingsTransferRate);
-            })
-            // Must stay after Misc: section names carry the group's position ("07 BetterContinents.Misc"), so a group
-            // inserted earlier would rename every later section and reset the values stored in them. Every value
-            // here is a default for NEW worlds: it is baked into the world's settings when the world is created and
-            // never read again for that world. Change a live world with the "bc ab" console commands (debug mode).
-            .AddGroup("BetterContinents.AltBiomes", groupBuilder =>
-            {
-                groupBuilder.AddValue("Altbiomemap File")
-                    .Description("Path to an alt-biome map (altbiomemap.png). It plants Valheim 1.0 alt biomes with colours, the way the biome map plants biomes; the legend beside it (altbiomemap.txt, written with a default colour per alt biome when missing) says which colour plants what. Black and transparent pixels are left to the game.")
-                    .Default("").Bind(out ConfigAltBiomeFile);
-                groupBuilder.AddValue("Mode")
-                    .Description("Random = the game's random alt-biome placement on unplanted land (tuned by the values below) plus every planted region; PlantedOnly = only planted regions; Off = no alt biomes at all, planted ones included")
-                    .Default("Random").Range(new AcceptableValueList<string>("Random", "PlantedOnly", "Off")).Bind(out ConfigAltBiomeMode);
-                groupBuilder.AddValue("Grid")
-                    .Description("WorldEdge = alt biomes and biome-based location candidates stop at the edge of the world (World Size + Edge Size) when it is smaller than vanilla's 10500 m; Vanilla = always sample the vanilla 10500 m disc")
-                    .Default("WorldEdge").Range(new AcceptableValueList<string>("WorldEdge", "Vanilla")).Bind(out ConfigAltBiomeGrid);
-                groupBuilder.AddValue("Fixed Seed")
-                    .Description("Seed for the game's random alt-biome placement. Empty = the world seed (vanilla). A number, or any text, gives the same random alt-biome layout for this map whatever the world seed is")
-                    .Default("").Bind(out ConfigAltBiomeSeed);
-                groupBuilder.AddValue("Chance Multiplier")
-                    .Description("Multiplies every alt biome's random placement chance (vanilla 0.2, Dark Meadows 0.5)")
-                    .Default(1f).Range(0f, 10f).Bind(out ConfigAltBiomeChanceMultiplier);
-                groupBuilder.AddValue("Amount Multiplier")
-                    .Description("Multiplies every alt biome's minimum and maximum number of regions")
-                    .Default(1f).Range(0f, 10f).Bind(out ConfigAltBiomeAmountMultiplier);
-                groupBuilder.AddValue("Region Size Scale")
-                    .Description("Multiplies every alt biome's region size window (edge length). Vanilla only gives alt biomes to regions roughly 0.1-2.4 km across; hand-drawn maps with big regions usually need 2-10")
-                    .Default(1f).Range(0.1f, 50f).Bind(out ConfigAltBiomeEdgeScale);
-                groupBuilder.AddValue("Distance Scale")
-                    .Description("Multiplies every alt biome's minimum distance from the world centre (vanilla 500-2000 m) and its world bounds")
-                    .Default(1f).Range(0f, 10f).Bind(out ConfigAltBiomeDistanceScale);
-                groupBuilder.AddValue("Min Sector Thickness")
-                    .Description("Regions thinner than this (area / edge length, in 12 m cells) never get a random alt biome. 0 = vanilla. 2 filters the slivers an anti-aliased biome map leaves along its borders")
-                    .Default(0f).Range(0f, 20f).Bind(out ConfigAltBiomeMinThickness);
-                groupBuilder.AddValue("Mean Sector Height")
-                    .Description("Measure a region's average height as the mean over the whole region instead of vanilla's (lowest + highest) / 2 of its border. Helps maps whose biome paint runs out into the sea: the border is then under water and vanilla's measure sinks below the 30 m every alt biome requires")
-                    .Default(false).Bind(out ConfigAltBiomeMeanHeight);
-                groupBuilder.AddValue("Fix Neighbour Check")
-                    .Description("Use a corrected version of vanilla's require/not-neighbour test (broken in vanilla; no vanilla alt biome uses it, modded ones may)")
-                    .Default(false).Bind(out ConfigAltBiomeFixNeighbourCheck);
-                groupBuilder.AddValue("Overrides")
-                    .Description("Per alt biome overrides of the game's random placement: 'Name: key=value, key=value; Other Name: key=value'. A name may contain * wildcards ('*Mistlands'); '*' alone applies to all. An exact name wins over a wildcard pattern, and a pattern over '*', field by field. Keys: enabled, chance, min, max, mindist, minedge, maxedge, minheight, maxheight, ignorebounds. 'Fortress Mountain: enabled=false' keeps the game from placing Fortress Mountain at random; planted Fortress Mountain still works")
-                    .Default("").Bind(out ConfigAltBiomeOverrides);
-            })
-            // Must stay last, like AltBiomes above ("09 BetterContinents.Export"). Unlike every group before it, these
-            // values apply while the game runs: see LiveConfig, which also re-reads this file when it changes on disk.
-            .AddGroup("BetterContinents.Export", groupBuilder =>
-            {
-                groupBuilder.AddValue("Hud")
-                    .Description("Shows the world export HUD in game: a status box (Hud Hotkey) and a window (Window Hotkey) with an Export tab (the maps, their options, Start and Cancel) and an Import tab (your exports, made into New World presets). Applies at once. On a client connected to a server that runs Better Continents 0.9.0 or later, the server's value is used instead")
-                    .Default(false).Bind(out ConfigExportHud);
-                groupBuilder.AddValue("Allow Export")
-                    .Description("Whether players connected to this server may export the world (bc_export, and Start in the export HUD). The machine that runs the world always may: single player, the host, and a dedicated server's own console (where an admin's 'bc_export server' runs). Applies at once, also to connected players. On a client, the server's value is used instead of this one")
-                    .Default(true).Bind(out ConfigExportAllowed);
-                groupBuilder.AddValue("Hud Hotkey")
-                    .Description("Shows or hides the export HUD's status box (with no Shift, Ctrl or Alt held). None = no key")
-                    .Default(KeyCode.F9).Bind(out ConfigExportHudKey);
-                groupBuilder.AddValue("Window Hotkey")
-                    .Description("Opens or closes the export and import window, which frees the mouse while it is open (with no Shift, Ctrl or Alt held). None = no key")
-                    .Default(KeyCode.F7).Bind(out ConfigExportWindowKey);
-                groupBuilder.AddValue("Default Size")
-                    .Description("Pixels per side of an export when bc_export is given no size, and the export window's first choice. 2048 and up keep the alt-biome map exact; 8192 holds about half a gigabyte while it runs")
-                    .Default(4096).Range(WorldExport.MinSize, WorldExport.MaxSize).Bind(out ConfigExportSize);
-                groupBuilder.AddValue("Default Heightmap Amount")
-                    .Description("The Heightmap Amount an export encodes its heights for, unless bc_export or the window says otherwise. 2 with Sea Level 0.5 spans -30 m to 370 m with the waterline at 0.15, the encoding hand-made and generated maps use")
-                    .Default(2f).Range(0.01f, 5f).Bind(out ConfigExportHeightmapAmount);
-                groupBuilder.AddValue("Default Sea Level")
-                    .Description("The Sea Level Adjustment an export encodes its heights for, unless bc_export or the window says otherwise")
-                    .Default(0.5f).Range(0f, 1f).Bind(out ConfigExportSeaLevel);
-            });
-    }
+    // the game does. Every setting is declared once, in SettingsSchema.
+    internal static void DeclareConfig(ConfigFile config) => SettingsSchema.Bind(config);
 
     public void Start()
     {

@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-09-24 for world export and import (0.9.0), and on 2026-09-29 for Expand World Data biomes (0.9.3), and on 2026-10-02 for export folders used as the Directory (0.9.4).
+// Added by Wubarrk on 2026-09-24 for world export and import (0.9.0), and on 2026-09-29 for Expand World Data biomes (0.9.3), and on 2026-10-02 for export folders used as the Directory (0.9.4), and modified on 2026-10-04 for the unifying refactor (0.10.0).
 
 using System;
 using System.Collections;
@@ -87,7 +87,7 @@ public static class WorldExportMath
   public static float ValueToMetres(float value, float amount, float seaLevel) =>
     (value * amount - BaseOffset + SeaLevelAdjustment(seaLevel)) * HeightScale;
 
-  /// <summary>The value at the water plane: MetresToValue(30) = (0.30 - Lerp(1, -1, seaLevel)) / amount; 0.15 at amount 2, sea level 0.5.</summary>
+  /// <summary>The value at the water plane: MetresToValue(30) = (0.30 - Lerp(1, -1, seaLevel)) / amount; 0.30 at amount 1 and 0.15 at amount 2, sea level 0.5.</summary>
   public static float WaterlineValue(float amount, float seaLevel) => MetresToValue(WaterLevel, amount, seaLevel);
 
   /// <summary>16-bit pixel for value v: round(clamp01(v) * 65535). clip is -1 below 0 (and for NaN), +1 above 1, else 0.</summary>
@@ -205,9 +205,9 @@ public static class WorldExport
     /// exact on the game's 12 m grid; 8192 holds about half a gigabyte while it runs, and every client that joins a
     /// world built from it downloads the maps.</summary>
     public int Size = 4096;
-    /// <summary>The Heightmap Amount the heights are encoded for (0-5). 2 with Sea Level 0.5 spans -30 m to 370 m, the
-    /// encoding Wubarrk's own generated maps use, so the two can be cut and pasted into each other.</summary>
-    public float HeightmapAmount = 2f;
+    /// <summary>The Heightmap Amount the heights are encoded for (0-5), recorded in export.cfg. 1, Better Continents' default
+    /// everywhere, spans -30 m to 170 m at Sea Level 0.5 and clips higher ground; 2 spans -30 m to 370 m.</summary>
+    public float HeightmapAmount = 1f;
     /// <summary>The Sea Level Adjustment (0-1) the heights are encoded for.</summary>
     public float SeaLevel = 0.5f;
     /// <summary>heightmap.png: the terrain height, 16-bit.</summary>
@@ -2047,97 +2047,87 @@ public static class WorldExport
     private List<string> ConfigLines()
     {
       var l = new List<string>();
-      void Section(string name)
+      // Every line names its setting through SettingsSchema, so the sections and keys are always the config's own; a
+      // section header is written whenever the next setting is in another section.
+      string? section = null;
+      void Key(SettingDef setting, string value, string why)
       {
-        l.Add("");
-        l.Add($"[{name}]");
-      }
-      void Key(string key, string value, string why)
-      {
+        if (setting.Section != section)
+        {
+          section = setting.Section;
+          l.Add("");
+          l.Add($"[{section}]");
+        }
         l.Add("");
         l.Add("## " + why);
-        l.Add($"{key} = {value}");
+        l.Add($"{setting.Key} = {value}");
       }
       bool fullLocations = LocationsWritten && LocationsFull && LocationsGenerated;
 
-      Section("00 BetterContinents.Debug");
-      Key("Enabled", "true", "Better Continents on for the new world.");
-      Key("Directory", ConfigDir, "Loads every map in this export folder by its standard name, and no map from anywhere else.");
-      Key("Override version", "", "Empty: the new world uses the current settings format (the V3 height formula this export is encoded for).");
+      Key(SettingsSchema.Enabled, "true", "Better Continents on for the new world.");
+      Key(SettingsSchema.Directory, ConfigDir, "Loads every map in this export folder by its standard name, and no map from anywhere else.");
+      Key(SettingsSchema.OverrideVersion, "", "Empty: the new world uses the current settings format (the V3 height formula this export is encoded for).");
 
-      Section("01 BetterContinents.Global");
-      Key("World Size", F(WorldSizeSetting), "The loaded world's playable radius.");
-      Key("Edge Size", F(EdgeSizeSetting), "The loaded world's edge width.");
-      Key("Map Edge Drop-off", B(EdgeDropoff), EdgeDropoff
+      Key(SettingsSchema.WorldSize, F(WorldSizeSetting), "The loaded world's playable radius.");
+      Key(SettingsSchema.EdgeSize, F(EdgeSizeSetting), "The loaded world's edge width.");
+      Key(SettingsSchema.MapEdgeDropoff, B(EdgeDropoff), EdgeDropoff
         ? "On: the heightmap holds the edge ring as it is before the drop-off, and Better Continents applies it once. Keeps the world edge (ship push, edge kill)."
         : "Off: the edge is already in the heightmap. Also removes the world edge (no ship push or edge kill); the outermost pixels continue past it.");
-      Key("Skip Default Locations", B(fullLocations), fullLocations
+      Key(SettingsSchema.SkipDefaultLocations, B(fullLocations), fullLocations
         ? "The location map holds every location, so the game places no others."
         : "The location map (if any) is incomplete, so the game places the rest.");
       if (HeightsWritten)
       {
-        Key("Sea Level Adjustment", F(O.SeaLevel), "The sea level the heights are encoded for.");
-        Key("Rivers", "false", "The heightmap overrides the biome height formulas, rivers included; the loaded world's rivers are in it.");
-        Key("Mountains Allowed At Center", "true", "The loaded world's centre is already in the heightmap; no second clamp.");
+        Key(SettingsSchema.SeaLevel, F(O.SeaLevel), "The sea level the heights are encoded for.");
+        Key(SettingsSchema.Rivers, "false", "The heightmap overrides the biome height formulas, rivers included; the loaded world's rivers are in it.");
+        Key(SettingsSchema.MountainsAllowedAtCenter, "true", "The loaded world's centre is already in the heightmap; no second clamp.");
+
+        Key(SettingsSchema.HeightmapAmount, F(O.HeightmapAmount), "metres = (pixel / 65535 * amount - 0.15 + Lerp(1, -1, sea level)) * 200.");
+        Key(SettingsSchema.HeightmapBlend, "1", "The heightmap is the height, not blended with generated terrain.");
+        Key(SettingsSchema.HeightmapAdd, "0", "Nothing added on top.");
+        Key(SettingsSchema.HeightmapMask, "0", "No masking.");
+        Key(SettingsSchema.HeightmapOverrideAll, "true", "Every biome takes its height from the heightmap.");
+        Key(SettingsSchema.HeightmapAlpha, "false", "heightmap.png is plain 16-bit grey.");
       }
 
-      if (HeightsWritten)
-      {
-        Section("02 BetterContinents.Heightmap");
-        Key("Heightmap Amount", F(O.HeightmapAmount), "metres = (pixel / 65535 * amount - 0.15 + Lerp(1, -1, sea level)) * 200.");
-        Key("Heightmap Blend", "1", "The heightmap is the height, not blended with generated terrain.");
-        Key("Heightmap Add", "0", "Nothing added on top.");
-        Key("Heightmap Mask", "0", "No masking.");
-        Key("Heightmap Override All", "true", "Every biome takes its height from the heightmap.");
-        Key("Heightmap Alpha", "false", "heightmap.png is plain 16-bit grey.");
-      }
-
-      Section("03 BetterContinents.Biomemap");
       var precision = EffectiveBiomePrecision(Settings);
-      Key("Biome precision", precision.ToString(CultureInfo.InvariantCulture), precision > 0
+      Key(SettingsSchema.BiomePrecision, precision.ToString(CultureInfo.InvariantCulture), precision > 0
         ? $"As the loaded world: the ground follows the biomes on {precision + 1} x {precision + 1} cells per 64 m terrain zone."
         : "As the loaded world: each 64 m terrain zone takes its biomes from its 4 corners (vanilla).");
 
-      Section("04 BetterContinents.Forest");
-      Key("Forest Scale", ForestScaleText, "The loaded world's forest scale, so the game's own forest noise lines up with forestmap.png.");
+      Key(SettingsSchema.ForestScale, ForestScaleText, "The loaded world's forest scale, so the game's own forest noise lines up with forestmap.png.");
       if (ForestWritten)
       {
-        Key("Forest Amount", "0.5", "Neutral: the loaded world's forest amount is already in forestmap.png.");
-        Key("Forestmap Multiply", O.ForestExact ? "1" : "0", O.ForestExact
+        Key(SettingsSchema.ForestAmount, "0.5", "Neutral: the loaded world's forest amount is already in forestmap.png.");
+        Key(SettingsSchema.ForestmapMultiply, O.ForestExact ? "1" : "0", O.ForestExact
           ? "Exact encoding: forest = forestmap * (game forest + 1)."
           : "Additive encoding: forest = game forest + forestmap (black = the game's own forest).");
-        Key("Forestmap Add", "1", "See Forestmap Multiply.");
+        Key(SettingsSchema.ForestmapAdd, "1", "See Forestmap Multiply.");
       }
       else
-        Key("Forest Amount", F(SourceForestAmount), "The loaded world's forest amount (no forestmap was exported).");
-      Key("Forest Factor Overrides All Trees", B(ForestOverridesAllTrees), "As the loaded world.");
+        Key(SettingsSchema.ForestAmount, F(SourceForestAmount), "The loaded world's forest amount (no forestmap was exported).");
+      Key(SettingsSchema.ForestFactorOverrideAllTrees, B(ForestOverridesAllTrees), "As the loaded world.");
 
-      Section("05 BetterContinents.StartPosition");
       if (LocationsWritten)
-        Key("Override Start Position", "false", "The start temple is in the location map.");
+        Key(SettingsSchema.OverrideStartPosition, "false", "The start temple is in the location map.");
       else if (BcWorld && Settings.OverrideStartPosition)
       {
-        Key("Override Start Position", "true", "As the loaded world.");
-        Key("Start Position X", F(Settings.StartPositionX), "As the loaded world.");
-        Key("Start Position Y", F(Settings.StartPositionY), "As the loaded world.");
+        Key(SettingsSchema.OverrideStartPosition, "true", "As the loaded world.");
+        Key(SettingsSchema.StartPositionX, F(Settings.StartPositionX), "As the loaded world.");
+        Key(SettingsSchema.StartPositionY, F(Settings.StartPositionY), "As the loaded world.");
       }
       else
-        Key("Override Start Position", "false", "As the loaded world.");
+        Key(SettingsSchema.OverrideStartPosition, "false", "As the loaded world.");
 
       if (HeatWritten)
-      {
-        Section("06 BetterContinents.Maps");
-        Key("Heatmap Scale", F(O.HeatScale), "heat = pixel / 65535 * scale; Ashlands where it is above 0.");
-      }
+        Key(SettingsSchema.HeatmapScale, F(O.HeatScale), "heat = pixel / 65535 * scale; Ashlands where it is above 0.");
 
-      Section("07 BetterContinents.Misc");
-      Key("SelectedPreset", "From Config", "Makes the new-world preset \"From Config\", i.e. these settings. Anything else creates the world without them.");
+      Key(SettingsSchema.SelectedPreset, "From Config", "Makes the new-world preset \"From Config\", i.e. these settings. Anything else creates the world without them.");
 
       if (AltBiomesWritten)
       {
-        Section("08 BetterContinents.AltBiomes");
-        Key("Mode", "PlantedOnly", "The alt-biome map holds every alt biome as placed, so the game places none at random.");
-        Key("Grid", AltGrid.ToString(), "As the loaded world.");
+        Key(SettingsSchema.AltBiomeMode, "PlantedOnly", "The alt-biome map holds every alt biome as placed, so the game places none at random.");
+        Key(SettingsSchema.AltBiomeGrid, AltGrid.ToString(), "As the loaded world.");
       }
       return l;
     }
@@ -2188,8 +2178,8 @@ public static class WorldExport
       l.Add("     2. Every New World you then create with \"From Config\" reads the PNGs in this folder as they are then.");
       l.Add("     Setting only Directory in BetterContinents.cfg to this folder works too: a new world made with \"From Config\"");
       l.Add("     then also takes the settings in export.cfg, which win over BetterContinents.cfg (edit export.cfg, or delete");
-      l.Add("     it, to use your own). Without them the heights are read at the wrong scale: at the default Heightmap Amount");
-      l.Add("     of 1 nearly the whole world is under water.");
+      l.Add("     it, to use your own). Without them the heights can be read at the wrong scale: export.cfg holds the");
+      l.Add($"     Heightmap Amount ({Inv(O.HeightmapAmount)}) and Sea Level ({Inv(O.SeaLevel)}) they are encoded for.");
       l.Add("");
       l.Add("  A world that already exists keeps the maps it was created with. With the same seed, vegetation, fine lava");
       l.Add("  detail and the random layout of things come out closest to the exported world.");

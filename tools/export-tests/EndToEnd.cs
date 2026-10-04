@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-09-24 for world export and import (0.9.0).
+// Added by Wubarrk on 2026-09-24 for world export and import (0.9.0), and modified on 2026-10-04 for the unifying refactor (0.10.0).
 
 using System;
 using System.Collections;
@@ -155,6 +155,8 @@ internal static class EndToEnd
     const float T = 21000f;
     var o = WorldExport.Options.Default();
     o.Size = n;
+    // The synthetic terrain reaches above the 170 m that the default amount 1 holds; this run checks the encoding is exact.
+    o.HeightmapAmount = 2f;
     o.Paint = true;
     o.Locations = false;   // ZoneSystem is a Unity object
     var dir = Path.Combine(work, "e2e-export");

@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-09-24 for world export and import (0.9.0).
+// Added by Wubarrk on 2026-09-24 for world export and import (0.9.0), and modified on 2026-10-04 for the unifying refactor (0.10.0).
 
 using System;
 using System.Collections.Generic;
@@ -42,7 +42,7 @@ public partial class DebugUtils
 public static class WorldExportCommands
 {
     public const string OptionsUsage =
-        "[size] [amount=2] [sealevel=0.5] [heatscale=10] [edge=auto|on|off] [forest=additive|exact] "
+        "[size] [amount=1] [sealevel=0.5] [heatscale=10] [edge=auto|on|off] [forest=additive|exact] "
         + "[noheight] [nobiomes] [nolocations] [noforest] [noheat] [noaltbiomes] [nolava] [nomoss] [nopaint] [nosources] [nopreset] [perpoint]";
 
     public const string Usage = "bc_export [status | cancel | server <options> | <options>] - options: " + OptionsUsage;

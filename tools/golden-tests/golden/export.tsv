@@ -1,5 +1,5 @@
-defaults	4096 px, amount 2, sea level 0.5, heights, biomes, locations, forest, heat, alt biomes, lava, moss, paint, sources; zone blend, edge drop-off as the world, forest additive, heat scale 10; New World preset
-usage	[size] [amount=2] [sealevel=0.5] [heatscale=10] [edge=auto|on|off] [forest=additive|exact] [noheight] [nobiomes] [nolocations] [noforest] [noheat] [noaltbiomes] [nolava] [nomoss] [nopaint] [nosources] [nopreset] [perpoint]
+defaults	4096 px, amount 1, sea level 0.5, heights, biomes, locations, forest, heat, alt biomes, lava, moss, paint, sources; zone blend, edge drop-off as the world, forest additive, heat scale 10; New World preset
+usage	[size] [amount=1] [sealevel=0.5] [heatscale=10] [edge=auto|on|off] [forest=additive|exact] [noheight] [nobiomes] [nolocations] [noforest] [noheat] [noaltbiomes] [nolava] [nomoss] [nopaint] [nosources] [nopreset] [perpoint]
 format	bc-export/1
 amount2/export.cfg/001	
 amount2/export.cfg/002	[00 BetterContinents.Debug]
@@ -124,8 +124,8 @@ amount2/README.txt/020	        it: Better Continents reads the file again within
 amount2/README.txt/021	     2. Every New World you then create with "From Config" reads the PNGs in this folder as they are then.
 amount2/README.txt/022	     Setting only Directory in BetterContinents.cfg to this folder works too: a new world made with "From Config"
 amount2/README.txt/023	     then also takes the settings in export.cfg, which win over BetterContinents.cfg (edit export.cfg, or delete
-amount2/README.txt/024	     it, to use your own). Without them the heights are read at the wrong scale: at the default Heightmap Amount
-amount2/README.txt/025	     of 1 nearly the whole world is under water.
+amount2/README.txt/024	     it, to use your own). Without them the heights can be read at the wrong scale: export.cfg holds the
+amount2/README.txt/025	     Heightmap Amount (2) and Sea Level (0.5) they are encoded for.
 amount2/README.txt/026	
 amount2/README.txt/027	  A world that already exists keeps the maps it was created with. With the same seed, vegetation, fine lava
 amount2/README.txt/028	  detail and the random layout of things come out closest to the exported world.
@@ -291,8 +291,8 @@ amount1-exact-edgeoff/README.txt/020	        it: Better Continents reads the fil
 amount1-exact-edgeoff/README.txt/021	     2. Every New World you then create with "From Config" reads the PNGs in this folder as they are then.
 amount1-exact-edgeoff/README.txt/022	     Setting only Directory in BetterContinents.cfg to this folder works too: a new world made with "From Config"
 amount1-exact-edgeoff/README.txt/023	     then also takes the settings in export.cfg, which win over BetterContinents.cfg (edit export.cfg, or delete
-amount1-exact-edgeoff/README.txt/024	     it, to use your own). Without them the heights are read at the wrong scale: at the default Heightmap Amount
-amount1-exact-edgeoff/README.txt/025	     of 1 nearly the whole world is under water.
+amount1-exact-edgeoff/README.txt/024	     it, to use your own). Without them the heights can be read at the wrong scale: export.cfg holds the
+amount1-exact-edgeoff/README.txt/025	     Heightmap Amount (1) and Sea Level (0.5) they are encoded for.
 amount1-exact-edgeoff/README.txt/026	
 amount1-exact-edgeoff/README.txt/027	  A world that already exists keeps the maps it was created with. With the same seed, vegetation, fine lava
 amount1-exact-edgeoff/README.txt/028	  detail and the random layout of things come out closest to the exported world.

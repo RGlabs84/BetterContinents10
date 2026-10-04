@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-09-24 for world export and import (0.9.0), and modified on 2026-10-02 for export folders used as the Directory (0.9.4).
+// Added by Wubarrk on 2026-09-24 for world export and import (0.9.0), and modified on 2026-10-02 for export folders used as the Directory (0.9.4), and modified on 2026-10-04 for the unifying refactor (0.10.0).
 
 using System;
 using System.Collections;
@@ -107,10 +107,6 @@ public static class WorldImport
     "heightmap.png", "biomemap.png", "locationmap.png", "roughmap.png", "forestmap.png", "heatmap.png", "terrainmap.png",
     "paintmap.png", "lavamap.png", "mossmap.png", "vegetationmap.png", "spawnmap.png", "altbiomemap.png",
   ];
-
-  // Settings that are not a new world's: the live Export group, the debug switches and the mod's own bookkeeping.
-  private const string ExportSection = "09 BetterContinents.Export";
-  private static readonly HashSet<string> NotWorldKeys = ["Debug Mode", "Debug Reset Command", "NexusID", "SelectedPreset"];
 
   private static readonly Regex StampPattern = new(@"^export-(\d{4}-\d{2}-\d{2}-\d{2}-\d{2}-\d{2})(?:-(\d+))?$", RegexOptions.CultureInvariant);
 
@@ -435,8 +431,8 @@ public static class WorldImport
     }
   }
 
-  internal static bool IsWorldSetting(ConfigEntryBase entry) =>
-    entry.Definition.Section != ExportSection && !NotWorldKeys.Contains(entry.Definition.Key);
+  // A new world's setting (SettingsSchema): not the live Export group, the debug switches or the mod's own bookkeeping.
+  internal static bool IsWorldSetting(ConfigEntryBase entry) => SettingsSchema.Find(entry)?.Scope == SettingScope.World;
 
   // The parsed lines matched to Better Continents' settings; the last line of a key wins. applied gets "[section] key = value"
   // per setting used, ignored the lines that were not (unknown, not a world setting, unreadable).
@@ -458,7 +454,7 @@ public static class WorldImport
       }
       if (!IsWorldSetting(entry))
       {
-        if (entry.Definition.Key != "SelectedPreset")
+        if (entry != ConfigSelectedPreset)
           ignored.Add($"{name}: not a world setting");
         continue;
       }
@@ -547,7 +543,7 @@ public static class WorldImport
   /// <summary>Main thread, when a new world is made "From Config": the values it reads when Directory is a folder with an
   /// export.cfg in it (a world export), i.e. export.cfg laid over the config the way an import's preset is built, with
   /// Directory kept as the config has it. An export's pixels are only right with the settings they were encoded for
-  /// (Heightmap Amount 2 puts the waterline at 0.15; the default 1 drowns all but the peaks). Null when Directory is empty
+  /// (an export at Heightmap Amount 2 read at 1 drowns all but the peaks). Null when Directory is empty
   /// or has no export.cfg: then the config is read as it is.</summary>
   internal static ConfigValues? DirectoryValues()
   {

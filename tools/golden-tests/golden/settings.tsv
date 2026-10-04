@@ -486,10 +486,8 @@ scalars/v9/dump-after-load	n=29 sha=213229205e2f5bb3a77b163e
 scalars/v10/disk	len=88 sha=b00eee2a946fd1bf25faa4f1
 scalars/v10/network	len=88 sha=b00eee2a946fd1bf25faa4f1
 scalars/v10/dump-after-load	n=29 sha=2c5bc10670e3aedbd16157d6
-legacy-spawnmap/build-log/001	[Log] [BetterContinents] Renaming legacy spawnmap.png to fx/legacy/locationmap.png
-legacy-spawnmap/build-log/002	[Log] [BetterContinents] No spawns are mapped to color #00FF80 (which has 1 spawn positions defined)
-legacy-spawnmap/build-log/003	[Log] [BetterContinents] No spawns are mapped to color #ABCDEF (which has 1 spawn positions defined)
-legacy-spawnmap/build-log/count	3
+legacy-spawnmap/build-log/001	[Warning] [BetterContinents] Cannot find image fx/legacy/locationmap.png: Image was not reloaded.
+legacy-spawnmap/build-log/count	1
 legacy-spawnmap/dump/001	Version 0
 legacy-spawnmap/dump/002	Continent size 0.50000006
 legacy-spawnmap/dump/003	Mountains amount 0
@@ -510,58 +508,57 @@ legacy-spawnmap/dump/017	Terrainmap disabled
 legacy-spawnmap/dump/018	Forest scale 1
 legacy-spawnmap/dump/019	Forest amount 0.5
 legacy-spawnmap/dump/020	Forestmap disabled
-legacy-spawnmap/dump/021	Location file (96) fx/legacy/locationmap.png
-legacy-spawnmap/dump/022	Locationmap includes spawns for 4 types
-legacy-spawnmap/dump/023	Paintmap disabled
-legacy-spawnmap/dump/024	Lavamap disabled
-legacy-spawnmap/dump/025	Mossmap disabled
-legacy-spawnmap/dump/026	Vegetationmap disabled
-legacy-spawnmap/dump/027	Heatmap disabled
-legacy-spawnmap/dump/028	Spawnmap disabled
-legacy-spawnmap/dump/029	Altbiomemap disabled
-legacy-spawnmap/dump/030	Alt biomes: mode Random, grid WorldEdge, placement seed world seed
-legacy-spawnmap/dump/031	Alt biomes: chance x1, amount x1, region size x1, distance x1
-legacy-spawnmap/dump/032	Alt biomes: neighbour fix off, mean sector height off, min sector thickness 0
-legacy-spawnmap/dump/count	32
-legacy-spawnmap/loaded-maps	locationmap.png
-legacy-spawnmap/v11/disk	len=160 sha=b21c624ff5f9256878387711
-legacy-spawnmap/v11/network	len=130 sha=e731b9498f7ee0cbbb0a3775
-legacy-spawnmap/v11/network-no-alt	len=130 sha=e731b9498f7ee0cbbb0a3775
-legacy-spawnmap/v11/config-version	len=160 sha=b21c624ff5f9256878387711
-legacy-spawnmap/cache-id	51ff249ebe3d9eac7b094fd19e676236
+legacy-spawnmap/dump/021	Locationmap disabled
+legacy-spawnmap/dump/022	Paintmap disabled
+legacy-spawnmap/dump/023	Lavamap disabled
+legacy-spawnmap/dump/024	Mossmap disabled
+legacy-spawnmap/dump/025	Vegetationmap disabled
+legacy-spawnmap/dump/026	Heatmap disabled
+legacy-spawnmap/dump/027	Spawnmap disabled
+legacy-spawnmap/dump/028	Altbiomemap disabled
+legacy-spawnmap/dump/029	Alt biomes: mode Random, grid WorldEdge, placement seed world seed
+legacy-spawnmap/dump/030	Alt biomes: chance x1, amount x1, region size x1, distance x1
+legacy-spawnmap/dump/031	Alt biomes: neighbour fix off, mean sector height off, min sector thickness 0
+legacy-spawnmap/dump/count	31
+legacy-spawnmap/loaded-maps	
+legacy-spawnmap/v11/disk	len=20 sha=a60f8a74e91d5a40a8a58e53
+legacy-spawnmap/v11/network	len=20 sha=a60f8a74e91d5a40a8a58e53
+legacy-spawnmap/v11/network-no-alt	len=20 sha=a60f8a74e91d5a40a8a58e53
+legacy-spawnmap/v11/config-version	len=20 sha=a60f8a74e91d5a40a8a58e53
+legacy-spawnmap/cache-id	d8f0541acef57f0de2422d34a053ede0
 legacy-spawnmap/v11/disk-roundtrip	same
 legacy-spawnmap/v11/network-roundtrip	same
-legacy-spawnmap/v11/dump-after-load	n=30 sha=ee8e2ebb6a533881b1211d6f
+legacy-spawnmap/v11/dump-after-load	n=29 sha=0c4530f61870685a81643787
 legacy-spawnmap/v1/disk	len=43 sha=d79304722954e055936f7f26
 legacy-spawnmap/v1/network	len=43 sha=d79304722954e055936f7f26
 legacy-spawnmap/v1/dump-after-load	n=29 sha=f0bc9edabcd7ee4132409e57
 legacy-spawnmap/v2/disk	len=62 sha=389d868f3c13f4fe3c6de4cb
 legacy-spawnmap/v2/network	len=62 sha=389d868f3c13f4fe3c6de4cb
 legacy-spawnmap/v2/dump-after-load	n=29 sha=c904bb031ecd7b908fd66e5b
-legacy-spawnmap/v3/disk	len=194 sha=c54e42cbcfa7a2ebd0f447be
-legacy-spawnmap/v3/network	len=170 sha=cb2a0853fad2b1017331c500
-legacy-spawnmap/v3/dump-after-load	n=30 sha=a363f01edf20b711b358000a
-legacy-spawnmap/v4/disk	len=194 sha=f890ed82cee91b529df26863
-legacy-spawnmap/v4/network	len=170 sha=dc5fe89166f83b5c01a05ef9
-legacy-spawnmap/v4/dump-after-load	n=30 sha=9c18aaf9f0a4e666feb11bd4
-legacy-spawnmap/v5/disk	len=205 sha=e46c044edc85430eea5e97f3
-legacy-spawnmap/v5/network	len=181 sha=dde87c0c2d376d8d7bb9c7c8
-legacy-spawnmap/v5/dump-after-load	n=30 sha=91f53a0ea011feb57f5db751
-legacy-spawnmap/v6/disk	len=210 sha=356db2261ad94ab483646b60
-legacy-spawnmap/v6/network	len=186 sha=1bc9c6d94d72c9a5b2d9eaf1
-legacy-spawnmap/v6/dump-after-load	n=30 sha=cb2333af8ed795bbb4d69d96
-legacy-spawnmap/v7/disk	len=214 sha=9698d15f29905786606d745b
-legacy-spawnmap/v7/network	len=190 sha=3758016d5781b1317ca1ad92
-legacy-spawnmap/v7/dump-after-load	n=30 sha=63625103789a534d98c269d3
-legacy-spawnmap/v8/disk	len=2661 sha=b1a617cc2695b1cd85bb9c4a
-legacy-spawnmap/v8/network	len=2637 sha=9d489468af28db46d02d18e6
-legacy-spawnmap/v8/dump-after-load	n=30 sha=5ebf305de58e0f3916efcdf2
-legacy-spawnmap/v9/disk	len=2665 sha=2e480f0897702f0588b1ae03
-legacy-spawnmap/v9/network	len=2641 sha=2a05a862191aec25030b22d7
-legacy-spawnmap/v9/dump-after-load	n=30 sha=0a2c87485f477c296a3001af
-legacy-spawnmap/v10/disk	len=2666 sha=f900716f4c81e5bee49a1b9a
-legacy-spawnmap/v10/network	len=2642 sha=4568925378198aa9a4f51889
-legacy-spawnmap/v10/dump-after-load	n=30 sha=f4e88ffc824af5a2f3145897
+legacy-spawnmap/v3/disk	len=63 sha=f4fd24b8df94cc1ceda588e6
+legacy-spawnmap/v3/network	len=63 sha=f4fd24b8df94cc1ceda588e6
+legacy-spawnmap/v3/dump-after-load	n=29 sha=d48769b96aa17eea0602b32e
+legacy-spawnmap/v4/disk	len=63 sha=c8e306b1c6fe033b6c7e22e9
+legacy-spawnmap/v4/network	len=63 sha=c8e306b1c6fe033b6c7e22e9
+legacy-spawnmap/v4/dump-after-load	n=29 sha=4f2cecdc2b561120bedd6adf
+legacy-spawnmap/v5/disk	len=74 sha=5af4d546784c475754e434a1
+legacy-spawnmap/v5/network	len=74 sha=5af4d546784c475754e434a1
+legacy-spawnmap/v5/dump-after-load	n=29 sha=294634b330a567c0416a321e
+legacy-spawnmap/v6/disk	len=79 sha=9bdcae9ed5470cba84366d0e
+legacy-spawnmap/v6/network	len=79 sha=9bdcae9ed5470cba84366d0e
+legacy-spawnmap/v6/dump-after-load	n=29 sha=be37d600c514ed44b74d3c83
+legacy-spawnmap/v7/disk	len=83 sha=d2f8604c91c212946c4297aa
+legacy-spawnmap/v7/network	len=83 sha=d2f8604c91c212946c4297aa
+legacy-spawnmap/v7/dump-after-load	n=29 sha=082a6c765242f887d26b458d
+legacy-spawnmap/v8/disk	len=83 sha=4b966d0f50c6d1c2d3355102
+legacy-spawnmap/v8/network	len=83 sha=4b966d0f50c6d1c2d3355102
+legacy-spawnmap/v8/dump-after-load	n=29 sha=ad96f1a090a0041ef54fc1ed
+legacy-spawnmap/v9/disk	len=87 sha=5b48ba4a9140af69cda03fc7
+legacy-spawnmap/v9/network	len=87 sha=5b48ba4a9140af69cda03fc7
+legacy-spawnmap/v9/dump-after-load	n=29 sha=7dcf53cf3a2a51368befc94d
+legacy-spawnmap/v10/disk	len=88 sha=8029c85a71f79e5d5a3bef8e
+legacy-spawnmap/v10/network	len=88 sha=8029c85a71f79e5d5a3bef8e
+legacy-spawnmap/v10/dump-after-load	n=29 sha=b03b7b1f01b460df7acfc2e2
 legacy-flat/build-log/001	[Error] [BetterContinents] fx/all/biomemap.txt: invalid biome name DeadWastes, skipped: its colour reads as None. The biomes are None, Meadows, Swamp, Mountain, BlackForest, Plains, AshLands, DeepNorth, Ocean, Mistlands; the biomes Expand World Data adds need Expand World Data installed.
 legacy-flat/build-log/002	[Log] [BetterContinents] Biome map (96 x 96): Meadows 13.45%, Swamp 1.02%, Mountain 3.33%, BlackForest 12.43%, Plains 13.68%, AshLands 1.77%, DeepNorth 1.81%, Ocean 38.54%, Mistlands 12.93%, None 1.02%
 legacy-flat/build-log/003	[Log] [BetterContinents] No spawns are mapped to color #ABCDEF (which has 1 spawn positions defined)

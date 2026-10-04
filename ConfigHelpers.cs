@@ -1,4 +1,6 @@
-﻿using System;
+﻿// Modified by Wubarrk on 2026-10-04 for the unifying refactor (0.10.0).
+
+using System;
 using System.Globalization;
 using BepInEx.Configuration;
 using UnityEngine.Assertions;
@@ -34,8 +36,11 @@ public class GroupBuilder
   internal GroupBuilder(ConfigBuilder configBuilder, string groupNameBase)
   {
     this.configBuilder = configBuilder;
-    this.groupName = $"{configBuilder.groupIdx++:00} {groupNameBase}";
+    this.groupName = SectionName(configBuilder.groupIdx++, groupNameBase);
   }
+
+  // "NN <name>": a section carries its position in the file (SettingsSchema).
+  internal static string SectionName(int index, string groupNameBase) => $"{index:00} {groupNameBase}";
 
   public ValueBuilder AddValue(string key) => new(this, key); //ref ConfigEntry<T> bindTarget, string key, T defaultValue, AcceptableValueBase range, string description);//=> configFile.
 }

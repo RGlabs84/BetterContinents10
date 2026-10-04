@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-09-24 for world export and import (0.9.0).
+// Added by Wubarrk on 2026-09-24 for world export and import (0.9.0), and modified on 2026-10-04 for the unifying refactor (0.10.0).
 
 using System;
 using System.Collections;
@@ -414,8 +414,8 @@ internal static class Tests
     C(WorldExportCommands.TryParse("2048 amount=3 sealevel=0.4 heatscale=20 edge=off forest=exact noforest nolava paint perpoint", out var o, out var e), "options parse: " + e);
     C(o.Size == 2048 && o.HeightmapAmount == 3f && o.SeaLevel == 0.4f && o.HeatScale == 20f && o.EdgeDropoff == false && o.ForestExact
       && !o.Forest && !o.Lava && o.Paint && !o.ZoneBlend && o.Heightmap && o.Biomes, "every option lands in its field");
-    C(WorldExportCommands.TryParse("", out var d, out _) && d.Size == 4096 && d.HeightmapAmount == 2f && d.SeaLevel == 0.5f && d.EdgeDropoff == null && d.Paint && d.Preset,
-      "defaults: 4096, amount 2, sea level 0.5, edge as the world, paint on, New World preset on (0.9.0)");
+    C(WorldExportCommands.TryParse("", out var d, out _) && d.Size == 4096 && d.HeightmapAmount == 1f && d.SeaLevel == 0.5f && d.EdgeDropoff == null && d.Paint && d.Preset,
+      "defaults: 4096, amount 1 (Better Continents' default everywhere since the unifying refactor), sea level 0.5, edge as the world, paint on, New World preset on");
     C(WorldExportCommands.TryParse("nopaint nopreset", out var np, out _) && !np.Paint && !np.Preset && np.Heightmap, "nopaint and nopreset switch those two off");
     C(WorldExportCommands.TryParse("paint preset", out var pp, out _) && pp.Paint && pp.Preset, "paint and preset are still accepted");
     C(d.ToString().Contains("New World preset") && np.ToString().Contains("no preset"), "the options' text says whether a preset is made");
@@ -528,9 +528,9 @@ internal static class Tests
     C(Get("01 BetterContinents.Global", "Map Edge Drop-off", false) && Get("01 BetterContinents.Global", "Mountains Allowed At Center", false)
       && !Get("01 BetterContinents.Global", "Rivers", true) && Get("01 BetterContinents.Global", "Skip Default Locations", false), "Global: edge drop-off on, mountains at centre allowed, rivers off, skip default locations");
     C(Get("01 BetterContinents.Global", "Sea Level Adjustment", 0f) == 0.5f && Get("01 BetterContinents.Global", "World Size", 0f) == 10000f && Get("01 BetterContinents.Global", "Edge Size", 0f) == 500f, "sea level 0.5, world size 10000, edge 500");
-    C(Get("02 BetterContinents.Heightmap", "Heightmap Amount", 0f) == 2f && Get("02 BetterContinents.Heightmap", "Heightmap Blend", 0f) == 1f
+    C(Get("02 BetterContinents.Heightmap", "Heightmap Amount", 0f) == 1f && Get("02 BetterContinents.Heightmap", "Heightmap Blend", 0f) == 1f
       && Get("02 BetterContinents.Heightmap", "Heightmap Add", 1f) == 0f && Get("02 BetterContinents.Heightmap", "Heightmap Mask", 1f) == 0f
-      && Get("02 BetterContinents.Heightmap", "Heightmap Override All", false) && !Get("02 BetterContinents.Heightmap", "Heightmap Alpha", true), "Heightmap: amount 2, blend 1, add 0, mask 0, override all, no alpha");
+      && Get("02 BetterContinents.Heightmap", "Heightmap Override All", false) && !Get("02 BetterContinents.Heightmap", "Heightmap Alpha", true), "Heightmap: amount 1 (the default export amount), blend 1, add 0, mask 0, override all, no alpha");
     C(Get("04 BetterContinents.Forest", "Forestmap Multiply", 1f) == 0f && Get("04 BetterContinents.Forest", "Forestmap Add", 0f) == 1f
       && Get("04 BetterContinents.Forest", "Forest Amount", 0f) == 0.5f && Get("04 BetterContinents.Forest", "Forest Scale", 0f) == 0.5f, "Forest: multiply 0, add 1, amount 0.5, scale 0.5");
     C(!Get("05 BetterContinents.StartPosition", "Override Start Position", true), "no start position override (the temple is in the location map)");
@@ -574,8 +574,8 @@ internal static class Tests
       string[] required = ["format", "modVersion", "gameVersion", "worldName", "seed", "sampledOn", "size", "totalSize", "metresPerPixel", "heightmapAmount", "seaLevel", "waterlineValue", "floorMetres", "ceilingMetres", "clippedLow", "clippedHigh", "files", "notes"];
       var missing = required.Where(k => !r.TryGetProperty(k, out _)).ToList();
       C(missing.Count == 0, "manifest has every required key" + (missing.Count > 0 ? ": missing " + string.Join(", ", missing) : ""));
-      C(r.GetProperty("format").GetString() == "bc-export/1" && Mathf.Abs((float)r.GetProperty("waterlineValue").GetDouble() - 0.15f) < 1e-6f
-        && System.Math.Abs(r.GetProperty("floorMetres").GetDouble() + 30) < 1e-3 && System.Math.Abs(r.GetProperty("ceilingMetres").GetDouble() - 370) < 1e-3, "format bc-export/1, waterline 0.15, floor -30 m, ceiling 370 m");
+      C(r.GetProperty("format").GetString() == "bc-export/1" && Mathf.Abs((float)r.GetProperty("waterlineValue").GetDouble() - 0.30f) < 1e-6f
+        && System.Math.Abs(r.GetProperty("floorMetres").GetDouble() + 30) < 1e-3 && System.Math.Abs(r.GetProperty("ceilingMetres").GetDouble() - 170) < 1e-3, "format bc-export/1 at the default amount 1: waterline 0.30, floor -30 m, ceiling 170 m");
       System.Console.WriteLine("    ---- manifest.json ----");
       foreach (var line in manifest.Split('\n')) System.Console.WriteLine("    | " + line);
     }

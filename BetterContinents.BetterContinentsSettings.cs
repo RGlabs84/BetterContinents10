@@ -1,4 +1,4 @@
-﻿// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and alt-biome planting (0.8.1), and on 2026-09-24 for world export and import (0.9.0), and on 2026-09-29 for Expand World Data biomes (0.9.3), and on 2026-10-02 for export folders used as the Directory (0.9.4).
+﻿// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and alt-biome planting (0.8.1), and on 2026-09-24 for world export and import (0.9.0), and on 2026-09-29 for Expand World Data biomes (0.9.3), and on 2026-10-02 for export folders used as the Directory (0.9.4), and on 2026-10-04 for the unifying refactor (0.10.0).
 
 using System;
 using System.Collections.Generic;
@@ -243,66 +243,29 @@ public partial class BetterContinents
       DynamicPatch();
     }
 
-    // Everything a new world takes from the config. ConfigValues.Live reads BetterContinents.cfg as it is now.
+    // Everything a new world takes from the config. ConfigValues.Live reads BetterContinents.cfg as it is now. Every
+    // plain value comes from its definition in SettingsSchema, so a new world can only ever read the config's own
+    // defaults and ranges; then the maps, in the order they have always loaded in (the location loader may rename a
+    // legacy spawnmap.png first).
     private void ReadConfig(ConfigValues c, bool lean)
     {
-      ContinentSize = c.Get(ConfigContinentSize);
-      SeaLevel = c.Get(ConfigSeaLevelAdjustment);
-      WorldSize = c.Get(ConfigWorldSize);
-      EdgeSize = c.Get(ConfigEdgeSize);
-      FixWaterColor = c.Get(ConfigFixWaterColor);
-
-      var dir = c.Get(ConfigMapSourceDir);
-      HeightMapAlpha = c.Get(ConfigHeightmapAlpha);
-      HeightMap = ImageMapFloat.Create(HeightPath(c.Get(ConfigHeightFile), dir), HeightMapAlpha);
-      HeightmapAmount = c.Get(ConfigHeightmapAmount);
-      HeightmapBlend = c.Get(ConfigHeightmapBlend);
-      HeightmapAdd = c.Get(ConfigHeightmapAdd);
-      HeightmapMask = c.Get(ConfigHeightmapMask);
-      HeightmapOverrideAll = c.Get(ConfigHeightmapOverrideAll);
-
+      foreach (var setting in SettingsSchema.Scalars)
+        setting.Read(c, this);
       BaseHeightNoise = new();
 
+      var dir = c.Get(ConfigMapSourceDir);
+      HeightMap = ImageMapFloat.Create(HeightPath(c.Get(ConfigHeightFile), dir), HeightMapAlpha);
       BiomeMap = ImageMapBiome.Create(BiomePath(c.Get(ConfigBiomeFile), dir));
-
-      OceanChannelsEnabled = c.Get(ConfigOceanChannelsEnabled);
-      AshlandsGapEnabled = c.Get(ConfigAshlandsGapEnabled);
-      DeepNorthGapEnabled = c.Get(ConfigDeepNorthGapEnabled);
-      RiversEnabled = c.Get(ConfigRiversEnabled);
-
-      ForestScaleFactor = c.Get(ConfigForestScale);
-      ForestAmount = c.Get(ConfigForestAmount);
-      ForestFactorOverrideAllTrees = c.Get(ConfigForestFactorOverrideAllTrees);
-
-      OverrideStartPosition = c.Get(ConfigOverrideStartPosition);
-      StartPositionX = c.Get(ConfigStartPositionX);
-      StartPositionY = c.Get(ConfigStartPositionY);
-      SkipDefaultLocations = c.Get(ConfigSkipDefaultLocations);
-
       LocationMap = ImageMapLocation.Create(LocationPath(c.Get(ConfigLocationFile), dir));
-
       RoughMap = Lean(ImageMapFloat.Create(RoughPath(c.Get(ConfigRoughFile), dir), false), lean);
-      RoughmapBlend = c.Get(ConfigRoughmapBlend);
-
       ForestMap = Lean(ImageMapFloat.Create(ForestPath(c.Get(ConfigForestFile), dir), false), lean);
-      ForestmapAdd = c.Get(ConfigForestmapAdd);
-      ForestmapMultiply = c.Get(ConfigForestmapMultiply);
-      MapEdgeDropoff = c.Get(ConfigMapEdgeDropoff);
-      MountainsAllowedAtCenter = c.Get(ConfigMountainsAllowedAtCenter);
-      BiomePrecision = c.Get(ConfigBiomePrecision);
-
       TerrainMap = Lean(ImageMapTerrain.Create(TerrainPath(c.Get(ConfigTerrainFile), dir)), lean);
-
       PaintMap = Lean(ImageMapPaint.Create(PaintPath(c.Get(ConfigPaintFile), dir)), lean);
       LavaMap = Lean(ImageMapFloat.Create(LavaPath(c.Get(ConfigLavaFile), dir), false), lean);
       MossMap = Lean(ImageMapFloat.Create(MossPath(c.Get(ConfigMossFile), dir), false), lean);
       VegetationMap = ImageMapSpawn.Create(VegetationPath(c.Get(ConfigVegetationFile), dir));
-
       HeatMap = Lean(ImageMapFloat.Create(HeatPath(c.Get(ConfigHeatFile), dir), false), lean);
-      HeatMapScale = c.Get(ConfigHeatScale);
-
       SpawnMap = ImageMapSpawn.Create(SpawnPath(c.Get(ConfigSpawnFile), dir));
-
       AltBiomeMap = ImageMapAltBiome.Create(AltBiomePath(c.Get(ConfigAltBiomeFile), dir));
       AltBiomes = AltBiomeSettings.FromConfig(c);
     }

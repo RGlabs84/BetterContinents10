@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-10-04 for the unifying refactor.
+// Added by Wubarrk on 2026-10-04 for the unifying refactor (0.10.0).
 
 using System;
 using System.Collections.Generic;
@@ -31,6 +31,8 @@ internal static class Sections
     Scenarios();
     Presets();
     Export();
+    // Last: it binds other config files, which takes the plugin's config entries away from cfg.
+    Migration();
   }
 
   static string F(float v) => v.ToString("R", CultureInfo.InvariantCulture);
@@ -547,6 +549,36 @@ internal static class Sections
     var bytes = File.ReadAllBytes(file);
     int count = BitConverter.ToInt32(bytes, 0);
     return bytes.Skip(4).Take(count).ToArray();
+  }
+
+  // ---- one-time changes to an existing BetterContinents.cfg -----------------------------------------------------------
+
+  static void Migration()
+  {
+    const string S = "migration";
+    var cases = new (string Name, string? File)[]
+    {
+      ("new-file", null),
+      ("0.9.x-file", "[09 BetterContinents.Export]\nDefault Heightmap Amount = 2\n"),
+      ("0.9.x-file-amount-3", "[09 BetterContinents.Export]\nDefault Heightmap Amount = 3\n"),
+      ("already-migrated", "[07 BetterContinents.Misc]\nConfig Version = 1\n\n[09 BetterContinents.Export]\nDefault Heightmap Amount = 2\n"),
+    };
+    foreach (var (name, text) in cases)
+    {
+      var path = Path.Combine(Program.Work, $"migration-{name}.cfg");
+      if (text != null)
+        File.WriteAllText(path, text);
+      var file = new ConfigFile(path, true);
+      List<string> log = [];
+      log = LogHandler.During(() =>
+      {
+        BC.DeclareConfig(file);
+        SettingsSchema.Migrate();
+      });
+      Golden.Add(S, $"{name}/export-amount", F(BC.ConfigExportHeightmapAmount.Value));
+      Golden.Add(S, $"{name}/config-version", BC.ConfigFileVersion.Value.ToString());
+      Golden.Lines(S, $"{name}/log", log);
+    }
   }
 
   // ---- the export ---------------------------------------------------------------------------------------------------

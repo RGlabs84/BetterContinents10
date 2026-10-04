@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-09-24 for world export and import (0.9.0), and modified on 2026-10-02 for export folders used as the Directory (0.9.4).
+// Added by Wubarrk on 2026-09-24 for world export and import (0.9.0), and modified on 2026-10-02 for export folders used as the Directory (0.9.4), and modified on 2026-10-04 for the unifying refactor (0.10.0).
 
 // Offline checks of Better Continents 0.9.0's world import (WorldImport). A synthetic export folder is written with
 // ImageSharp and made into a New World preset by the real builder, on a worker thread as in the game, then read back with
@@ -662,8 +662,8 @@ internal static class Program
     C(File.Exists(presetPath) && File.Exists(Path.ChangeExtension(presetPath, ".png")), "the export writes the preset \"<world> <time>\" and its picture");
     C(((List<string>)jobType.GetField("Tracked", BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(job)!).Contains(presetPath), "a cancel or a failure deletes the preset with the maps (it is tracked)");
     var s = BC.BetterContinentsSettings.Load(presetPath);
-    C(s.HeightmapAmount == 2f && s.SeaLevel == 0.5f && s.HasHeightMap && s.HasBiomeMap && s.AltBiomes?.Mode == BC.AltBiomeMode.PlantedOnly,
-      "built from the export's own settings lines (amount 2, sea level 0.5, PlantedOnly) before export.cfg exists");
+    C(s.HeightmapAmount == 1f && s.SeaLevel == 0.5f && s.HasHeightMap && s.HasBiomeMap && s.AltBiomes?.Mode == BC.AltBiomeMode.PlantedOnly,
+      "built from the export's own settings lines (the default amount 1, sea level 0.5, PlantedOnly) before export.cfg exists");
     C(BC.ConfigSelectedPreset.Value == "Disabled", "the export does not select its preset: it only appears in the New World list");
     Drain(job, "TextPass", config);
     var readme = File.ReadAllText(Path.Combine(dir, "README.txt"));
