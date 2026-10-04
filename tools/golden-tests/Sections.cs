@@ -416,6 +416,11 @@ internal static class Sections
       var after = SampleMap(back);
       var differ = before.Keys.Where(k => !after.TryGetValue(k, out var v) || v != before[k]).ToList();
       Golden.Add(P, $"{key}/after-load", differ.Count == 0 ? "same" : "DIFFERENT: " + string.Join(", ", differ.Select(k => $"{k} ({before[k]} -> {(after.TryGetValue(k, out var v) ? v : "missing")})")));
+      // Saved at the settings' own version, as the game saves a world (12 for one made since 0.10; the probe above
+      // writes 11, the format 0.9.4 is compared in, which reads a new world's heightmap alpha the old way).
+      var own = SampleMap(BC.BetterContinentsSettings.Load(new ZPackage(Save(s, false, true, s.SavedVersion))));
+      var differOwn = before.Keys.Where(k => !own.TryGetValue(k, out var v) || v != before[k]).ToList();
+      Golden.Add(P, $"{key}/after-load-own-version", differOwn.Count == 0 ? "same" : "DIFFERENT: " + string.Join(", ", differOwn.Select(k => $"{k} ({before[k]} -> {(own.TryGetValue(k, out var v) ? v : "missing")})")));
     }
   }
 

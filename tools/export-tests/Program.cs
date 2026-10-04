@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-09-24 for world export and import (0.9.0).
+// Added by Wubarrk on 2026-09-24 for world export and import (0.9.0), and modified on 2026-10-04 for the unifying refactor (0.10.0).
 
 using System;
 using System.Collections.Generic;
@@ -71,6 +71,7 @@ internal static class Program
     {
       Tests.Math();
       Tests.HeightRoundTrip(work);
+      AlphaTest.Run();
       Tests.EightBitRoundTrip(work);
       Tests.BiomeRoundTrip(work);
       Tests.AltBiomeRoundTrip(work);

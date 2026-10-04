@@ -192,7 +192,7 @@ internal static partial class Tests
     // takes BC terrain past the grid's 10500 m disc: GetBiomeSector falls back to the real biome there.
     var big = NewSettings();
     big.WorldSize = 20000f;
-    big.Version = BC.BetterContinentsSettings.WorldSizeMapsVersion;
+    big.Version = BC.BetterContinentsSettings.UnifiedVersion;
     Use(big);
     Check(BC.Geometry.TotalRadius == 20500f && !Control.ExternalGrid && Control.CutoffRadius == 0f && Control.SampledRadius == 10500f
           && Control.FallbackActive && Control.FallbackRadiusSq == 10500f * 10500f,

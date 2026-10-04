@@ -87,19 +87,28 @@ public partial class BetterContinents
   {
     // The settings versions. 1 to 10 are the old fixed layouts (DeserializeLegacy), and choose the base height formula
     // (Patcher.PatchGetBaseHeight). 11 is the keyed format: each value under its DataKey. 12 is the same format, for a
-    // world made since the unifying refactor (0.10): its maps span its own World Size and Edge Size (MapsSpanWorldSize),
-    // where an older world's span vanilla's 21000 m whatever World Size says. A world keeps its version: one read as 12
-    // is saved as 12, any older one as 11, as always. Better Continents 0.9 reads a version 12 world as a version 11 one.
+    // world made since the unifying refactor (0.10), with the fixes that change what a world is like, which only a new
+    // world gets: its maps span its own World Size and Edge Size (MapsSpanWorldSize), where an older world's span
+    // vanilla's 21000 m whatever World Size says; and Heightmap Alpha reads the heightmap at full precision and blends it
+    // with the game's own terrain by its alpha (HeightmapAlphaMode). A world keeps its version: one read as 12 is saved as
+    // 12, any older one as 11, as always. Better Continents 0.9 reads a version 12 world as a version 11 one.
     public const int MaxVersion = 12;
     internal const int KeyedVersion = 11;
-    internal const int WorldSizeMapsVersion = 12;
+    internal const int UnifiedVersion = 12;
 
     // The version these settings are saved with when Override version says nothing.
     internal int SavedVersion => Math.Max(Version, KeyedVersion);
 
     // Whether the maps span this world's World Size and Edge Size (a world made since 0.10), or vanilla's 21000 m.
     // Expand World Size's size wins over both (BetterContinents.MapGeometry).
-    public bool MapsSpanWorldSize => Version >= WorldSizeMapsVersion;
+    public bool MapsSpanWorldSize => Version >= UnifiedVersion;
+
+    // How the heightmap's alpha is read: not at all without Heightmap Alpha; with it, blended on a world made since 0.10,
+    // and as it always was (8-bit heights, the alpha unused) on an older one.
+    internal ImageMapFloat.HeightAlpha HeightmapAlphaMode =>
+      !HeightMapAlpha ? ImageMapFloat.HeightAlpha.None
+      : Version >= UnifiedVersion ? ImageMapFloat.HeightAlpha.Blend
+      : ImageMapFloat.HeightAlpha.Legacy;
 
     // This world's World Size and Edge Size as a size; null when they make no world (no size at all, or not a number).
     internal WorldGeometry? OwnGeometry
@@ -507,7 +516,7 @@ public partial class BetterContinents
             RidgeBlendSigmoidXOffset = pkg.ReadSingle();
             break;
           case DataKey.HeightMap:
-            HeightMap = ImageMapFloat.Create(pkg.ReadByteArray(), HeightMapAlpha);
+            HeightMap = ImageMapFloat.Create(pkg.ReadByteArray(), HeightmapAlphaMode);
             break;
           case DataKey.HeightMapPath:
             path = pkg.ReadString();

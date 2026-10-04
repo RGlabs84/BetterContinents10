@@ -276,26 +276,27 @@ alpha/dump/010	Map edge dropoff True
 alpha/dump/011	Mountains allowed at center False
 alpha/dump/012	Heightmap file (96) fx/alpha/heightmap.png
 alpha/dump/013	Heightmap amount 1, blend 1, add 0, mask 0
-alpha/dump/014	Base height noise stack:
-alpha/dump/015	Roughmap disabled
-alpha/dump/016	Biomemap disabled
-alpha/dump/017	Biome precision 0: the ground takes its biomes from the 4 corners of each 64 m terrain zone (vanilla)
-alpha/dump/018	Terrainmap disabled
-alpha/dump/019	Forest scale 1
-alpha/dump/020	Forest amount 0.5
-alpha/dump/021	Forestmap disabled
-alpha/dump/022	Locationmap disabled
-alpha/dump/023	Paintmap disabled
-alpha/dump/024	Lavamap disabled
-alpha/dump/025	Mossmap disabled
-alpha/dump/026	Vegetationmap disabled
-alpha/dump/027	Heatmap disabled
-alpha/dump/028	Spawnmap disabled
-alpha/dump/029	Altbiomemap disabled
-alpha/dump/030	Alt biomes: mode Random, grid WorldEdge, placement seed world seed
-alpha/dump/031	Alt biomes: chance x1, amount x1, region size x1, distance x1
-alpha/dump/032	Alt biomes: neighbour fix off, mean sector height off, min sector thickness 0
-alpha/dump/count	32
+alpha/dump/014	Heightmap alpha: full precision, blended with the game's own terrain by the alpha
+alpha/dump/015	Base height noise stack:
+alpha/dump/016	Roughmap disabled
+alpha/dump/017	Biomemap disabled
+alpha/dump/018	Biome precision 0: the ground takes its biomes from the 4 corners of each 64 m terrain zone (vanilla)
+alpha/dump/019	Terrainmap disabled
+alpha/dump/020	Forest scale 1
+alpha/dump/021	Forest amount 0.5
+alpha/dump/022	Forestmap disabled
+alpha/dump/023	Locationmap disabled
+alpha/dump/024	Paintmap disabled
+alpha/dump/025	Lavamap disabled
+alpha/dump/026	Mossmap disabled
+alpha/dump/027	Vegetationmap disabled
+alpha/dump/028	Heatmap disabled
+alpha/dump/029	Spawnmap disabled
+alpha/dump/030	Altbiomemap disabled
+alpha/dump/031	Alt biomes: mode Random, grid WorldEdge, placement seed world seed
+alpha/dump/032	Alt biomes: chance x1, amount x1, region size x1, distance x1
+alpha/dump/033	Alt biomes: neighbour fix off, mean sector height off, min sector thickness 0
+alpha/dump/count	33
 alpha/loaded-maps	heightmap.png
 alpha/v11/disk	len=16645 sha=70f85b182cb839bf1d0df11a
 alpha/v11/network	len=16618 sha=325adbcc790b405c84235cd4
@@ -304,7 +305,7 @@ alpha/v11/config-version	len=16645 sha=86efd880ce979e084d00a959
 alpha/cache-id	402316138b97b46d1911d0a8e82949ac
 alpha/v11/disk-roundtrip	same
 alpha/v11/network-roundtrip	same
-alpha/v11/dump-after-load	n=30 sha=a4344df85fe758a2a5f39dd2
+alpha/v11/dump-after-load	n=31 sha=2e7ccc79f144382225d4112c
 alpha/v1/disk	len=16663 sha=8857024e2a92ec91bf44e286
 alpha/v1/network	len=16642 sha=75049d59d4699a2851f627b5
 alpha/v1/dump-after-load	n=30 sha=ddfc779108cf217d4fd37e3d

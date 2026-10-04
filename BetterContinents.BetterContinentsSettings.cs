@@ -336,6 +336,10 @@ public partial class BetterContinents
         {
           output($"Heightmap file ({HeightMap.Size}) {HeightMap.FilePath}");
           output($"Heightmap amount {HeightmapAmount}, blend {HeightmapBlend}, add {HeightmapAdd}, mask {HeightmapMask}");
+          if (HeightMapAlpha)
+            output(HeightmapAlphaMode == ImageMapFloat.HeightAlpha.Blend
+              ? "Heightmap alpha: full precision, blended with the game's own terrain by the alpha"
+              : "Heightmap alpha: 8-bit heights, the alpha unused (a world made by an older Better Continents)");
           if (HeightmapOverrideAll)
           {
             output($"Heightmap overrides ALL");
@@ -637,6 +641,11 @@ public partial class BetterContinents
       }
       EnabledSpawns.Clear();
     }
+    // Whether the heightmap blends with the game's own terrain by its alpha (a world made since 0.10 with Heightmap Alpha:
+    // HeightmapAlphaMode), and its alpha at a map position (1, opaque, where it has none).
+    public bool BlendsHeightmapAlpha => HeightMap?.HasAlpha == true;
+    public float HeightmapAlphaAt(float x, float y) => HeightMap?.GetAlpha(x, y) ?? 1f;
+
     public float ApplyHeightmap(float x, float y, float height)
     {
       if (HeightMap == null || (HeightmapBlend == 0 && HeightmapAdd == 0 && HeightmapMask == 0))

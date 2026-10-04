@@ -49,7 +49,7 @@ public partial class BetterContinents
       internal virtual string ConfigPath => GetPath(ConfigMapSourceDir.Value, FileName, FileSetting!.Entry.Value);
 
       public static readonly MapKind Height = new MapKind<ImageMapFloat>("Heightmap", "heightmap.png", SettingsSchema.HeightmapFile, "h", "hm",
-        s => s.HeightMap, (s, m) => s.HeightMap = m, (s, path) => ImageMapFloat.Create(path, s.HeightMapAlpha), false, (s, m) => m.CreateMap(s.HeightMapAlpha));
+        s => s.HeightMap, (s, m) => s.HeightMap = m, (s, path) => ImageMapFloat.Create(path, s.HeightmapAlphaMode), false, (s, m) => m.CreateMap(s.HeightmapAlphaMode));
       public static readonly MapKind Biome = new BiomeMapKind();
       public static readonly MapKind Terrain = new MapKind<ImageMapTerrain>("Terrainmap", "terrainmap.png", SettingsSchema.TerrainmapFile, "terrain", "terrain",
         s => s.TerrainMap, (s, m) => s.TerrainMap = m, (_, path) => ImageMapTerrain.Create(path), true, (_, m) => m.CreateMap());

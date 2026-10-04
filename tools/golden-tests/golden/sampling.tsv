@@ -27,6 +27,7 @@ all/override-all	False
 all/altbiome-map	classes=#000000 [none] | #6A8CA0 [Wolf Mountain] | #3C5A28 [Dark Meadows + Lantern] | #A05A3C [!Drake Mountain] | #101010 [none] | point [Wolf Mountain] map=len=9216 sha=710881f77dc2b12720276c69
 all/altbiome-settings	len=87 sha=377cb1880ce91ae280f7aebe
 all/after-load	same
+all/after-load-own-version	same
 all-defaults/heightmap	n=4010 min=0 max=0.48522586 sha=5eafdab92026aba9634622dd
 all-defaults/roughmap	n=4010 min=0.2 max=0.6 sha=4c16650a90a626225c1652d0
 all-defaults/flatmap	n=4010 min=0.25 max=0.25 sha=44a7f8f6bd2426271a9e8ded
@@ -56,6 +57,7 @@ all-defaults/override-all	True
 all-defaults/altbiome-map	classes=#000000 [none] | #6A8CA0 [Wolf Mountain] | #3C5A28 [Dark Meadows + Lantern] | #A05A3C [!Drake Mountain] | #101010 [none] | point [Wolf Mountain] map=len=9216 sha=710881f77dc2b12720276c69
 all-defaults/altbiome-settings	len=37 sha=9096fc807cffab9346cccab0
 all-defaults/after-load	DIFFERENT: altbiome-settings (len=37 sha=9096fc807cffab9346cccab0 -> null)
+all-defaults/after-load-own-version	DIFFERENT: altbiome-settings (len=37 sha=9096fc807cffab9346cccab0 -> null)
 heightonly/heightmap	n=4010 min=0 max=0.48522586 sha=5eafdab92026aba9634622dd
 heightonly/roughmap	n=4010 min=0.5 max=0.6 sha=e83d4a6b0db80ddf69cc1644
 heightonly/flatmap	n=4010 min=0.25 max=0.25 sha=44a7f8f6bd2426271a9e8ded
@@ -85,7 +87,8 @@ heightonly/override-all	True
 heightonly/altbiome-map	none
 heightonly/altbiome-settings	len=37 sha=9096fc807cffab9346cccab0
 heightonly/after-load	DIFFERENT: altbiome-settings (len=37 sha=9096fc807cffab9346cccab0 -> null)
-alpha/heightmap	n=4010 min=0 max=0.4862745 sha=8528b7a441a6290000dd9ec8
+heightonly/after-load-own-version	DIFFERENT: altbiome-settings (len=37 sha=9096fc807cffab9346cccab0 -> null)
+alpha/heightmap	n=4010 min=0 max=0.48522586 sha=5eafdab92026aba9634622dd
 alpha/roughmap	n=4010 min=0.5 max=0.6 sha=e83d4a6b0db80ddf69cc1644
 alpha/flatmap	n=4010 min=0.4 max=0.6 sha=9c50e1741e0dc802bfa4ba26
 alpha/forest	n=4010 min=0.145071 max=1.850145 sha=eeb3281d59709601259340cd
@@ -103,7 +106,7 @@ alpha/locations/Vendor_BlackForest
 alpha/locations/Runestone_Meadows:alias	
 alpha/locations/Hildir_camp	
 alpha/locations/Runestone_Meadows	
-alpha/base-height-v3	n=4010 min=-2 max=0.3362745 sha=9b05d183560155a61922b221
+alpha/base-height-v3	n=4010 min=-2 max=0.33522585 sha=796fde1051b898667ba28208
 alpha/getbiome-prefix	n=8020 min=1 max=2 sha=4b91b98a3662c926f503b199
 alpha/isashlands	n=16040 min=0 max=1 sha=6c2b4abae9de0cfc037071f7
 alpha/isdeepnorth	n=16040 min=-1 max=1 sha=ce25cc9acce7422ac350c37e
@@ -113,7 +116,8 @@ alpha/precision	0
 alpha/override-all	False
 alpha/altbiome-map	none
 alpha/altbiome-settings	len=37 sha=9096fc807cffab9346cccab0
-alpha/after-load	DIFFERENT: altbiome-settings (len=37 sha=9096fc807cffab9346cccab0 -> null)
+alpha/after-load	DIFFERENT: heightmap (n=4010 min=0 max=0.48522586 sha=5eafdab92026aba9634622dd -> n=4010 min=0 max=0.4862745 sha=8528b7a441a6290000dd9ec8), base-height-v3 (n=4010 min=-2 max=0.33522585 sha=796fde1051b898667ba28208 -> n=4010 min=-2 max=0.3362745 sha=9b05d183560155a61922b221), altbiome-settings (len=37 sha=9096fc807cffab9346cccab0 -> null)
+alpha/after-load-own-version	DIFFERENT: altbiome-settings (len=37 sha=9096fc807cffab9346cccab0 -> null)
 files/heightmap	n=4010 min=0 max=0.9704517 sha=98c1825f4c8b024294cd5378
 files/roughmap	n=4010 min=0.5 max=0.6 sha=e83d4a6b0db80ddf69cc1644
 files/flatmap	n=4010 min=0.25 max=0.25 sha=44a7f8f6bd2426271a9e8ded
@@ -143,6 +147,7 @@ files/override-all	True
 files/altbiome-map	none
 files/altbiome-settings	len=37 sha=9096fc807cffab9346cccab0
 files/after-load	DIFFERENT: altbiome-settings (len=37 sha=9096fc807cffab9346cccab0 -> null)
+files/after-load-own-version	DIFFERENT: altbiome-settings (len=37 sha=9096fc807cffab9346cccab0 -> null)
 scalars/heightmap	n=4010 min=0.20019457 max=0.39985436 sha=e4d2e5502cbae2d090e6d333
 scalars/roughmap	n=4010 min=0.5 max=0.6 sha=e83d4a6b0db80ddf69cc1644
 scalars/flatmap	n=4010 min=0.4 max=0.6 sha=9c50e1741e0dc802bfa4ba26
@@ -172,6 +177,7 @@ scalars/override-all	False
 scalars/altbiome-map	none
 scalars/altbiome-settings	len=37 sha=9096fc807cffab9346cccab0
 scalars/after-load	same
+scalars/after-load-own-version	same
 legacy-spawnmap/heightmap	n=4010 min=0.20019457 max=0.39985436 sha=e4d2e5502cbae2d090e6d333
 legacy-spawnmap/roughmap	n=4010 min=0.5 max=0.6 sha=e83d4a6b0db80ddf69cc1644
 legacy-spawnmap/flatmap	n=4010 min=0.4 max=0.6 sha=9c50e1741e0dc802bfa4ba26
@@ -201,6 +207,7 @@ legacy-spawnmap/override-all	False
 legacy-spawnmap/altbiome-map	none
 legacy-spawnmap/altbiome-settings	len=37 sha=9096fc807cffab9346cccab0
 legacy-spawnmap/after-load	DIFFERENT: altbiome-settings (len=37 sha=9096fc807cffab9346cccab0 -> null)
+legacy-spawnmap/after-load-own-version	DIFFERENT: altbiome-settings (len=37 sha=9096fc807cffab9346cccab0 -> null)
 legacy-flat/heightmap	n=4010 min=0 max=0.48522586 sha=5eafdab92026aba9634622dd
 legacy-flat/roughmap	n=4010 min=0.2 max=0.6 sha=4c16650a90a626225c1652d0
 legacy-flat/flatmap	n=4010 min=0.31005183 max=0.5997949 sha=c797bef8bc1b78f1621ea7d4
@@ -230,3 +237,4 @@ legacy-flat/override-all	False
 legacy-flat/altbiome-map	classes=#000000 [none] | #6A8CA0 [Wolf Mountain] | #3C5A28 [Dark Meadows + Lantern] | #A05A3C [!Drake Mountain] | #101010 [none] | point [Wolf Mountain] map=len=9216 sha=710881f77dc2b12720276c69
 legacy-flat/altbiome-settings	len=37 sha=9096fc807cffab9346cccab0
 legacy-flat/after-load	DIFFERENT: altbiome-settings (len=37 sha=9096fc807cffab9346cccab0 -> null)
+legacy-flat/after-load-own-version	DIFFERENT: altbiome-settings (len=37 sha=9096fc807cffab9346cccab0 -> null)

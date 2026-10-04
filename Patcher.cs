@@ -409,6 +409,10 @@ public partial class BetterContinents
           // GetBaseHeightV3 doesn't work at all without heightmap which makes testing more difficult.
           if (Settings.HasHeightMap || Settings.BaseHeightNoise.NoiseLayers.Count > 0)
             patchVersion = 3;
+          // 4: V3 blended with the game's own height by the heightmap's alpha (a world made since 0.10 with Heightmap
+          // Alpha; the map is read that way only then).
+          if (Settings.BlendsHeightmapAlpha)
+            patchVersion = 4;
           break;
       }
     }
@@ -419,6 +423,8 @@ public partial class BetterContinents
     var patch1 = AccessTools.Method(typeof(WorldGeneratorPatch), nameof(WorldGeneratorPatch.GetBaseHeightPrefixV1));
     var patch2 = AccessTools.Method(typeof(WorldGeneratorPatch), nameof(WorldGeneratorPatch.GetBaseHeightPrefixV2));
     var patch3 = AccessTools.Method(typeof(WorldGeneratorPatch), nameof(WorldGeneratorPatch.GetBaseHeightPrefixV3));
+    var patch4 = AccessTools.Method(typeof(WorldGeneratorPatch), nameof(WorldGeneratorPatch.GetBaseHeightPrefixV3Alpha));
+    var postfix4 = AccessTools.Method(typeof(WorldGeneratorPatch), nameof(WorldGeneratorPatch.GetBaseHeightPostfixV3Alpha));
     if (!EnsurePatchTargetFound(method, "WorldGenerator.GetBaseHeight"))
       return;
     if (GetBaseHeightPatched == 1)
@@ -439,6 +445,13 @@ public partial class BetterContinents
       HarmonyInstance.Unpatch(method, patch3);
       GetBaseHeightPatched = 0;
     }
+    if (GetBaseHeightPatched == 4)
+    {
+      Log("Unpatching WorldGenerator.GetBaseHeight with the heightmap's alpha");
+      HarmonyInstance.Unpatch(method, patch4);
+      HarmonyInstance.Unpatch(method, postfix4);
+      GetBaseHeightPatched = 0;
+    }
     if (patchVersion == 1)
     {
       Log($"Patching WorldGenerator.GetBaseHeight V1");
@@ -456,6 +469,12 @@ public partial class BetterContinents
       Log($"Patching WorldGenerator.GetBaseHeight");
       HarmonyInstance.Patch(method, prefix: new(patch3));
       GetBaseHeightPatched = 3;
+    }
+    if (patchVersion == 4)
+    {
+      Log($"Patching WorldGenerator.GetBaseHeight with the heightmap's alpha");
+      HarmonyInstance.Patch(method, prefix: new(patch4), postfix: new(postfix4));
+      GetBaseHeightPatched = 4;
     }
   }
 

@@ -78,6 +78,29 @@ public partial class BetterContinents
             __result = GetBaseHeightV3(wx, wy, ___m_minMountainDistance);
             return false;
         }
+
+        // GetBaseHeightV3 on a world made since 0.10 with Heightmap Alpha (ImageMapFloat.HeightAlpha.Blend): the
+        // heightmap's alpha blends its height with the game's own. Where the heightmap is opaque the prefix answers and
+        // the game's formula is skipped; elsewhere the formula runs, and the postfix mixes in Better Continents' height
+        // (x) by the alpha (y). A transparent pixel is the game's own terrain.
+        public static bool GetBaseHeightPrefixV3Alpha(ref float wx, ref float wy, ref float __result, float ___m_minMountainDistance, out Vector2 __state)
+        {
+            var size = Geometry;
+            float alpha = Settings.HeightmapAlphaAt(size.Normalize(wx), size.Normalize(wy));
+            if (alpha <= 0f)
+            {
+                __state = Vector2.zero;
+                return true;
+            }
+            __result = GetBaseHeightV3(wx, wy, ___m_minMountainDistance);
+            __state = new Vector2(__result, alpha);
+            return alpha < 1f;
+        }
+        public static void GetBaseHeightPostfixV3Alpha(ref float __result, Vector2 __state)
+        {
+            if (__state.y > 0f && __state.y < 1f)
+                __result = Mathf.Lerp(__result, __state.x, __state.y);
+        }
         public static bool GetBaseHeightPrefixV2(ref float wx, ref float wy, ref float __result, float ___m_offset0, float ___m_offset1, float ___m_minMountainDistance)
         {
             __result = GetBaseHeightV2(wx, wy, ___m_offset0, ___m_offset1, ___m_minMountainDistance);
