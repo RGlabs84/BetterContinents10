@@ -1,0 +1,232 @@
+all/heightmap	n=4010 min=0.03206136 max=0.6764059 sha=f73455b3b0a6fc97c3066e71
+all/roughmap	n=4010 min=0.2 max=0.48000002 sha=6bd7430e4fdc8df30434b2fb
+all/flatmap	n=4010 min=0.4 max=0.6 sha=9c50e1741e0dc802bfa4ba26
+all/forest	n=4010 min=0.34507102 max=1.850145 sha=06114b1cdcb4431dd78e6350
+all/heat	n=4010 min=0 max=7.5 sha=5886211dd7507c7af06c3154
+all/biome	n=4010 min=0 max=512 sha=81458a9140cf1e5fd59c7cae
+all/paint-AshLands	n=16040 min=0 max=1 sha=475077a0fdb1eba4115c41a6
+all/paint-Mistlands	n=16040 min=0 max=1 sha=260b5138b83dd0d54d537b97
+all/paint-Meadows	n=16040 min=0 max=1 sha=933ca1cd4e6a10fd14687d4c
+all/terrain	n=20050 min=0 max=1 sha=4696c5f424425da5bce3575a
+all/VegetationMap	n=4010 sha=e95dff8b31da09aa4c6d8792
+all/SpawnMap	n=4010 sha=996590bf9197394deb1e6e90
+all/locations/StartTemple	(0.5,0.48958334)
+all/locations/Eikthyrnir	(0.3125,0.36458334)
+all/locations/Vendor_BlackForest	(0.7291667,0.7604167)
+all/locations/Runestone_Meadows:alias	(0.20833333,0.6770833)
+all/locations/Hildir_camp	(0.78125,0.20833333)
+all/locations/Runestone_Meadows	
+all/base-height-v3	n=4010 min=-0.35000005 max=0.2904891 sha=f8e92c132b69d6292bf4a210
+all/getbiome-prefix	n=8020 min=0 max=512 sha=258116ca7cb93c9abfdb690d
+all/isashlands	n=16040 min=0 max=1 sha=fa112cd722ed3b193b0507a9
+all/isdeepnorth	n=16040 min=-1 max=1 sha=08ab360808886048fe1b6c90
+all/ashlands-gradient	n=4010 min=-1E-05 max=7.49999 sha=898b5b5ef0e0d70e283e10c1
+all/forest-factor	n=12030 min=-6774.0054 max=6774.0054 sha=4f8388c7bd6ac4c4c061bdaf
+all/precision	3
+all/override-all	False
+all/altbiome-map	classes=#000000 [none] | #6A8CA0 [Wolf Mountain] | #3C5A28 [Dark Meadows + Lantern] | #A05A3C [!Drake Mountain] | #101010 [none] | point [Wolf Mountain] map=len=9216 sha=710881f77dc2b12720276c69
+all/altbiome-settings	len=87 sha=377cb1880ce91ae280f7aebe
+all/after-load	same
+all-defaults/heightmap	n=4010 min=0 max=0.48522586 sha=5eafdab92026aba9634622dd
+all-defaults/roughmap	n=4010 min=0.2 max=0.6 sha=4c16650a90a626225c1652d0
+all-defaults/flatmap	n=4010 min=0.25 max=0.25 sha=44a7f8f6bd2426271a9e8ded
+all-defaults/forest	n=4010 min=0.14507103 max=1.8489003 sha=f14bf15acbc3a753d77cd026
+all-defaults/heat	n=4010 min=0 max=10 sha=8fe2c5e69fe013d879b95f9b
+all-defaults/biome	n=4010 min=0 max=512 sha=81458a9140cf1e5fd59c7cae
+all-defaults/paint-AshLands	n=16040 min=0 max=1 sha=475077a0fdb1eba4115c41a6
+all-defaults/paint-Mistlands	n=16040 min=0 max=1 sha=260b5138b83dd0d54d537b97
+all-defaults/paint-Meadows	n=16040 min=0 max=1 sha=933ca1cd4e6a10fd14687d4c
+all-defaults/terrain	n=20050 min=0 max=1 sha=4696c5f424425da5bce3575a
+all-defaults/VegetationMap	n=4010 sha=e95dff8b31da09aa4c6d8792
+all-defaults/SpawnMap	n=4010 sha=996590bf9197394deb1e6e90
+all-defaults/locations/StartTemple	(0.5,0.48958334)
+all-defaults/locations/Eikthyrnir	(0.3125,0.36458334)
+all-defaults/locations/Vendor_BlackForest	(0.7291667,0.7604167)
+all-defaults/locations/Runestone_Meadows:alias	(0.20833333,0.6770833)
+all-defaults/locations/Hildir_camp	(0.78125,0.20833333)
+all-defaults/locations/Runestone_Meadows	
+all-defaults/base-height-v3	n=4010 min=-2 max=0.33522585 sha=796fde1051b898667ba28208
+all-defaults/getbiome-prefix	n=8020 min=0 max=512 sha=258116ca7cb93c9abfdb690d
+all-defaults/isashlands	n=16040 min=0 max=1 sha=fa112cd722ed3b193b0507a9
+all-defaults/isdeepnorth	n=16040 min=-1 max=1 sha=08ab360808886048fe1b6c90
+all-defaults/ashlands-gradient	n=4010 min=-1E-05 max=9.99999 sha=efe9b385bf0bd854feaea91b
+all-defaults/forest-factor	n=12030 min=-2100 max=2100 sha=b402aeb1d84c6939d6411c60
+all-defaults/precision	0
+all-defaults/override-all	True
+all-defaults/altbiome-map	classes=#000000 [none] | #6A8CA0 [Wolf Mountain] | #3C5A28 [Dark Meadows + Lantern] | #A05A3C [!Drake Mountain] | #101010 [none] | point [Wolf Mountain] map=len=9216 sha=710881f77dc2b12720276c69
+all-defaults/altbiome-settings	len=37 sha=9096fc807cffab9346cccab0
+all-defaults/after-load	DIFFERENT: altbiome-settings (len=37 sha=9096fc807cffab9346cccab0 -> null)
+heightonly/heightmap	n=4010 min=0 max=0.48522586 sha=5eafdab92026aba9634622dd
+heightonly/roughmap	n=4010 min=0.5 max=0.6 sha=e83d4a6b0db80ddf69cc1644
+heightonly/flatmap	n=4010 min=0.25 max=0.25 sha=44a7f8f6bd2426271a9e8ded
+heightonly/forest	n=4010 min=0.145071 max=1.850145 sha=eeb3281d59709601259340cd
+heightonly/heat	n=4010 min=0 max=0 sha=6ef9465fabb1f843e42bc313
+heightonly/biome	n=4010 min=0 max=0 sha=6ef9465fabb1f843e42bc313
+heightonly/paint-AshLands	n=16040 min=0.1 max=0.4 sha=cea63d3346deec2efc1bc59f
+heightonly/paint-Mistlands	n=16040 min=0.1 max=0.4 sha=cea63d3346deec2efc1bc59f
+heightonly/paint-Meadows	n=16040 min=0.1 max=0.4 sha=cea63d3346deec2efc1bc59f
+heightonly/terrain	n=20050 min=0 max=0.5 sha=8a15252b13aae7d655289dcf
+heightonly/VegetationMap	none
+heightonly/SpawnMap	none
+heightonly/locations/StartTemple	
+heightonly/locations/Eikthyrnir	
+heightonly/locations/Vendor_BlackForest	
+heightonly/locations/Runestone_Meadows:alias	
+heightonly/locations/Hildir_camp	
+heightonly/locations/Runestone_Meadows	
+heightonly/base-height-v3	n=4010 min=-2 max=0.33522585 sha=796fde1051b898667ba28208
+heightonly/getbiome-prefix	n=8020 min=1 max=2 sha=4b91b98a3662c926f503b199
+heightonly/isashlands	n=16040 min=0 max=1 sha=6c2b4abae9de0cfc037071f7
+heightonly/isdeepnorth	n=16040 min=-1 max=1 sha=ce25cc9acce7422ac350c37e
+heightonly/ashlands-gradient	n=4010 min=-1E-05 max=-1E-05 sha=5f926809bfe151a0bcec709a
+heightonly/forest-factor	n=12030 min=-2100 max=2100 sha=f902cc92f3107b59c0d6bf89
+heightonly/precision	0
+heightonly/override-all	True
+heightonly/altbiome-map	none
+heightonly/altbiome-settings	len=37 sha=9096fc807cffab9346cccab0
+heightonly/after-load	DIFFERENT: altbiome-settings (len=37 sha=9096fc807cffab9346cccab0 -> null)
+alpha/heightmap	n=4010 min=0 max=0.4862745 sha=8528b7a441a6290000dd9ec8
+alpha/roughmap	n=4010 min=0.5 max=0.6 sha=e83d4a6b0db80ddf69cc1644
+alpha/flatmap	n=4010 min=0.4 max=0.6 sha=9c50e1741e0dc802bfa4ba26
+alpha/forest	n=4010 min=0.145071 max=1.850145 sha=eeb3281d59709601259340cd
+alpha/heat	n=4010 min=0 max=0 sha=6ef9465fabb1f843e42bc313
+alpha/biome	n=4010 min=0 max=0 sha=6ef9465fabb1f843e42bc313
+alpha/paint-AshLands	n=16040 min=0.1 max=0.4 sha=cea63d3346deec2efc1bc59f
+alpha/paint-Mistlands	n=16040 min=0.1 max=0.4 sha=cea63d3346deec2efc1bc59f
+alpha/paint-Meadows	n=16040 min=0.1 max=0.4 sha=cea63d3346deec2efc1bc59f
+alpha/terrain	n=20050 min=0 max=0.5 sha=8a15252b13aae7d655289dcf
+alpha/VegetationMap	none
+alpha/SpawnMap	none
+alpha/locations/StartTemple	
+alpha/locations/Eikthyrnir	
+alpha/locations/Vendor_BlackForest	
+alpha/locations/Runestone_Meadows:alias	
+alpha/locations/Hildir_camp	
+alpha/locations/Runestone_Meadows	
+alpha/base-height-v3	n=4010 min=-2 max=0.3362745 sha=9b05d183560155a61922b221
+alpha/getbiome-prefix	n=8020 min=1 max=2 sha=4b91b98a3662c926f503b199
+alpha/isashlands	n=16040 min=0 max=1 sha=6c2b4abae9de0cfc037071f7
+alpha/isdeepnorth	n=16040 min=-1 max=1 sha=ce25cc9acce7422ac350c37e
+alpha/ashlands-gradient	n=4010 min=-1E-05 max=-1E-05 sha=5f926809bfe151a0bcec709a
+alpha/forest-factor	n=12030 min=-2100 max=2100 sha=f902cc92f3107b59c0d6bf89
+alpha/precision	0
+alpha/override-all	False
+alpha/altbiome-map	none
+alpha/altbiome-settings	len=37 sha=9096fc807cffab9346cccab0
+alpha/after-load	DIFFERENT: altbiome-settings (len=37 sha=9096fc807cffab9346cccab0 -> null)
+files/heightmap	n=4010 min=0 max=0.9704517 sha=98c1825f4c8b024294cd5378
+files/roughmap	n=4010 min=0.5 max=0.6 sha=e83d4a6b0db80ddf69cc1644
+files/flatmap	n=4010 min=0.25 max=0.25 sha=44a7f8f6bd2426271a9e8ded
+files/forest	n=4010 min=0.14507103 max=1.850145 sha=4c459cb6a1e6a14292e5e332
+files/heat	n=4010 min=0 max=0 sha=6ef9465fabb1f843e42bc313
+files/biome	n=4010 min=0 max=512 sha=81458a9140cf1e5fd59c7cae
+files/paint-AshLands	n=16040 min=0.1 max=0.4 sha=cea63d3346deec2efc1bc59f
+files/paint-Mistlands	n=16040 min=0.1 max=0.4 sha=cea63d3346deec2efc1bc59f
+files/paint-Meadows	n=16040 min=0.1 max=0.4 sha=cea63d3346deec2efc1bc59f
+files/terrain	n=20050 min=0 max=0.5 sha=8a15252b13aae7d655289dcf
+files/VegetationMap	none
+files/SpawnMap	none
+files/locations/StartTemple	
+files/locations/Eikthyrnir	
+files/locations/Vendor_BlackForest	
+files/locations/Runestone_Meadows:alias	
+files/locations/Hildir_camp	
+files/locations/Runestone_Meadows	
+files/base-height-v3	n=4010 min=-2 max=0.8190597 sha=f71175d49992fb1858adbb8e
+files/getbiome-prefix	n=8020 min=0 max=512 sha=258116ca7cb93c9abfdb690d
+files/isashlands	n=16040 min=0 max=1 sha=225b2440231a50a5247ca207
+files/isdeepnorth	n=16040 min=-1 max=1 sha=08ab360808886048fe1b6c90
+files/ashlands-gradient	n=4010 min=-1E-05 max=-1E-05 sha=5f926809bfe151a0bcec709a
+files/forest-factor	n=12030 min=-2100 max=2100 sha=ffdc10afe319fe8eedde4ab4
+files/precision	0
+files/override-all	True
+files/altbiome-map	none
+files/altbiome-settings	len=37 sha=9096fc807cffab9346cccab0
+files/after-load	DIFFERENT: altbiome-settings (len=37 sha=9096fc807cffab9346cccab0 -> null)
+scalars/heightmap	n=4010 min=0.20019457 max=0.39985436 sha=e4d2e5502cbae2d090e6d333
+scalars/roughmap	n=4010 min=0.5 max=0.6 sha=e83d4a6b0db80ddf69cc1644
+scalars/flatmap	n=4010 min=0.4 max=0.6 sha=9c50e1741e0dc802bfa4ba26
+scalars/forest	n=4010 min=0.145071 max=1.2 sha=7fe6eb367d9216b22a4332a7
+scalars/heat	n=4010 min=0 max=0 sha=6ef9465fabb1f843e42bc313
+scalars/biome	n=4010 min=0 max=0 sha=6ef9465fabb1f843e42bc313
+scalars/paint-AshLands	n=16040 min=0.1 max=0.4 sha=cea63d3346deec2efc1bc59f
+scalars/paint-Mistlands	n=16040 min=0.1 max=0.4 sha=cea63d3346deec2efc1bc59f
+scalars/paint-Meadows	n=16040 min=0.1 max=0.4 sha=cea63d3346deec2efc1bc59f
+scalars/terrain	n=20050 min=0 max=0.5 sha=8a15252b13aae7d655289dcf
+scalars/VegetationMap	none
+scalars/SpawnMap	none
+scalars/locations/StartTemple	
+scalars/locations/Eikthyrnir	
+scalars/locations/Vendor_BlackForest	
+scalars/locations/Runestone_Meadows:alias	
+scalars/locations/Hildir_camp	
+scalars/locations/Runestone_Meadows	
+scalars/base-height-v3	n=4010 min=0.38 max=0.65 sha=6fe53c30d5f25d1ee9f59200
+scalars/getbiome-prefix	n=8020 min=1 max=2 sha=4b91b98a3662c926f503b199
+scalars/isashlands	n=16040 min=0 max=1 sha=6c2b4abae9de0cfc037071f7
+scalars/isdeepnorth	n=16040 min=-1 max=1 sha=ce25cc9acce7422ac350c37e
+scalars/ashlands-gradient	n=4010 min=-1E-05 max=-1E-05 sha=5f926809bfe151a0bcec709a
+scalars/forest-factor	n=12030 min=-14368.876 max=14368.876 sha=3ad1098d72c7be7a7b8bcf85
+scalars/precision	5
+scalars/override-all	False
+scalars/altbiome-map	none
+scalars/altbiome-settings	len=37 sha=9096fc807cffab9346cccab0
+scalars/after-load	same
+legacy-spawnmap/heightmap	n=4010 min=0.20019457 max=0.39985436 sha=e4d2e5502cbae2d090e6d333
+legacy-spawnmap/roughmap	n=4010 min=0.5 max=0.6 sha=e83d4a6b0db80ddf69cc1644
+legacy-spawnmap/flatmap	n=4010 min=0.4 max=0.6 sha=9c50e1741e0dc802bfa4ba26
+legacy-spawnmap/forest	n=4010 min=0.145071 max=1.850145 sha=eeb3281d59709601259340cd
+legacy-spawnmap/heat	n=4010 min=0 max=0 sha=6ef9465fabb1f843e42bc313
+legacy-spawnmap/biome	n=4010 min=0 max=0 sha=6ef9465fabb1f843e42bc313
+legacy-spawnmap/paint-AshLands	n=16040 min=0.1 max=0.4 sha=cea63d3346deec2efc1bc59f
+legacy-spawnmap/paint-Mistlands	n=16040 min=0.1 max=0.4 sha=cea63d3346deec2efc1bc59f
+legacy-spawnmap/paint-Meadows	n=16040 min=0.1 max=0.4 sha=cea63d3346deec2efc1bc59f
+legacy-spawnmap/terrain	n=20050 min=0 max=0.5 sha=8a15252b13aae7d655289dcf
+legacy-spawnmap/VegetationMap	none
+legacy-spawnmap/SpawnMap	none
+legacy-spawnmap/locations/StartTemple	(0.5,0.48958334)
+legacy-spawnmap/locations/Eikthyrnir	(0.3125,0.36458334)
+legacy-spawnmap/locations/Vendor_BlackForest	(0.7291667,0.7604167)
+legacy-spawnmap/locations/Runestone_Meadows:alias	
+legacy-spawnmap/locations/Hildir_camp	(0.78125,0.20833333)
+legacy-spawnmap/locations/Runestone_Meadows	
+legacy-spawnmap/base-height-v3	n=4010 min=-2 max=-0.15 sha=a4e3e2980beb7e81fe7371da
+legacy-spawnmap/getbiome-prefix	n=8020 min=1 max=2 sha=4b91b98a3662c926f503b199
+legacy-spawnmap/isashlands	n=16040 min=0 max=1 sha=6c2b4abae9de0cfc037071f7
+legacy-spawnmap/isdeepnorth	n=16040 min=-1 max=1 sha=ce25cc9acce7422ac350c37e
+legacy-spawnmap/ashlands-gradient	n=4010 min=-1E-05 max=-1E-05 sha=5f926809bfe151a0bcec709a
+legacy-spawnmap/forest-factor	n=12030 min=-2100 max=2100 sha=f902cc92f3107b59c0d6bf89
+legacy-spawnmap/precision	0
+legacy-spawnmap/override-all	False
+legacy-spawnmap/altbiome-map	none
+legacy-spawnmap/altbiome-settings	len=37 sha=9096fc807cffab9346cccab0
+legacy-spawnmap/after-load	DIFFERENT: altbiome-settings (len=37 sha=9096fc807cffab9346cccab0 -> null)
+legacy-flat/heightmap	n=4010 min=0 max=0.48522586 sha=5eafdab92026aba9634622dd
+legacy-flat/roughmap	n=4010 min=0.2 max=0.6 sha=4c16650a90a626225c1652d0
+legacy-flat/flatmap	n=4010 min=0.31005183 max=0.5997949 sha=c797bef8bc1b78f1621ea7d4
+legacy-flat/forest	n=4010 min=0.14507103 max=1.8489003 sha=f14bf15acbc3a753d77cd026
+legacy-flat/heat	n=4010 min=0 max=10 sha=8fe2c5e69fe013d879b95f9b
+legacy-flat/biome	n=4010 min=0 max=512 sha=81458a9140cf1e5fd59c7cae
+legacy-flat/paint-AshLands	n=16040 min=0 max=1 sha=475077a0fdb1eba4115c41a6
+legacy-flat/paint-Mistlands	n=16040 min=0 max=1 sha=260b5138b83dd0d54d537b97
+legacy-flat/paint-Meadows	n=16040 min=0 max=1 sha=933ca1cd4e6a10fd14687d4c
+legacy-flat/terrain	n=20050 min=0 max=1 sha=4696c5f424425da5bce3575a
+legacy-flat/VegetationMap	n=4010 sha=e95dff8b31da09aa4c6d8792
+legacy-flat/SpawnMap	n=4010 sha=996590bf9197394deb1e6e90
+legacy-flat/locations/StartTemple	(0.5,0.48958334)
+legacy-flat/locations/Eikthyrnir	(0.3125,0.36458334)
+legacy-flat/locations/Vendor_BlackForest	(0.7291667,0.7604167)
+legacy-flat/locations/Runestone_Meadows:alias	(0.20833333,0.6770833)
+legacy-flat/locations/Hildir_camp	(0.78125,0.20833333)
+legacy-flat/locations/Runestone_Meadows	
+legacy-flat/base-height-v3	n=4010 min=-2 max=0.33522585 sha=796fde1051b898667ba28208
+legacy-flat/getbiome-prefix	n=8020 min=0 max=512 sha=258116ca7cb93c9abfdb690d
+legacy-flat/isashlands	n=16040 min=0 max=1 sha=fa112cd722ed3b193b0507a9
+legacy-flat/isdeepnorth	n=16040 min=-1 max=1 sha=08ab360808886048fe1b6c90
+legacy-flat/ashlands-gradient	n=4010 min=-1E-05 max=9.99999 sha=efe9b385bf0bd854feaea91b
+legacy-flat/forest-factor	n=12030 min=-2100 max=2100 sha=b402aeb1d84c6939d6411c60
+legacy-flat/precision	0
+legacy-flat/override-all	False
+legacy-flat/altbiome-map	classes=#000000 [none] | #6A8CA0 [Wolf Mountain] | #3C5A28 [Dark Meadows + Lantern] | #A05A3C [!Drake Mountain] | #101010 [none] | point [Wolf Mountain] map=len=9216 sha=710881f77dc2b12720276c69
+legacy-flat/altbiome-settings	len=37 sha=9096fc807cffab9346cccab0
+legacy-flat/after-load	DIFFERENT: altbiome-settings (len=37 sha=9096fc807cffab9346cccab0 -> null)

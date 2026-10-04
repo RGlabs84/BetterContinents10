@@ -1,0 +1,484 @@
+Continents/file	len=759 sha=5fbae44bdf1ec17d4b2e67d3
+Continents/dump/001	Version 7
+Continents/dump/002	Continent size 0.50000006
+Continents/dump/003	Mountains amount 0
+Continents/dump/004	Sea level adjustment 0.52
+Continents/dump/005	Ocean channels enabled True
+Continents/dump/006	Ashlands gap enabled False
+Continents/dump/007	Deep North gap enabled False
+Continents/dump/008	Rivers enabled True
+Continents/dump/009	Fix water color True
+Continents/dump/010	Map edge dropoff True
+Continents/dump/011	Mountains allowed at center False
+Continents/dump/012	Heightmap disabled
+Continents/dump/013	Base height noise stack:
+Continents/dump/014	    Layer 1:
+Continents/dump/015	    Version 1
+Continents/dump/016	    Noise Settings:
+Continents/dump/017	        version 1
+Continents/dump/018	        type OpenSimplex2, freq 0.0004, aspect 1, frac FBm, octaves 7, lac 2, gain 0.5, w. str. 0, ping-ping str. 0
+Continents/dump/019	        cell. dist. fn. Euclidean, cell. ret. type CellValue, cell jitt. 0
+Continents/dump/020	        warp type OpenSimplex2, warp amp 0
+Continents/dump/021	        invert False
+Continents/dump/022	        blend mode Normal
+Continents/dump/023	    Layer 2:
+Continents/dump/024	    Version 1
+Continents/dump/025	    Noise Settings:
+Continents/dump/026	        version 1
+Continents/dump/027	        type OpenSimplex2, freq 0.0005, aspect 1, frac FBm, octaves 7, lac 2, gain 0.5, w. str. 0, ping-ping str. 0
+Continents/dump/028	        cell. dist. fn. Euclidean, cell. ret. type CellValue, cell jitt. 0
+Continents/dump/029	        warp type OpenSimplex2, warp amp 0
+Continents/dump/030	        invert False
+Continents/dump/031	        blend mode Normal
+Continents/dump/032	    Noise Warp Settings:
+Continents/dump/033	        version 1
+Continents/dump/034	        type OpenSimplex2, freq 0.0005, aspect 1, frac DomainWarpIndependent, octaves 1, lac 2, gain 0.5, w. str. 0, ping-ping str. 0
+Continents/dump/035	        cell. dist. fn. Euclidean, cell. ret. type CellValue, cell jitt. 0
+Continents/dump/036	        warp type OpenSimplex2, warp amp 10000
+Continents/dump/037	        invert False
+Continents/dump/038	        blend mode Normal
+Continents/dump/039	    Mask Settings:
+Continents/dump/040	        version 1
+Continents/dump/041	        type OpenSimplex2, freq 0.0005, aspect 1, frac FBm, octaves 3, lac 2, gain 0.5, w. str. 0, ping-ping str. 0
+Continents/dump/042	        cell. dist. fn. Euclidean, cell. ret. type CellValue, cell jitt. 0
+Continents/dump/043	        warp type OpenSimplex2, warp amp 0
+Continents/dump/044	        invert False
+Continents/dump/045	        smooth step 0.5 - 1
+Continents/dump/046	        range 0 - 0.75
+Continents/dump/047	        blend mode Normal
+Continents/dump/048	    Mask Warp Settings:
+Continents/dump/049	        version 1
+Continents/dump/050	        type OpenSimplex2, freq 0.0004, aspect 1, frac DomainWarpIndependent, octaves 1, lac 2, gain 0.5, w. str. 0, ping-ping str. 0
+Continents/dump/051	        cell. dist. fn. Euclidean, cell. ret. type CellValue, cell jitt. 0
+Continents/dump/052	        warp type OpenSimplex2, warp amp 3000
+Continents/dump/053	        invert False
+Continents/dump/054	        blend mode Normal
+Continents/dump/055	    Layer 3:
+Continents/dump/056	    Version 1
+Continents/dump/057	    Noise Settings:
+Continents/dump/058	        version 1
+Continents/dump/059	        type OpenSimplex2, freq 0.0002, aspect 1, frac None, octaves 1, lac 2, gain 0.5, w. str. 0, ping-ping str. 0
+Continents/dump/060	        cell. dist. fn. Euclidean, cell. ret. type CellValue, cell jitt. 0
+Continents/dump/061	        warp type OpenSimplex2, warp amp 0
+Continents/dump/062	        invert False
+Continents/dump/063	        smooth step 0.2 - 1
+Continents/dump/064	        blend mode Multiply
+Continents/dump/065	    Noise Warp Settings:
+Continents/dump/066	        version 1
+Continents/dump/067	        type Perlin, freq 0.0001, aspect 1, frac DomainWarpIndependent, octaves 3, lac 2, gain 0.5, w. str. 0, ping-ping str. 0
+Continents/dump/068	        cell. dist. fn. Euclidean, cell. ret. type CellValue, cell jitt. 0
+Continents/dump/069	        warp type OpenSimplex2, warp amp 7000
+Continents/dump/070	        invert False
+Continents/dump/071	        blend mode Normal
+Continents/dump/072	Roughmap disabled
+Continents/dump/073	Biomemap disabled
+Continents/dump/074	Biome precision 0: the ground takes its biomes from the 4 corners of each 64 m terrain zone (vanilla)
+Continents/dump/075	Terrainmap disabled
+Continents/dump/076	Forest scale 0.50000006
+Continents/dump/077	Forest amount 0.5
+Continents/dump/078	Forestmap disabled
+Continents/dump/079	Locationmap disabled
+Continents/dump/080	Paintmap disabled
+Continents/dump/081	Lavamap disabled
+Continents/dump/082	Mossmap disabled
+Continents/dump/083	Vegetationmap disabled
+Continents/dump/084	Heatmap disabled
+Continents/dump/085	Spawnmap disabled
+Continents/dump/086	Altbiomemap disabled
+Continents/dump/087	Alt biomes: legacy defaults (mode Random, grid Vanilla; no alt-biome settings stored in this world)
+Continents/dump/count	87
+Continents/v11/disk	len=712 sha=67900e74dac6bdbab2eb3ac5
+Continents/v11/network	len=712 sha=67900e74dac6bdbab2eb3ac5
+Continents/v7/disk-roundtrip	DIFFERENT
+Continents/heightmap	n=4010 min=0.20019457 max=0.39985436 sha=e4d2e5502cbae2d090e6d333
+Continents/roughmap	n=4010 min=0.5 max=0.6 sha=e83d4a6b0db80ddf69cc1644
+Continents/flatmap	n=4010 min=0.4 max=0.6 sha=9c50e1741e0dc802bfa4ba26
+Continents/forest	n=4010 min=0.145071 max=1.850145 sha=eeb3281d59709601259340cd
+Continents/heat	n=4010 min=0 max=0 sha=6ef9465fabb1f843e42bc313
+Continents/biome	n=4010 min=0 max=0 sha=6ef9465fabb1f843e42bc313
+Continents/paint-AshLands	n=16040 min=0.1 max=0.4 sha=cea63d3346deec2efc1bc59f
+Continents/paint-Mistlands	n=16040 min=0.1 max=0.4 sha=cea63d3346deec2efc1bc59f
+Continents/paint-Meadows	n=16040 min=0.1 max=0.4 sha=cea63d3346deec2efc1bc59f
+Continents/terrain	n=20050 min=0 max=0.5 sha=8a15252b13aae7d655289dcf
+Continents/VegetationMap	none
+Continents/SpawnMap	none
+Continents/locations/StartTemple	
+Continents/locations/Eikthyrnir	
+Continents/locations/Vendor_BlackForest	
+Continents/locations/Runestone_Meadows:alias	
+Continents/locations/Hildir_camp	
+Continents/locations/Runestone_Meadows	
+Continents/base-height-v3	n=4010 min=-2 max=0.6911689 sha=2ffcafee503674a196beff37
+Continents/getbiome-prefix	n=8020 min=1 max=2 sha=4b91b98a3662c926f503b199
+Continents/isashlands	n=16040 min=0 max=1 sha=6c2b4abae9de0cfc037071f7
+Continents/isdeepnorth	n=16040 min=-1 max=1 sha=ce25cc9acce7422ac350c37e
+Continents/ashlands-gradient	n=4010 min=-1E-05 max=-1E-05 sha=5f926809bfe151a0bcec709a
+Continents/forest-factor	n=12030 min=-10499.999 max=10499.999 sha=fafdc5f1acb832f1477d612f
+Continents/precision	0
+Continents/override-all	False
+Continents/altbiome-map	none
+Continents/altbiome-settings	null
+Pangaea/file	len=759 sha=55898daf7616a92e9e9f54a8
+Pangaea/dump/001	Version 7
+Pangaea/dump/002	Continent size 0.50000006
+Pangaea/dump/003	Mountains amount 0
+Pangaea/dump/004	Sea level adjustment 0.52
+Pangaea/dump/005	Ocean channels enabled True
+Pangaea/dump/006	Ashlands gap enabled False
+Pangaea/dump/007	Deep North gap enabled False
+Pangaea/dump/008	Rivers enabled True
+Pangaea/dump/009	Fix water color True
+Pangaea/dump/010	Map edge dropoff True
+Pangaea/dump/011	Mountains allowed at center False
+Pangaea/dump/012	Heightmap disabled
+Pangaea/dump/013	Base height noise stack:
+Pangaea/dump/014	    Layer 1:
+Pangaea/dump/015	    Version 1
+Pangaea/dump/016	    Noise Settings:
+Pangaea/dump/017	        version 1
+Pangaea/dump/018	        type OpenSimplex2, freq 0.0001, aspect 1, frac FBm, octaves 7, lac 2, gain 0.5, w. str. 0, ping-ping str. 0
+Pangaea/dump/019	        cell. dist. fn. Euclidean, cell. ret. type CellValue, cell jitt. 0
+Pangaea/dump/020	        warp type OpenSimplex2, warp amp 0
+Pangaea/dump/021	        invert False
+Pangaea/dump/022	        blend mode Normal
+Pangaea/dump/023	    Layer 2:
+Pangaea/dump/024	    Version 1
+Pangaea/dump/025	    Noise Settings:
+Pangaea/dump/026	        version 1
+Pangaea/dump/027	        type OpenSimplex2, freq 0.0005, aspect 1, frac FBm, octaves 7, lac 2, gain 0.5, w. str. 0, ping-ping str. 0
+Pangaea/dump/028	        cell. dist. fn. Euclidean, cell. ret. type CellValue, cell jitt. 0
+Pangaea/dump/029	        warp type OpenSimplex2, warp amp 0
+Pangaea/dump/030	        invert False
+Pangaea/dump/031	        blend mode Normal
+Pangaea/dump/032	    Noise Warp Settings:
+Pangaea/dump/033	        version 1
+Pangaea/dump/034	        type OpenSimplex2, freq 0.0005, aspect 1, frac DomainWarpIndependent, octaves 1, lac 2, gain 0.5, w. str. 0, ping-ping str. 0
+Pangaea/dump/035	        cell. dist. fn. Euclidean, cell. ret. type CellValue, cell jitt. 0
+Pangaea/dump/036	        warp type OpenSimplex2, warp amp 10000
+Pangaea/dump/037	        invert False
+Pangaea/dump/038	        blend mode Normal
+Pangaea/dump/039	    Mask Settings:
+Pangaea/dump/040	        version 1
+Pangaea/dump/041	        type OpenSimplex2, freq 0.0005, aspect 1, frac FBm, octaves 3, lac 2, gain 0.5, w. str. 0, ping-ping str. 0
+Pangaea/dump/042	        cell. dist. fn. Euclidean, cell. ret. type CellValue, cell jitt. 0
+Pangaea/dump/043	        warp type OpenSimplex2, warp amp 0
+Pangaea/dump/044	        invert False
+Pangaea/dump/045	        smooth step 0.5 - 1
+Pangaea/dump/046	        range 0 - 0.75
+Pangaea/dump/047	        blend mode Normal
+Pangaea/dump/048	    Mask Warp Settings:
+Pangaea/dump/049	        version 1
+Pangaea/dump/050	        type OpenSimplex2, freq 0.0004, aspect 1, frac DomainWarpIndependent, octaves 1, lac 2, gain 0.5, w. str. 0, ping-ping str. 0
+Pangaea/dump/051	        cell. dist. fn. Euclidean, cell. ret. type CellValue, cell jitt. 0
+Pangaea/dump/052	        warp type OpenSimplex2, warp amp 3000
+Pangaea/dump/053	        invert False
+Pangaea/dump/054	        blend mode Normal
+Pangaea/dump/055	    Layer 3:
+Pangaea/dump/056	    Version 1
+Pangaea/dump/057	    Noise Settings:
+Pangaea/dump/058	        version 1
+Pangaea/dump/059	        type OpenSimplex2, freq 0.0001, aspect 1, frac None, octaves 1, lac 2, gain 0.5, w. str. 0, ping-ping str. 0
+Pangaea/dump/060	        cell. dist. fn. Euclidean, cell. ret. type CellValue, cell jitt. 0
+Pangaea/dump/061	        warp type OpenSimplex2, warp amp 0
+Pangaea/dump/062	        invert False
+Pangaea/dump/063	        blend mode Multiply
+Pangaea/dump/064	    Noise Warp Settings:
+Pangaea/dump/065	        version 1
+Pangaea/dump/066	        type Perlin, freq 0.0001, aspect 1, frac DomainWarpIndependent, octaves 3, lac 2, gain 0.5, w. str. 0, ping-ping str. 0
+Pangaea/dump/067	        cell. dist. fn. Euclidean, cell. ret. type CellValue, cell jitt. 0
+Pangaea/dump/068	        warp type OpenSimplex2, warp amp 7000
+Pangaea/dump/069	        invert False
+Pangaea/dump/070	        blend mode Normal
+Pangaea/dump/071	Roughmap disabled
+Pangaea/dump/072	Biomemap disabled
+Pangaea/dump/073	Biome precision 0: the ground takes its biomes from the 4 corners of each 64 m terrain zone (vanilla)
+Pangaea/dump/074	Terrainmap disabled
+Pangaea/dump/075	Forest scale 0.50000006
+Pangaea/dump/076	Forest amount 0.5
+Pangaea/dump/077	Forestmap disabled
+Pangaea/dump/078	Locationmap disabled
+Pangaea/dump/079	Paintmap disabled
+Pangaea/dump/080	Lavamap disabled
+Pangaea/dump/081	Mossmap disabled
+Pangaea/dump/082	Vegetationmap disabled
+Pangaea/dump/083	Heatmap disabled
+Pangaea/dump/084	Spawnmap disabled
+Pangaea/dump/085	Altbiomemap disabled
+Pangaea/dump/086	Alt biomes: legacy defaults (mode Random, grid Vanilla; no alt-biome settings stored in this world)
+Pangaea/dump/count	86
+Pangaea/v11/disk	len=712 sha=bec5d8501f9d9f0f59834708
+Pangaea/v11/network	len=712 sha=bec5d8501f9d9f0f59834708
+Pangaea/v7/disk-roundtrip	DIFFERENT
+Pangaea/heightmap	n=4010 min=0.20019457 max=0.39985436 sha=e4d2e5502cbae2d090e6d333
+Pangaea/roughmap	n=4010 min=0.5 max=0.6 sha=e83d4a6b0db80ddf69cc1644
+Pangaea/flatmap	n=4010 min=0.4 max=0.6 sha=9c50e1741e0dc802bfa4ba26
+Pangaea/forest	n=4010 min=0.145071 max=1.850145 sha=eeb3281d59709601259340cd
+Pangaea/heat	n=4010 min=0 max=0 sha=6ef9465fabb1f843e42bc313
+Pangaea/biome	n=4010 min=0 max=0 sha=6ef9465fabb1f843e42bc313
+Pangaea/paint-AshLands	n=16040 min=0.1 max=0.4 sha=cea63d3346deec2efc1bc59f
+Pangaea/paint-Mistlands	n=16040 min=0.1 max=0.4 sha=cea63d3346deec2efc1bc59f
+Pangaea/paint-Meadows	n=16040 min=0.1 max=0.4 sha=cea63d3346deec2efc1bc59f
+Pangaea/terrain	n=20050 min=0 max=0.5 sha=8a15252b13aae7d655289dcf
+Pangaea/VegetationMap	none
+Pangaea/SpawnMap	none
+Pangaea/locations/StartTemple	
+Pangaea/locations/Eikthyrnir	
+Pangaea/locations/Vendor_BlackForest	
+Pangaea/locations/Runestone_Meadows:alias	
+Pangaea/locations/Hildir_camp	
+Pangaea/locations/Runestone_Meadows	
+Pangaea/base-height-v3	n=4010 min=-2 max=0.67073584 sha=50505cf8be2aedc880e4c4cd
+Pangaea/getbiome-prefix	n=8020 min=1 max=2 sha=4b91b98a3662c926f503b199
+Pangaea/isashlands	n=16040 min=0 max=1 sha=6c2b4abae9de0cfc037071f7
+Pangaea/isdeepnorth	n=16040 min=-1 max=1 sha=ce25cc9acce7422ac350c37e
+Pangaea/ashlands-gradient	n=4010 min=-1E-05 max=-1E-05 sha=5f926809bfe151a0bcec709a
+Pangaea/forest-factor	n=12030 min=-10499.999 max=10499.999 sha=fafdc5f1acb832f1477d612f
+Pangaea/precision	0
+Pangaea/override-all	False
+Pangaea/altbiome-map	none
+Pangaea/altbiome-settings	null
+Swirls/file	len=852 sha=0b1827dbd545271342b83e84
+Swirls/dump/001	Version 7
+Swirls/dump/002	Continent size 0.50000006
+Swirls/dump/003	Mountains amount 0
+Swirls/dump/004	Sea level adjustment 0.52
+Swirls/dump/005	Ocean channels enabled True
+Swirls/dump/006	Ashlands gap enabled False
+Swirls/dump/007	Deep North gap enabled False
+Swirls/dump/008	Rivers enabled True
+Swirls/dump/009	Fix water color True
+Swirls/dump/010	Map edge dropoff True
+Swirls/dump/011	Mountains allowed at center False
+Swirls/dump/012	Heightmap disabled
+Swirls/dump/013	Base height noise stack:
+Swirls/dump/014	    Layer 1:
+Swirls/dump/015	    Version 1
+Swirls/dump/016	    Noise Settings:
+Swirls/dump/017	        version 1
+Swirls/dump/018	        type OpenSimplex2, freq 0.0005, aspect 1, frac FBm, octaves 7, lac 2, gain 0.5, w. str. 0, ping-ping str. 0
+Swirls/dump/019	        cell. dist. fn. Euclidean, cell. ret. type CellValue, cell jitt. 0
+Swirls/dump/020	        warp type OpenSimplex2, warp amp 0
+Swirls/dump/021	        invert False
+Swirls/dump/022	        blend mode Normal
+Swirls/dump/023	    Noise Warp Settings:
+Swirls/dump/024	        version 1
+Swirls/dump/025	        type OpenSimplex2, freq 5E-05, aspect 1, frac DomainWarpIndependent, octaves 1, lac 2, gain 0.5, w. str. 0, ping-ping str. 0
+Swirls/dump/026	        cell. dist. fn. Euclidean, cell. ret. type CellValue, cell jitt. 0
+Swirls/dump/027	        warp type OpenSimplex2, warp amp 40000
+Swirls/dump/028	        invert False
+Swirls/dump/029	        blend mode Normal
+Swirls/dump/030	    Layer 2:
+Swirls/dump/031	    Version 1
+Swirls/dump/032	    Noise Settings:
+Swirls/dump/033	        version 1
+Swirls/dump/034	        type OpenSimplex2, freq 0.0005, aspect 1, frac FBm, octaves 7, lac 2, gain 0.5, w. str. 0, ping-ping str. 0
+Swirls/dump/035	        cell. dist. fn. Euclidean, cell. ret. type CellValue, cell jitt. 0
+Swirls/dump/036	        warp type OpenSimplex2, warp amp 0
+Swirls/dump/037	        invert False
+Swirls/dump/038	        blend mode Normal
+Swirls/dump/039	    Noise Warp Settings:
+Swirls/dump/040	        version 1
+Swirls/dump/041	        type OpenSimplex2, freq 0.0005, aspect 1, frac DomainWarpIndependent, octaves 1, lac 2, gain 0.5, w. str. 0, ping-ping str. 0
+Swirls/dump/042	        cell. dist. fn. Euclidean, cell. ret. type CellValue, cell jitt. 0
+Swirls/dump/043	        warp type OpenSimplex2, warp amp 10000
+Swirls/dump/044	        invert False
+Swirls/dump/045	        blend mode Normal
+Swirls/dump/046	    Mask Settings:
+Swirls/dump/047	        version 1
+Swirls/dump/048	        type OpenSimplex2, freq 0.0005, aspect 1, frac FBm, octaves 3, lac 2, gain 0.5, w. str. 0, ping-ping str. 0
+Swirls/dump/049	        cell. dist. fn. Euclidean, cell. ret. type CellValue, cell jitt. 0
+Swirls/dump/050	        warp type OpenSimplex2, warp amp 0
+Swirls/dump/051	        invert False
+Swirls/dump/052	        smooth step 0.5 - 1
+Swirls/dump/053	        range 0 - 0.75
+Swirls/dump/054	        blend mode Normal
+Swirls/dump/055	    Mask Warp Settings:
+Swirls/dump/056	        version 1
+Swirls/dump/057	        type OpenSimplex2, freq 0.0004, aspect 1, frac DomainWarpIndependent, octaves 1, lac 2, gain 0.5, w. str. 0, ping-ping str. 0
+Swirls/dump/058	        cell. dist. fn. Euclidean, cell. ret. type CellValue, cell jitt. 0
+Swirls/dump/059	        warp type OpenSimplex2, warp amp 3000
+Swirls/dump/060	        invert False
+Swirls/dump/061	        blend mode Normal
+Swirls/dump/062	    Layer 3:
+Swirls/dump/063	    Version 1
+Swirls/dump/064	    Noise Settings:
+Swirls/dump/065	        version 1
+Swirls/dump/066	        type OpenSimplex2, freq 0.0002, aspect 1, frac None, octaves 1, lac 2, gain 0.5, w. str. 0, ping-ping str. 0
+Swirls/dump/067	        cell. dist. fn. Euclidean, cell. ret. type CellValue, cell jitt. 0
+Swirls/dump/068	        warp type OpenSimplex2, warp amp 0
+Swirls/dump/069	        invert False
+Swirls/dump/070	        blend mode Multiply
+Swirls/dump/071	    Noise Warp Settings:
+Swirls/dump/072	        version 1
+Swirls/dump/073	        type Perlin, freq 0.0001, aspect 1, frac DomainWarpIndependent, octaves 3, lac 2, gain 0.5, w. str. 0, ping-ping str. 0
+Swirls/dump/074	        cell. dist. fn. Euclidean, cell. ret. type CellValue, cell jitt. 0
+Swirls/dump/075	        warp type OpenSimplex2, warp amp 7000
+Swirls/dump/076	        invert False
+Swirls/dump/077	        blend mode Normal
+Swirls/dump/078	Roughmap disabled
+Swirls/dump/079	Biomemap disabled
+Swirls/dump/080	Biome precision 0: the ground takes its biomes from the 4 corners of each 64 m terrain zone (vanilla)
+Swirls/dump/081	Terrainmap disabled
+Swirls/dump/082	Forest scale 0.50000006
+Swirls/dump/083	Forest amount 0.5
+Swirls/dump/084	Forestmap disabled
+Swirls/dump/085	Locationmap disabled
+Swirls/dump/086	Paintmap disabled
+Swirls/dump/087	Lavamap disabled
+Swirls/dump/088	Mossmap disabled
+Swirls/dump/089	Vegetationmap disabled
+Swirls/dump/090	Heatmap disabled
+Swirls/dump/091	Spawnmap disabled
+Swirls/dump/092	Altbiomemap disabled
+Swirls/dump/093	Alt biomes: legacy defaults (mode Random, grid Vanilla; no alt-biome settings stored in this world)
+Swirls/dump/count	93
+Swirls/v11/disk	len=805 sha=ec1c1307fd623e576d2041e1
+Swirls/v11/network	len=805 sha=ec1c1307fd623e576d2041e1
+Swirls/v7/disk-roundtrip	DIFFERENT
+Swirls/heightmap	n=4010 min=0.20019457 max=0.39985436 sha=e4d2e5502cbae2d090e6d333
+Swirls/roughmap	n=4010 min=0.5 max=0.6 sha=e83d4a6b0db80ddf69cc1644
+Swirls/flatmap	n=4010 min=0.4 max=0.6 sha=9c50e1741e0dc802bfa4ba26
+Swirls/forest	n=4010 min=0.145071 max=1.850145 sha=eeb3281d59709601259340cd
+Swirls/heat	n=4010 min=0 max=0 sha=6ef9465fabb1f843e42bc313
+Swirls/biome	n=4010 min=0 max=0 sha=6ef9465fabb1f843e42bc313
+Swirls/paint-AshLands	n=16040 min=0.1 max=0.4 sha=cea63d3346deec2efc1bc59f
+Swirls/paint-Mistlands	n=16040 min=0.1 max=0.4 sha=cea63d3346deec2efc1bc59f
+Swirls/paint-Meadows	n=16040 min=0.1 max=0.4 sha=cea63d3346deec2efc1bc59f
+Swirls/terrain	n=20050 min=0 max=0.5 sha=8a15252b13aae7d655289dcf
+Swirls/VegetationMap	none
+Swirls/SpawnMap	none
+Swirls/locations/StartTemple	
+Swirls/locations/Eikthyrnir	
+Swirls/locations/Vendor_BlackForest	
+Swirls/locations/Runestone_Meadows:alias	
+Swirls/locations/Hildir_camp	
+Swirls/locations/Runestone_Meadows	
+Swirls/base-height-v3	n=4010 min=-2 max=0.71076524 sha=c6c50530c848d730dc05fcbf
+Swirls/getbiome-prefix	n=8020 min=1 max=2 sha=4b91b98a3662c926f503b199
+Swirls/isashlands	n=16040 min=0 max=1 sha=6c2b4abae9de0cfc037071f7
+Swirls/isdeepnorth	n=16040 min=-1 max=1 sha=ce25cc9acce7422ac350c37e
+Swirls/ashlands-gradient	n=4010 min=-1E-05 max=-1E-05 sha=5f926809bfe151a0bcec709a
+Swirls/forest-factor	n=12030 min=-10499.999 max=10499.999 sha=fafdc5f1acb832f1477d612f
+Swirls/precision	0
+Swirls/override-all	False
+Swirls/altbiome-map	none
+Swirls/altbiome-settings	null
+Vanillaish/file	len=759 sha=8965fb079e517cb56dcb9db0
+Vanillaish/dump/001	Version 7
+Vanillaish/dump/002	Continent size 0.50000006
+Vanillaish/dump/003	Mountains amount 0
+Vanillaish/dump/004	Sea level adjustment 0.52
+Vanillaish/dump/005	Ocean channels enabled True
+Vanillaish/dump/006	Ashlands gap enabled False
+Vanillaish/dump/007	Deep North gap enabled False
+Vanillaish/dump/008	Rivers enabled True
+Vanillaish/dump/009	Fix water color True
+Vanillaish/dump/010	Map edge dropoff True
+Vanillaish/dump/011	Mountains allowed at center False
+Vanillaish/dump/012	Heightmap disabled
+Vanillaish/dump/013	Base height noise stack:
+Vanillaish/dump/014	    Layer 1:
+Vanillaish/dump/015	    Version 1
+Vanillaish/dump/016	    Noise Settings:
+Vanillaish/dump/017	        version 1
+Vanillaish/dump/018	        type OpenSimplex2, freq 0.0005, aspect 1, frac FBm, octaves 7, lac 2, gain 0.5, w. str. 0, ping-ping str. 0
+Vanillaish/dump/019	        cell. dist. fn. Euclidean, cell. ret. type CellValue, cell jitt. 0
+Vanillaish/dump/020	        warp type OpenSimplex2, warp amp 0
+Vanillaish/dump/021	        invert False
+Vanillaish/dump/022	        blend mode Normal
+Vanillaish/dump/023	    Layer 2:
+Vanillaish/dump/024	    Version 1
+Vanillaish/dump/025	    Noise Settings:
+Vanillaish/dump/026	        version 1
+Vanillaish/dump/027	        type OpenSimplex2, freq 0.0005, aspect 1, frac FBm, octaves 7, lac 2, gain 0.5, w. str. 0, ping-ping str. 0
+Vanillaish/dump/028	        cell. dist. fn. Euclidean, cell. ret. type CellValue, cell jitt. 0
+Vanillaish/dump/029	        warp type OpenSimplex2, warp amp 0
+Vanillaish/dump/030	        invert False
+Vanillaish/dump/031	        blend mode Normal
+Vanillaish/dump/032	    Noise Warp Settings:
+Vanillaish/dump/033	        version 1
+Vanillaish/dump/034	        type OpenSimplex2, freq 0.0005, aspect 1, frac DomainWarpIndependent, octaves 1, lac 2, gain 0.5, w. str. 0, ping-ping str. 0
+Vanillaish/dump/035	        cell. dist. fn. Euclidean, cell. ret. type CellValue, cell jitt. 0
+Vanillaish/dump/036	        warp type OpenSimplex2, warp amp 10000
+Vanillaish/dump/037	        invert False
+Vanillaish/dump/038	        blend mode Normal
+Vanillaish/dump/039	    Mask Settings:
+Vanillaish/dump/040	        version 1
+Vanillaish/dump/041	        type OpenSimplex2, freq 0.0005, aspect 1, frac FBm, octaves 3, lac 2, gain 0.5, w. str. 0, ping-ping str. 0
+Vanillaish/dump/042	        cell. dist. fn. Euclidean, cell. ret. type CellValue, cell jitt. 0
+Vanillaish/dump/043	        warp type OpenSimplex2, warp amp 0
+Vanillaish/dump/044	        invert False
+Vanillaish/dump/045	        smooth step 0.5 - 1
+Vanillaish/dump/046	        range 0 - 0.75
+Vanillaish/dump/047	        blend mode Normal
+Vanillaish/dump/048	    Mask Warp Settings:
+Vanillaish/dump/049	        version 1
+Vanillaish/dump/050	        type OpenSimplex2, freq 0.0004, aspect 1, frac DomainWarpIndependent, octaves 1, lac 2, gain 0.5, w. str. 0, ping-ping str. 0
+Vanillaish/dump/051	        cell. dist. fn. Euclidean, cell. ret. type CellValue, cell jitt. 0
+Vanillaish/dump/052	        warp type OpenSimplex2, warp amp 3000
+Vanillaish/dump/053	        invert False
+Vanillaish/dump/054	        blend mode Normal
+Vanillaish/dump/055	    Layer 3:
+Vanillaish/dump/056	    Version 1
+Vanillaish/dump/057	    Noise Settings:
+Vanillaish/dump/058	        version 1
+Vanillaish/dump/059	        type OpenSimplex2, freq 0.0006, aspect 1, frac None, octaves 1, lac 2, gain 0.5, w. str. 0, ping-ping str. 0
+Vanillaish/dump/060	        cell. dist. fn. Euclidean, cell. ret. type CellValue, cell jitt. 0
+Vanillaish/dump/061	        warp type OpenSimplex2, warp amp 0
+Vanillaish/dump/062	        invert False
+Vanillaish/dump/063	        blend mode Multiply
+Vanillaish/dump/064	    Noise Warp Settings:
+Vanillaish/dump/065	        version 1
+Vanillaish/dump/066	        type Perlin, freq 0.0001, aspect 1, frac DomainWarpIndependent, octaves 3, lac 2, gain 0.5, w. str. 0, ping-ping str. 0
+Vanillaish/dump/067	        cell. dist. fn. Euclidean, cell. ret. type CellValue, cell jitt. 0
+Vanillaish/dump/068	        warp type OpenSimplex2, warp amp 7000
+Vanillaish/dump/069	        invert False
+Vanillaish/dump/070	        blend mode Normal
+Vanillaish/dump/071	Roughmap disabled
+Vanillaish/dump/072	Biomemap disabled
+Vanillaish/dump/073	Biome precision 0: the ground takes its biomes from the 4 corners of each 64 m terrain zone (vanilla)
+Vanillaish/dump/074	Terrainmap disabled
+Vanillaish/dump/075	Forest scale 0.50000006
+Vanillaish/dump/076	Forest amount 0.5
+Vanillaish/dump/077	Forestmap disabled
+Vanillaish/dump/078	Locationmap disabled
+Vanillaish/dump/079	Paintmap disabled
+Vanillaish/dump/080	Lavamap disabled
+Vanillaish/dump/081	Mossmap disabled
+Vanillaish/dump/082	Vegetationmap disabled
+Vanillaish/dump/083	Heatmap disabled
+Vanillaish/dump/084	Spawnmap disabled
+Vanillaish/dump/085	Altbiomemap disabled
+Vanillaish/dump/086	Alt biomes: legacy defaults (mode Random, grid Vanilla; no alt-biome settings stored in this world)
+Vanillaish/dump/count	86
+Vanillaish/v11/disk	len=712 sha=326de5b9e4e67cd94132f720
+Vanillaish/v11/network	len=712 sha=326de5b9e4e67cd94132f720
+Vanillaish/v7/disk-roundtrip	DIFFERENT
+Vanillaish/heightmap	n=4010 min=0.20019457 max=0.39985436 sha=e4d2e5502cbae2d090e6d333
+Vanillaish/roughmap	n=4010 min=0.5 max=0.6 sha=e83d4a6b0db80ddf69cc1644
+Vanillaish/flatmap	n=4010 min=0.4 max=0.6 sha=9c50e1741e0dc802bfa4ba26
+Vanillaish/forest	n=4010 min=0.145071 max=1.850145 sha=eeb3281d59709601259340cd
+Vanillaish/heat	n=4010 min=0 max=0 sha=6ef9465fabb1f843e42bc313
+Vanillaish/biome	n=4010 min=0 max=0 sha=6ef9465fabb1f843e42bc313
+Vanillaish/paint-AshLands	n=16040 min=0.1 max=0.4 sha=cea63d3346deec2efc1bc59f
+Vanillaish/paint-Mistlands	n=16040 min=0.1 max=0.4 sha=cea63d3346deec2efc1bc59f
+Vanillaish/paint-Meadows	n=16040 min=0.1 max=0.4 sha=cea63d3346deec2efc1bc59f
+Vanillaish/terrain	n=20050 min=0 max=0.5 sha=8a15252b13aae7d655289dcf
+Vanillaish/VegetationMap	none
+Vanillaish/SpawnMap	none
+Vanillaish/locations/StartTemple	
+Vanillaish/locations/Eikthyrnir	
+Vanillaish/locations/Vendor_BlackForest	
+Vanillaish/locations/Runestone_Meadows:alias	
+Vanillaish/locations/Hildir_camp	
+Vanillaish/locations/Runestone_Meadows	
+Vanillaish/base-height-v3	n=4010 min=-2 max=0.64357793 sha=b4f3a572ce112186f7ce0857
+Vanillaish/getbiome-prefix	n=8020 min=1 max=2 sha=4b91b98a3662c926f503b199
+Vanillaish/isashlands	n=16040 min=0 max=1 sha=6c2b4abae9de0cfc037071f7
+Vanillaish/isdeepnorth	n=16040 min=-1 max=1 sha=ce25cc9acce7422ac350c37e
+Vanillaish/ashlands-gradient	n=4010 min=-1E-05 max=-1E-05 sha=5f926809bfe151a0bcec709a
+Vanillaish/forest-factor	n=12030 min=-10499.999 max=10499.999 sha=fafdc5f1acb832f1477d612f
+Vanillaish/precision	0
+Vanillaish/override-all	False
+Vanillaish/altbiome-map	none
+Vanillaish/altbiome-settings	null

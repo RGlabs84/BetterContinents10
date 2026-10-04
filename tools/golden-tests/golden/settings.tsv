@@ -1,0 +1,656 @@
+disabled/disk	len=4 sha=ad95131bc0b799c0b1af477f
+disabled/network	len=4 sha=ad95131bc0b799c0b1af477f
+all/build-log/001	[Error] [BetterContinents] fx/all/biomemap.txt: invalid biome name DeadWastes, skipped: its colour reads as None. The biomes are None, Meadows, Swamp, Mountain, BlackForest, Plains, AshLands, DeepNorth, Ocean, Mistlands; the biomes Expand World Data adds need Expand World Data installed.
+all/build-log/002	[Log] [BetterContinents] Biome map (96 x 96): Meadows 13.45%, Swamp 1.02%, Mountain 3.33%, BlackForest 12.43%, Plains 13.68%, AshLands 1.77%, DeepNorth 1.81%, Ocean 38.54%, Mistlands 12.93%, None 1.02%
+all/build-log/003	[Log] [BetterContinents] No spawns are mapped to color #ABCDEF (which has 1 spawn positions defined)
+all/build-log/004	[Log] [BetterContinents] Alt-biome legend altbiomemap.txt: 4 colours, 1 points.
+all/build-log/005	[Log] [BetterContinents] Alt-biome map fx/all/altbiomemap.png: 96x96, 7376 planted pixels, decoded in <n> ms.
+all/build-log/count	5
+all/dump/001	Version 0
+all/dump/002	Continent size 0.29999998
+all/dump/003	Mountains amount 0
+all/dump/004	Sea level adjustment 0.6
+all/dump/005	Ocean channels enabled False
+all/dump/006	Ashlands gap enabled True
+all/dump/007	Deep North gap enabled True
+all/dump/008	Rivers enabled False
+all/dump/009	World size 12000
+all/dump/010	Edge size 600
+all/dump/011	Fix water color False
+all/dump/012	Map edge dropoff False
+all/dump/013	Mountains allowed at center True
+all/dump/014	Heightmap file (96) fx/all/heightmap.png
+all/dump/015	Heightmap amount 1.7, blend 0.8, add 0.1, mask 0.2
+all/dump/016	Flatmap disabled
+all/dump/017	Roughmap file (96) fx/all/roughmap.png
+all/dump/018	Roughmap blend 0.7
+all/dump/019	Biomemap file (96) fx/all/biomemap.png
+all/dump/020	Biome precision 3: the ground follows the biomes on 4 x 4 cells per 64 m terrain zone (16 m)
+all/dump/021	Terrainmap file (96) fx/all/terrainmap.png
+all/dump/022	Terrain map colors Meadows: 00FF00|Ocean: 0000FF|Mountain: FFFFFF|FF8800FF: 123456|Default: 000000
+all/dump/023	Forest scale 0.70000005
+all/dump/024	Forest amount 0.4
+all/dump/025	Forestmap file (96) fx/all/forestmap.png
+all/dump/026	Forestmap multiply 0.5, add 0.25
+all/dump/027	Forest Factor overrides all trees
+all/dump/028	Location file (96) fx/all/locationmap.png
+all/dump/029	Locationmap includes spawns for 5 types
+all/dump/030	StartPosition 123.5, -456.25
+all/dump/031	Paintmap file (96) fx/all/paintmap.png
+all/dump/032	Paintmap colors 80808080: FF0000|FF000000: 102030
+all/dump/033	Lavamap file (96) fx/all/lavamap.png
+all/dump/034	Mossmap file (96) fx/all/mossmap.png
+all/dump/035	Vegetationmap file (96) fx/all/vegetationmap.png
+all/dump/036	Heatmap file fx/all/heatmap.png
+all/dump/037	Heatmap size 96x96
+all/dump/038	Heatmap scale 7.5
+all/dump/039	Spawnmap file (96) fx/all/spawnmap.png
+all/dump/040	Altbiomemap file (96) fx/all/altbiomemap.png
+all/dump/041	    #6A8CA0: Wolf Mountain
+all/dump/042	    #3C5A28: Dark Meadows + Lantern
+all/dump/043	    #A05A3C: !Drake Mountain
+all/dump/044	    #101010: none
+all/dump/045	    point at 100, -200: Wolf Mountain
+all/dump/046	Alt biomes: mode PlantedOnly, grid Vanilla, placement seed 1099313834
+all/dump/047	Alt biomes: chance x1.5, amount x2, region size x3, distance x0.5
+all/dump/048	Alt biomes: neighbour fix on, mean sector height on, min sector thickness 2
+all/dump/049	Alt biome overrides: *Mistlands: chance=0.3, min=2; Wolf Mountain: enabled=false
+all/dump/count	49
+all/loaded-maps	heightmap.png, biomemap.png, terrainmap.png, locationmap.png, roughmap.png, forestmap.png, heatmap.png, paintmap.png, lavamap.png, mossmap.png, vegetationmap.png, spawnmap.png, altbiomemap.png
+all/v11/disk	len=52342 sha=1b264c5c6b0090589b0311fb
+all/v11/network	len=52018 sha=e3d338082868c6c45834877f
+all/v11/network-no-alt	len=50669 sha=475d606cc55b1fe804686e8f
+all/v11/config-version	len=52342 sha=1b264c5c6b0090589b0311fb
+all/cache-id	c9bc481288b0429db87a14fe6354343b
+all/v11/disk-roundtrip	same
+all/v11/network-roundtrip	same
+all/v11/dump-after-load	n=49 sha=13ec5496cf89ce0e0747036b
+all/v1/disk	len=13402 sha=40b2469c715f4eaca367c3ff
+all/v1/network	len=13383 sha=ac121e574b4a122195fa1c2f
+all/v1/dump-after-load	n=30 sha=f6e3ce4306d19b2a51c60d9e
+all/v2/disk	len=14556 sha=a7deda92cf5b44371342f5a9
+all/v2/network	len=14519 sha=360cb177fc27e45a7fd70a33
+all/v2/dump-after-load	n=31 sha=f25ddf83d79cf369bb3e3e30
+all/v3/disk	len=14721 sha=c56cfbf9ee4d9c87cb680aff
+all/v3/network	len=14663 sha=bebff5dac9a2107ea635749f
+all/v3/dump-after-load	n=32 sha=855eebce93e47ed32028e989
+all/v4/disk	len=14721 sha=ea35f631ad1cb90d21a963d7
+all/v4/network	len=14663 sha=bff4362d7740ff9c187c55bb
+all/v4/dump-after-load	n=32 sha=277b7a6b28b4bc47d7f319b4
+all/v5/disk	len=22401 sha=bda7a3888b29430e049e992e
+all/v5/network	len=22306 sha=381fec8c441cc1297148e65c
+all/v5/dump-after-load	n=35 sha=58c7f166820212e91a99ff23
+all/v6/disk	len=22406 sha=02a789ca9fcfb49be8b7b4fc
+all/v6/network	len=22311 sha=c46911fc3df599ddf1b91216
+all/v6/dump-after-load	n=35 sha=d14cabb601321ec04ae1fb29
+all/v7/disk	len=22410 sha=b9c5644a8b77976bfb962c11
+all/v7/network	len=22315 sha=b44368affc275c4475936454
+all/v7/dump-after-load	n=35 sha=c4236aabace554698533457a
+all/v8/disk	len=22797 sha=92bde0ed709fad389e9e05c7
+all/v8/network	len=22702 sha=6e24a0bb79b6003c57eb3610
+all/v8/dump-after-load	n=35 sha=797fba0106394666fff1d4b8
+all/v9/disk	len=22801 sha=d7af11aab71fc1a421b1ff00
+all/v9/network	len=22706 sha=8100d0c3d254adc05563adcb
+all/v9/dump-after-load	n=35 sha=7cb8e8f41491b165d6557235
+all/v10/disk	len=23205 sha=f0e3cd1c58cec0c7382df73c
+all/v10/network	len=23092 sha=20e5a55d327837683972b019
+all/v10/dump-after-load	n=36 sha=e76c2e88e29a4cafbdbeb97e
+all-defaults/build-log/001	[Error] [BetterContinents] fx/all/biomemap.txt: invalid biome name DeadWastes, skipped: its colour reads as None. The biomes are None, Meadows, Swamp, Mountain, BlackForest, Plains, AshLands, DeepNorth, Ocean, Mistlands; the biomes Expand World Data adds need Expand World Data installed.
+all-defaults/build-log/002	[Log] [BetterContinents] Biome map (96 x 96): Meadows 13.45%, Swamp 1.02%, Mountain 3.33%, BlackForest 12.43%, Plains 13.68%, AshLands 1.77%, DeepNorth 1.81%, Ocean 38.54%, Mistlands 12.93%, None 1.02%
+all-defaults/build-log/003	[Log] [BetterContinents] No spawns are mapped to color #ABCDEF (which has 1 spawn positions defined)
+all-defaults/build-log/004	[Log] [BetterContinents] Alt-biome legend altbiomemap.txt: 4 colours, 1 points.
+all-defaults/build-log/005	[Log] [BetterContinents] Alt-biome map fx/all/altbiomemap.png: 96x96, 7376 planted pixels, decoded in <n> ms.
+all-defaults/build-log/count	5
+all-defaults/dump/001	Version 0
+all-defaults/dump/002	Continent size 0.50000006
+all-defaults/dump/003	Mountains amount 0
+all-defaults/dump/004	Sea level adjustment 0.5
+all-defaults/dump/005	Ocean channels enabled True
+all-defaults/dump/006	Ashlands gap enabled False
+all-defaults/dump/007	Deep North gap enabled False
+all-defaults/dump/008	Rivers enabled True
+all-defaults/dump/009	Fix water color True
+all-defaults/dump/010	Map edge dropoff True
+all-defaults/dump/011	Mountains allowed at center False
+all-defaults/dump/012	Heightmap file (96) fx/all/heightmap.png
+all-defaults/dump/013	Heightmap amount 1, blend 1, add 0, mask 0
+all-defaults/dump/014	Heightmap overrides ALL
+all-defaults/dump/015	Flatmap disabled
+all-defaults/dump/016	Roughmap file (96) fx/all/roughmap.png
+all-defaults/dump/017	Roughmap blend 1
+all-defaults/dump/018	Biomemap file (96) fx/all/biomemap.png
+all-defaults/dump/019	Biome precision 0: the ground takes its biomes from the 4 corners of each 64 m terrain zone (vanilla)
+all-defaults/dump/020	Terrainmap file (96) fx/all/terrainmap.png
+all-defaults/dump/021	Terrain map colors Meadows: 00FF00|Ocean: 0000FF|Mountain: FFFFFF|FF8800FF: 123456|Default: 000000
+all-defaults/dump/022	Forest scale 1
+all-defaults/dump/023	Forest amount 0.5
+all-defaults/dump/024	Forestmap file (96) fx/all/forestmap.png
+all-defaults/dump/025	Forestmap multiply 1, add 1
+all-defaults/dump/026	Forest Factor applies only to the same trees as vanilla
+all-defaults/dump/027	Location file (96) fx/all/locationmap.png
+all-defaults/dump/028	Locationmap includes spawns for 5 types
+all-defaults/dump/029	Paintmap file (96) fx/all/paintmap.png
+all-defaults/dump/030	Paintmap colors 80808080: FF0000|FF000000: 102030
+all-defaults/dump/031	Lavamap file (96) fx/all/lavamap.png
+all-defaults/dump/032	Mossmap file (96) fx/all/mossmap.png
+all-defaults/dump/033	Vegetationmap file (96) fx/all/vegetationmap.png
+all-defaults/dump/034	Heatmap file fx/all/heatmap.png
+all-defaults/dump/035	Heatmap size 96x96
+all-defaults/dump/036	Heatmap scale 10
+all-defaults/dump/037	Spawnmap file (96) fx/all/spawnmap.png
+all-defaults/dump/038	Altbiomemap file (96) fx/all/altbiomemap.png
+all-defaults/dump/039	    #6A8CA0: Wolf Mountain
+all-defaults/dump/040	    #3C5A28: Dark Meadows + Lantern
+all-defaults/dump/041	    #A05A3C: !Drake Mountain
+all-defaults/dump/042	    #101010: none
+all-defaults/dump/043	    point at 100, -200: Wolf Mountain
+all-defaults/dump/044	Alt biomes: mode Random, grid WorldEdge, placement seed world seed
+all-defaults/dump/045	Alt biomes: chance x1, amount x1, region size x1, distance x1
+all-defaults/dump/046	Alt biomes: neighbour fix off, mean sector height off, min sector thickness 0
+all-defaults/dump/count	46
+all-defaults/loaded-maps	heightmap.png, biomemap.png, terrainmap.png, locationmap.png, roughmap.png, forestmap.png, heatmap.png, paintmap.png, lavamap.png, mossmap.png, vegetationmap.png, spawnmap.png, altbiomemap.png
+all-defaults/v11/disk	len=52091 sha=cd0045384799092e208ad812
+all-defaults/v11/network	len=51767 sha=99e6c6a95a501709a68b932b
+all-defaults/v11/network-no-alt	len=50513 sha=0bb7157d792cb306920f8a03
+all-defaults/v11/config-version	len=52091 sha=cd0045384799092e208ad812
+all-defaults/cache-id	e072a453d701951f5194141a2512eee5
+all-defaults/v11/disk-roundtrip	same
+all-defaults/v11/network-roundtrip	same
+all-defaults/v11/dump-after-load	n=44 sha=5c1cf6d2caf6de3a6ba680b8
+all-defaults/v1/disk	len=13402 sha=b44a6add0c7c6d44b1a5422e
+all-defaults/v1/network	len=13383 sha=d3f5eb1928e078815766a171
+all-defaults/v1/dump-after-load	n=30 sha=ffa609fead46e95e957da55c
+all-defaults/v2/disk	len=14556 sha=a1b0709f8f92181aca4dbc31
+all-defaults/v2/network	len=14519 sha=3ee91cfc72e750194fa78233
+all-defaults/v2/dump-after-load	n=30 sha=cbcbd064c47c8595ddc728f3
+all-defaults/v3/disk	len=14721 sha=1ebfba6b8056672474faa381
+all-defaults/v3/network	len=14663 sha=f3b0bfc79a9f58e6db7c21fe
+all-defaults/v3/dump-after-load	n=31 sha=7185789056a212bb392d5aa2
+all-defaults/v4/disk	len=14721 sha=293a5117422f231ae7039952
+all-defaults/v4/network	len=14663 sha=aed25e962268855500e193ac
+all-defaults/v4/dump-after-load	n=31 sha=a471ffbb13b3081d1854d442
+all-defaults/v5/disk	len=22401 sha=af2d9e17adb739098b2d7eec
+all-defaults/v5/network	len=22306 sha=a74e5e4d55688d11dbd23a22
+all-defaults/v5/dump-after-load	n=34 sha=48865d3a54fb0ca279f03876
+all-defaults/v6/disk	len=22406 sha=7aa46f55b786572da90b0246
+all-defaults/v6/network	len=22311 sha=e70bfcc7ae132835f04bebfb
+all-defaults/v6/dump-after-load	n=35 sha=656e3fae7c41d67e52498a7c
+all-defaults/v7/disk	len=22410 sha=d3dc7061c0ebf51b7d41ee65
+all-defaults/v7/network	len=22315 sha=b4bf2985143b12e79d1760d2
+all-defaults/v7/dump-after-load	n=35 sha=cd515914652d0eacaf01d685
+all-defaults/v8/disk	len=22797 sha=e115bbadb8c9ee16d213ccbd
+all-defaults/v8/network	len=22702 sha=579e04f0d4fd9d40f2e4642a
+all-defaults/v8/dump-after-load	n=35 sha=d5f71953621c475a71e23c3e
+all-defaults/v9/disk	len=22801 sha=a9faff31a361e482ac15203b
+all-defaults/v9/network	len=22706 sha=08531326cefa74fa31681bf1
+all-defaults/v9/dump-after-load	n=35 sha=b6a9f9d92df8f6f882fd7819
+all-defaults/v10/disk	len=23205 sha=70dd0ae7f1891d690199fa16
+all-defaults/v10/network	len=23092 sha=1a8efe70cf3de27283b22d24
+all-defaults/v10/dump-after-load	n=36 sha=f42c60aac75b7ef089f34b26
+heightonly/build-log/count	0
+heightonly/dump/001	Version 0
+heightonly/dump/002	Continent size 0.50000006
+heightonly/dump/003	Mountains amount 0
+heightonly/dump/004	Sea level adjustment 0.5
+heightonly/dump/005	Ocean channels enabled True
+heightonly/dump/006	Ashlands gap enabled False
+heightonly/dump/007	Deep North gap enabled False
+heightonly/dump/008	Rivers enabled True
+heightonly/dump/009	Fix water color True
+heightonly/dump/010	Map edge dropoff True
+heightonly/dump/011	Mountains allowed at center False
+heightonly/dump/012	Heightmap file (96) fx/heightonly/heightmap.png
+heightonly/dump/013	Heightmap amount 1, blend 1, add 0, mask 0
+heightonly/dump/014	Heightmap overrides ALL
+heightonly/dump/015	Flatmap disabled
+heightonly/dump/016	Roughmap disabled
+heightonly/dump/017	Biomemap disabled
+heightonly/dump/018	Biome precision 0: the ground takes its biomes from the 4 corners of each 64 m terrain zone (vanilla)
+heightonly/dump/019	Terrainmap disabled
+heightonly/dump/020	Forest scale 1
+heightonly/dump/021	Forest amount 0.5
+heightonly/dump/022	Forestmap disabled
+heightonly/dump/023	Locationmap disabled
+heightonly/dump/024	Paintmap disabled
+heightonly/dump/025	Lavamap disabled
+heightonly/dump/026	Mossmap disabled
+heightonly/dump/027	Vegetationmap disabled
+heightonly/dump/028	Heatmap disabled
+heightonly/dump/029	Spawnmap disabled
+heightonly/dump/030	Altbiomemap disabled
+heightonly/dump/031	Alt biomes: mode Random, grid WorldEdge, placement seed world seed
+heightonly/dump/032	Alt biomes: chance x1, amount x1, region size x1, distance x1
+heightonly/dump/033	Alt biomes: neighbour fix off, mean sector height off, min sector thickness 0
+heightonly/dump/count	33
+heightonly/loaded-maps	heightmap.png
+heightonly/v11/disk	len=13383 sha=c3dc7f691f25961a020f7cc8
+heightonly/v11/network	len=13351 sha=f9284b15286966c7e4694380
+heightonly/v11/network-no-alt	len=13351 sha=f9284b15286966c7e4694380
+heightonly/v11/config-version	len=13383 sha=c3dc7f691f25961a020f7cc8
+heightonly/cache-id	4d6594a795a76407c6ec55a3d92e8693
+heightonly/v11/disk-roundtrip	same
+heightonly/v11/network-roundtrip	same
+heightonly/v11/dump-after-load	n=31 sha=35d1cf5e52d2a540610058c7
+heightonly/v1/disk	len=13409 sha=fc89bf47c870ad60685bd5f9
+heightonly/v1/network	len=13383 sha=d3f5eb1928e078815766a171
+heightonly/v1/dump-after-load	n=30 sha=be4ef6281c85627555908bf2
+heightonly/v2/disk	len=13428 sha=0bbc0362666cc9edd47db915
+heightonly/v2/network	len=13402 sha=145175dbbebb93a3b0a5c5aa
+heightonly/v2/dump-after-load	n=30 sha=a9a2ae5668bc280cd5903856
+heightonly/v3/disk	len=13429 sha=dd2efa634d5a301dcd22619f
+heightonly/v3/network	len=13403 sha=72c5108f63a1d5241ef1a67b
+heightonly/v3/dump-after-load	n=30 sha=880a4d9dc67e3b823bd715ca
+heightonly/v4/disk	len=13429 sha=8a31323456899619ba223824
+heightonly/v4/network	len=13403 sha=9bc3750db715d65d0c16e472
+heightonly/v4/dump-after-load	n=30 sha=a09b956aabede05f69f0548a
+heightonly/v5/disk	len=13440 sha=8205a623b41da12612495afb
+heightonly/v5/network	len=13414 sha=717697734082015742010f44
+heightonly/v5/dump-after-load	n=30 sha=65f6770226559bd003874f3e
+heightonly/v6/disk	len=13445 sha=8965f8c01bc249c0a71c1069
+heightonly/v6/network	len=13419 sha=f6b5ca13c6393569ddeff154
+heightonly/v6/dump-after-load	n=31 sha=7c72a83be2feee2362cff1cb
+heightonly/v7/disk	len=13449 sha=0daf26641cbda6d66137a28a
+heightonly/v7/network	len=13423 sha=d61f3b3c90eb1c65afc7f165
+heightonly/v7/dump-after-load	n=31 sha=ac7794c701a239f01d2f6b48
+heightonly/v8/disk	len=13449 sha=5da26536242eb3599f58b451
+heightonly/v8/network	len=13423 sha=948192b8ee0783613f2ca76a
+heightonly/v8/dump-after-load	n=31 sha=e57a2e14d0814cfcc746f972
+heightonly/v9/disk	len=13453 sha=86674ba4a2eb7a617a54f403
+heightonly/v9/network	len=13427 sha=cfea7eabb2be8e6cbf433c97
+heightonly/v9/dump-after-load	n=31 sha=035e639f1abd1b1a52a9c174
+heightonly/v10/disk	len=13454 sha=9086def102f857d92f411c19
+heightonly/v10/network	len=13428 sha=1489ad691f27db6d62df899a
+heightonly/v10/dump-after-load	n=31 sha=652c4f5fbf4c11de42f58262
+alpha/build-log/count	0
+alpha/dump/001	Version 0
+alpha/dump/002	Continent size 0.50000006
+alpha/dump/003	Mountains amount 0
+alpha/dump/004	Sea level adjustment 0.5
+alpha/dump/005	Ocean channels enabled True
+alpha/dump/006	Ashlands gap enabled False
+alpha/dump/007	Deep North gap enabled False
+alpha/dump/008	Rivers enabled True
+alpha/dump/009	Fix water color True
+alpha/dump/010	Map edge dropoff True
+alpha/dump/011	Mountains allowed at center False
+alpha/dump/012	Heightmap file (96) fx/alpha/heightmap.png
+alpha/dump/013	Heightmap amount 1, blend 1, add 0, mask 0
+alpha/dump/014	Flatmap disabled
+alpha/dump/015	Roughmap disabled
+alpha/dump/016	Biomemap disabled
+alpha/dump/017	Biome precision 0: the ground takes its biomes from the 4 corners of each 64 m terrain zone (vanilla)
+alpha/dump/018	Terrainmap disabled
+alpha/dump/019	Forest scale 1
+alpha/dump/020	Forest amount 0.5
+alpha/dump/021	Forestmap disabled
+alpha/dump/022	Locationmap disabled
+alpha/dump/023	Paintmap disabled
+alpha/dump/024	Lavamap disabled
+alpha/dump/025	Mossmap disabled
+alpha/dump/026	Vegetationmap disabled
+alpha/dump/027	Heatmap disabled
+alpha/dump/028	Spawnmap disabled
+alpha/dump/029	Altbiomemap disabled
+alpha/dump/030	Alt biomes: mode Random, grid WorldEdge, placement seed world seed
+alpha/dump/031	Alt biomes: chance x1, amount x1, region size x1, distance x1
+alpha/dump/032	Alt biomes: neighbour fix off, mean sector height off, min sector thickness 0
+alpha/dump/count	32
+alpha/loaded-maps	heightmap.png
+alpha/v11/disk	len=16645 sha=70f85b182cb839bf1d0df11a
+alpha/v11/network	len=16618 sha=325adbcc790b405c84235cd4
+alpha/v11/network-no-alt	len=16618 sha=325adbcc790b405c84235cd4
+alpha/v11/config-version	len=16645 sha=70f85b182cb839bf1d0df11a
+alpha/cache-id	402316138b97b46d1911d0a8e82949ac
+alpha/v11/disk-roundtrip	same
+alpha/v11/network-roundtrip	same
+alpha/v11/dump-after-load	n=30 sha=a4344df85fe758a2a5f39dd2
+alpha/v1/disk	len=16663 sha=8857024e2a92ec91bf44e286
+alpha/v1/network	len=16642 sha=75049d59d4699a2851f627b5
+alpha/v1/dump-after-load	n=30 sha=ddfc779108cf217d4fd37e3d
+alpha/v2/disk	len=16682 sha=438389fe2f1328d888e5ff8c
+alpha/v2/network	len=16661 sha=735b62c8ab79c5d159f4ef6d
+alpha/v2/dump-after-load	n=30 sha=36e7671162aac0e972c857d3
+alpha/v3/disk	len=16683 sha=deb7f85a95b2bdc16f68e472
+alpha/v3/network	len=16662 sha=712f391758f6538d1e933c47
+alpha/v3/dump-after-load	n=30 sha=4c897aff521feab51e8d9b24
+alpha/v4/disk	len=16683 sha=2d5317139e7833c09fc90f55
+alpha/v4/network	len=16662 sha=505323ec0bccfe01bee964e0
+alpha/v4/dump-after-load	n=30 sha=e5c06032cee511b510508ee9
+alpha/v5/disk	len=16694 sha=7df223c3f44376edc9adee57
+alpha/v5/network	len=16673 sha=0e05b4dae6ededce12c92c26
+alpha/v5/dump-after-load	n=30 sha=4a19ac57933f2bd157003aec
+alpha/v6/disk	len=16699 sha=fdd9bdaa788c351a3b636dba
+alpha/v6/network	len=16678 sha=eca2dbc30e4f28be805693ba
+alpha/v6/dump-after-load	n=30 sha=da933a7055fa8180eaa10537
+alpha/v7/disk	len=16703 sha=ee79731023da703bf1a3790f
+alpha/v7/network	len=16682 sha=ceec479ce527837708f3c6f9
+alpha/v7/dump-after-load	n=30 sha=bff5b63f40527eeadefd388c
+alpha/v8/disk	len=16703 sha=04b58497b97859d1531ef4a6
+alpha/v8/network	len=16682 sha=be5ef4fd5b8990fe97a790f6
+alpha/v8/dump-after-load	n=30 sha=6f1741dbeede105db81e8932
+alpha/v9/disk	len=16707 sha=4382372e5fcd6f63094b5932
+alpha/v9/network	len=16686 sha=c9b695d0ddba2eb04de6e849
+alpha/v9/dump-after-load	n=30 sha=17b05c8963fa1150eca3a55d
+alpha/v10/disk	len=16708 sha=5005c9ddba9ec3931e41afd5
+alpha/v10/network	len=16687 sha=2aba353833b4691a164fbf0a
+alpha/v10/dump-after-load	n=30 sha=95f9cacd16128f4f4fe29614
+files/build-log/001	[Error] [BetterContinents] fx/files/biomes.txt: invalid biome name DeadWastes, skipped: its colour reads as None. The biomes are None, Meadows, Swamp, Mountain, BlackForest, Plains, AshLands, DeepNorth, Ocean, Mistlands; the biomes Expand World Data adds need Expand World Data installed.
+files/build-log/002	[Log] [BetterContinents] Biome map (96 x 96): Meadows 13.45%, Swamp 1.02%, Mountain 3.33%, BlackForest 12.43%, Plains 13.68%, AshLands 1.77%, DeepNorth 1.81%, Ocean 38.54%, Mistlands 12.93%, None 1.02%
+files/build-log/count	2
+files/dump/001	Version 0
+files/dump/002	Continent size 0.50000006
+files/dump/003	Mountains amount 0
+files/dump/004	Sea level adjustment 0.5
+files/dump/005	Ocean channels enabled True
+files/dump/006	Ashlands gap enabled False
+files/dump/007	Deep North gap enabled False
+files/dump/008	Rivers enabled True
+files/dump/009	Fix water color True
+files/dump/010	Map edge dropoff True
+files/dump/011	Mountains allowed at center False
+files/dump/012	Heightmap file (96) fx/files/h.png
+files/dump/013	Heightmap amount 2, blend 1, add 0, mask 0
+files/dump/014	Heightmap overrides ALL
+files/dump/015	Flatmap disabled
+files/dump/016	Roughmap disabled
+files/dump/017	Biomemap file (96) fx/files/biomes.png
+files/dump/018	Biome precision 0: the ground takes its biomes from the 4 corners of each 64 m terrain zone (vanilla)
+files/dump/019	Terrainmap disabled
+files/dump/020	Forest scale 1
+files/dump/021	Forest amount 0.5
+files/dump/022	Forestmap file (96) fx/files/forest.png
+files/dump/023	Forestmap multiply 1, add 1
+files/dump/024	Forest Factor applies only to the same trees as vanilla
+files/dump/025	Locationmap disabled
+files/dump/026	Paintmap disabled
+files/dump/027	Lavamap disabled
+files/dump/028	Mossmap disabled
+files/dump/029	Vegetationmap disabled
+files/dump/030	Heatmap disabled
+files/dump/031	Spawnmap disabled
+files/dump/032	Altbiomemap disabled
+files/dump/033	Alt biomes: mode Random, grid WorldEdge, placement seed world seed
+files/dump/034	Alt biomes: chance x1, amount x1, region size x1, distance x1
+files/dump/035	Alt biomes: neighbour fix off, mean sector height off, min sector thickness 0
+files/dump/count	35
+files/loaded-maps	heightmap.png, biomemap.png, forestmap.png
+files/v11/disk	len=22876 sha=91aa771c37a4408c9997d393
+files/v11/network	len=22809 sha=d2fcc65ad8db05a5f620a46e
+files/v11/network-no-alt	len=22809 sha=d2fcc65ad8db05a5f620a46e
+files/v11/config-version	len=22876 sha=91aa771c37a4408c9997d393
+files/cache-id	783b1fb929da2919f074faa62c9edd3e
+files/v11/disk-roundtrip	same
+files/v11/network-roundtrip	same
+files/v11/dump-after-load	n=33 sha=d517f0b80344c14a7803f512
+files/v1/disk	len=13396 sha=5ef26a0ab92bf74d085edbea
+files/v1/network	len=13383 sha=7f9b5cf1f54c973abef9815e
+files/v1/dump-after-load	n=30 sha=0331a13320827792e98f83a7
+files/v2/disk	len=14550 sha=bb963a40098203f99a181a2e
+files/v2/network	len=14519 sha=48fa400e4705130f30d7687a
+files/v2/dump-after-load	n=30 sha=97735d64444b93ef313d7c42
+files/v3/disk	len=14551 sha=c3caeb2155a4e92e2259d1b9
+files/v3/network	len=14520 sha=e8cb108b3811ef7a4edbd140
+files/v3/dump-after-load	n=30 sha=0914afa8906a776b798d6a99
+files/v4/disk	len=14551 sha=d8188471d005d68969d82696
+files/v4/network	len=14520 sha=478f933662e9c3e0be68dc4d
+files/v4/dump-after-load	n=30 sha=132976b3090c5b5793acc8c4
+files/v5/disk	len=14811 sha=71a5476c2ebe34edb85ac3eb
+files/v5/network	len=14762 sha=7967709ed8d230d7c5074234
+files/v5/dump-after-load	n=32 sha=c38f8b7f363280c332f445d6
+files/v6/disk	len=14816 sha=5cff31521aeb6435ea4f7f08
+files/v6/network	len=14767 sha=d4249de1f258c50ab7747dd2
+files/v6/dump-after-load	n=33 sha=7e0768f2a588263e1657f194
+files/v7/disk	len=14820 sha=4e66e456009d08392cbc2ed3
+files/v7/network	len=14771 sha=8672c79e77a59c50b3068293
+files/v7/dump-after-load	n=33 sha=c0469d1813d923eed960451a
+files/v8/disk	len=15060 sha=8d723cd15b26da02953f17c7
+files/v8/network	len=15011 sha=6246ada1a7dd752ddb0dfa2d
+files/v8/dump-after-load	n=33 sha=a0848ab460588e40d0eb8162
+files/v9/disk	len=15064 sha=24ae60d26cd1fed24bcb3c53
+files/v9/network	len=15015 sha=796226a0e2027d1415371e5e
+files/v9/dump-after-load	n=33 sha=74911ea99b3753c0c6f0f4f8
+files/v10/disk	len=15065 sha=199e355d60a11038759c6deb
+files/v10/network	len=15016 sha=473c6acdae95f1c19a98663e
+files/v10/dump-after-load	n=33 sha=ce8c7afe6d700ab8cb0c2dc2
+scalars/build-log/count	0
+scalars/dump/001	Version 0
+scalars/dump/002	Continent size 0.90000004
+scalars/dump/003	Mountains amount 0
+scalars/dump/004	Sea level adjustment 0.099999994
+scalars/dump/005	Ocean channels enabled False
+scalars/dump/006	Ashlands gap enabled False
+scalars/dump/007	Deep North gap enabled False
+scalars/dump/008	Rivers enabled False
+scalars/dump/009	World size 8000
+scalars/dump/010	Edge size 250
+scalars/dump/011	Fix water color True
+scalars/dump/012	Map edge dropoff False
+scalars/dump/013	Mountains allowed at center False
+scalars/dump/014	Heightmap disabled
+scalars/dump/015	Flatmap disabled
+scalars/dump/016	Roughmap disabled
+scalars/dump/017	Biomemap disabled
+scalars/dump/018	Biome precision 5: the ground follows the biomes on 6 x 6 cells per 64 m terrain zone (10.7 m)
+scalars/dump/019	Terrainmap disabled
+scalars/dump/020	Forest scale 2.5000002
+scalars/dump/021	Forest amount 0.9
+scalars/dump/022	Forestmap disabled
+scalars/dump/023	Locationmap disabled
+scalars/dump/024	Paintmap disabled
+scalars/dump/025	Lavamap disabled
+scalars/dump/026	Mossmap disabled
+scalars/dump/027	Vegetationmap disabled
+scalars/dump/028	Heatmap disabled
+scalars/dump/029	Spawnmap disabled
+scalars/dump/030	Altbiomemap disabled
+scalars/dump/031	Alt biomes: mode Random, grid WorldEdge, placement seed world seed
+scalars/dump/032	Alt biomes: chance x1, amount x1, region size x1, distance x1
+scalars/dump/033	Alt biomes: neighbour fix off, mean sector height off, min sector thickness 0
+scalars/dump/count	33
+scalars/loaded-maps	
+scalars/v11/disk	len=117 sha=fe8d70ab6dc604b8c6b3dbc1
+scalars/v11/network	len=117 sha=fe8d70ab6dc604b8c6b3dbc1
+scalars/v11/network-no-alt	len=72 sha=031e3f499093e7913651f3a3
+scalars/v11/config-version	len=117 sha=fe8d70ab6dc604b8c6b3dbc1
+scalars/cache-id	5eed445dfcae461fa6739de535823bd1
+scalars/v11/disk-roundtrip	same
+scalars/v11/network-roundtrip	same
+scalars/v11/dump-after-load	n=33 sha=d3e15545f49ca230b5f970e0
+scalars/v1/disk	len=43 sha=b4e700288c5c55dab7ec5e34
+scalars/v1/network	len=43 sha=b4e700288c5c55dab7ec5e34
+scalars/v1/dump-after-load	n=29 sha=12accd470ecd9e3347874fe7
+scalars/v2/disk	len=62 sha=c673cc10d8057737a002d87a
+scalars/v2/network	len=62 sha=c673cc10d8057737a002d87a
+scalars/v2/dump-after-load	n=29 sha=d8c45963de8791453382edff
+scalars/v3/disk	len=63 sha=5497cb9b7a40500f0490db93
+scalars/v3/network	len=63 sha=5497cb9b7a40500f0490db93
+scalars/v3/dump-after-load	n=29 sha=e98604b705df95a2abd00960
+scalars/v4/disk	len=63 sha=31308c13a24e969ab5913b89
+scalars/v4/network	len=63 sha=31308c13a24e969ab5913b89
+scalars/v4/dump-after-load	n=29 sha=84995f82caa9e657a040b12b
+scalars/v5/disk	len=74 sha=fc47b426f603f5b3614ed732
+scalars/v5/network	len=74 sha=fc47b426f603f5b3614ed732
+scalars/v5/dump-after-load	n=29 sha=65f1d87eb8efc1b227ecad7f
+scalars/v6/disk	len=79 sha=d24ef8a2025f49b466ff51d2
+scalars/v6/network	len=79 sha=d24ef8a2025f49b466ff51d2
+scalars/v6/dump-after-load	n=29 sha=454f4752e3dae00f3f04f30c
+scalars/v7/disk	len=83 sha=de94361dedcedbd727801a3e
+scalars/v7/network	len=83 sha=de94361dedcedbd727801a3e
+scalars/v7/dump-after-load	n=29 sha=2f5a2645a1bb69695e6e00da
+scalars/v8/disk	len=83 sha=b82353995408ca6d15b685d7
+scalars/v8/network	len=83 sha=b82353995408ca6d15b685d7
+scalars/v8/dump-after-load	n=29 sha=bf0c5513155d4ff88abd3d34
+scalars/v9/disk	len=87 sha=71ecd54bcf113c6c7c196862
+scalars/v9/network	len=87 sha=71ecd54bcf113c6c7c196862
+scalars/v9/dump-after-load	n=29 sha=213229205e2f5bb3a77b163e
+scalars/v10/disk	len=88 sha=b00eee2a946fd1bf25faa4f1
+scalars/v10/network	len=88 sha=b00eee2a946fd1bf25faa4f1
+scalars/v10/dump-after-load	n=29 sha=2c5bc10670e3aedbd16157d6
+legacy-spawnmap/build-log/001	[Log] [BetterContinents] Renaming legacy spawnmap.png to fx/legacy/locationmap.png
+legacy-spawnmap/build-log/002	[Log] [BetterContinents] No spawns are mapped to color #00FF80 (which has 1 spawn positions defined)
+legacy-spawnmap/build-log/003	[Log] [BetterContinents] No spawns are mapped to color #ABCDEF (which has 1 spawn positions defined)
+legacy-spawnmap/build-log/count	3
+legacy-spawnmap/dump/001	Version 0
+legacy-spawnmap/dump/002	Continent size 0.50000006
+legacy-spawnmap/dump/003	Mountains amount 0
+legacy-spawnmap/dump/004	Sea level adjustment 0.5
+legacy-spawnmap/dump/005	Ocean channels enabled True
+legacy-spawnmap/dump/006	Ashlands gap enabled False
+legacy-spawnmap/dump/007	Deep North gap enabled False
+legacy-spawnmap/dump/008	Rivers enabled True
+legacy-spawnmap/dump/009	Fix water color True
+legacy-spawnmap/dump/010	Map edge dropoff True
+legacy-spawnmap/dump/011	Mountains allowed at center False
+legacy-spawnmap/dump/012	Heightmap disabled
+legacy-spawnmap/dump/013	Flatmap disabled
+legacy-spawnmap/dump/014	Roughmap disabled
+legacy-spawnmap/dump/015	Biomemap disabled
+legacy-spawnmap/dump/016	Biome precision 0: the ground takes its biomes from the 4 corners of each 64 m terrain zone (vanilla)
+legacy-spawnmap/dump/017	Terrainmap disabled
+legacy-spawnmap/dump/018	Forest scale 1
+legacy-spawnmap/dump/019	Forest amount 0.5
+legacy-spawnmap/dump/020	Forestmap disabled
+legacy-spawnmap/dump/021	Location file (96) fx/legacy/locationmap.png
+legacy-spawnmap/dump/022	Locationmap includes spawns for 4 types
+legacy-spawnmap/dump/023	Paintmap disabled
+legacy-spawnmap/dump/024	Lavamap disabled
+legacy-spawnmap/dump/025	Mossmap disabled
+legacy-spawnmap/dump/026	Vegetationmap disabled
+legacy-spawnmap/dump/027	Heatmap disabled
+legacy-spawnmap/dump/028	Spawnmap disabled
+legacy-spawnmap/dump/029	Altbiomemap disabled
+legacy-spawnmap/dump/030	Alt biomes: mode Random, grid WorldEdge, placement seed world seed
+legacy-spawnmap/dump/031	Alt biomes: chance x1, amount x1, region size x1, distance x1
+legacy-spawnmap/dump/032	Alt biomes: neighbour fix off, mean sector height off, min sector thickness 0
+legacy-spawnmap/dump/count	32
+legacy-spawnmap/loaded-maps	locationmap.png
+legacy-spawnmap/v11/disk	len=160 sha=b21c624ff5f9256878387711
+legacy-spawnmap/v11/network	len=130 sha=e731b9498f7ee0cbbb0a3775
+legacy-spawnmap/v11/network-no-alt	len=130 sha=e731b9498f7ee0cbbb0a3775
+legacy-spawnmap/v11/config-version	len=160 sha=b21c624ff5f9256878387711
+legacy-spawnmap/cache-id	51ff249ebe3d9eac7b094fd19e676236
+legacy-spawnmap/v11/disk-roundtrip	same
+legacy-spawnmap/v11/network-roundtrip	same
+legacy-spawnmap/v11/dump-after-load	n=30 sha=ee8e2ebb6a533881b1211d6f
+legacy-spawnmap/v1/disk	len=43 sha=d79304722954e055936f7f26
+legacy-spawnmap/v1/network	len=43 sha=d79304722954e055936f7f26
+legacy-spawnmap/v1/dump-after-load	n=29 sha=f0bc9edabcd7ee4132409e57
+legacy-spawnmap/v2/disk	len=62 sha=389d868f3c13f4fe3c6de4cb
+legacy-spawnmap/v2/network	len=62 sha=389d868f3c13f4fe3c6de4cb
+legacy-spawnmap/v2/dump-after-load	n=29 sha=c904bb031ecd7b908fd66e5b
+legacy-spawnmap/v3/disk	len=194 sha=c54e42cbcfa7a2ebd0f447be
+legacy-spawnmap/v3/network	len=170 sha=cb2a0853fad2b1017331c500
+legacy-spawnmap/v3/dump-after-load	n=30 sha=a363f01edf20b711b358000a
+legacy-spawnmap/v4/disk	len=194 sha=f890ed82cee91b529df26863
+legacy-spawnmap/v4/network	len=170 sha=dc5fe89166f83b5c01a05ef9
+legacy-spawnmap/v4/dump-after-load	n=30 sha=9c18aaf9f0a4e666feb11bd4
+legacy-spawnmap/v5/disk	len=205 sha=e46c044edc85430eea5e97f3
+legacy-spawnmap/v5/network	len=181 sha=dde87c0c2d376d8d7bb9c7c8
+legacy-spawnmap/v5/dump-after-load	n=30 sha=91f53a0ea011feb57f5db751
+legacy-spawnmap/v6/disk	len=210 sha=356db2261ad94ab483646b60
+legacy-spawnmap/v6/network	len=186 sha=1bc9c6d94d72c9a5b2d9eaf1
+legacy-spawnmap/v6/dump-after-load	n=30 sha=cb2333af8ed795bbb4d69d96
+legacy-spawnmap/v7/disk	len=214 sha=9698d15f29905786606d745b
+legacy-spawnmap/v7/network	len=190 sha=3758016d5781b1317ca1ad92
+legacy-spawnmap/v7/dump-after-load	n=30 sha=63625103789a534d98c269d3
+legacy-spawnmap/v8/disk	len=2661 sha=b1a617cc2695b1cd85bb9c4a
+legacy-spawnmap/v8/network	len=2637 sha=9d489468af28db46d02d18e6
+legacy-spawnmap/v8/dump-after-load	n=30 sha=5ebf305de58e0f3916efcdf2
+legacy-spawnmap/v9/disk	len=2665 sha=2e480f0897702f0588b1ae03
+legacy-spawnmap/v9/network	len=2641 sha=2a05a862191aec25030b22d7
+legacy-spawnmap/v9/dump-after-load	n=30 sha=0a2c87485f477c296a3001af
+legacy-spawnmap/v10/disk	len=2666 sha=f900716f4c81e5bee49a1b9a
+legacy-spawnmap/v10/network	len=2642 sha=4568925378198aa9a4f51889
+legacy-spawnmap/v10/dump-after-load	n=30 sha=f4e88ffc824af5a2f3145897
+legacy-flat/build-log/001	[Error] [BetterContinents] fx/all/biomemap.txt: invalid biome name DeadWastes, skipped: its colour reads as None. The biomes are None, Meadows, Swamp, Mountain, BlackForest, Plains, AshLands, DeepNorth, Ocean, Mistlands; the biomes Expand World Data adds need Expand World Data installed.
+legacy-flat/build-log/002	[Log] [BetterContinents] Biome map (96 x 96): Meadows 13.45%, Swamp 1.02%, Mountain 3.33%, BlackForest 12.43%, Plains 13.68%, AshLands 1.77%, DeepNorth 1.81%, Ocean 38.54%, Mistlands 12.93%, None 1.02%
+legacy-flat/build-log/003	[Log] [BetterContinents] No spawns are mapped to color #ABCDEF (which has 1 spawn positions defined)
+legacy-flat/build-log/004	[Log] [BetterContinents] Alt-biome legend altbiomemap.txt: 4 colours, 1 points.
+legacy-flat/build-log/005	[Log] [BetterContinents] Alt-biome map fx/all/altbiomemap.png: 96x96, 7376 planted pixels, decoded in <n> ms.
+legacy-flat/build-log/count	5
+legacy-flat/dump/001	Version 0
+legacy-flat/dump/002	Continent size 0.50000006
+legacy-flat/dump/003	Mountains amount 0
+legacy-flat/dump/004	Sea level adjustment 0.5
+legacy-flat/dump/005	Ocean channels enabled True
+legacy-flat/dump/006	Ashlands gap enabled False
+legacy-flat/dump/007	Deep North gap enabled False
+legacy-flat/dump/008	Rivers enabled True
+legacy-flat/dump/009	Fix water color True
+legacy-flat/dump/010	Map edge dropoff True
+legacy-flat/dump/011	Mountains allowed at center False
+legacy-flat/dump/012	Heightmap file (96) fx/all/heightmap.png
+legacy-flat/dump/013	Heightmap amount 1, blend 1, add 0, mask 0
+legacy-flat/dump/014	Flatmap file fx/all/forestmap.png
+legacy-flat/dump/015	Flatmap size 96x96, blend 0.6
+legacy-flat/dump/016	Roughmap file (96) fx/all/roughmap.png
+legacy-flat/dump/017	Roughmap blend 1
+legacy-flat/dump/018	Biomemap file (96) fx/all/biomemap.png
+legacy-flat/dump/019	Biome precision 0: the ground takes its biomes from the 4 corners of each 64 m terrain zone (vanilla)
+legacy-flat/dump/020	Terrainmap file (96) fx/all/terrainmap.png
+legacy-flat/dump/021	Terrain map colors Meadows: 00FF00|Ocean: 0000FF|Mountain: FFFFFF|FF8800FF: 123456|Default: 000000
+legacy-flat/dump/022	Forest scale 1
+legacy-flat/dump/023	Forest amount 0.5
+legacy-flat/dump/024	Forestmap file (96) fx/all/forestmap.png
+legacy-flat/dump/025	Forestmap multiply 1, add 1
+legacy-flat/dump/026	Forest Factor applies only to the same trees as vanilla
+legacy-flat/dump/027	Location file (96) fx/all/locationmap.png
+legacy-flat/dump/028	Locationmap includes spawns for 5 types
+legacy-flat/dump/029	Paintmap file (96) fx/all/paintmap.png
+legacy-flat/dump/030	Paintmap colors 80808080: FF0000|FF000000: 102030
+legacy-flat/dump/031	Lavamap file (96) fx/all/lavamap.png
+legacy-flat/dump/032	Mossmap file (96) fx/all/mossmap.png
+legacy-flat/dump/033	Vegetationmap file (96) fx/all/vegetationmap.png
+legacy-flat/dump/034	Heatmap file fx/all/heatmap.png
+legacy-flat/dump/035	Heatmap size 96x96
+legacy-flat/dump/036	Heatmap scale 10
+legacy-flat/dump/037	Spawnmap file (96) fx/all/spawnmap.png
+legacy-flat/dump/038	Altbiomemap file (96) fx/all/altbiomemap.png
+legacy-flat/dump/039	    #6A8CA0: Wolf Mountain
+legacy-flat/dump/040	    #3C5A28: Dark Meadows + Lantern
+legacy-flat/dump/041	    #A05A3C: !Drake Mountain
+legacy-flat/dump/042	    #101010: none
+legacy-flat/dump/043	    point at 100, -200: Wolf Mountain
+legacy-flat/dump/044	Alt biomes: mode Random, grid WorldEdge, placement seed world seed
+legacy-flat/dump/045	Alt biomes: chance x1, amount x1, region size x1, distance x1
+legacy-flat/dump/046	Alt biomes: neighbour fix off, mean sector height off, min sector thickness 0
+legacy-flat/dump/count	46
+legacy-flat/loaded-maps	heightmap.png, biomemap.png, terrainmap.png, locationmap.png, roughmap.png, flatmap.png, forestmap.png, heatmap.png, paintmap.png, lavamap.png, mossmap.png, vegetationmap.png, spawnmap.png, altbiomemap.png
+legacy-flat/v11/disk	len=59502 sha=8beff0885ad87b0e0a1eea9b
+legacy-flat/v11/network	len=59153 sha=adc2a679ffe6d04d39022145
+legacy-flat/v11/network-no-alt	len=57899 sha=3e0e55489d00c99dd3b26570
+legacy-flat/v11/config-version	len=59502 sha=8beff0885ad87b0e0a1eea9b
+legacy-flat/cache-id	4c4d753e5c3e9dea4fe01489a9232c12
+legacy-flat/v11/disk-roundtrip	same
+legacy-flat/v11/network-roundtrip	same
+legacy-flat/v11/dump-after-load	n=43 sha=564b839d7e27b45c81f8c859
+legacy-flat/v1/disk	len=13402 sha=b44a6add0c7c6d44b1a5422e
+legacy-flat/v1/network	len=13383 sha=d3f5eb1928e078815766a171
+legacy-flat/v1/dump-after-load	n=30 sha=ffa609fead46e95e957da55c
+legacy-flat/v2/disk	len=14556 sha=a1b0709f8f92181aca4dbc31
+legacy-flat/v2/network	len=14519 sha=3ee91cfc72e750194fa78233
+legacy-flat/v2/dump-after-load	n=30 sha=cbcbd064c47c8595ddc728f3
+legacy-flat/v3/disk	len=14721 sha=1ebfba6b8056672474faa381
+legacy-flat/v3/network	len=14663 sha=f3b0bfc79a9f58e6db7c21fe
+legacy-flat/v3/dump-after-load	n=31 sha=7185789056a212bb392d5aa2
+legacy-flat/v4/disk	len=14721 sha=293a5117422f231ae7039952
+legacy-flat/v4/network	len=14663 sha=aed25e962268855500e193ac
+legacy-flat/v4/dump-after-load	n=31 sha=a471ffbb13b3081d1854d442
+legacy-flat/v5/disk	len=29791 sha=99f4a0e428250acade49fba6
+legacy-flat/v5/network	len=29677 sha=9941e4f97ca4d79fb1c5aade
+legacy-flat/v5/dump-after-load	n=35 sha=c1e869b6317894e7b7cdd29f
+legacy-flat/v6/disk	len=29796 sha=38a650799d4e42f359b19e8c
+legacy-flat/v6/network	len=29682 sha=3654d54acba074aa365c7d5b
+legacy-flat/v6/dump-after-load	n=35 sha=e15476f9bbba2152e858e97d
+legacy-flat/v7/disk	len=29800 sha=7fe3950b9310d13a5d0afbf5
+legacy-flat/v7/network	len=29686 sha=d245bcdafc30db5db5db869f
+legacy-flat/v7/dump-after-load	n=34 sha=a36dbec3903b86967f3a65fc
+legacy-flat/v8/disk	len=30187 sha=e8c489ff17db957a0c5b7673
+legacy-flat/v8/network	len=30073 sha=80e2390c3d68e9f4c3c8cf5b
+legacy-flat/v8/dump-after-load	n=34 sha=75585310f559c3a20e103e9e
+legacy-flat/v9/disk	len=30191 sha=1b9722f6590de4cf7447ef20
+legacy-flat/v9/network	len=30077 sha=1d4cec48b9f9a631af78e26f
+legacy-flat/v9/dump-after-load	n=34 sha=af41edb96e697645354c774d
+legacy-flat/v10/disk	len=30595 sha=89b8a7eabff4539435fe1a54
+legacy-flat/v10/network	len=30463 sha=878073bbeb0f2235c6f00d6a
+legacy-flat/v10/dump-after-load	n=35 sha=7a76bace177c0220ce4cb91b

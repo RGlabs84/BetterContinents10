@@ -1,0 +1,138 @@
+biome/missing/created	True
+biome/missing/legend-file-after	None: 000000\nMeadows: 00FF00\nBlackForest: 007F00\nSwamp: 7F7F00\nMountain: FFFFFF\nPlains: FFFF00\nMistlands: 7F7F7F\nAshLands: FF0000\nDeepNorth: 00FFFF\nOcean: 0000FF\n
+biome/missing/errors	0
+biome/missing/unresolved	
+biome/missing/pixels	8,0,32,64,0,2,2,512,256,1,0,32,1,8,4,2
+biome/missing/serialized	len=16 sha=3c26e0a6b24a77a2a9354356
+biome/missing/log/001	[Log] [BetterContinents] Biome map (4 x 4): Meadows 12.50%, Swamp 18.75%, Mountain 6.25%, BlackForest 12.50%, AshLands 12.50%, DeepNorth 6.25%, Ocean 6.25%, Mistlands 6.25%, None 18.75%
+biome/missing/log/count	1
+biome/default/created	True
+biome/default/legend-file-after	None: 000000\nMeadows: 00FF00\nBlackForest: 007F00\nSwamp: 7F7F00\nMountain: FFFFFF\nPlains: FFFF00\nMistlands: 7F7F7F\nAshLands: FF0000\nDeepNorth: 00FFFF\nOcean: 0000FF
+biome/default/errors	0
+biome/default/unresolved	
+biome/default/pixels	8,0,32,64,0,2,2,512,256,1,0,32,1,8,4,2
+biome/default/serialized	len=16 sha=3c26e0a6b24a77a2a9354356
+biome/default/log/001	[Log] [BetterContinents] Biome map (4 x 4): Meadows 12.50%, Swamp 18.75%, Mountain 6.25%, BlackForest 12.50%, AshLands 12.50%, DeepNorth 6.25%, Ocean 6.25%, Mistlands 6.25%, None 18.75%
+biome/default/log/count	1
+biome/messy/created	True
+biome/messy/legend-file-after	# comment\n\nMeadows: 00FF00\nBlack Forest: 7,127,0\nmountain: zzz\nDeadWastes: 8B4513\nOcean: 0000FF\nOcean: 0000FE\n4: 7F7F00\nthis line is broken\nAshLands: FF0000\n
+biome/messy/errors	3
+biome/messy/unresolved	DeadWastes=RGBA(139, 69, 19, 255)
+biome/messy/pixels	8,8,32,1,8,4,0,0,256,1,8,32,1,8,4,0
+biome/messy/serialized	len=16 sha=343e247f1c4e6fec4fb4b1c9
+biome/messy/log/001	[Error] [BetterContinents] fx/legends/biome-messy.txt: invalid colour zzz for mountain (a hex colour like 8B4513, or r,g,b): its default colour is used.
+biome/messy/log/002	[Error] [BetterContinents] fx/legends/biome-messy.txt: invalid biome name DeadWastes, skipped: its colour reads as None. The biomes are None, Meadows, Swamp, Mountain, BlackForest, Plains, AshLands, DeepNorth, Ocean, Mistlands; the biomes Expand World Data adds need Expand World Data installed.
+biome/messy/log/003	[Warning] [BetterContinents] fx/legends/biome-messy.txt: Ocean is listed more than once; its last colour is used.
+biome/messy/log/004	[Warning] [BetterContinents] fx/legends/biome-messy.txt: 4 is listed more than once; its last colour is used.
+biome/messy/log/005	[Error] [BetterContinents] fx/legends/biome-messy.txt: "this line is broken" is not "name: colour" (start a note with #), skipped.
+biome/messy/log/006	[Log] [BetterContinents] Biome map (4 x 4): Meadows 18.75%, Mountain 12.50%, BlackForest 31.25%, AshLands 12.50%, Ocean 6.25%, None 18.75%
+biome/messy/log/count	6
+location/missing/created	True
+location/missing/legend-file-after	n=88 sha=957b1812c44ac8faedaae4f2
+location/missing/areas/GDKing	(0,0.75)
+location/missing/areas/StartTemple	(0.75,0.5)
+location/missing/log/001	[Log] [BetterContinents] No spawns are mapped to color #101010 (which has 1 spawn positions defined)
+location/missing/log/002	[Log] [BetterContinents] No spawns are mapped to color #00FF80 (which has 1 spawn positions defined)
+location/missing/log/003	[Log] [BetterContinents] No spawns are mapped to color #123456 (which has 1 spawn positions defined)
+location/missing/log/004	[Log] [BetterContinents] No spawns are mapped to color #A05A3C (which has 1 spawn positions defined)
+location/missing/log/005	[Log] [BetterContinents] No spawns are mapped to color #10F010 (which has 1 spawn positions defined)
+location/missing/log/006	[Log] [BetterContinents] No spawns are mapped to color #FFFFFF (which has 1 spawn positions defined)
+location/missing/log/count	6
+location/messy/created	True
+location/messy/legend-file-after	n=7 sha=cdc832ab26cc9d47c2a623f4
+location/messy/areas/Runestone_Meadows:alias	(0.75,0)
+location/messy/areas/StartTemple	(0.75,0.5)
+location/messy/log/001	[Error] [BetterContinents] Location colors: invalid colour nope for Eikthyrnir (a hex colour like FF0000, or r,g,b), skipped.
+location/messy/log/002	[Warning] [BetterContinents] Location colors: StartTemple is listed more than once; its last colour is used.
+location/messy/log/003	[Log] [BetterContinents] No spawns are mapped to color #101010 (which has 1 spawn positions defined)
+location/messy/log/004	[Log] [BetterContinents] No spawns are mapped to color #123456 (which has 1 spawn positions defined)
+location/messy/log/005	[Log] [BetterContinents] No spawns are mapped to color #A05A3C (which has 1 spawn positions defined)
+location/messy/log/006	[Log] [BetterContinents] No spawns are mapped to color #10F010 (which has 1 spawn positions defined)
+location/messy/log/007	[Log] [BetterContinents] No spawns are mapped to color #00FF00 (which has 1 spawn positions defined)
+location/messy/log/008	[Log] [BetterContinents] No spawns are mapped to color #FFFFFF (which has 1 spawn positions defined)
+location/messy/log/count	8
+paint/missing/created	True
+paint/missing/legend-file-after	\n
+paint/missing/source-colors	
+paint/missing/pixels	0.23529412,0.3529412,0.15686275,1 0.0627451,0.0627451,0.0627451,1 0.99607843,0.003921569,0.007843138,1 0,1,0.5019608,1 0.07058824,0.20392157,0.3372549,1 0.49803922,0.49803922,0,1 0.627451,0.3529412,0.23529412,1 0.41568628,0.54901963,0.627451,1 0,0,1,1 0.0627451,0.9411765,0.0627451,1 0,0,0,1 1,0,0,1 0,1,0,1 0,0.49803922,0,1 1,1,1,1 0.54509807,0.27058825,0.07450981,1
+paint/missing/log/count	0
+paint/mapped/created	True
+paint/mapped/legend-file-after	80808080: FF0000\nFF000000: 123456\n
+paint/mapped/source-colors	80808080: FF0000|FF000000: 123456
+paint/mapped/pixels	0.23529412,0.3529412,0.15686275,1 0.0627451,0.0627451,0.0627451,1 0.99607843,0.003921569,0.007843138,1 0,1,0.5019608,1 1,0,0,0 0.49803922,0.49803922,0,1 0.627451,0.3529412,0.23529412,1 0.41568628,0.54901963,0.627451,1 0,0,1,1 0.0627451,0.9411765,0.0627451,1 0,0,0,1 0.5019608,0.5019608,0.5019608,0.5019608 0,1,0,1 0,0.49803922,0,1 1,1,1,1 0.54509807,0.27058825,0.07450981,1
+paint/mapped/log/count	0
+paint/broken/created	True
+paint/broken/legend-file-after	80808080: FF0000\n1,2: 123456\nzz: 00FF00\n
+paint/broken/source-colors	80808080: FF0000|1,2: 123456|zz: 00FF00
+paint/broken/pixels	0.23529412,0.3529412,0.15686275,1 0.0627451,0.0627451,0.0627451,1 0.99607843,0.003921569,0.007843138,1 0,1,0.5019608,1 0,0,0,0 0.49803922,0.49803922,0,1 0.627451,0.3529412,0.23529412,1 0.41568628,0.54901963,0.627451,1 0,0,1,1 0.0627451,0.9411765,0.0627451,1 0,0,0,1 0.5019608,0.5019608,0.5019608,0.5019608 0,0,0,0 0,0.49803922,0,1 1,1,1,1 0.54509807,0.27058825,0.07450981,1
+paint/broken/log/001	[Warning] [BetterContinents] Cannot parse color 1,2
+paint/broken/log/002	[Warning] [BetterContinents] Cannot parse color zz
+paint/broken/log/count	2
+terrain/missing/created	True
+terrain/missing/legend-file-after	Default: 000000\nMeadows: 00FF00\nBlackForest: 007F00\nSwamp: 7F7F00\nMountain: FFFFFF\nPlains: FFFF00\nMistlands: 7F7F7F\nAshLands: FF0000\nDeepNorth: 00FFFF\nOcean: 0000FF\n
+terrain/missing/source-colors	
+terrain/missing/pixels	0.23529412,0.3529412,0.15686275,1 0.0627451,0.0627451,0.0627451,1 0.99607843,0.003921569,0.007843138,1 0,1,0.5019608,1 0.07058824,0.20392157,0.3372549,1 - - 0.41568628,0.54901963,0.627451,1 0,0,0,0 - - 1,0,0,1 0,0,0,0 0,0,1,0 0,1,0,0 0.54509807,0.27058825,0.07450981,1
+terrain/missing/log/count	0
+terrain/mapped/created	True
+terrain/mapped/legend-file-after	Meadows: 00FF00\nOcean: 0000FF\nMountain: FFFFFF\nFF8800FF: 123456\nDefault: 000000\n
+terrain/mapped/source-colors	Meadows: 00FF00|Ocean: 0000FF|Mountain: FFFFFF|FF8800FF: 123456|Default: 000000
+terrain/mapped/pixels	0.23529412,0.3529412,0.15686275,1 0.0627451,0.0627451,0.0627451,1 0.99607843,0.003921569,0.007843138,1 0,1,0.5019608,1 1,0.53333336,0,1 - - 0.41568628,0.54901963,0.627451,1 0,0,0,0 - - 1,0,0,1 0,0,0,0 0,0.49803922,0,1 0,1,0,0 0.54509807,0.27058825,0.07450981,1
+terrain/mapped/log/count	0
+terrain/commented/created	True
+terrain/commented/legend-file-after	# a comment\nMeadows: 00FF00\n
+terrain/commented/source-colors	# a comment|Meadows: 00FF00
+terrain/commented/pixels	0.23529412,0.3529412,0.15686275,1 0.0627451,0.0627451,0.0627451,1 0.99607843,0.003921569,0.007843138,1 0,1,0.5019608,1 0.07058824,0.20392157,0.3372549,1 0.49803922,0.49803922,0,1 0.627451,0.3529412,0.23529412,1 0.41568628,0.54901963,0.627451,1 0,0,1,1 0.0627451,0.9411765,0.0627451,1 0,0,0,1 1,0,0,1 0,0,0,0 0,0.49803922,0,1 1,1,1,1 0.54509807,0.27058825,0.07450981,1
+terrain/commented/log/count	0
+spawn/missing/created	True
+spawn/missing/legend-file-after	
+spawn/missing/legend	RGBA(255, 255, 255, 255)=none
+spawn/missing/pixels	- - - - - - - - - - - - - - none -
+spawn/missing/log/001	[Warning] [BetterContinents] spawn-missing.png: Unknown color Rgba32(60, 90, 40, 255) found in the image.
+spawn/missing/log/count	1
+spawn/entries/created	True
+spawn/entries/legend-file-after	# veg\n255,0,0,255: -FirTree, +Beech1\n0,255,0,255: none, +Pinetree_01\nbroken line\n0,0,255: +Birch*\n
+spawn/entries/legend	RGBA(255, 255, 255, 255)=none | RGBA(255, 0, 0, 255)=-FirTree, +Beech1 | RGBA(0, 255, 0, 255)=none, +Pinetree_01 | RGBA(0, 0, 255, 255)=+Birch*
+spawn/entries/pixels	- - - - - - - - +Birch* - - -FirTree, +Beech1 none, +Pinetree_01 - none -
+spawn/entries/log/001	[Warning] [BetterContinents] spawn-entries.png: Unknown color Rgba32(60, 90, 40, 255) found in the image.
+spawn/entries/log/count	1
+spawn/badcolour/created	True
+spawn/badcolour/legend-file-after	255,0,0,255: -FirTree\nzz: +Beech1\n0,255,0,255: none\n
+spawn/badcolour/legend	RGBA(255, 255, 255, 255)=none | RGBA(255, 0, 0, 255)=-FirTree | RGBA(0, 0, 0, 0)=+Beech1 | RGBA(0, 255, 0, 255)=none
+spawn/badcolour/pixels	- - - - - - - - - - - -FirTree none - none -
+spawn/badcolour/log/001	[Warning] [BetterContinents] Cannot parse color zz
+spawn/badcolour/log/002	[Warning] [BetterContinents] spawn-badcolour.png: Unknown color Rgba32(60, 90, 40, 255) found in the image.
+spawn/badcolour/log/count	2
+alt/missing/created	True
+alt/missing/legend-file-after	n=56 sha=242fc02618785e83485be54e
+alt/missing/classes	#000000 [none] none | #FF969C [Mushroom] | #F2A300 [Lantern] | #F8E1B6 [Bones] | #DDA776 [Menhir] | #2D4613 [Dark Meadows] | #ADFFDA [Peaceful Meadows] | #E5C54B [Dandelion Meadows] | #C2185B [Raspberry Meadows] | #6EC03D [Smalltree Meadows] | #CCFFAC [Birch Meadows] | #2C7B76 [Troll Black Forest] | #6F5E32 [Root Black Forest] | #9D6C4B [Ruin Black Forest] | #5A5264 [Rock Black Forest] | #004754 [Pinetree Black Forest] | #4A5CB6 [Blueberry Black Forest] | #B1332D [Hut Swamp] | #6E2143 [Bog Swamp] | #382B41 [Bat Swamp] | #95B17E [Abomination Swamp] | #93C7BC [Wolf Mountain] | #5AAAC2 [Drake Mountain] | #B697AF [Fortress Mountain] | #CC605F [Lox Plains] | #FF7622 [Goblin Plains] | #671E07 [Death Plains] | #A9AE34 [Kalhygge Black Forest] | #D99FE8 [Rockless Mistlands] | #472577 [Trees Mistlands] | #8A7FDB [Swords Mistlands] | #D56EBB [Hare Mistlands] | #8E2F8E [BroodSwarm Mistlands]
+alt/missing/pins	
+alt/missing/map	0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+alt/missing/block	len=3940 sha=a305c1ad65b79e2a5fe83e42
+alt/missing/log/001	[Log] [BetterContinents] Wrote the default alt-biome legend to fx/legends/alt-missing.txt
+alt/missing/log/002	[Log] [BetterContinents] Alt-biome legend alt-missing.txt: 32 colours, 0 points.
+alt/missing/log/003	[Log] [BetterContinents] Alt-biome map fx/legends/alt-missing.png: 4x4, 0 planted pixels, decoded in <n> ms.
+alt/missing/log/004	[Warning] [BetterContinents] Alt-biome map alt-missing.png: 15 pixels in 15 colours match no legend colour (within 20) and are treated as unplanted. Most common:
+alt/missing/log/005	[Warning] [BetterContinents]     #3C5A28: 1 pixels, nearest legend colour #2D4613 (Dark Meadows) is 33 away
+alt/missing/log/006	[Warning] [BetterContinents]     #101010: 1 pixels, nearest legend colour #2D4613 (Dark Meadows) is 61 away
+alt/missing/log/007	[Warning] [BetterContinents]     #FE0102: 1 pixels, nearest legend colour #B1332D (Hut Swamp) is 101 away
+alt/missing/log/008	[Warning] [BetterContinents]     #00FF80: 1 pixels, nearest legend colour #2C7B76 (Troll Black Forest) is 139 away
+alt/missing/log/009	[Warning] [BetterContinents]     #123456: 1 pixels, nearest legend colour #004754 (Pinetree Black Forest) is 26 away
+alt/missing/log/count	9
+alt/planted/created	True
+alt/planted/legend-file-after	n=9 sha=7db1490149601c06f53c95e5
+alt/planted/classes	#000000 [none] none | #6A8CA0 [Wolf Mountain] | #3C5A28 [Dark Meadows + Lantern] | #A05A3C [!Drake Mountain] | #101010 [none] none | point [Wolf Mountain]
+alt/planted/pins	100,-200->5
+alt/planted/map	2,4,0,0,0,0,3,1,0,0,0,0,0,0,0,0
+alt/planted/block	len=347 sha=e4cc6a32c57a7a102a3773a8
+alt/planted/log/001	[Warning] [BetterContinents] alt-planted.txt line 7: expected '<alt biome>[ + <alt biome>...]: <colour>' or '...: at <x>, <z>', ignoring "this is not a line".
+alt/planted/log/002	[Warning] [BetterContinents] alt-planted.txt line 8: cannot read 'zzz' as a colour (RRGGBB, #RRGGBB or r,g,b) or as 'at <x>, <z>', ignoring the line.
+alt/planted/log/003	[Warning] [BetterContinents] alt-planted.txt line 9: black (000000) is reserved for unplanted land, ignoring the line.
+alt/planted/log/004	[Log] [BetterContinents] Alt-biome legend alt-planted.txt: 4 colours, 1 points.
+alt/planted/log/005	[Log] [BetterContinents] Alt-biome map fx/legends/alt-planted.png: 4x4, 4 planted pixels, decoded in <n> ms.
+alt/planted/log/006	[Warning] [BetterContinents] Alt-biome map alt-planted.png: 11 pixels in 11 colours match no legend colour (within 20) and are treated as unplanted. Most common:
+alt/planted/log/007	[Warning] [BetterContinents]     #FE0102: 1 pixels, nearest legend colour #A05A3C (!Drake Mountain) is 142 away
+alt/planted/log/008	[Warning] [BetterContinents]     #00FF80: 1 pixels, nearest legend colour #6A8CA0 (Wolf Mountain) is 160 away
+alt/planted/log/009	[Warning] [BetterContinents]     #123456: 1 pixels, nearest legend colour #3C5A28 (Dark Meadows + Lantern) is 73 away
+alt/planted/log/010	[Warning] [BetterContinents]     #7F7F00: 1 pixels, nearest legend colour #A05A3C (!Drake Mountain) is 78 away
+alt/planted/log/011	[Warning] [BetterContinents]     #0000FF: 1 pixels, nearest legend colour #6A8CA0 (Wolf Mountain) is 200 away
+alt/planted/log/count	11

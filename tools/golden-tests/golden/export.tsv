@@ -1,0 +1,336 @@
+defaults	4096 px, amount 2, sea level 0.5, heights, biomes, locations, forest, heat, alt biomes, lava, moss, paint, sources; zone blend, edge drop-off as the world, forest additive, heat scale 10; New World preset
+usage	[size] [amount=2] [sealevel=0.5] [heatscale=10] [edge=auto|on|off] [forest=additive|exact] [noheight] [nobiomes] [nolocations] [noforest] [noheat] [noaltbiomes] [nolava] [nomoss] [nopaint] [nosources] [nopreset] [perpoint]
+format	bc-export/1
+amount2/export.cfg/001	
+amount2/export.cfg/002	[00 BetterContinents.Debug]
+amount2/export.cfg/003	
+amount2/export.cfg/004	## Better Continents on for the new world.
+amount2/export.cfg/005	Enabled = true
+amount2/export.cfg/006	
+amount2/export.cfg/007	## Loads every map in this export folder by its standard name, and no map from anywhere else.
+amount2/export.cfg/008	Directory = <work>/BetterContinents/Golden/export-2026-10-04-12-00-00
+amount2/export.cfg/009	
+amount2/export.cfg/010	## Empty: the new world uses the current settings format (the V3 height formula this export is encoded for).
+amount2/export.cfg/011	Override version = 
+amount2/export.cfg/012	
+amount2/export.cfg/013	[01 BetterContinents.Global]
+amount2/export.cfg/014	
+amount2/export.cfg/015	## The loaded world's playable radius.
+amount2/export.cfg/016	World Size = 10000
+amount2/export.cfg/017	
+amount2/export.cfg/018	## The loaded world's edge width.
+amount2/export.cfg/019	Edge Size = 500
+amount2/export.cfg/020	
+amount2/export.cfg/021	## On: the heightmap holds the edge ring as it is before the drop-off, and Better Continents applies it once. Keeps the world edge (ship push, edge kill).
+amount2/export.cfg/022	Map Edge Drop-off = true
+amount2/export.cfg/023	
+amount2/export.cfg/024	## The location map holds every location, so the game places no others.
+amount2/export.cfg/025	Skip Default Locations = true
+amount2/export.cfg/026	
+amount2/export.cfg/027	## The sea level the heights are encoded for.
+amount2/export.cfg/028	Sea Level Adjustment = 0.5
+amount2/export.cfg/029	
+amount2/export.cfg/030	## The heightmap overrides the biome height formulas, rivers included; the loaded world's rivers are in it.
+amount2/export.cfg/031	Rivers = false
+amount2/export.cfg/032	
+amount2/export.cfg/033	## The loaded world's centre is already in the heightmap; no second clamp.
+amount2/export.cfg/034	Mountains Allowed At Center = true
+amount2/export.cfg/035	
+amount2/export.cfg/036	[02 BetterContinents.Heightmap]
+amount2/export.cfg/037	
+amount2/export.cfg/038	## metres = (pixel / 65535 * amount - 0.15 + Lerp(1, -1, sea level)) * 200.
+amount2/export.cfg/039	Heightmap Amount = 2
+amount2/export.cfg/040	
+amount2/export.cfg/041	## The heightmap is the height, not blended with generated terrain.
+amount2/export.cfg/042	Heightmap Blend = 1
+amount2/export.cfg/043	
+amount2/export.cfg/044	## Nothing added on top.
+amount2/export.cfg/045	Heightmap Add = 0
+amount2/export.cfg/046	
+amount2/export.cfg/047	## No masking.
+amount2/export.cfg/048	Heightmap Mask = 0
+amount2/export.cfg/049	
+amount2/export.cfg/050	## Every biome takes its height from the heightmap.
+amount2/export.cfg/051	Heightmap Override All = true
+amount2/export.cfg/052	
+amount2/export.cfg/053	## heightmap.png is plain 16-bit grey.
+amount2/export.cfg/054	Heightmap Alpha = false
+amount2/export.cfg/055	
+amount2/export.cfg/056	[03 BetterContinents.Biomemap]
+amount2/export.cfg/057	
+amount2/export.cfg/058	## As the loaded world: the ground follows the biomes on 3 x 3 cells per 64 m terrain zone.
+amount2/export.cfg/059	Biome precision = 2
+amount2/export.cfg/060	
+amount2/export.cfg/061	[04 BetterContinents.Forest]
+amount2/export.cfg/062	
+amount2/export.cfg/063	## The loaded world's forest scale, so the game's own forest noise lines up with forestmap.png.
+amount2/export.cfg/064	Forest Scale = 1
+amount2/export.cfg/065	
+amount2/export.cfg/066	## Neutral: the loaded world's forest amount is already in forestmap.png.
+amount2/export.cfg/067	Forest Amount = 0.5
+amount2/export.cfg/068	
+amount2/export.cfg/069	## Additive encoding: forest = game forest + forestmap (black = the game's own forest).
+amount2/export.cfg/070	Forestmap Multiply = 0
+amount2/export.cfg/071	
+amount2/export.cfg/072	## See Forestmap Multiply.
+amount2/export.cfg/073	Forestmap Add = 1
+amount2/export.cfg/074	
+amount2/export.cfg/075	## As the loaded world.
+amount2/export.cfg/076	Forest Factor Overrides All Trees = false
+amount2/export.cfg/077	
+amount2/export.cfg/078	[05 BetterContinents.StartPosition]
+amount2/export.cfg/079	
+amount2/export.cfg/080	## The start temple is in the location map.
+amount2/export.cfg/081	Override Start Position = false
+amount2/export.cfg/082	
+amount2/export.cfg/083	[06 BetterContinents.Maps]
+amount2/export.cfg/084	
+amount2/export.cfg/085	## heat = pixel / 65535 * scale; Ashlands where it is above 0.
+amount2/export.cfg/086	Heatmap Scale = 10
+amount2/export.cfg/087	
+amount2/export.cfg/088	[07 BetterContinents.Misc]
+amount2/export.cfg/089	
+amount2/export.cfg/090	## Makes the new-world preset "From Config", i.e. these settings. Anything else creates the world without them.
+amount2/export.cfg/091	SelectedPreset = From Config
+amount2/export.cfg/092	
+amount2/export.cfg/093	[08 BetterContinents.AltBiomes]
+amount2/export.cfg/094	
+amount2/export.cfg/095	## The alt-biome map holds every alt biome as placed, so the game places none at random.
+amount2/export.cfg/096	Mode = PlantedOnly
+amount2/export.cfg/097	
+amount2/export.cfg/098	## As the loaded world.
+amount2/export.cfg/099	Grid = WorldEdge
+amount2/export.cfg/count	99
+amount2/README.txt/001	Better Continents world export of "Golden" (seed "GoldenSeed"), 2026-10-04 12:00,
+amount2/README.txt/002	Better Continents <version>, Valheim <game>, sampled on the host.
+amount2/README.txt/003	Every image is 2048 x 2048 pixels over 21000 m (10.259 m per pixel), north at the top.
+amount2/README.txt/004	
+amount2/README.txt/005	MAKE A NEW WORLD FROM THIS EXPORT - pick one of the three ways
+amount2/README.txt/006	
+amount2/README.txt/007	  A. The preset. The export did not make it (switched off); way B makes it.
+amount2/README.txt/008	
+amount2/README.txt/009	  B. bc_import, for example after you have edited the PNGs.
+amount2/README.txt/010	     1. Open the console with F5, in the main menu or in a world.
+amount2/README.txt/011	     2. Type   bc_import Golden/export-2026-10-04-12-00-00
+amount2/README.txt/012	        (or just  bc_import  for your newest export, or  bc_import list  and then  bc_import <number>).
+amount2/README.txt/013	     3. That makes the preset "Golden 2026-10-04 12-00-00" again from the PNGs as they are now and selects it.
+amount2/README.txt/014	        Then choose Start, New World, and Create.
+amount2/README.txt/015	
+amount2/README.txt/016	  C. The config, if you keep editing the PNGs and making worlds from them.
+amount2/README.txt/017	     1. Type   bc_import Golden/export-2026-10-04-12-00-00 config   in the console. It copies export.cfg into
+amount2/README.txt/018	        BepInEx/config/BetterContinents.cfg (your old file is kept beside it, ending in .before-import-<time>)
+amount2/README.txt/019	        and selects the preset "From Config". Or paste export.cfg at the END of that file yourself and save
+amount2/README.txt/020	        it: Better Continents reads the file again within a second, with no restart.
+amount2/README.txt/021	     2. Every New World you then create with "From Config" reads the PNGs in this folder as they are then.
+amount2/README.txt/022	     Setting only Directory in BetterContinents.cfg to this folder works too: a new world made with "From Config"
+amount2/README.txt/023	     then also takes the settings in export.cfg, which win over BetterContinents.cfg (edit export.cfg, or delete
+amount2/README.txt/024	     it, to use your own). Without them the heights are read at the wrong scale: at the default Heightmap Amount
+amount2/README.txt/025	     of 1 nearly the whole world is under water.
+amount2/README.txt/026	
+amount2/README.txt/027	  A world that already exists keeps the maps it was created with. With the same seed, vegetation, fine lava
+amount2/README.txt/028	  detail and the random layout of things come out closest to the exported world.
+amount2/README.txt/029	
+amount2/README.txt/030	WHAT EACH FILE IS
+amount2/README.txt/031	  heightmap.png     How high the ground is (16-bit grey): black -30 m, white 370 m, the sea (30 m) 0.15.
+amount2/README.txt/032	                    Only right at Heightmap Amount 2 and Sea Level Adjustment 0.5 (export.cfg sets both).
+amount2/README.txt/033	  biomemap.png      Which biome is where, in Better Continents' biome colours (biomemap.txt lists them).
+amount2/README.txt/034	  locationmap.png   One dot per location: start temple, bosses, traders, dungeons (locationmap.txt names the colours).
+amount2/README.txt/035	  forestmap.png     Forest added to the game's own (16-bit grey): black keeps the game's forest, lighter adds trees.
+amount2/README.txt/036	  heatmap.png       The Ashlands heat (16-bit grey): heat = value x 10; Ashlands wherever it is above black.
+amount2/README.txt/037	  altbiomemap.png   The alt biomes (Dark Meadows, Wolf Mountain...) exactly as placed (altbiomemap.txt names them).
+amount2/README.txt/038	  lavamap.png       Where Ashlands lava is (8-bit grey).
+amount2/README.txt/039	  mossmap.png       The Mistlands ground cover (8-bit grey).
+amount2/README.txt/040	  paintmap.png      The ground paint of every biome (snow depth and the like), a colour per pixel.
+amount2/README.txt/041	  sources/          The loaded world's own Better Continents maps as its settings keep them (not loaded).
+amount2/README.txt/042	  export.cfg        The settings that load this folder (way C). It keeps the world's Biome precision (2):
+amount2/README.txt/043	                    how closely the ground follows the biome map inside each 64 m terrain zone.
+amount2/README.txt/044	  manifest.json     Every number about this export, for tools.
+amount2/README.txt/045	  Delete a map from the folder, then remake the preset (B), to let the game make that part itself.
+amount2/README.txt/046	
+amount2/README.txt/047	EDITING, AND CUTTING AND PASTING BETWEEN EXPORTS
+amount2/README.txt/048	  - Edit the PNGs in any image editor. Keep them square PNGs of the same size, and keep heightmap.png,
+amount2/README.txt/049	    forestmap.png and heatmap.png 16-bit grey (an 8-bit save turns smooth slopes into steps).
+amount2/README.txt/050	  - Two exports line up pixel for pixel when they have the same size, heightmap amount and sea level
+amount2/README.txt/051	    (size, heightmapAmount, seaLevel and totalSize in manifest.json). Then an area cut from one pastes into the
+amount2/README.txt/052	    same place of the other, and the heights there come out the same.
+amount2/README.txt/053	  - Paste the same area from every map (heights, biomes, forest, lava, moss, heat, alt biomes) so they stay
+amount2/README.txt/054	    matched, and copy the legend lines (.txt) of any colour the other export's legend lacks.
+amount2/README.txt/055	  - Heights are read smoothly, so a seam blends over one pixel; a biome is the one most of the 4 nearest
+amount2/README.txt/056	    pixels have.
+amount2/README.txt/057	  - A location dot must stay one pixel that touches no other dot of its colour.
+amount2/README.txt/058	  - Forest is added to the game's own forest at the new place, so pasted woods keep their extra trees, but the
+amount2/README.txt/059	    game's pattern under them changes.
+amount2/README.txt/060	  - Only the generated world is exported: buildings, terrain edits and placed objects are not.
+amount2/README.txt/061	
+amount2/README.txt/062	THE NUMBERS
+amount2/README.txt/063	  Heights: metres = (v x 2 - 0.15 + 0) x 200, v = pixel / 65535.
+amount2/README.txt/064	  Past 10000 m the heightmap holds the ground before Better Continents' edge drop-off, which rebuilds the edge.
+amount2/README.txt/065	  Pixel (column c, row r) is world x = (c / 2047 - 0.5) x 21000, z = (0.5 - r / 2047) x 21000.
+amount2/README.txt/066	  The location map alone uses c / 2048 and r / 2048 (Better Continents' location loader): up to a pixel off the rest.
+amount2/README.txt/count	66
+amount1-exact-edgeoff/export.cfg/001	
+amount1-exact-edgeoff/export.cfg/002	[00 BetterContinents.Debug]
+amount1-exact-edgeoff/export.cfg/003	
+amount1-exact-edgeoff/export.cfg/004	## Better Continents on for the new world.
+amount1-exact-edgeoff/export.cfg/005	Enabled = true
+amount1-exact-edgeoff/export.cfg/006	
+amount1-exact-edgeoff/export.cfg/007	## Loads every map in this export folder by its standard name, and no map from anywhere else.
+amount1-exact-edgeoff/export.cfg/008	Directory = <work>/BetterContinents/Golden/export-2026-10-04-12-00-00
+amount1-exact-edgeoff/export.cfg/009	
+amount1-exact-edgeoff/export.cfg/010	## Empty: the new world uses the current settings format (the V3 height formula this export is encoded for).
+amount1-exact-edgeoff/export.cfg/011	Override version = 
+amount1-exact-edgeoff/export.cfg/012	
+amount1-exact-edgeoff/export.cfg/013	[01 BetterContinents.Global]
+amount1-exact-edgeoff/export.cfg/014	
+amount1-exact-edgeoff/export.cfg/015	## The loaded world's playable radius.
+amount1-exact-edgeoff/export.cfg/016	World Size = 10000
+amount1-exact-edgeoff/export.cfg/017	
+amount1-exact-edgeoff/export.cfg/018	## The loaded world's edge width.
+amount1-exact-edgeoff/export.cfg/019	Edge Size = 500
+amount1-exact-edgeoff/export.cfg/020	
+amount1-exact-edgeoff/export.cfg/021	## Off: the edge is already in the heightmap. Also removes the world edge (no ship push or edge kill); the outermost pixels continue past it.
+amount1-exact-edgeoff/export.cfg/022	Map Edge Drop-off = false
+amount1-exact-edgeoff/export.cfg/023	
+amount1-exact-edgeoff/export.cfg/024	## The location map holds every location, so the game places no others.
+amount1-exact-edgeoff/export.cfg/025	Skip Default Locations = true
+amount1-exact-edgeoff/export.cfg/026	
+amount1-exact-edgeoff/export.cfg/027	## The sea level the heights are encoded for.
+amount1-exact-edgeoff/export.cfg/028	Sea Level Adjustment = 0.5
+amount1-exact-edgeoff/export.cfg/029	
+amount1-exact-edgeoff/export.cfg/030	## The heightmap overrides the biome height formulas, rivers included; the loaded world's rivers are in it.
+amount1-exact-edgeoff/export.cfg/031	Rivers = false
+amount1-exact-edgeoff/export.cfg/032	
+amount1-exact-edgeoff/export.cfg/033	## The loaded world's centre is already in the heightmap; no second clamp.
+amount1-exact-edgeoff/export.cfg/034	Mountains Allowed At Center = true
+amount1-exact-edgeoff/export.cfg/035	
+amount1-exact-edgeoff/export.cfg/036	[02 BetterContinents.Heightmap]
+amount1-exact-edgeoff/export.cfg/037	
+amount1-exact-edgeoff/export.cfg/038	## metres = (pixel / 65535 * amount - 0.15 + Lerp(1, -1, sea level)) * 200.
+amount1-exact-edgeoff/export.cfg/039	Heightmap Amount = 1
+amount1-exact-edgeoff/export.cfg/040	
+amount1-exact-edgeoff/export.cfg/041	## The heightmap is the height, not blended with generated terrain.
+amount1-exact-edgeoff/export.cfg/042	Heightmap Blend = 1
+amount1-exact-edgeoff/export.cfg/043	
+amount1-exact-edgeoff/export.cfg/044	## Nothing added on top.
+amount1-exact-edgeoff/export.cfg/045	Heightmap Add = 0
+amount1-exact-edgeoff/export.cfg/046	
+amount1-exact-edgeoff/export.cfg/047	## No masking.
+amount1-exact-edgeoff/export.cfg/048	Heightmap Mask = 0
+amount1-exact-edgeoff/export.cfg/049	
+amount1-exact-edgeoff/export.cfg/050	## Every biome takes its height from the heightmap.
+amount1-exact-edgeoff/export.cfg/051	Heightmap Override All = true
+amount1-exact-edgeoff/export.cfg/052	
+amount1-exact-edgeoff/export.cfg/053	## heightmap.png is plain 16-bit grey.
+amount1-exact-edgeoff/export.cfg/054	Heightmap Alpha = false
+amount1-exact-edgeoff/export.cfg/055	
+amount1-exact-edgeoff/export.cfg/056	[03 BetterContinents.Biomemap]
+amount1-exact-edgeoff/export.cfg/057	
+amount1-exact-edgeoff/export.cfg/058	## As the loaded world: the ground follows the biomes on 3 x 3 cells per 64 m terrain zone.
+amount1-exact-edgeoff/export.cfg/059	Biome precision = 2
+amount1-exact-edgeoff/export.cfg/060	
+amount1-exact-edgeoff/export.cfg/061	[04 BetterContinents.Forest]
+amount1-exact-edgeoff/export.cfg/062	
+amount1-exact-edgeoff/export.cfg/063	## The loaded world's forest scale, so the game's own forest noise lines up with forestmap.png.
+amount1-exact-edgeoff/export.cfg/064	Forest Scale = 1
+amount1-exact-edgeoff/export.cfg/065	
+amount1-exact-edgeoff/export.cfg/066	## Neutral: the loaded world's forest amount is already in forestmap.png.
+amount1-exact-edgeoff/export.cfg/067	Forest Amount = 0.5
+amount1-exact-edgeoff/export.cfg/068	
+amount1-exact-edgeoff/export.cfg/069	## Exact encoding: forest = forestmap * (game forest + 1).
+amount1-exact-edgeoff/export.cfg/070	Forestmap Multiply = 1
+amount1-exact-edgeoff/export.cfg/071	
+amount1-exact-edgeoff/export.cfg/072	## See Forestmap Multiply.
+amount1-exact-edgeoff/export.cfg/073	Forestmap Add = 1
+amount1-exact-edgeoff/export.cfg/074	
+amount1-exact-edgeoff/export.cfg/075	## As the loaded world.
+amount1-exact-edgeoff/export.cfg/076	Forest Factor Overrides All Trees = false
+amount1-exact-edgeoff/export.cfg/077	
+amount1-exact-edgeoff/export.cfg/078	[05 BetterContinents.StartPosition]
+amount1-exact-edgeoff/export.cfg/079	
+amount1-exact-edgeoff/export.cfg/080	## The start temple is in the location map.
+amount1-exact-edgeoff/export.cfg/081	Override Start Position = false
+amount1-exact-edgeoff/export.cfg/082	
+amount1-exact-edgeoff/export.cfg/083	[06 BetterContinents.Maps]
+amount1-exact-edgeoff/export.cfg/084	
+amount1-exact-edgeoff/export.cfg/085	## heat = pixel / 65535 * scale; Ashlands where it is above 0.
+amount1-exact-edgeoff/export.cfg/086	Heatmap Scale = 10
+amount1-exact-edgeoff/export.cfg/087	
+amount1-exact-edgeoff/export.cfg/088	[07 BetterContinents.Misc]
+amount1-exact-edgeoff/export.cfg/089	
+amount1-exact-edgeoff/export.cfg/090	## Makes the new-world preset "From Config", i.e. these settings. Anything else creates the world without them.
+amount1-exact-edgeoff/export.cfg/091	SelectedPreset = From Config
+amount1-exact-edgeoff/export.cfg/092	
+amount1-exact-edgeoff/export.cfg/093	[08 BetterContinents.AltBiomes]
+amount1-exact-edgeoff/export.cfg/094	
+amount1-exact-edgeoff/export.cfg/095	## The alt-biome map holds every alt biome as placed, so the game places none at random.
+amount1-exact-edgeoff/export.cfg/096	Mode = PlantedOnly
+amount1-exact-edgeoff/export.cfg/097	
+amount1-exact-edgeoff/export.cfg/098	## As the loaded world.
+amount1-exact-edgeoff/export.cfg/099	Grid = WorldEdge
+amount1-exact-edgeoff/export.cfg/count	99
+amount1-exact-edgeoff/README.txt/001	Better Continents world export of "Golden" (seed "GoldenSeed"), 2026-10-04 12:00,
+amount1-exact-edgeoff/README.txt/002	Better Continents <version>, Valheim <game>, sampled on the host.
+amount1-exact-edgeoff/README.txt/003	Every image is 2048 x 2048 pixels over 21000 m (10.259 m per pixel), north at the top.
+amount1-exact-edgeoff/README.txt/004	
+amount1-exact-edgeoff/README.txt/005	MAKE A NEW WORLD FROM THIS EXPORT - pick one of the three ways
+amount1-exact-edgeoff/README.txt/006	
+amount1-exact-edgeoff/README.txt/007	  A. The preset. The export did not make it (switched off); way B makes it.
+amount1-exact-edgeoff/README.txt/008	
+amount1-exact-edgeoff/README.txt/009	  B. bc_import, for example after you have edited the PNGs.
+amount1-exact-edgeoff/README.txt/010	     1. Open the console with F5, in the main menu or in a world.
+amount1-exact-edgeoff/README.txt/011	     2. Type   bc_import Golden/export-2026-10-04-12-00-00
+amount1-exact-edgeoff/README.txt/012	        (or just  bc_import  for your newest export, or  bc_import list  and then  bc_import <number>).
+amount1-exact-edgeoff/README.txt/013	     3. That makes the preset "Golden 2026-10-04 12-00-00" again from the PNGs as they are now and selects it.
+amount1-exact-edgeoff/README.txt/014	        Then choose Start, New World, and Create.
+amount1-exact-edgeoff/README.txt/015	
+amount1-exact-edgeoff/README.txt/016	  C. The config, if you keep editing the PNGs and making worlds from them.
+amount1-exact-edgeoff/README.txt/017	     1. Type   bc_import Golden/export-2026-10-04-12-00-00 config   in the console. It copies export.cfg into
+amount1-exact-edgeoff/README.txt/018	        BepInEx/config/BetterContinents.cfg (your old file is kept beside it, ending in .before-import-<time>)
+amount1-exact-edgeoff/README.txt/019	        and selects the preset "From Config". Or paste export.cfg at the END of that file yourself and save
+amount1-exact-edgeoff/README.txt/020	        it: Better Continents reads the file again within a second, with no restart.
+amount1-exact-edgeoff/README.txt/021	     2. Every New World you then create with "From Config" reads the PNGs in this folder as they are then.
+amount1-exact-edgeoff/README.txt/022	     Setting only Directory in BetterContinents.cfg to this folder works too: a new world made with "From Config"
+amount1-exact-edgeoff/README.txt/023	     then also takes the settings in export.cfg, which win over BetterContinents.cfg (edit export.cfg, or delete
+amount1-exact-edgeoff/README.txt/024	     it, to use your own). Without them the heights are read at the wrong scale: at the default Heightmap Amount
+amount1-exact-edgeoff/README.txt/025	     of 1 nearly the whole world is under water.
+amount1-exact-edgeoff/README.txt/026	
+amount1-exact-edgeoff/README.txt/027	  A world that already exists keeps the maps it was created with. With the same seed, vegetation, fine lava
+amount1-exact-edgeoff/README.txt/028	  detail and the random layout of things come out closest to the exported world.
+amount1-exact-edgeoff/README.txt/029	
+amount1-exact-edgeoff/README.txt/030	WHAT EACH FILE IS
+amount1-exact-edgeoff/README.txt/031	  heightmap.png     How high the ground is (16-bit grey): black -30 m, white 170 m, the sea (30 m) 0.3.
+amount1-exact-edgeoff/README.txt/032	                    Only right at Heightmap Amount 1 and Sea Level Adjustment 0.5 (export.cfg sets both).
+amount1-exact-edgeoff/README.txt/033	  biomemap.png      Which biome is where, in Better Continents' biome colours (biomemap.txt lists them).
+amount1-exact-edgeoff/README.txt/034	  locationmap.png   One dot per location: start temple, bosses, traders, dungeons (locationmap.txt names the colours).
+amount1-exact-edgeoff/README.txt/035	  forestmap.png     How dense the forest is (16-bit grey): density = value x (the game's own density + 1).
+amount1-exact-edgeoff/README.txt/036	  heatmap.png       The Ashlands heat (16-bit grey): heat = value x 10; Ashlands wherever it is above black.
+amount1-exact-edgeoff/README.txt/037	  altbiomemap.png   The alt biomes (Dark Meadows, Wolf Mountain...) exactly as placed (altbiomemap.txt names them).
+amount1-exact-edgeoff/README.txt/038	  lavamap.png       Where Ashlands lava is (8-bit grey).
+amount1-exact-edgeoff/README.txt/039	  mossmap.png       The Mistlands ground cover (8-bit grey).
+amount1-exact-edgeoff/README.txt/040	  paintmap.png      The ground paint of every biome (snow depth and the like), a colour per pixel.
+amount1-exact-edgeoff/README.txt/041	  sources/          The loaded world's own Better Continents maps as its settings keep them (not loaded).
+amount1-exact-edgeoff/README.txt/042	  export.cfg        The settings that load this folder (way C). It keeps the world's Biome precision (2):
+amount1-exact-edgeoff/README.txt/043	                    how closely the ground follows the biome map inside each 64 m terrain zone.
+amount1-exact-edgeoff/README.txt/044	  manifest.json     Every number about this export, for tools.
+amount1-exact-edgeoff/README.txt/045	  Delete a map from the folder, then remake the preset (B), to let the game make that part itself.
+amount1-exact-edgeoff/README.txt/046	
+amount1-exact-edgeoff/README.txt/047	EDITING, AND CUTTING AND PASTING BETWEEN EXPORTS
+amount1-exact-edgeoff/README.txt/048	  - Edit the PNGs in any image editor. Keep them square PNGs of the same size, and keep heightmap.png,
+amount1-exact-edgeoff/README.txt/049	    forestmap.png and heatmap.png 16-bit grey (an 8-bit save turns smooth slopes into steps).
+amount1-exact-edgeoff/README.txt/050	  - Two exports line up pixel for pixel when they have the same size, heightmap amount and sea level
+amount1-exact-edgeoff/README.txt/051	    (size, heightmapAmount, seaLevel and totalSize in manifest.json). Then an area cut from one pastes into the
+amount1-exact-edgeoff/README.txt/052	    same place of the other, and the heights there come out the same.
+amount1-exact-edgeoff/README.txt/053	  - Paste the same area from every map (heights, biomes, forest, lava, moss, heat, alt biomes) so they stay
+amount1-exact-edgeoff/README.txt/054	    matched, and copy the legend lines (.txt) of any colour the other export's legend lacks.
+amount1-exact-edgeoff/README.txt/055	  - Heights are read smoothly, so a seam blends over one pixel; a biome is the one most of the 4 nearest
+amount1-exact-edgeoff/README.txt/056	    pixels have.
+amount1-exact-edgeoff/README.txt/057	  - A location dot must stay one pixel that touches no other dot of its colour.
+amount1-exact-edgeoff/README.txt/058	  - Forest is added to the game's own forest at the new place, so pasted woods keep their extra trees, but the
+amount1-exact-edgeoff/README.txt/059	    game's pattern under them changes.
+amount1-exact-edgeoff/README.txt/060	  - Only the generated world is exported: buildings, terrain edits and placed objects are not.
+amount1-exact-edgeoff/README.txt/061	
+amount1-exact-edgeoff/README.txt/062	THE NUMBERS
+amount1-exact-edgeoff/README.txt/063	  Heights: metres = (v x 1 - 0.15 + 0) x 200, v = pixel / 65535.
+amount1-exact-edgeoff/README.txt/064	  Pixel (column c, row r) is world x = (c / 2047 - 0.5) x 21000, z = (0.5 - r / 2047) x 21000.
+amount1-exact-edgeoff/README.txt/065	  The location map alone uses c / 2048 and r / 2048 (Better Continents' location loader): up to a pixel off the rest.
+amount1-exact-edgeoff/README.txt/count	65
