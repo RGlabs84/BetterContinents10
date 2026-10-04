@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-09-22 for alt-biome planting (0.8.1), and on 2026-09-25 for version-agnostic wording (0.9.1), and on 2026-09-29 for Expand World Data biomes (0.9.3).
+// Added by Wubarrk on 2026-09-22 for alt-biome planting (0.8.1), and on 2026-09-25 for version-agnostic wording (0.9.1), and on 2026-09-29 for Expand World Data biomes (0.9.3), and modified on 2026-10-04 for the unifying refactor (0.10.0).
 
 using System;
 using System.Collections;
@@ -138,7 +138,7 @@ public partial class BetterContinents
     {
       // The grid about to be built holds only the biomes the game lists now (Expand World Data's, from its yaml as
       // loaded for this world): the biome map reads any other as None, or the grid would throw on it.
-      ImageMapBiome.RefreshUsableBiomes();
+      BiomeRegistry.RefreshUsable();
       Settings.WarnUnusableBiomes();
       Configure();
       Warned.Clear();
@@ -184,7 +184,7 @@ public partial class BetterContinents
     internal static BiomeSector PlainSector(Heightmap.Biome biome)
     {
       var sectors = PlainSectors;
-      int index = ImageMapBiome.ToSafeIndex(biome);
+      int index = BiomeRegistry.ToSafeIndex(biome);
       return index < sectors.Length ? sectors[index] : sectors[0];
     }
 
@@ -837,11 +837,11 @@ public partial class BetterContinents
           continue;
         if (!planting.Claims(p.Key, sector.Biome))
         {
-          WarnOnce("point:" + where, $"Alt biomes: the point plant at {where} ({planting.DescribeKey(p.Key)}) lands on {ImageMapBiome.BiomeName(sector.Biome)}, which none of its alt biomes can change; it is ignored.");
+          WarnOnce("point:" + where, $"Alt biomes: the point plant at {where} ({planting.DescribeKey(p.Key)}) lands on {BiomeRegistry.Name(sector.Biome)}, which none of its alt biomes can change; it is ignored.");
           continue;
         }
         if (IsGlobal(sector.Biome) && !PartitionKeys.ContainsKey(sector))
-          WarnOnce("pointglobal:" + where, $"Alt biomes: the point plant at {where} ({planting.DescribeKey(p.Key)}) lands on {ImageMapBiome.BiomeName(sector.Biome)}, which the game treats as ONE world-wide region: it applies to all unplanted {ImageMapBiome.BiomeName(sector.Biome)}. Paint the area instead to plant only part of it.");
+          WarnOnce("pointglobal:" + where, $"Alt biomes: the point plant at {where} ({planting.DescribeKey(p.Key)}) lands on {BiomeRegistry.Name(sector.Biome)}, which the game treats as ONE world-wide region: it applies to all unplanted {BiomeRegistry.Name(sector.Biome)}. Paint the area instead to plant only part of it.");
         if (!Pinned.TryGetValue(sector, out var list))
           Pinned[sector] = list = [];
         if (!list.Contains(p.Key))
@@ -1059,9 +1059,9 @@ public partial class BetterContinents
     // no biome in m_notNeighbor may (Expand World Data's biomes included).
     internal static bool NeighboursOk(BiomeSector sector, AltBiome modifier)
     {
-      for (int i = 1; i < ImageMapBiome.BiomeIndexCount; i++)
+      for (int i = 1; i < BiomeRegistry.IndexCount; i++)
       {
-        var biome = ImageMapBiome.ToSafeBiome(i);
+        var biome = BiomeRegistry.ToSafeBiome(i);
         if ((modifier.m_requireNeighbor & biome) != 0 && !sector.Neighbors.Any(n => n.Biome == biome))
           return false;
         if ((modifier.m_notNeighbor & biome) != 0 && sector.Neighbors.Any(n => n.Biome == biome))

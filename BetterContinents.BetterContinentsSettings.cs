@@ -94,7 +94,7 @@ public partial class BetterContinents
     public bool HasAltBiomeMap => AltBiomeMap != null;
     internal ImageMapAltBiome? AltBiomeMapData => AltBiomeMap;
     public bool HasBiomeMap => BiomeMap != null;
-    // Before the alt-biome grid is built: says which of the map's biomes the world cannot use now (ImageMapBiome.Usable).
+    // Before the alt-biome grid is built: says which of the map's biomes the world cannot use now (BiomeRegistry.Usable).
     internal void WarnUnusableBiomes() => BiomeMap?.WarnUnusable();
     public bool HasLocationMap => LocationMap != null;
     public bool HasRoughMap => RoughMap != null;
@@ -239,7 +239,7 @@ public partial class BetterContinents
     {
       if (map != null && map.LegendErrors == 0)
       {
-        ImageMapBiome.RefreshUsableBiomes();
+        BiomeRegistry.RefreshUsable();
         map.WarnUnusable();
         return true;
       }

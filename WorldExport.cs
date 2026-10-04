@@ -663,7 +663,7 @@ public static class WorldExport
     private float MinMetres = float.NaN, MaxMetres = float.NaN;
     private long LavaCells, MossCells;
     // Per biome index, Expand World Data's biomes included.
-    private readonly long[] BiomePixels = new long[ImageMapBiome.BiomeIndexCount];
+    private readonly long[] BiomePixels = new long[BiomeRegistry.IndexCount];
     private long UnknownBiomePixels;
     private long ForestClippedLow, ForestClippedHigh;
     private long HeatPixels, HeatClipped;
@@ -1129,9 +1129,9 @@ public static class WorldExport
       int n = Size;
       // The default legend's colours, and a colour of its own for each biome Expand World Data adds.
       var table = ImageMapBiome.ExportColorTable();
-      var colours = new Rgb24[ImageMapBiome.BiomeIndexCount];
+      var colours = new Rgb24[BiomeRegistry.IndexCount];
       foreach (var kv in table)
-        colours[ImageMapBiome.ToSafeIndex(kv.Key)] = new Rgb24(kv.Value.r, kv.Value.g, kv.Value.b);
+        colours[BiomeRegistry.ToSafeIndex(kv.Key)] = new Rgb24(kv.Value.r, kv.Value.g, kv.Value.b);
       Rgb24[]? pixels = new Rgb24[n * n];
       Begin("Sampling biomes", W(1.0));
       foreach (var step in Await(RunRows(n, row =>
@@ -1142,7 +1142,7 @@ public static class WorldExport
                  for (int col = 0; col < n; col++)
                  {
                    var biome = Wg.GetBiome(WorldExportMath.PixelToWorld(col, n, Total), wz);
-                   int k = ImageMapBiome.ToSafeIndex(biome);
+                   int k = BiomeRegistry.ToSafeIndex(biome);
                    if (k == 0 && biome != Heightmap.Biome.None)
                      unknown++;
                    pixels![row * n + col] = colours[k];
@@ -1159,7 +1159,7 @@ public static class WorldExport
                {
                  WorldExportPng.SaveRgb24(p, pixels!, n);
                  // The default legend, plus the added biomes this world has, by the names Expand World Data reads.
-                 var legend = table.Where(kv => ImageMapBiome.IsVanillaBiome(kv.Key) || BiomePixels[ImageMapBiome.ToSafeIndex(kv.Key)] > 0)
+                 var legend = table.Where(kv => BiomeRegistry.IsVanilla(kv.Key) || BiomePixels[BiomeRegistry.ToSafeIndex(kv.Key)] > 0)
                    .ToDictionary(kv => kv.Key, kv => kv.Value);
                  WorldExportPng.WriteText(Path.Combine(Dir, "biomemap.txt"), ImageMapBiome.LegendLines(legend));
                }, "biomemap.txt"))
@@ -1834,7 +1834,7 @@ public static class WorldExport
         case ImageMapBiome biome:
           {
             var colours = ImageMapBiome.ExportLegend(biome.LegendColors, biome.Biomes);
-            var legend = colours.Select(kv => $"{ImageMapBiome.BiomeName(kv.Key)}: {kv.Value.r},{kv.Value.g},{kv.Value.b},{kv.Value.a}").ToList();
+            var legend = colours.Select(kv => $"{BiomeRegistry.Name(kv.Key)}: {kv.Value.r},{kv.Value.g},{kv.Value.b},{kv.Value.a}").ToList();
             if (ext != null)
             {
               Original(ext);
@@ -2256,7 +2256,7 @@ public static class WorldExport
       var biomes = new WorldExportJson.Obj();
       for (int k = 1; k < BiomePixels.Length; k++)
         if (BiomePixels[k] > 0)
-          biomes.Add(ImageMapBiome.BiomeName(ImageMapBiome.ToSafeBiome(k)), BiomePixels[k]);
+          biomes.Add(BiomeRegistry.Name(BiomeRegistry.ToSafeBiome(k)), BiomePixels[k]);
       var m = new WorldExportJson.Obj
       {
         { "format", Format },

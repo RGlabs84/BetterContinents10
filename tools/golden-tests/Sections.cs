@@ -26,7 +26,7 @@ internal static class Sections
   {
     cfg = new ConfigFile(Path.Combine(Program.Work, "BetterContinents.cfg"), true);
     BC.DeclareConfig(cfg);
-    ImageMapBiome.RefreshBiomeTable();
+    BiomeRegistry.RefreshTable();
   }
 
   public static void All()
@@ -649,7 +649,7 @@ internal static class Sections
     Set("Written", new List<string> { "heightmap.png", "biomemap.png", "biomemap.txt", "locationmap.png", "locationmap.txt", "forestmap.png", "heatmap.png", "altbiomemap.png", "altbiomemap.txt", "lavamap.png", "mossmap.png", "paintmap.png", "paintmap.txt", "sources/bc-settings.txt" });
     Set("Notes", new List<string> { "Only the generated world is exported: player terrain edits, buildings and placed objects are not." });
     Set("Tracked", new List<string>());
-    Set("BiomePixels", new long[ImageMapBiome.BiomeIndexCount]);
+    Set("BiomePixels", new long[BiomeRegistry.IndexCount]);
     Set("MinMetres", 1f);
     Set("MaxMetres", 300f);
     Set("LocationsFull", true);

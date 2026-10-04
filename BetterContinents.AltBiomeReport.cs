@@ -30,7 +30,7 @@ public partial class BetterContinents
       // Vanilla's biomes in the usual order, then Expand World Data's by its names.
       var names = RealBiomes.Where(b => (mask & b) != 0).Select(b => b.ToString())
         .Concat(Enumerable.Range(0, 32).Select(bit => (Heightmap.Biome)(int)(1u << bit))
-          .Where(b => (mask & b) != 0 && !ImageMapBiome.IsVanillaBiome(b) && ImageMapBiome.IsValidBiome(b)).Select(ImageMapBiome.BiomeName)).ToList();
+          .Where(b => (mask & b) != 0 && !BiomeRegistry.IsVanilla(b) && BiomeRegistry.IsValid(b)).Select(BiomeRegistry.Name)).ToList();
       return names.Count == 0 ? ((int)mask).ToString(CultureInfo.InvariantCulture) : string.Join("|", names);
     }
 
@@ -80,19 +80,19 @@ public partial class BetterContinents
 
       var absent = new List<string>();
       // Vanilla's biomes, then any Expand World Data added that the grid holds.
-      var added = data.Sectors.Select(x => x.Biome).Where(b => b != Heightmap.Biome.None && !ImageMapBiome.IsVanillaBiome(b)).Distinct().OrderBy(ImageMapBiome.ToSafeIndex);
+      var added = data.Sectors.Select(x => x.Biome).Where(b => b != Heightmap.Biome.None && !BiomeRegistry.IsVanilla(b)).Distinct().OrderBy(BiomeRegistry.ToSafeIndex);
       foreach (var biome in RealBiomes.Concat(added))
       {
         var sectors = data.Sectors.Where(x => x.Biome == biome).ToList();
         int area = sectors.Sum(x => AltBiomeControl.GetInfo(x).Area);
         if (area == 0)
         {
-          absent.Add(ImageMapBiome.BiomeName(biome));
+          absent.Add(BiomeRegistry.Name(biome));
           continue;
         }
         if (AltBiomeControl.IsGlobal(biome) && sectors.Count == 1)
         {
-          lines.Add($"Alt biomes: {ImageMapBiome.BiomeName(biome)}: one world-wide sector, edge {sectors[0].EdgeCount}, centre ({F(sectors[0].Center.x)}, {F(sectors[0].Center.y)})");
+          lines.Add($"Alt biomes: {BiomeRegistry.Name(biome)}: one world-wide sector, edge {sectors[0].EdgeCount}, centre ({F(sectors[0].Center.x)}, {F(sectors[0].Center.y)})");
           continue;
         }
         int tiny = sectors.Count(x => x.EdgeCount < 20);
@@ -100,7 +100,7 @@ public partial class BetterContinents
         int maxEdge = sectors.Count > 0 ? sectors.Max(x => x.EdgeCount) : 0;
         int biomeWithAlt = sectors.Count(x => x.AltBiomes.Count > 0);
         int planted = sectors.Count(IsPlanted);
-        lines.Add($"Alt biomes: {ImageMapBiome.BiomeName(biome)}: {sectors.Count} regions ({tiny} tiny < 20 edge, {thin} sliver-thin), largest edge {maxEdge}, {biomeWithAlt} with alt biomes"
+        lines.Add($"Alt biomes: {BiomeRegistry.Name(biome)}: {sectors.Count} regions ({tiny} tiny < 20 edge, {thin} sliver-thin), largest edge {maxEdge}, {biomeWithAlt} with alt biomes"
                   + (planted > 0 ? $", {planted} planted" : ""));
       }
       if (absent.Count > 0)
@@ -243,7 +243,7 @@ public partial class BetterContinents
       var alts = sector.AltBiomes.Count > 0 ? string.Join(", ", sector.AltBiomes.Select(a => a.m_name)) : "no alt biome";
       // Both measures, so an author can see when the vanilla one is dragged down by an underwater border.
       var height = $"h {F(sector.HeightAvg)} (mean {F(info.MeanHeight)})";
-      return $"#{info.Id} {ImageMapBiome.BiomeName(sector.Biome)} [{PlantingOf(sector)}] centre ({F(sector.Center.x)}, {F(sector.Center.y)}) edge {sector.EdgeCount} area {info.Area} thick {F(info.Thickness(sector))} {height} dist {F(sector.DistanceFromCenter)} -> {alts}";
+      return $"#{info.Id} {BiomeRegistry.Name(sector.Biome)} [{PlantingOf(sector)}] centre ({F(sector.Center.x)}, {F(sector.Center.y)}) edge {sector.EdgeCount} area {info.Area} thick {F(info.Thickness(sector))} {height} dist {F(sector.DistanceFromCenter)} -> {alts}";
     }
 
     // No filter: sectors with alt biomes. "all": every sector. "planted": planted regions. Otherwise a biome name
@@ -264,7 +264,7 @@ public partial class BetterContinents
         sectors = data.Sectors.Where(IsPlanted);
       else if (filter.Equals("random", StringComparison.OrdinalIgnoreCase))
         sectors = data.Sectors.Where(x => x.AltBiomes.Count > 0 && !IsPlanted(x));
-      else if (ImageMapBiome.TryParseBiome(filter, out var biome) && biome != Heightmap.Biome.None)
+      else if (BiomeRegistry.TryParse(filter, out var biome) && biome != Heightmap.Biome.None)
         sectors = data.Sectors.Where(x => x.Biome == biome);
       else
         sectors = data.Sectors.Where(x => x.AltBiomes.Any(a => (a.m_name ?? "").IndexOf(filter, StringComparison.OrdinalIgnoreCase) >= 0));
@@ -291,12 +291,12 @@ public partial class BetterContinents
       var biome = WorldGenerator.instance.GetBiome(position);
       if (!AltBiomeControl.Info.ContainsKey(sector))
       {
-        lines.Add($"No grid sector here: {ImageMapBiome.BiomeName(sector.Biome)} without alt biomes (outside the sampled area, or biome data not ready).");
+        lines.Add($"No grid sector here: {BiomeRegistry.Name(sector.Biome)} without alt biomes (outside the sampled area, or biome data not ready).");
         return lines;
       }
       lines.Add($"Here ({F(position.x)}, {F(position.z)}): " + DescribeSector(sector));
       if (sector.Biome != biome)
-        lines.Add($"Note: the grid says {ImageMapBiome.BiomeName(sector.Biome)} but the biome map says {ImageMapBiome.BiomeName(biome)} here (a 12 m grid cell on a border).");
+        lines.Add($"Note: the grid says {BiomeRegistry.Name(sector.Biome)} but the biome map says {BiomeRegistry.Name(biome)} here (a 12 m grid cell on a border).");
       if (!AltBiomeControl.WorldEnabled)
         return lines;
       foreach (var alt in AltBiomeList.m_altBiomes.Where(a => (a.m_biome & sector.Biome) != 0))

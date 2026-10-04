@@ -223,7 +223,7 @@ public partial class BetterContinents : BaseUnityPlugin
         try
         {
             // After every plugin's Awake, where Expand World Data patches the game's biome conversions.
-            ImageMapBiome.RefreshBiomeTable();
+            BiomeRegistry.RefreshTable();
         }
         catch (Exception e)
         {

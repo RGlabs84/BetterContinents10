@@ -1,4 +1,4 @@
-// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0), and on 2026-09-24 for world export and import (0.9.0), and on 2026-09-29 for Expand World Data biomes (0.9.3).
+// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0), and on 2026-09-24 for world export and import (0.9.0), and on 2026-09-29 for Expand World Data biomes (0.9.3), and on 2026-10-04 for the unifying refactor (0.10.0).
 
 using System;
 using System.Collections.Generic;
@@ -99,13 +99,13 @@ public partial class BetterContinents
   // one per biome index, Expand World Data's biomes included (RefreshPlainSectors).
   internal static BiomeSector[] PlainSectors { get; private set; } = CreatePlainSectors();
   private static BiomeSector[] CreatePlainSectors() =>
-    [.. Enumerable.Range(0, ImageMapBiome.BiomeIndexCount).Select(i => new BiomeSector(null, ImageMapBiome.ToSafeBiome(i)))];
-  // ImageMapBiome.RefreshBiomeTable, at Start: the sectors of vanilla's biomes are kept, so they stay the same objects.
+    [.. Enumerable.Range(0, BiomeRegistry.IndexCount).Select(i => new BiomeSector(null, BiomeRegistry.ToSafeBiome(i)))];
+  // BiomeRegistry.RefreshTable, at Start: the sectors of vanilla's biomes are kept, so they stay the same objects.
   internal static void RefreshPlainSectors()
   {
     var old = PlainSectors;
-    PlainSectors = [.. Enumerable.Range(0, ImageMapBiome.BiomeIndexCount).Select(i =>
-      i < old.Length && old[i].Biome == ImageMapBiome.ToSafeBiome(i) ? old[i] : new BiomeSector(null, ImageMapBiome.ToSafeBiome(i)))];
+    PlainSectors = [.. Enumerable.Range(0, BiomeRegistry.IndexCount).Select(i =>
+      i < old.Length && old[i].Biome == BiomeRegistry.ToSafeBiome(i) ? old[i] : new BiomeSector(null, BiomeRegistry.ToSafeBiome(i)))];
   }
 
   // The world sector data has a resolution of 12 meters and is built from the patched GetBiome,
@@ -205,12 +205,12 @@ public partial class BetterContinents
       if (b0 == b1 && b0 == b2 && b0 == b3)
         return b0;
       // One weight per biome index (with Expand World Data, its biomes' indices too).
-      var weights = Weights is { } w && w.Length == ImageMapBiome.BiomeIndexCount ? w : Weights = new float[ImageMapBiome.BiomeIndexCount];
+      var weights = Weights is { } w && w.Length == BiomeRegistry.IndexCount ? w : Weights = new float[BiomeRegistry.IndexCount];
       Array.Clear(weights, 0, weights.Length);
-      weights[ImageMapBiome.ToSafeIndex(b0)] += Heightmap.Distance(fx, fy, 0f, 0f);
-      weights[ImageMapBiome.ToSafeIndex(b1)] += Heightmap.Distance(fx, fy, 1f, 0f);
-      weights[ImageMapBiome.ToSafeIndex(b2)] += Heightmap.Distance(fx, fy, 0f, 1f);
-      weights[ImageMapBiome.ToSafeIndex(b3)] += Heightmap.Distance(fx, fy, 1f, 1f);
+      weights[BiomeRegistry.ToSafeIndex(b0)] += Heightmap.Distance(fx, fy, 0f, 0f);
+      weights[BiomeRegistry.ToSafeIndex(b1)] += Heightmap.Distance(fx, fy, 1f, 0f);
+      weights[BiomeRegistry.ToSafeIndex(b2)] += Heightmap.Distance(fx, fy, 0f, 1f);
+      weights[BiomeRegistry.ToSafeIndex(b3)] += Heightmap.Distance(fx, fy, 1f, 1f);
       int best = 0;
       float most = -99999f;
       for (int j = 1; j < weights.Length; j++)
@@ -221,7 +221,7 @@ public partial class BetterContinents
           most = weights[j];
         }
       }
-      return ImageMapBiome.ToSafeBiome(best);
+      return BiomeRegistry.ToSafeBiome(best);
     }
 
     // The cell along one axis that holds t (0 to 1 across the zone), and t's position inside it.

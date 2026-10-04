@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-09-29 for Expand World Data biomes (0.9.3).
+// Added by Wubarrk on 2026-09-29 for Expand World Data biomes (0.9.3), and modified on 2026-10-04 for the unifying refactor (0.10.0).
 
 // Offline checks of Better Continents' support for the biomes Expand World Data adds, against the real
 // ExpandWorldData.dll 1.73.0 (the Hexium package, kept in libs-Tools/1.0/thirdparty/expand-world-data-2026-09-29):
@@ -135,13 +135,13 @@ internal static class Program
   static void Vanilla(string work)
   {
     Section("biome table without Expand World Data");
-    ImageMapBiome.RefreshBiomeTable();
-    C(ImageMapBiome.BiomeIndexCount == (int)Heightmap.BiomeIndex.Count, $"ten biome indices (got {ImageMapBiome.BiomeIndexCount})");
-    C(ImageMapBiome.ExtraBiomes == Heightmap.Biome.None, $"no biomes beyond vanilla (got 0x{(uint)ImageMapBiome.ExtraBiomes:X})");
+    BiomeRegistry.RefreshTable();
+    C(BiomeRegistry.IndexCount == (int)Heightmap.BiomeIndex.Count, $"ten biome indices (got {BiomeRegistry.IndexCount})");
+    C(BiomeRegistry.Extra == Heightmap.Biome.None, $"no biomes beyond vanilla (got 0x{(uint)BiomeRegistry.Extra:X})");
     C(BC.PlainSectors.Length == 10 && Enumerable.Range(0, 10).All(i => BC.PlainSectors[i].Biome == ((Heightmap.BiomeIndex)i).ToBiome()), "ten plain sectors, one per vanilla index");
-    C(!ImageMapBiome.IsValidBiome(DeadWastes) && !ImageMapBiome.IsValidBiome(Bit7) && !ImageMapBiome.IsValidBiome(Heightmap.Biome.All), "0x400, 0x80 and All are not biomes the game can use");
-    C(ImageMapBiome.ToSafeIndex(DeadWastes) == 0 && ImageMapBiome.ToSafeIndex(Heightmap.Biome.Mistlands) == 9, "ToSafeIndex: 0x400 -> 0, Mistlands -> 9");
-    C(ImageMapBiome.ToSafeBiome(11) == Heightmap.Biome.None && ImageMapBiome.ToSafeBiome(-1) == Heightmap.Biome.None && ImageMapBiome.ToSafeBiome(9) == Heightmap.Biome.Mistlands, "ToSafeBiome: out of range -> None, 9 -> Mistlands");
+    C(!BiomeRegistry.IsValid(DeadWastes) && !BiomeRegistry.IsValid(Bit7) && !BiomeRegistry.IsValid(Heightmap.Biome.All), "0x400, 0x80 and All are not biomes the game can use");
+    C(BiomeRegistry.ToSafeIndex(DeadWastes) == 0 && BiomeRegistry.ToSafeIndex(Heightmap.Biome.Mistlands) == 9, "ToSafeIndex: 0x400 -> 0, Mistlands -> 9");
+    C(BiomeRegistry.ToSafeBiome(11) == Heightmap.Biome.None && BiomeRegistry.ToSafeBiome(-1) == Heightmap.Biome.None && BiomeRegistry.ToSafeBiome(9) == Heightmap.Biome.Mistlands, "ToSafeBiome: out of range -> None, 9 -> Mistlands");
 
     Section("legend names without Expand World Data");
     ExpectParse("Meadows", Heightmap.Biome.Meadows);
@@ -158,7 +158,7 @@ internal static class Program
     ExpectParse("deep_north", Heightmap.Biome.DeepNorth);
     ExpectParse("Ash-Lands", Heightmap.Biome.AshLands);
     ExpectNoParse("Meadow");
-    C(ImageMapBiome.BiomeName(Heightmap.Biome.AshLands) == "AshLands" && ImageMapBiome.BiomeName(DeadWastes) == "1024", $"BiomeName: AshLands, 0x400 -> 1024 (got {ImageMapBiome.BiomeName(DeadWastes)})");
+    C(BiomeRegistry.Name(Heightmap.Biome.AshLands) == "AshLands" && BiomeRegistry.Name(DeadWastes) == "1024", $"BiomeName: AshLands, 0x400 -> 1024 (got {BiomeRegistry.Name(DeadWastes)})");
 
     Section("one bad legend entry no longer discards the legend");
     // The tester's legend, on a game without Expand World Data: DeadWastes is not a biome here. Meadows is in the
@@ -271,7 +271,7 @@ internal static class Program
       "but the game reads them as None (the default generation decides there)");
     C(At(decoded, 1, 0) == Heightmap.Biome.Meadows && At(decoded, 2, 0) == Heightmap.Biome.Mistlands && At(decoded, 1, 2) == Heightmap.Biome.Ocean, "vanilla pixels read as before");
     LogHandler.Clear();
-    ImageMapBiome.RefreshUsableBiomes();
+    BiomeRegistry.RefreshUsable();
     decoded.WarnUnusable();
     C(LogHandler.Has("does not have now") && LogHandler.Has("1024 (0x400)") && LogHandler.Has("-2147483648 (0x80000000)") && LogHandler.Has("128 (0x80)") && LogHandler.Has("Expand World Data"),
       "one warning at world load names them and points at Expand World Data");
@@ -398,16 +398,16 @@ internal static class Program
 
     Section("biome table with Expand World Data");
     var vanillaSectors = BC.PlainSectors.ToArray();
-    ImageMapBiome.RefreshBiomeTable();
-    C(ImageMapBiome.BiomeIndexCount == 33, $"33 biome indices (got {ImageMapBiome.BiomeIndexCount})");
-    C((uint)ImageMapBiome.ExtraBiomes == 0xFFFFFC80u, $"every other flag bit is a biome the game can use (got 0x{(uint)ImageMapBiome.ExtraBiomes:X})");
+    BiomeRegistry.RefreshTable();
+    C(BiomeRegistry.IndexCount == 33, $"33 biome indices (got {BiomeRegistry.IndexCount})");
+    C((uint)BiomeRegistry.Extra == 0xFFFFFC80u, $"every other flag bit is a biome the game can use (got 0x{(uint)BiomeRegistry.Extra:X})");
     C(LogHandler.Has("Biome maps accept 23 biomes beyond vanilla"), "the startup line reports them");
-    C(ImageMapBiome.IsValidBiome(DeadWastes) && ImageMapBiome.IsValidBiome(Unnamed) && ImageMapBiome.IsValidBiome(LastBit) && ImageMapBiome.IsValidBiome(Bit7),
+    C(BiomeRegistry.IsValid(DeadWastes) && BiomeRegistry.IsValid(Unnamed) && BiomeRegistry.IsValid(LastBit) && BiomeRegistry.IsValid(Bit7),
       "0x400, an unnamed 0x1000, 0x80000000 and 0x80 are all usable (the game indexes every bit)");
-    C(!ImageMapBiome.IsValidBiome(Heightmap.Biome.All) && !ImageMapBiome.IsValidBiome(DeadWastes | Heightmap.Biome.Meadows), "combinations still are not");
-    C(ImageMapBiome.ToSafeIndex(DeadWastes) == 11 && ImageMapBiome.ToSafeIndex(LastBit) == 32 && ImageMapBiome.ToSafeIndex(Heightmap.Biome.All) == 0,
+    C(!BiomeRegistry.IsValid(Heightmap.Biome.All) && !BiomeRegistry.IsValid(DeadWastes | Heightmap.Biome.Meadows), "combinations still are not");
+    C(BiomeRegistry.ToSafeIndex(DeadWastes) == 11 && BiomeRegistry.ToSafeIndex(LastBit) == 32 && BiomeRegistry.ToSafeIndex(Heightmap.Biome.All) == 0,
       "ToSafeIndex: 0x400 -> 11, 0x80000000 -> 32, All -> 0");
-    C(Enumerable.Range(0, 33).All(i => i == 0 || ImageMapBiome.ToSafeBiome(i) != Heightmap.Biome.None) && ImageMapBiome.ToSafeBiome(33) == Heightmap.Biome.None,
+    C(Enumerable.Range(0, 33).All(i => i == 0 || BiomeRegistry.ToSafeBiome(i) != Heightmap.Biome.None) && BiomeRegistry.ToSafeBiome(33) == Heightmap.Biome.None,
       "ToSafeBiome covers indices 1..32");
     C(BC.PlainSectors.Length == 33 && BC.PlainSectors[11].Biome == DeadWastes && BC.PlainSectors[10].Biome == Bit7 && BC.PlainSectors[32].Biome == LastBit,
       "33 plain sectors, Expand World Data's biomes included");
@@ -428,13 +428,13 @@ internal static class Program
     ExpectNoParse("All");
     ExpectNoParse("Nowhere");
     ExpectNoParse("1025");
-    C(ImageMapBiome.BiomeName(DeadWastes) == "DeadWastes" && ImageMapBiome.BiomeName(Unnamed) == "4096" && ImageMapBiome.BiomeName(Heightmap.Biome.Ocean) == "Ocean",
+    C(BiomeRegistry.Name(DeadWastes) == "DeadWastes" && BiomeRegistry.Name(Unnamed) == "4096" && BiomeRegistry.Name(Heightmap.Biome.Ocean) == "Ocean",
       $"BiomeName: 0x400 -> DeadWastes, unnamed 0x1000 -> 4096, Ocean -> Ocean");
 
     Section("biomes the world can use now (the alt-biome grid's)");
     C(Enum.GetValues(typeof(Heightmap.Biome)).Cast<Heightmap.Biome>().Contains(DeadWastes) && !Enum.GetValues(typeof(Heightmap.Biome)).Cast<Heightmap.Biome>().Contains(Unnamed),
       "Expand World Data's Enum.GetValues lists DeadWastes, not the unnamed 0x1000");
-    C(ImageMapBiome.IsUsableBiome(DeadWastes) && ImageMapBiome.IsUsableBiome(LastBit) && !ImageMapBiome.IsUsableBiome(Unnamed) && ImageMapBiome.IsUsableBiome(Heightmap.Biome.Plains),
+    C(BiomeRegistry.IsUsable(DeadWastes) && BiomeRegistry.IsUsable(LastBit) && !BiomeRegistry.IsUsable(Unnamed) && BiomeRegistry.IsUsable(Heightmap.Biome.Plains),
       "usable now: the named biomes and vanilla's, not 0x1000");
     var unnamed = ImageMapBiome.Create(new byte[] { 13, 11, 1, 13 })!;
     C(unnamed.Biomes[0] == Unnamed && unnamed.GetValue(0f, 0f) == Heightmap.Biome.None && unnamed.GetValue(1f, 0f) == DeadWastes,
@@ -443,10 +443,10 @@ internal static class Program
     unnamed.WarnUnusable();
     C(LogHandler.Has("4096 (0x1000)") && !LogHandler.Has("DeadWastes (0x400)"), "the world-load warning names 0x1000 only");
     SetNames(new() { [DeadWastes] = "DeadWastes", [AshenMarsh] = "AshenMarsh", [LastBit] = "LastBit", [Unnamed] = "Frost" });
-    ImageMapBiome.RefreshUsableBiomes();
+    BiomeRegistry.RefreshUsable();
     C(unnamed.GetValue(0f, 0f) == Unnamed, "once Expand World Data names 0x1000 (its yaml changed back), the map's pixels are that biome again: nothing was lost");
     SetNames(new() { [DeadWastes] = "DeadWastes", [AshenMarsh] = "AshenMarsh", [LastBit] = "LastBit" });
-    ImageMapBiome.RefreshUsableBiomes();
+    BiomeRegistry.RefreshUsable();
 
     Section("the tester's map: a DeadWastes region in biomemap.png, DeadWastes in biomemap.txt");
     var path = WriteMap(work, "biomemap", [
@@ -488,14 +488,14 @@ internal static class Program
     C(table.Values.Select(c => (c.r, c.g, c.b)).Distinct().Count() == 33, "every biome's colour differs from every other");
     C(Enumerable.Range(0, 10).All(i => table[((Heightmap.BiomeIndex)i).ToBiome()].Equals(ImageMapBiome.DefaultColorTable()[((Heightmap.BiomeIndex)i).ToBiome()])),
       "vanilla's biomes keep the default colours");
-    var worldLegend = table.Where(kv => ImageMapBiome.IsVanillaBiome(kv.Key) || kv.Key == DeadWastes).ToDictionary(kv => kv.Key, kv => kv.Value);
+    var worldLegend = table.Where(kv => BiomeRegistry.IsVanilla(kv.Key) || kv.Key == DeadWastes).ToDictionary(kv => kv.Key, kv => kv.Value);
     var lines = ImageMapBiome.LegendLines(worldLegend).ToList();
     C(lines.Take(10).SequenceEqual(ImageMapBiome.DefaultColors.Split('|')) && lines.Count == 11 && lines[10] == "DeadWastes: 004488",
       $"biomemap.txt: the default lines, then \"DeadWastes: 004488\" (got \"{lines.LastOrDefault()}\")");
     // Export -> import: a map drawn in the export colours and read back with the exported legend.
     var mixed = new[] { Heightmap.Biome.Meadows, DeadWastes, AshenMarsh, Heightmap.Biome.Ocean };
-    var exported = WriteMap(work, "exported", mixed.Select(b => (ImageMapBiome.BiomeName(b), ToRgba(table[b]))).ToArray());
-    File.WriteAllLines(Path.ChangeExtension(exported, ".txt"), ImageMapBiome.LegendLines(table.Where(kv => ImageMapBiome.IsVanillaBiome(kv.Key) || mixed.Contains(kv.Key)).ToDictionary(kv => kv.Key, kv => kv.Value)));
+    var exported = WriteMap(work, "exported", mixed.Select(b => (BiomeRegistry.Name(b), ToRgba(table[b]))).ToArray());
+    File.WriteAllLines(Path.ChangeExtension(exported, ".txt"), ImageMapBiome.LegendLines(table.Where(kv => BiomeRegistry.IsVanilla(kv.Key) || mixed.Contains(kv.Key)).ToDictionary(kv => kv.Key, kv => kv.Value)));
     LogHandler.Clear();
     var imported = ImageMapBiome.Create(exported);
     C(imported != null && Enumerable.Range(0, 4).All(i => imported.GetValue(Q(i), 0.5f) == mixed[i]) && !LogHandler.Has("[Error]"),
@@ -530,9 +530,9 @@ internal static class Program
   static Rgba32 ToRgba(Color32 c) => new(c.r, c.g, c.b, c.a);
 
   static void ExpectParse(string name, Heightmap.Biome want) =>
-    C(ImageMapBiome.TryParseBiome(name, out var got) && got == want, $"\"{name}\" -> {(uint)want:X} (got {(ImageMapBiome.TryParseBiome(name, out var g) ? $"{(uint)g:X}" : "no biome")})");
+    C(BiomeRegistry.TryParse(name, out var got) && got == want, $"\"{name}\" -> {(uint)want:X} (got {(BiomeRegistry.TryParse(name, out var g) ? $"{(uint)g:X}" : "no biome")})");
   static void ExpectNoParse(string name) =>
-    C(!ImageMapBiome.TryParseBiome(name, out _), $"\"{name}\" is not a biome here");
+    C(!BiomeRegistry.TryParse(name, out _), $"\"{name}\" is not a biome here");
 
   // The x at the middle of column band i of the test map's four vertical bands.
   static float Q(int i) => (i + 0.5f) / 4f;

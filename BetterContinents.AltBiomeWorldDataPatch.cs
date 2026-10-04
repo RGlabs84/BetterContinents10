@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and modified for alt-biome planting (0.8.1), and on 2026-09-29 for Expand World Data biomes (0.9.3).
+// Added by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and modified for alt-biome planting (0.8.1), and on 2026-09-29 for Expand World Data biomes (0.9.3), and modified on 2026-10-04 for the unifying refactor (0.10.0).
 
 using System.Collections.Generic;
 using System.Linq;
@@ -39,7 +39,7 @@ public partial class BetterContinents
     private static void ReportOnce(Heightmap.Biome biome, string what)
     {
       if (Reported.Add(biome))
-        LogWarning($"The biome map has no {ImageMapBiome.BiomeName(biome)}, so no {what} exist for it. Locations that require {ImageMapBiome.BiomeName(biome)} will be skipped.");
+        LogWarning($"The biome map has no {BiomeRegistry.Name(biome)}, so no {what} exist for it. Locations that require {BiomeRegistry.Name(biome)} will be skipped.");
     }
 
     [HarmonyPrefix, HarmonyPatch("GetRandomPointByBiome")]
@@ -82,7 +82,7 @@ public partial class BetterContinents
       if ((__result & biome) != 0 && __instance.Biomes.TryGetValue(__result, out var picked) && picked.AllPoints.Count > 0)
         return;
       var present = new List<Heightmap.Biome>(PickOrder.Length);
-      var added = __instance.Biomes.Keys.Where(b => b != Heightmap.Biome.None && !ImageMapBiome.IsVanillaBiome(b) && ImageMapBiome.IsValidBiome(b)).OrderBy(b => (uint)b);
+      var added = __instance.Biomes.Keys.Where(b => b != Heightmap.Biome.None && !BiomeRegistry.IsVanilla(b) && BiomeRegistry.IsValid(b)).OrderBy(b => (uint)b);
       foreach (var candidate in PickOrder.Concat(added))
         if ((biome & candidate) != 0 && __instance.Biomes.TryGetValue(candidate, out var info) && info.AllPoints.Count > 0)
           present.Add(candidate);

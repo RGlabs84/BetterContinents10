@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-09-29 for Expand World Data biomes (0.9.3).
+// Added by Wubarrk on 2026-09-29 for Expand World Data biomes (0.9.3), and modified on 2026-10-04 for the unifying refactor (0.10.0).
 
 // World generation with Expand World Data's biomes (called at the end of Program.EwdChecks, so its patches are in). The game's
 // WorldGenerator.GetBiome and GetBiomeHeight run for real, under Expand World Data's own Harmony patches of them (its
@@ -654,7 +654,7 @@ internal static class Generation
     Set("Written", new List<string>());
     Set("Notes", new List<string>());
     Set("Tracked", new List<string>());
-    Set("BiomePixels", new long[ImageMapBiome.BiomeIndexCount]);
+    Set("BiomePixels", new long[BiomeRegistry.IndexCount]);
     Set("MinMetres", float.NaN);
     Set("MaxMetres", float.NaN);
     Set("LocationsGenerated", true);
