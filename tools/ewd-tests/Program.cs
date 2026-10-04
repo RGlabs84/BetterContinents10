@@ -523,7 +523,74 @@ internal static class Program
     C(tie.GetBiome(0.5f, 0.5f) == DeadWastes, "an exact tie goes to the lower index, as in vanilla (0x400 = 11 before 0x800 = 12)");
 
     // World generation (Generation.cs): patched games only, after everything above.
+    NameFollowing(work);
     Generation.Run(work, ewd);
+  }
+
+  // A world made since 0.10 saves its biome map's added biomes with their names (in the alt-biome blob, format 2) and reads them
+  // back by name: Expand World Data numbers its biomes in its yaml's order, so after the yaml changes the same bit can be another
+  // biome. The bytes the world saved never change; an older world reads the bits as it always has.
+  [MethodImpl(MethodImplOptions.NoInlining)]
+  static void NameFollowing(string work)
+  {
+    Section("a new world's biome map follows Expand World Data's biome names");
+    var field = typeof(BC.BetterContinentsSettings).GetField("BiomeMap", BindingFlags.NonPublic | BindingFlags.Instance)!;
+    var bands = new[] { Heightmap.Biome.Meadows, DeadWastes, AshenMarsh, Heightmap.Biome.Ocean };
+    var path = WriteMap(work, "named", [("Meadows", new Rgba32(0, 255, 0)), ("DeadWastes", new Rgba32(0x8B, 0x45, 0x13)), ("AshenMarsh", new Rgba32(0x55, 0x22, 0x77)), ("Ocean", new Rgba32(0, 0, 255))]);
+    var map = ImageMapBiome.Create(path)!;
+    BC.BetterContinentsSettings World(int version)
+    {
+      var s = new BC.BetterContinentsSettings { EnabledForThisWorld = true, Version = version };
+      field.SetValue(s, map);
+      return s;
+    }
+    byte[] Save(BC.BetterContinentsSettings s, bool network = false)
+    {
+      var pkg = new ZPackage();
+      s.Serialize(pkg, network, true, s.SavedVersion);
+      return pkg.GetArray();
+    }
+    BC.BetterContinentsSettings Read(byte[] bytes) => BC.BetterContinentsSettings.Load(new ZPackage(bytes));
+    string Band(BC.BetterContinentsSettings s, int i) => BiomeRegistry.Name(((ImageMapBiome)field.GetValue(s)!).GetValue(Q(i), 0.5f));
+    void Names(Dictionary<Heightmap.Biome, string> extra)
+    {
+      SetNames(extra);
+      BiomeRegistry.RefreshUsable();
+    }
+
+    var saved12 = Save(World(12));
+    var saved11 = Save(World(11));
+    var back = Read(saved12);
+    C(back.AltBiomes == null && Band(back, 1) == "DeadWastes" && Band(back, 2) == "AshenMarsh" && Save(back).SequenceEqual(saved12),
+      "a new world saves the names with its map and reads it back the same: no alt-biome options of its own (the blob only carries the names), the same bytes saved again");
+    C(saved11.Length < saved12.Length && Read(saved11).AltBiomes == null, "an older world saves no names");
+
+    // The yaml changes: DeadWastes and AshenMarsh swap their numbers.
+    Names(new() { [AshenMarsh] = "DeadWastes", [DeadWastes] = "AshenMarsh", [LastBit] = "LastBit" });
+    var moved = Read(saved12);
+    C(Band(moved, 1) == "DeadWastes" && Band(moved, 2) == "AshenMarsh",
+      $"after the yaml swaps their numbers, the new world's map still reads DeadWastes and AshenMarsh where they were (got {Band(moved, 1)}, {Band(moved, 2)})");
+    C(Save(moved).SequenceEqual(saved12), "and saves the bytes and names it read, unchanged");
+    var client = Read(Save(moved, network: true));
+    C(Band(client, 1) == "DeadWastes" && Band(client, 2) == "AshenMarsh", "a client gets the map as the server reads it");
+    var older = Read(saved11);
+    C(Band(older, 1) == "AshenMarsh" && Band(older, 2) == "DeadWastes", "an older world reads the bits as it always has: the swap shows (as before 0.10)");
+
+    // DeadWastes leaves the yaml and another biome takes its number.
+    Names(new() { [DeadWastes] = "Frost", [AshenMarsh] = "AshenMarsh", [LastBit] = "LastBit" });
+    var gone = Read(saved12);
+    C(Band(gone, 1) == "None" && Band(gone, 2) == "AshenMarsh", $"with no DeadWastes in the yaml, its ground reads as None, not as Frost, which has its number now (got {Band(gone, 1)})");
+    C(Save(gone).SequenceEqual(saved12), "and the world keeps DeadWastes' bytes and name, for when the yaml has it again");
+    Names(new() { [DeadWastes] = "DeadWastes", [AshenMarsh] = "AshenMarsh", [LastBit] = "LastBit" });
+    C(Band(Read(saved12), 1) == "DeadWastes", "the yaml as it was: DeadWastes is back");
+
+    // What an older build reads: the blob's format 1 part, unchanged.
+    var legacy = BC.AltBiomeSettings.Legacy;
+    var one = legacy.Serialize();
+    var two = legacy.Serialize(new Dictionary<Heightmap.Biome, string> { [DeadWastes] = "DeadWastes" }, true);
+    C(BitConverter.ToInt32(one, 0) == 1 && BitConverter.ToInt32(two, 0) == 2 && two.Skip(4).Take(one.Length - 4).SequenceEqual(one.Skip(4))
+      && BC.AltBiomeSettings.Deserialize(two).Serialize().SequenceEqual(one),
+      "the names come after format 1's fields, so a build that knows format 1 reads the same options (Better Continents 0.9 warns and keeps the blob)");
   }
 
   static BiomeSector Sector(Heightmap.Biome biome) => BC.AltBiomeControl.PlainSector(biome);

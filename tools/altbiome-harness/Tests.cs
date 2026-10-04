@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-09-22 for alt-biome planting (0.8.1), and on 2026-09-24 for world export and import (0.9.0), and on 2026-09-25 for version-agnostic wording (0.9.1).
+// Added by Wubarrk on 2026-09-22 for alt-biome planting (0.8.1), and on 2026-09-24 for world export and import (0.9.0), and on 2026-09-25 for version-agnostic wording (0.9.1), and modified on 2026-10-04 for the unifying refactor (0.10.0).
 
 using System;
 using System.Collections;
@@ -123,9 +123,10 @@ internal static partial class Tests
     Check(!ok4 && err4.Contains("Bad") && err4.Contains("not a number") && err4.Contains("unknown field") && s4.Overrides["Mushroom"].MaxAmount == 3,
       "override parse errors reported, good parts kept: " + err4);
 
-    // Forward compatibility: a newer blob with extra trailing fields, and an override entry with an unknown bit.
+    // Forward compatibility: a newer blob (format 3, with format 2's biome names) with extra trailing fields, and an override
+    // entry with an unknown bit.
     var pkg = new ZPackage();
-    pkg.Write(2);
+    pkg.Write(BC.AltBiomeSettings.FormatVersion + 1);
     pkg.Write((byte)0); pkg.Write((byte)1); pkg.Write(false); pkg.Write(0); pkg.Write(false); pkg.Write(false);
     pkg.Write(0f); pkg.Write(1f); pkg.Write(1f); pkg.Write(3f); pkg.Write(1f);
     var entry = new ZPackage();
@@ -135,6 +136,8 @@ internal static partial class Tests
     entry.Write(123.5f); // unknown future field
     pkg.Write(1);
     pkg.Write(entry.GetArray());
+    pkg.Write(false); // format 2: not only a carrier of biome names
+    pkg.Write(0); // format 2: no biome names
     pkg.Write(999); // unknown future blob field
     var f = BC.AltBiomeSettings.Deserialize(pkg.GetArray());
     Check(f.Grid == BC.AltBiomeGridMode.WorldEdge && f.EdgeScale == 3f && f.Overrides["Mushroom"].Chance == 0.75f, "forward-compatible read of a newer blob");
@@ -243,9 +246,11 @@ internal static partial class Tests
 
     // A newer or unreadable blob is kept and written back unchanged, so an older build never drops data.
     var newer = new ZPackage();
-    newer.Write(2);
+    newer.Write(BC.AltBiomeSettings.FormatVersion + 1);
     newer.Write((byte)1); newer.Write((byte)0); newer.Write(false); newer.Write(0); newer.Write(false); newer.Write(false);
-    newer.Write(0f); newer.Write(1f); newer.Write(1f); newer.Write(1f); newer.Write(1f); newer.Write(0); newer.Write(12345);
+    newer.Write(0f); newer.Write(1f); newer.Write(1f); newer.Write(1f); newer.Write(1f); newer.Write(0);
+    newer.Write(false); newer.Write(0); // format 2: no biome names
+    newer.Write(12345);
     var newerBlob = newer.GetArray();
     var withNewer = BaseSettingsPackage();
     withNewer.Write((int)BC.DataKey.AltBiomes);

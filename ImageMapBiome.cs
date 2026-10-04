@@ -108,7 +108,69 @@ internal class ImageMapBiome() : ImageMapBase
         BetterContinents.Log($"Biome map ({(int)Math.Sqrt(total)} x {(int)Math.Sqrt(total)}): {string.Join(", ", parts)}");
     }
 
-    public byte[] Serialize() => [.. Map.Select(BiomeRegistry.ToByte)];
+    // The bytes a world saves (or, for network, sends): the map as read; the bytes the world saved when FollowNames moved
+    // biomes (a client gets the map as this game reads it).
+    public byte[] Serialize(bool network = false) => !network && StoredBytes != null ? StoredBytes : [.. Map.Select(BiomeRegistry.ToByte)];
+
+    // A world made since 0.10 saves the names of the added biomes its map holds (Expand World Data numbers its biomes in
+    // its yaml's order, so after the yaml changes the same bit can be another biome). FollowNames reads each by its name:
+    // where Expand World Data numbers it differently now, the map follows; where it has no such biome now, its ground reads
+    // as None (the default generation decides) rather than as whatever biome holds that bit. The world's bytes and names
+    // stay as saved (StoredBytes, StoredNames), so nothing is lost when the yaml is put back.
+    private byte[]? StoredBytes;
+    private Dictionary<Heightmap.Biome, string>? StoredNames;
+
+    internal void FollowNames(Dictionary<Heightmap.Biome, string> names)
+    {
+        StoredNames = names;
+        var to = new Heightmap.Biome[33];
+        for (int value = 0; value < to.Length; value++)
+            to[value] = BiomeRegistry.FromByte((byte)value);
+        bool moved = false;
+        foreach (var kv in names.OrderBy(kv => (uint)kv.Key))
+        {
+            var now = EWD.TryGetBiome(kv.Value, out var biome) && BiomeRegistry.IsSingleBit(biome) ? biome : Heightmap.Biome.None;
+            if (now == kv.Key || (Present & kv.Key) == 0)
+                continue;
+            moved = true;
+            to[BiomeRegistry.ToByte(kv.Key)] = now;
+            BetterContinents.Log(now == Heightmap.Biome.None
+                ? $"Biome map: {kv.Value} was biome 0x{(uint)kv.Key:X} when the world was saved, and Expand World Data has no such biome now: its ground reads as None (the default generation decides) until it has again."
+                : $"Biome map: {kv.Value} was biome 0x{(uint)kv.Key:X} when the world was saved, and Expand World Data numbers it 0x{(uint)now:X} now: the map follows the name.");
+        }
+        if (!moved)
+            return;
+        StoredBytes = Serialize();
+        var present = Heightmap.Biome.None;
+        for (int i = 0; i < Map.Length; i++)
+        {
+            var biome = to[BiomeRegistry.ToByte(Map[i])];
+            Map[i] = biome;
+            present |= biome;
+        }
+        Present = present;
+    }
+
+    // The names a world made since 0.10 saves beside the map's bytes: the ones it read with those bytes; for a map read from
+    // its file this session, Expand World Data's names for the added biomes it holds (a name read before, when there is
+    // none now).
+    internal Dictionary<Heightmap.Biome, string> NamesToSave()
+    {
+        if (StoredBytes != null && StoredNames != null)
+            return StoredNames;
+        var names = new Dictionary<Heightmap.Biome, string>();
+        for (int bit = 0; bit < 32; bit++)
+        {
+            var biome = (Heightmap.Biome)(int)(1u << bit);
+            if ((Present & biome) == 0 || BiomeRegistry.IsVanilla(biome))
+                continue;
+            if (EWD.TryGetName(biome, out var name))
+                names[biome] = name;
+            else if (StoredNames != null && StoredNames.TryGetValue(biome, out var stored))
+                names[biome] = stored;
+        }
+        return names;
+    }
 
     private Heightmap.Biome[] Map = [];
     // Every biome in Map.

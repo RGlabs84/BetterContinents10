@@ -15,7 +15,16 @@ public partial class BetterContinents
   // weights the terrain shader reads). RebuildRenderMesh calls it with ix = SmoothStep(0, 1, column / width) and iy
   // likewise. This one prefix owns the target (PatchBiomeColor): the terrain map wins where it has a colour, then the
   // biome precision grid, and otherwise vanilla blends the zone's four corners.
-  public static bool GetBiomeColorPatch(Heightmap __instance, float ix, float iy, ref Color __result)
+  public static bool GetBiomeColorPatch(Heightmap __instance, float ix, float iy, ref Color __result) =>
+    VertexColor(__instance, ix, iy, ref __result, given: false);
+
+  // A new world's (PrecisionKeepsTerritories), ordered after Expand World Data's prefix: where a prefix before this one
+  // gave the colour (__runOriginal false: Expand World Data's territory colorTerrain), the biome precision grid keeps it,
+  // as vanilla's corner blend would; the terrain map still wins where it has a colour.
+  public static bool GetBiomeColorPatchAfterTerritories(Heightmap __instance, float ix, float iy, ref Color __result, bool __runOriginal) =>
+    VertexColor(__instance, ix, iy, ref __result, given: !__runOriginal);
+
+  private static bool VertexColor(Heightmap __instance, float ix, float iy, ref Color __result, bool given)
   {
     if (Settings.HasTerrainMap)
     {
@@ -26,6 +35,8 @@ public partial class BetterContinents
       if (Settings.ApplyTerrainMap(x, y, ref __result))
         return false;
     }
+    if (given)
+      return false;
     if (BiomePrecisionGrid.For(__instance.m_cornerBiomes) is { } grid)
     {
       __result = grid.GetColor(ix, iy, __instance.m_width);

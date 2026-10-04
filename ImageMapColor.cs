@@ -20,8 +20,8 @@ abstract class ImageMapColor() : ImageMapBase()
 
     public bool CreateMap() => CreateMap<Rgba32>();
 
-    // A paint or terrain map from its picture and legend file (bc fn, a new world).
-    protected static T? FromFile<T>(string path) where T : ImageMapColor, new()
+    // A paint or terrain map from its picture and legend file (bc fn, a new world); setup runs before the files are read.
+    protected static T? FromFile<T>(string path, Action<T>? setup = null) where T : ImageMapColor, new()
     {
         if (string.IsNullOrEmpty(path))
             return null;
@@ -29,6 +29,7 @@ abstract class ImageMapColor() : ImageMapBase()
         {
             FilePath = path,
         };
+        setup?.Invoke(map);
         if (!map.LoadSourceImage())
             return null;
         if (!map.CreateMap())
@@ -65,7 +66,7 @@ abstract class ImageMapColor() : ImageMapBase()
         }
         try
         {
-            SourceColors = Legends.ReadJoined(path);
+            SourceColors = PrepareLegend(Legends.ReadJoined(path));
             ParseColors();
         }
         catch (Exception ex)
@@ -102,6 +103,9 @@ abstract class ImageMapColor() : ImageMapBase()
     // The paint and terrain legend (their rows of Legends' table): "target: image colour" entries separated by '|', only
     // entries with exactly one ':' read. The image colour is read first (its warning comes first), then the target;
     // the first entry for an image colour wins. A broken number throws out of here.
+    // The legend as read from its file, as the map keeps it (and a world's settings save it).
+    protected virtual string PrepareLegend(string legend) => legend;
+
     protected static Dictionary<Rgba32, Color32?> ParseColors(string colors, Func<string, Color32?> target) =>
         colors.Split('|')
         .Select(s => s.Trim().Split(':')).Where(s => s.Length == 2)

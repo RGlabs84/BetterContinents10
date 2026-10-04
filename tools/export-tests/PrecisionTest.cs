@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-09-24 for world export and import (0.9.0).
+// Added by Wubarrk on 2026-09-24 for world export and import (0.9.0), and modified on 2026-10-04 for the unifying refactor (0.10.0).
 
 using System;
 using System.Collections.Generic;
@@ -458,6 +458,28 @@ internal static class PrecisionTest
       if (!BC.GetBiomePatch(hm, centre, false, ref lr) || !BC.GetBiomeColorPatch(hm, ix, iy, ref color)) glueBad++;
     }
     C(glueBad == 0, "the GetBiome and GetBiomeColor prefixes use the grid of the heightmap's own corner array, and leave distant LOD, waterAlwaysOcean, grid-less heightmaps and precision 0 to vanilla");
+
+    // A new world's GetBiomeColor prefix (after Expand World Data's): a colour a prefix before it gave (__runOriginal false: a
+    // territory's colorTerrain) stays; otherwise it is the older world's prefix.
+    int keptBad = 0;
+    var territory = new Color(0.25f, 0.5f, 0.75f, 1f);
+    foreach (var (centre, _, byPrecision) in Built.Take(40))
+    {
+      var d = byPrecision[3];
+      Grid.Active = 3;
+      var g = Grid.For(d.m_cornerBiomes)!;
+      var hm = FakeHeightmap(centre, d.m_cornerBiomes);
+      float ix = VertexS(17, Width), iy = VertexS(40, Width);
+      var kept = territory;
+      if (BC.GetBiomeColorPatchAfterTerritories(hm, ix, iy, ref kept, false) || !Same(kept, territory)) keptBad++;
+      var own = Color.clear;
+      if (BC.GetBiomeColorPatchAfterTerritories(hm, ix, iy, ref own, true) || !Same(own, g.GetColor(ix, iy, Width))) keptBad++;
+      var bare = FakeHeightmap(centre, [.. d.m_cornerBiomes]);
+      if (!BC.GetBiomeColorPatchAfterTerritories(bare, ix, iy, ref own, true)) keptBad++;
+      Grid.Active = 0;
+      if (!BC.GetBiomeColorPatchAfterTerritories(hm, ix, iy, ref own, true)) keptBad++;
+    }
+    C(keptBad == 0, "a new world's GetBiomeColor prefix keeps a colour an earlier prefix gave (an Expand World Data territory's), and otherwise colours as an older world's does");
   }
 
   static int Owned(MethodBase method, Func<Patches, IEnumerable<Patch>> kind)

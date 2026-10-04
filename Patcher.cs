@@ -211,13 +211,25 @@ public partial class BetterContinents
       typeof(WorldGeneratorPatch), patch, kind, priority, after, before);
 
   // Heightmap.GetBiomeColor(float, float) has one prefix for both features that use it, the terrain map and biome
-  // precision (GetBiomeColorPatch picks per vertex), so neither can unpatch the other.
+  // precision (GetBiomeColorPatch picks per vertex), so neither can unpatch the other. A new world's
+  // (PrecisionKeepsTerritories) comes after Expand World Data's and keeps its territory colours.
+  private static bool WantsBiomeColor(BetterContinentsSettings s) => s.EnabledForThisWorld && (s.HasTerrainMap || EffectiveBiomePrecision(s) > 0);
   private static readonly Toggle BiomeColor = new("Heightmap.GetBiomeColor",
-    s => s.EnabledForThisWorld && (s.HasTerrainMap || EffectiveBiomePrecision(s) > 0),
+    s => WantsBiomeColor(s) && !s.PrecisionKeepsTerritories,
     new Hook(() => AccessTools.Method(typeof(Heightmap), nameof(Heightmap.GetBiomeColor), [typeof(float), typeof(float)]),
       "Heightmap.GetBiomeColor(float,float)", typeof(BetterContinents), nameof(GetBiomeColorPatch), HookKind.Prefix))
   { ViaProcessor = true };
-  internal static void PatchBiomeColor() => BiomeColor.Update(Settings);
+  private static readonly Toggle BiomeColorAfterTerritories = new("Heightmap.GetBiomeColor, after Expand World Data's territories",
+    s => WantsBiomeColor(s) && s.PrecisionKeepsTerritories,
+    new Hook(() => AccessTools.Method(typeof(Heightmap), nameof(Heightmap.GetBiomeColor), [typeof(float), typeof(float)]),
+      "Heightmap.GetBiomeColor(float,float)", typeof(BetterContinents), nameof(GetBiomeColorPatchAfterTerritories), HookKind.Prefix,
+      after: [EWD.GUID]))
+  { ViaProcessor = true };
+  internal static void PatchBiomeColor()
+  {
+    BiomeColor.Update(Settings);
+    BiomeColorAfterTerritories.Update(Settings);
+  }
 
   // WorldGenerator.GetBiomeHeight: five postfixes on a world made before 0.10, chosen by whether the world paints the
   // ground (a paint, lava, moss or vegetation map), whether its heightmap overrides everything, and whether it has a rough
@@ -337,7 +349,7 @@ public partial class BetterContinents
   // The toggles these settings want on, by name (the offline tests compare it with the rules as they were written
   // out one by one before the unifying refactor).
   internal static IEnumerable<string> WantedToggles(BetterContinentsSettings settings) =>
-    new[] { BiomeColor }.Concat(TogglesBeforeWorldSize).Concat(TogglesAfterWorldSize).Where(t => t.Wanted(settings)).Select(t => t.Name);
+    new[] { BiomeColor, BiomeColorAfterTerritories }.Concat(TogglesBeforeWorldSize).Concat(TogglesAfterWorldSize).Where(t => t.Wanted(settings)).Select(t => t.Name);
 
   // ---- the three that are more than on or off -------------------------------------------------------------------------
 

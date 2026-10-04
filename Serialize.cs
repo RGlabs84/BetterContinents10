@@ -1,6 +1,7 @@
 // Modified by Wubarrk on 2026-09-22 for alt-biome planting (0.8.1), and on 2026-09-24 for world export and import (0.9.0), and on 2026-10-04 for the unifying refactor (0.10.0).
 
 using System;
+using System.Collections.Generic;
 
 namespace BetterContinents;
 
@@ -91,9 +92,12 @@ public partial class BetterContinents
     // world gets: its maps span its own World Size and Edge Size (MapsSpanWorldSize), where an older world's span
     // vanilla's 21000 m whatever World Size says; and Heightmap Alpha reads the heightmap at full precision and blends it
     // with the game's own terrain by its alpha (HeightmapAlphaMode); Expand World Data's altitude rules apply over the
-    // maps' heights (HeightBeforeBiomeRules); and its lava biomes are hot where the biome map puts them
-    // (EwdLavaBiomesHot). A world keeps its version: one read as 12 is saved as 12, any older one as 11, as always.
-    // Better Continents 0.9 reads a version 12 world as a version 11 one.
+    // maps' heights (HeightBeforeBiomeRules); its lava biomes are hot where the biome map puts them (EwdLavaBiomesHot);
+    // a terrain legend can name its biomes' grounds (TerrainNamesEwdGrounds); biome precision keeps its territories'
+    // ground colours (PrecisionKeepsTerritories); and its biome map's added biomes are saved with their names, which the
+    // map follows when Expand World Data numbers them differently (in the alt-biome blob: AltBiomeSettings.Serialize,
+    // ImageMapBiome.FollowNames). A world keeps its version: one read as 12 is saved as 12, any older one as 11, as
+    // always. Better Continents 0.9 reads a version 12 world as a version 11 one.
     public const int MaxVersion = 12;
     internal const int KeyedVersion = 11;
     internal const int UnifiedVersion = 12;
@@ -123,6 +127,16 @@ public partial class BetterContinents
     // made since 0.10; on an older one only the Ashlands are (WorldGeneratorPatch.IsAshlandsFallbackPrefix).
     internal bool EwdLavaBiomesHot => Version >= UnifiedVersion;
 
+    // Whether the terrain map's legend, read from its file, can name an Expand World Data biome for the ground (written
+    // into the world as that biome's ground colour: ImageMapTerrain.NameEwdGrounds); a world made since 0.10. An older
+    // one reads such a name as the legend always has, as a colour that does not parse.
+    internal bool TerrainNamesEwdGrounds => Version >= UnifiedVersion;
+
+    // Whether biome precision keeps a ground colour another mod's prefix gave first (Expand World Data's territory
+    // colorTerrain), as vanilla's corner blend does: a world made since 0.10. On an older one the precision grid's colour
+    // replaces it (Patcher's BiomeColor toggles).
+    internal bool PrecisionKeepsTerritories => Version >= UnifiedVersion;
+
     // This world's World Size and Edge Size as a size; null when they make no world (no size at all, or not a number).
     internal WorldGeometry? OwnGeometry
     {
@@ -139,6 +153,9 @@ public partial class BetterContinents
     internal static int NewWorldVersion(ConfigValues values, bool overridable) =>
       values.SettingsVersion
       ?? (overridable && int.TryParse(ConfigOverrideVersion.Value, out var v) && v >= KeyedVersion ? v : MaxVersion);
+
+    // The names of the biome map's added biomes, as a world made since 0.10 saved them (read from the alt-biome blob).
+    private Dictionary<Heightmap.Biome, string>? BiomeNamesAsRead;
 
     // Set when a planted alt-biome map could not be read: the world load then stops (AltBiomeControl) instead of
     // generating zones without the author's alt biomes.
@@ -236,7 +253,7 @@ public partial class BetterContinents
       if (BiomeMap != null)
       {
         pkg.Write((int)DataKey.BiomeMap);
-        pkg.Write(BiomeMap.Serialize());
+        pkg.Write(BiomeMap.Serialize(network));
 
         if (!network)
         {
@@ -463,6 +480,10 @@ public partial class BetterContinents
 
       if (includeAltBiomes)
       {
+        // A world made since 0.10 saves the names of its biome map's added biomes in the alt-biome blob, the one place
+        // older builds keep something new (AltBiomeSettings.Serialize); with no alt-biome options of its own, the blob
+        // carries only them.
+        var biomeNames = !network && version >= UnifiedVersion ? BiomeMap?.NamesToSave() : null;
         if (AltBiomesBlobAsRead != null)
         {
           pkg.Write((int)DataKey.AltBiomes);
@@ -471,7 +492,12 @@ public partial class BetterContinents
         else if (AltBiomes != null && !AltBiomes.IsLegacyEquivalent(WorldSize + EdgeSize))
         {
           pkg.Write((int)DataKey.AltBiomes);
-          pkg.Write(AltBiomes.Serialize());
+          pkg.Write(AltBiomes.Serialize(biomeNames, carriesOnly: false));
+        }
+        else if (biomeNames is { Count: > 0 })
+        {
+          pkg.Write((int)DataKey.AltBiomes);
+          pkg.Write((AltBiomes ?? AltBiomeSettings.Legacy).Serialize(biomeNames, carriesOnly: true));
         }
         if (AltBiomeMap != null || AltBiomeMapBlockAsRead != null)
         {
@@ -737,8 +763,10 @@ public partial class BetterContinents
             var altBiomeBlob = pkg.ReadByteArray();
             try
             {
-              AltBiomes = AltBiomeSettings.Deserialize(altBiomeBlob);
+              AltBiomes = AltBiomeSettings.Deserialize(altBiomeBlob, out BiomeNamesAsRead, out var carriesOnly);
               AltBiomesBlobAsRead = BlockVersionOf(altBiomeBlob) > AltBiomeSettings.FormatVersion ? altBiomeBlob : null;
+              if (carriesOnly && AltBiomesBlobAsRead == null)
+                AltBiomes = null;
             }
             catch (Exception e)
             {
@@ -778,6 +806,9 @@ public partial class BetterContinents
         }
 
       }
+      // A world made since 0.10 reads its map's added biomes by the names it saved with them.
+      if (BiomeMap != null && BiomeNamesAsRead is { Count: > 0 })
+        BiomeMap.FollowNames(BiomeNamesAsRead);
     }
     public void SerializeLegacy(ZPackage pkg, int version, bool network)
     {

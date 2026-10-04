@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-09-22 for alt-biome planting (0.8.1), and on 2026-09-24 for world export and import (0.9.0).
+// Added by Wubarrk on 2026-09-22 for alt-biome planting (0.8.1), and on 2026-09-24 for world export and import (0.9.0), and modified on 2026-10-04 for the unifying refactor (0.10.0).
 
 using System;
 using System.Collections.Generic;
@@ -216,8 +216,9 @@ public partial class BetterContinents
   public sealed class AltBiomeSettings
   {
     // Blob format. Append new fields at the END of Serialize and read them under a version check; a reader
-    // stops at the fields it knows, so older builds ignore anything newer.
-    public const int FormatVersion = 1;
+    // stops at the fields it knows, so older builds ignore anything newer. Format 2 (0.10) adds the names of the biome
+    // map's added biomes; it is written only when there are names, so every other blob stays format 1, byte for byte.
+    public const int FormatVersion = 2;
     public const string Wildcard = "*";
     public const float VanillaSampleRadius = 10500f;
 
@@ -335,10 +336,18 @@ public partial class BetterContinents
       return merged;
     }
 
-    public byte[] Serialize()
+    public byte[] Serialize() => Serialize(null, false);
+
+    // biomeNames: the biome map's added biomes by the bit the map stores them under, for a world made since 0.10 (Expand
+    // World Data numbers its biomes in its yaml's order, so the map reads them back by name: ImageMapBiome.FollowNames).
+    // carriesOnly: these options are here only to carry the names, the world having none of its own; read back as absent.
+    // This blob is the one place a world can carry something new without older builds refusing it: Better Continents
+    // 0.9 reads format 1's part, warns, and saves the blob back unchanged.
+    public byte[] Serialize(IReadOnlyDictionary<Heightmap.Biome, string>? biomeNames, bool carriesOnly)
     {
+      bool names = biomeNames is { Count: > 0 };
       var pkg = new ZPackage();
-      pkg.Write(FormatVersion);
+      pkg.Write(names ? 2 : 1);
       pkg.Write((byte)Mode);
       pkg.Write((byte)Grid);
       pkg.Write(UseFixedSeed);
@@ -356,11 +365,26 @@ public partial class BetterContinents
       pkg.Write(entries.Count);
       foreach (var kv in entries)
         pkg.Write(kv.Value.Serialize(kv.Key));
+      if (names)
+      {
+        pkg.Write(carriesOnly);
+        var sorted = biomeNames!.OrderBy(kv => (uint)kv.Key).ToList();
+        pkg.Write(sorted.Count);
+        foreach (var kv in sorted)
+        {
+          pkg.Write((int)kv.Key);
+          pkg.Write(kv.Value);
+        }
+      }
       return pkg.GetArray();
     }
 
-    public static AltBiomeSettings Deserialize(byte[] data)
+    public static AltBiomeSettings Deserialize(byte[] data) => Deserialize(data, out _, out _);
+
+    public static AltBiomeSettings Deserialize(byte[] data, out Dictionary<Heightmap.Biome, string>? biomeNames, out bool carriesOnly)
     {
+      biomeNames = null;
+      carriesOnly = false;
       var pkg = new ZPackage(data);
       var s = new AltBiomeSettings();
       int version = pkg.ReadInt();
@@ -388,7 +412,20 @@ public partial class BetterContinents
         if (!o.IsEmpty)
           s.Overrides[name] = o;
       }
-      // Format 2+ fields would be read here, guarded by `if (version >= 2)`.
+      if (version >= 2)
+      {
+        carriesOnly = pkg.ReadBool();
+        int named = pkg.ReadInt();
+        biomeNames = [];
+        for (int i = 0; i < named; i++)
+        {
+          var biome = (Heightmap.Biome)pkg.ReadInt();
+          var name = pkg.ReadString();
+          if (BiomeRegistry.IsSingleBit(biome) && !BiomeRegistry.IsVanilla(biome) && name != "")
+            biomeNames[biome] = name;
+        }
+      }
+      // Format 3+ fields would be read here, guarded by `if (version >= 3)`.
       return s;
     }
 

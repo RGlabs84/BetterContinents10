@@ -68,6 +68,8 @@ internal static class Generation
     Heights();
     Section("Expand World Data's lava biomes on a biome map");
     Lava();
+    Section("a terrain legend naming an Expand World Data biome");
+    TerrainLegend();
   }
 
   // ---- the two DLLs, loaded from memory with a few call sites changed --------------------------------------------------
@@ -445,6 +447,20 @@ internal static class Generation
       }
     C(keptWorld && plainWest, "with world sector data the DeadWastes samples are the world's own DeadWastes sector (its alt biome kept), and the Meadows samples are plain Meadows where the world's sector disagrees");
     wg.m_world.m_biomeData = null;
+
+    // A new world's GetBiomeColor prefix runs after Expand World Data's (its territory colours, HeightmapPatches.CustomGetBiomeColor),
+    // even when Expand World Data's is added later, so precision can keep a colour it gave.
+    var colorMethod = AccessTools.Method(typeof(Heightmap), nameof(Heightmap.GetBiomeColor), [typeof(float), typeof(float)]);
+    var territories = AccessTools.Method(ewd.GetType("ExpandWorldData.HeightmapPatches"), "CustomGetBiomeColor");
+    var fresh = MakeSettings(biomeMap: MakeBiomeMap(), version: 12);
+    fresh.BiomePrecision = 3;
+    Load(fresh);
+    EwdHarmony.Patch(colorMethod, prefix: new HarmonyMethod(territories));
+    var order = RunOrder(colorMethod, Harmony.GetPatchInfo(colorMethod).Prefixes).Select(m => m.Name).ToList();
+    C(order.IndexOf("CustomGetBiomeColor") >= 0 && order.IndexOf("GetBiomeColorPatchAfterTerritories") > order.IndexOf("CustomGetBiomeColor") && !order.Contains("GetBiomeColorPatch"),
+      $"a new world with biome precision: Better Continents' GetBiomeColor prefix runs after Expand World Data's territory colours ({string.Join(" > ", order)})");
+    EwdHarmony.Unpatch(colorMethod, territories);
+    Load(MakeSettings());
   }
 
   // ---- terrain height ----------------------------------------------------------------------------------------------
@@ -717,6 +733,43 @@ internal static class Generation
     finally
     {
       terrain[DeadWastes] = savedTerrain;
+    }
+  }
+
+  // ---- terrain legend ----------------------------------------------------------------------------------------------
+
+  // A new world's terrain legend can name an Expand World Data biome for the ground: read from the file, the name becomes the
+  // biome's ground colour, the one the game paints it with (Heightmap.GetBiomeColor, answered by Expand World Data's real prefix
+  // from its yaml's colorTerrain), so the legend the world keeps reads the same everywhere. An older world's legend, vanilla
+  // names, colours (even a name that reads as one) and names Expand World Data does not know stay as written.
+  [MethodImpl(MethodImplOptions.NoInlining)]
+  static void TerrainLegend()
+  {
+    EwdHarmony.Patch(AccessTools.Method(typeof(Heightmap), nameof(Heightmap.GetBiomeColor), [typeof(Heightmap.Biome)]),
+      prefix: new HarmonyMethod(AccessTools.Method(ewd.GetType("ExpandWorldData.HeightmapPatches"), "GetBiomeColor")));
+    var data = (System.Collections.IDictionary)Manager("BiomeData");
+    var dead = AltitudeData(0f);
+    dead.GetType().GetField("colorTerrain")!.SetValue(dead, new Color(1f, 0f, 1f, 1f));
+    data[DeadWastes] = dead;
+    try
+    {
+      var path = Program.WriteMap(work, "terrainmap", [("DeadWastes", new Rgba32(0x8B, 0x45, 0x13)), ("Meadows", new Rgba32(0x00, 0xFF, 0x00)),
+        ("FF0000FF", new Rgba32(0x12, 0x34, 0x56)), ("Cafe", new Rgba32(0x11, 0x22, 0x33)), ("Nowhere", new Rgba32(0x44, 0x55, 0x66))]);
+      var fresh = ImageMapTerrain.Create(path, true)!;
+      var older = ImageMapTerrain.Create(path, false)!;
+      const string Kept = "|Meadows: 00FF00|FF0000FF: 123456|Cafe: 112233|Nowhere: 445566";
+      C(fresh.SourceColors == "FF00FFFF: 8B4513" + Kept,
+        $"a new world's terrain legend: DeadWastes becomes its ground colour FF00FFFF; Meadows, a colour, a name that reads as one (Cafe) and an unknown name stay (got \"{fresh.SourceColors}\")");
+      C(fresh.TryGetValue(0.05f, 0.5f, out var ground) && ground == new Color(1f, 0f, 1f, 1f), $"its DeadWastes pixels paint that ground (got {ground})");
+      C(older.SourceColors == "DeadWastes: 8B4513" + Kept, "an older world's terrain legend stays as written");
+      C(older.TryGetValue(0.05f, 0.5f, out var old) && old == new Color(0f, 0f, 0f, 0f), "and reads the name as it always has, as a colour that does not parse: transparent black");
+      var back = ImageMapTerrain.Create(fresh.SourceData, fresh.SourceColors)!;
+      C(back.SourceColors == fresh.SourceColors && back.TryGetValue(0.05f, 0.5f, out var again) && again == ground,
+        "the world's settings keep the colour: read back without the file, the same ground");
+    }
+    finally
+    {
+      data.Remove(DeadWastes);
     }
   }
 
