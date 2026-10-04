@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-09-22 for alt-biome planting (0.8.1), and on 2026-09-25 for version-agnostic wording (0.9.1).
+// Added by Wubarrk on 2026-09-22 for alt-biome planting (0.8.1), and on 2026-09-25 for version-agnostic wording (0.9.1), and modified on 2026-10-04 for the unifying refactor (0.10.0).
 
 using System;
 using System.Collections.Generic;
@@ -89,9 +89,6 @@ internal class ImageMapAltBiome() : ImageMapBase()
     }
   }
 
-  public static string LegendPath(string imagePath) =>
-    Path.Combine(Path.GetDirectoryName(imagePath) ?? "", Path.GetFileNameWithoutExtension(imagePath) + ".txt");
-
   public static ImageMapAltBiome? Create(string path)
   {
     if (string.IsNullOrEmpty(path))
@@ -112,7 +109,7 @@ internal class ImageMapAltBiome() : ImageMapBase()
   {
     if (!base.LoadSourceImage())
       return false;
-    var path = LegendPath(FilePath);
+    var path = Legends.FileFor(FilePath);
     try
     {
       if (!File.Exists(path))
@@ -139,7 +136,7 @@ internal class ImageMapAltBiome() : ImageMapBase()
     var lines = text.Replace("\r\n", "\n").Split('\n');
     for (int n = 0; n < lines.Length; n++)
     {
-      var line = StripComment(lines[n]).Trim();
+      var line = Legends.StripAltBiomeComment(lines[n]).Trim();
       if (line.Length == 0)
         continue;
       string Where() => $"{source} line {n + 1}";
@@ -198,7 +195,7 @@ internal class ImageMapAltBiome() : ImageMapBase()
         Pins.Add(new AltBiomePin { X = px, Z = pz, Class = (byte)(Classes.Count - 1) });
         continue;
       }
-      if (!TryParseColor(valuePart, out var color))
+      if (!Legends.TryParseAltBiomeColour(valuePart, out var color))
       {
         BetterContinents.LogWarning($"{Where()}: cannot read '{valuePart}' as a colour (RRGGBB, #RRGGBB or r,g,b) or as 'at <x>, <z>', ignoring the line.");
         continue;
@@ -239,21 +236,6 @@ internal class ImageMapAltBiome() : ImageMapBase()
     BetterContinents.Log($"Alt-biome legend {source}: {Classes.Count(c => !c.IsPin) - 1} colours, {Pins.Count} points.");
   }
 
-  // "#" starts a comment at the start of a line, or after whitespace when followed by whitespace, so that
-  // "#2D4613" can still be written as a colour after the ':'.
-  internal static string StripComment(string line)
-  {
-    var trimmed = line.TrimStart();
-    if (trimmed.StartsWith("#"))
-      return "";
-    for (int i = 1; i < line.Length; i++)
-    {
-      if (line[i] == '#' && char.IsWhiteSpace(line[i - 1]) && (i + 1 == line.Length || char.IsWhiteSpace(line[i + 1])))
-        return line.Substring(0, i);
-    }
-    return line;
-  }
-
   private static bool TryParsePin(string value, out float x, out float z)
   {
     x = z = 0f;
@@ -269,35 +251,6 @@ internal class ImageMapAltBiome() : ImageMapBase()
            && float.TryParse(parts[0].Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out x)
            && float.TryParse(parts[1].Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out z)
            && !float.IsNaN(x) && !float.IsInfinity(x) && !float.IsNaN(z) && !float.IsInfinity(z);
-  }
-
-  internal static bool TryParseColor(string value, out Color32 color)
-  {
-    color = new Color32(0, 0, 0, 255);
-    value = value.Trim();
-    var parts = value.Split(',');
-    if (parts.Length >= 3)
-    {
-      if (parts.Length > 4)
-        return false;
-      var v = new byte[4] { 0, 0, 0, 255 };
-      for (int i = 0; i < parts.Length; i++)
-        if (!byte.TryParse(parts[i].Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out v[i]))
-          return false;
-      color = new Color32(v[0], v[1], v[2], v[3]);
-      return true;
-    }
-    if (value.StartsWith("#"))
-      value = value.Substring(1);
-    if (value.Length != 6 && value.Length != 8)
-      return false;
-    if (!uint.TryParse(value, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var hex))
-      return false;
-    if (value.Length == 6)
-      color = new Color32((byte)(hex >> 16), (byte)(hex >> 8), (byte)hex, 255);
-    else
-      color = new Color32((byte)(hex >> 24), (byte)(hex >> 16), (byte)(hex >> 8), (byte)hex);
-    return true;
   }
 
   internal static int ColorDistanceSq(Color32 a, Color32 b) =>

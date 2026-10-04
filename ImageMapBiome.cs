@@ -1,4 +1,4 @@
-﻿// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0), and on 2026-09-24 for world export and import (0.9.0), and on 2026-09-29 for Expand World Data biomes (0.9.3).
+﻿// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0), and on 2026-09-24 for world export and import (0.9.0), and on 2026-09-29 for Expand World Data biomes (0.9.3), and on 2026-10-04 for the unifying refactor (0.10.0).
 
 using System;
 using System.Collections.Generic;
@@ -235,13 +235,6 @@ internal class ImageMapBiome() : ImageMapBase
         biome = Heightmap.Biome.None;
         return false;
     }
-    // A legend line to skip: blank, or a comment. Ordinal, not StartsWith("#"): that is culture-sensitive and differs
-    // between the game's Mono and .NET for lines starting with an invisible character.
-    internal static bool IsBlankOrComment(string line)
-    {
-        line = line.Trim().TrimStart('\uFEFF', '\u200B').Trim();
-        return line.Length == 0 || line[0] == '#';
-    }
     // The legend name TryParseBiome reads back: the enum name for a vanilla biome, Expand World Data's name for one it
     // added, else the number.
     internal static string BiomeName(Heightmap.Biome biome)
@@ -285,16 +278,16 @@ internal class ImageMapBiome() : ImageMapBase
     public override bool LoadSourceImage()
     {
         if (!base.LoadSourceImage()) return false;
-        var path = Path.Combine(Path.GetDirectoryName(FilePath), Path.GetFileNameWithoutExtension(FilePath) + ".txt");
+        var path = Legends.FileFor(FilePath);
         if (!File.Exists(path))
         {
-            File.WriteAllLines(path, DefaultColors.Split('|'));
+            Legends.WriteDefault(path, DefaultColors);
             Colors = ParseColors(DefaultColors);
             return true;
         }
         try
         {
-            var legend = ParseLegend(string.Join("|", File.ReadAllLines(path)), path);
+            var legend = ParseLegend(Legends.ReadJoined(path), path);
             Colors = legend.Colors;
             Unresolved = legend.Unresolved;
             LegendErrors = legend.Errors;
@@ -309,9 +302,10 @@ internal class ImageMapBiome() : ImageMapBase
         return true;
     }
 
-    // "Name: colour" entries separated by '|'; a line starting with '#' is a comment. An entry whose name is not a
-    // biome the game can use here, or whose colour does not parse, is reported and skipped, and the others still
-    // apply (before 0.9.3 one such entry discarded the whole legend for the default colours).
+    // "Name: colour" entries separated by '|' (the biome row of Legends' table); a line starting with '#' is a comment.
+    // An entry whose name is not a biome the game can use here, or whose colour does not parse, is reported and
+    // skipped, and the others still apply (before 0.9.3 one such entry discarded the whole legend for the default
+    // colours).
     private sealed class Legend
     {
         public readonly Dictionary<Heightmap.Biome, Color32> Colors = [];
@@ -324,7 +318,7 @@ internal class ImageMapBiome() : ImageMapBase
         var result = new Legend();
         foreach (var entry in colors.Split('|'))
         {
-            if (IsBlankOrComment(entry))
+            if (Legends.IsBlankOrComment(entry))
                 continue;
             var line = entry.Trim();
             var s = line.Split(':');
@@ -334,7 +328,7 @@ internal class ImageMapBiome() : ImageMapBase
                 result.Errors++;
                 continue;
             }
-            if (!TryParseColor32(s[1], out var color))
+            if (!Legends.TryParseColor32(s[1], out var color))
             {
                 // A vanilla biome keeps its default colour, so a picture in the default colours still decodes right.
                 if (TryParseBiome(s[0], out var named) && IsVanillaBiome(named) && DefaultColorTable().TryGetValue(named, out var fallback))

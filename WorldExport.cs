@@ -1406,7 +1406,7 @@ public static class WorldExport
         if (c.Names.Count != 1 || c.Names[0].StartsWith("!"))
           continue;
         var hex = ImageMapAltBiome.DefaultColorFor(c.Names[0]);
-        if (hex != null && ImageMapAltBiome.TryParseColor(hex, out var colour) && !used.Any(u => u.r == colour.r && u.g == colour.g && u.b == colour.b))
+        if (hex != null && Legends.TryParseAltBiomeColour(hex, out var colour) && !used.Any(u => u.r == colour.r && u.g == colour.g && u.b == colour.b))
         {
           c.Color = colour;
           used.Add(colour);

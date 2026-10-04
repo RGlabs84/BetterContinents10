@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-09-22 for alt-biome planting (0.8.1), and on 2026-09-25 for version-agnostic wording (0.9.1), and on 2026-09-29 for Expand World Data biomes (0.9.3).
+// Added by Wubarrk on 2026-09-22 for alt-biome planting (0.8.1), and on 2026-09-25 for version-agnostic wording (0.9.1), and on 2026-09-29 for Expand World Data biomes (0.9.3), and modified on 2026-10-04 for the unifying refactor (0.10.0).
 
 using System;
 using System.Collections.Generic;
@@ -396,7 +396,7 @@ public partial class BetterContinents
     private static Color32 AltColor(string name)
     {
       var hex = ImageMapAltBiome.DefaultColorFor(name ?? "");
-      if (hex != null && ImageMapAltBiome.TryParseColor(hex, out var c))
+      if (hex != null && Legends.TryParseAltBiomeColour(hex, out var c))
         return c;
       var hue = (uint)(name ?? "").GetStableHashCode() % 360u / 360f;
       return Color.HSVToRGB(hue, 0.9f, 1f);

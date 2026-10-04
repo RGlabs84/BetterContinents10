@@ -9,6 +9,8 @@
 //
 //   dotnet run -c Release                 compare with golden/ (exit code 1 on any difference)
 //   dotnet run -c Release -- record       rewrite golden/ from this build
+//   dotnet run -c Release -- fuzz <kind> <case>   one legend fuzz case in full (LegendFuzz.cs)
+//   dotnet run -c Release -- fuzz-dump <file> <n> its digests for n cases per kind, to compare two builds
 //
 // Like the other suites it loads the plugin's pre-ILRepack DLL (obj/Release/net4.8), so build the plugin first. The
 // fixtures are written into <temp>/bc-golden, which is also the working directory, so every map path is relative
@@ -228,12 +230,13 @@ internal static class Program
       }
       return null;
     };
-    return Run(args.Any(a => a.Equals("record", StringComparison.OrdinalIgnoreCase)));
+    return Run(args);
   }
 
   [MethodImpl(MethodImplOptions.NoInlining)]
-  static int Run(bool record)
+  static int Run(string[] args)
   {
+    bool record = args.Any(a => a.Equals("record", StringComparison.OrdinalIgnoreCase));
     UnityEngine.Debug.unityLogger.logHandler = new LogHandler();
     Work = Path.Combine(Path.GetTempPath(), "bc-golden");
     if (Directory.Exists(Work))
@@ -241,6 +244,23 @@ internal static class Program
     Directory.CreateDirectory(Work);
     var home = Directory.GetCurrentDirectory();
     Directory.SetCurrentDirectory(Work);
+    // "fuzz <kind> <case>": one legend fuzz case in full; "fuzz-dump <file> <cases>": every case's digests (LegendFuzz).
+    if (args.Length == 3 && args[0] is "fuzz" or "fuzz-dump" && int.TryParse(args[2], out var number))
+    {
+      try
+      {
+        Sections.Prepare();
+        if (args[0] == "fuzz")
+          LegendFuzz.Show(args[1], number);
+        else
+          LegendFuzz.Dump(Path.GetFullPath(Path.Combine(home, args[1])), number);
+        return 0;
+      }
+      finally
+      {
+        Directory.SetCurrentDirectory(home);
+      }
+    }
     int crashes = 0;
     try
     {

@@ -21,13 +21,20 @@ internal static class Sections
   static ConfigFile cfg;
   const BindingFlags Any = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static;
 
-  public static void All()
+  // The config the plugin binds, and the biome table, as the game has them before a map loads.
+  public static void Prepare()
   {
     cfg = new ConfigFile(Path.Combine(Program.Work, "BetterContinents.cfg"), true);
     BC.DeclareConfig(cfg);
     ImageMapBiome.RefreshBiomeTable();
+  }
+
+  public static void All()
+  {
+    Prepare();
     Config();
     Legends();
+    LegendFuzz.Run();
     Scenarios();
     Presets();
     Export();

@@ -1,4 +1,6 @@
-﻿using System;
+﻿// Modified by Wubarrk on 2026-10-04 for the unifying refactor (0.10.0).
+
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using SixLabors.ImageSharp.PixelFormats;
@@ -8,33 +10,8 @@ namespace BetterContinents;
 
 internal class ImageMapTerrain() : ImageMapColor()
 {
-    public static ImageMapTerrain? Create(string path)
-    {
-        if (string.IsNullOrEmpty(path))
-            return null;
-        ImageMapTerrain map = new()
-        {
-            FilePath = path,
-        };
-        if (!map.LoadSourceImage())
-            return null;
-        if (!map.CreateMap())
-            return null;
-        return map;
-    }
-    public static ImageMapTerrain? Create(byte[] data, string path, string colors)
-    {
-        ImageMapTerrain map = new()
-        {
-            FilePath = path,
-            SourceData = data,
-            SourceColors = colors
-        };
-        map.ParseColors();
-        if (!map.CreateMap())
-            return null;
-        return map;
-    }
+    public static ImageMapTerrain? Create(string path) => FromFile<ImageMapTerrain>(path);
+    public static ImageMapTerrain? Create(byte[] data, string path, string colors) => FromSettings<ImageMapTerrain>(data, path, colors);
     public static ImageMapTerrain? Create(byte[] data, string colors) => Create(data, "", colors);
     private static readonly string DefaultColors = "Default: 000000|Meadows: 00FF00|BlackForest: 007F00|Swamp: 7F7F00|Mountain: FFFFFF|Plains: FFFF00|Mistlands: 7F7F7F|AshLands: FF0000|DeepNorth: 00FFFF|Ocean: 0000FF";
 
@@ -51,20 +28,11 @@ internal class ImageMapTerrain() : ImageMapColor()
         {"ocean", new Color32(0, 0, 0, 0)}
     };
     public override bool LoadSourceImage() => LoadSourceImageAndColors(DefaultColors);
+    // The target is a ground name (lower-cased in the player's culture, as always) or a paint colour; an empty legend
+    // is the default one.
     protected override void ParseColors()
     {
-        Colors = ParseColors(SourceColors == "" ? DefaultColors : SourceColors);
-    }
-    private static Dictionary<Rgba32, Color32?> ParseColors(string colors) =>
-        colors.Split('|')
-        .Select(s => s.Trim().Split(':')).Where(s => s.Length == 2)
-        .Select(s => Tuple.Create(ParseRGBA(s[1]), TerrainGrounds.TryGetValue(s[0].Trim().ToLower(), out var color) ? color : ParseColor32(s[0])))
-        .Distinct(new Comparer())
-        .ToDictionary(s => s.Item1, s => s.Item2);
-
-    class Comparer : IEqualityComparer<Tuple<Rgba32, Color32?>>
-    {
-        public bool Equals(Tuple<Rgba32, Color32?> x, Tuple<Rgba32, Color32?> y) => x.Item1.Equals(y.Item1);
-        public int GetHashCode(Tuple<Rgba32, Color32?> obj) => obj.Item1.GetHashCode();
+        Colors = ParseColors(SourceColors == "" ? DefaultColors : SourceColors,
+            target => TerrainGrounds.TryGetValue(target.Trim().ToLower(), out var color) ? color : Legends.ParseColor32(target));
     }
 }

@@ -1,4 +1,4 @@
-﻿// Modified by Wubarrk on 2026-09-24 for world export and import (0.9.0).
+﻿// Modified by Wubarrk on 2026-09-24 for world export and import (0.9.0), and on 2026-10-04 for the unifying refactor (0.10.0).
 
 using System;
 using System.Collections.Generic;
@@ -60,7 +60,8 @@ internal class ImageMapSpawn() : ImageMapBase
     Entries.Add(new SpawnEntry("none"));
 
     if (!base.LoadSourceImage()) return false;
-    var path = Path.Combine(Path.GetDirectoryName(FilePath), Path.GetFileNameWithoutExtension(FilePath) + ".txt");
+    var path = Legends.FileFor(FilePath);
+    // A missing legend is written empty (not as an empty '|' legend would be, a single line break).
     if (!File.Exists(path))
     {
       File.WriteAllText(path, "");
@@ -76,7 +77,7 @@ internal class ImageMapSpawn() : ImageMapBase
         if (trimmed.StartsWith("#")) continue;
         var parts = trimmed.Split(':');
         if (parts.Length != 2) continue;
-        var color = ParseColor32(parts[0]);
+        var color = Legends.ParseColor32(parts[0]);
         var spawn = parts[1].Trim();
         Colors.Add(color);
         Entries.Add(new SpawnEntry(spawn));

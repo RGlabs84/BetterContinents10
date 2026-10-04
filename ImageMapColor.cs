@@ -1,9 +1,10 @@
-﻿// Modified by Wubarrk on 2026-09-24 for world export and import (0.9.0).
+﻿// Modified by Wubarrk on 2026-09-24 for world export and import (0.9.0), and on 2026-10-04 for the unifying refactor (0.10.0).
 
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
 using UnityEngine;
@@ -19,20 +20,52 @@ abstract class ImageMapColor() : ImageMapBase()
 
     public bool CreateMap() => CreateMap<Rgba32>();
 
+    // A paint or terrain map from its picture and legend file (bc fn, a new world).
+    protected static T? FromFile<T>(string path) where T : ImageMapColor, new()
+    {
+        if (string.IsNullOrEmpty(path))
+            return null;
+        T map = new()
+        {
+            FilePath = path,
+        };
+        if (!map.LoadSourceImage())
+            return null;
+        if (!map.CreateMap())
+            return null;
+        return map;
+    }
+    // A paint or terrain map from a world's settings: the picture's bytes and the legend as the file read it then.
+    protected static T? FromSettings<T>(byte[] data, string path, string colors) where T : ImageMapColor, new()
+    {
+        T map = new()
+        {
+            FilePath = path,
+            SourceData = data,
+            SourceColors = colors
+        };
+        map.ParseColors();
+        if (!map.CreateMap())
+            return null;
+        return map;
+    }
+
     protected bool LoadSourceImageAndColors(string defaultColors)
     {
         SourceColors = "";
         if (!base.LoadSourceImage()) return false;
-        var path = Path.Combine(Path.GetDirectoryName(FilePath), Path.GetFileNameWithoutExtension(FilePath) + ".txt");
+        var path = Legends.FileFor(FilePath);
+        // A missing legend is written out, but SourceColors stays empty: a world's settings keep "" (terrain then
+        // reads its default legend again).
         if (!File.Exists(path))
         {
-            File.WriteAllLines(path, defaultColors.Split('|'));
+            Legends.WriteDefault(path, defaultColors);
             ParseColors();
             return true;
         }
         try
         {
-            SourceColors = string.Join("|", File.ReadAllLines(path));
+            SourceColors = Legends.ReadJoined(path);
             ParseColors();
         }
         catch (Exception ex)
@@ -64,6 +97,22 @@ abstract class ImageMapColor() : ImageMapBase()
     protected virtual void ParseColors()
     {
         Colors = [];
+    }
+
+    // The paint and terrain legend (their rows of Legends' table): "target: image colour" entries separated by '|', only
+    // entries with exactly one ':' read. The image colour is read first (its warning comes first), then the target;
+    // the first entry for an image colour wins. A broken number throws out of here.
+    protected static Dictionary<Rgba32, Color32?> ParseColors(string colors, Func<string, Color32?> target) =>
+        colors.Split('|')
+        .Select(s => s.Trim().Split(':')).Where(s => s.Length == 2)
+        .Select(s => Tuple.Create(Legends.ParseRGBA(s[1]), target(s[0])))
+        .Distinct(new FirstImageColour())
+        .ToDictionary(s => s.Item1, s => s.Item2);
+
+    private class FirstImageColour : IEqualityComparer<Tuple<Rgba32, Color32?>>
+    {
+        public bool Equals(Tuple<Rgba32, Color32?> x, Tuple<Rgba32, Color32?> y) => x.Item1.Equals(y.Item1);
+        public int GetHashCode(Tuple<Rgba32, Color32?> obj) => obj.Item1.GetHashCode();
     }
 
     public bool TryGetValue(float x, float y, out UnityEngine.Color color)
