@@ -9,8 +9,8 @@ using HarmonyLib;
 
 namespace BetterContinents;
 
-// "bc export ..." and "bc import ..." - the world export and import in the host's debug tree, next to "bc scr". The same
-// options as bc_export and bc_import.
+// "bc export ...", "bc import ...", "bc cache ..." and "bc twins ...": the console tools in the host's debug tree, next to
+// "bc scr". The same options as bc_export, bc_import, bc_cache and bc_twins (ConsoleTools), which every player has.
 public partial class DebugUtils
 {
     private static void AddExportCommands(Command.SubcommandBuilder bc)
@@ -33,6 +33,10 @@ public partial class DebugUtils
             import.AddCommand("status", "Status", "What the import is doing, and how the last one went",
                 _ => WorldImportCommands.PrintStatus(line => Console.instance.Print(line)));
         });
+        bc.AddCommand("cache", "World cache", $"A shareable world cache, for pre-seeding clients of big worlds: as {WorldCacheCommands.Usage}",
+            args => WorldCacheCommands.RunLine(args ?? "", line => Console.instance.Print(line)));
+        bc.AddCommand("twins", "Vegetation twins", $"Two copies of one vegetation prefab on one spot, found and removed: as {VegetationTwinCommands.Usage}",
+            args => VegetationTwinCommands.RunLine(args ?? "", line => Console.instance.Print(line)));
     }
 }
 
@@ -59,41 +63,39 @@ public static class WorldExportCommands
 
     private static void Run(Terminal.ConsoleEventArgs args)
     {
-        void Output(string line)
-        {
-            args.Context?.AddString(line);
-            BetterContinents.Log(line);
-        }
+        // To the console that asked, the log, and the admin a server runs it for (ConsoleTools).
+        var output = ConsoleTools.Output(args.Context);
         var sub = args.Length >= 2 ? args[1].ToLowerInvariant() : "";
         var rest = args.Length >= 2 ? string.Join(" ", args.Args.Skip(1)).Trim() : "";
         switch (sub)
         {
             case "help":
-                Output(Usage);
-                Output("Writes heightmap, biome, location, forest, heat, alt-biome, lava, moss and paint maps, export.cfg, README.txt and manifest.json,");
-                Output("and a New World preset \"<world> <time>\": pick it in the New World screen to make a world from the export.");
-                Output("After editing the PNGs, bc_import makes the preset again (bc_import help).");
-                Output($"Defaults, from [09 BetterContinents.Export] in BetterContinents.cfg: {WorldExport.Options.Default()}");
-                Output("The same section's Hud turns on the export HUD: a status box (Hud Hotkey, F9) and an export window (Window Hotkey, F7).");
+                output(Usage);
+                output("Writes heightmap, biome, location, forest, heat, alt-biome, lava, moss and paint maps, export.cfg, README.txt and manifest.json,");
+                output("and a New World preset \"<world> <time>\": pick it in the New World screen to make a world from the export.");
+                output("After editing the PNGs, bc_import makes the preset again (bc_import help).");
+                output($"Defaults, from [09 BetterContinents.Export] in BetterContinents.cfg: {WorldExport.Options.Default()}");
+                output("The same section's Hud turns on the export HUD: a status box (Hud Hotkey, F9) and an export window (Window Hotkey, F7).");
                 break;
             case "status":
-                PrintStatus(Output);
+                PrintStatus(output);
                 break;
             case "cancel":
-                CancelExport(Output);
+                CancelExport(output);
                 break;
             case "server":
                 var serverArgs = args.Length >= 3 ? string.Join(" ", args.Args.Skip(2)).Trim() : "";
-                SendToServer(serverArgs, Output);
+                SendToServer(serverArgs, output);
                 break;
             default:
-                StartExport(rest, Output);
+                StartExport(rest, output);
                 break;
         }
     }
 
     // The dedicated server exports its own world (every location, its own files). ZNet.RemoteCommand has the server
-    // check adminlist.txt and run "bc_export <options>" on its console, so the answer lands in the server's log.
+    // check adminlist.txt and run "bc_export <options>" on its console: the answer lands in the server's log, and comes
+    // back to the admin who asked (ConsoleTools), the export's end too.
     private static void SendToServer(string options, Action<string> output)
     {
         var net = ZNet.instance;
@@ -122,8 +124,8 @@ public static class WorldExportCommands
         }
         net.RemoteCommand(("bc_export " + options).Trim());
         output(control
-            ? $"Sent '{word}' to the server (admins only); the answer is in the server's log."
-            : "Asked the server to export its world (admins only). It writes under its own save folder and reports in its log; 'bc_export server status' and 'bc_export server cancel' go the same way.");
+            ? $"Sent '{word}' to the server (admins only); its answer comes back here and goes to its log."
+            : "Asked the server to export its world (admins only). It writes under its own save folder; its answer and the export's end come back here and go to its log. 'bc_export server status' and 'bc_export server cancel' go the same way.");
     }
 
     public static void StartExport(string text, Action<string> output)
@@ -140,7 +142,11 @@ public static class WorldExportCommands
             return;
         }
         if (WorldExport.Start(options))
+        {
+            // An export a server runs for an admin tells them when it ends.
+            WorldExport.Echo = ConsoleTools.RemoteEcho();
             output("World export running; 'bc_export status' shows progress, 'bc_export cancel' stops it.");
+        }
         else
             output($"World export cannot start: {WorldExport.LastError}");
     }
@@ -268,25 +274,13 @@ public static class WorldCacheCommands
             optionsFetcher: () => ["export", "import", "list", "help"]);
     }
 
-    private static void Run(Terminal.ConsoleEventArgs args)
+    // To the console that asked, the log, and the admin a server runs it for (ConsoleTools). Everything after the
+    // command is its argument, so an import path with spaces needs no quotes.
+    private static void Run(Terminal.ConsoleEventArgs args) => RunLine(ConsoleTools.Rest(args, "bc_cache"), ConsoleTools.Output(args.Context));
+
+    // bc_cache, and "bc cache" in the host's debug tree.
+    internal static void RunLine(string rest, Action<string> output)
     {
-        void Output(string line)
-        {
-            try
-            {
-                args.Context?.AddString(line);
-            }
-            catch
-            {
-                // The console that asked is gone.
-            }
-            BetterContinents.Log(line);
-        }
-        // Everything after the command, so an import path with spaces needs no quotes.
-        var line = args.FullLine ?? "";
-        var rest = line.Length > "bc_cache".Length && line.StartsWith("bc_cache", StringComparison.OrdinalIgnoreCase)
-            ? line.Substring("bc_cache".Length).Trim()
-            : string.Join(" ", args.Args.Skip(1)).Trim();
         var split = rest.Split([' ', '\t'], 2, StringSplitOptions.RemoveEmptyEntries);
         var word = split.Length > 0 ? split[0].ToLowerInvariant() : "";
         var tail = split.Length > 1 ? split[1].Trim() : "";
@@ -294,20 +288,20 @@ public static class WorldCacheCommands
         {
             case "":
             case "help":
-                Help(Output);
+                Help(output);
                 break;
             case "export":
-                Export(Output);
+                Export(output);
                 break;
             case "import":
-                Import(tail, Output);
+                Import(tail, output);
                 break;
             case "list":
-                List(Output);
+                List(output);
                 break;
             default:
-                Output($"bc_cache: unknown option '{word}'");
-                Output(Usage);
+                output($"bc_cache: unknown option '{word}'");
+                output(Usage);
                 break;
         }
     }
@@ -415,36 +409,23 @@ public static class WorldImportCommands
 
     private static void Run(Terminal.ConsoleEventArgs args)
     {
-        void Output(string line)
-        {
-            try
-            {
-                args.Context?.AddString(line);
-            }
-            catch
-            {
-                // The console that asked is gone.
-            }
-            BetterContinents.Log(line);
-        }
+        // To the console that asked, the log, and the admin a server runs it for (ConsoleTools).
+        var output = ConsoleTools.Output(args.Context);
         // Everything after the command, so a folder with spaces in its name needs no quotes.
-        var line = args.FullLine ?? "";
-        var rest = line.Length > "bc_import".Length && line.StartsWith("bc_import", StringComparison.OrdinalIgnoreCase)
-            ? line.Substring("bc_import".Length).Trim()
-            : string.Join(" ", args.Args.Skip(1)).Trim();
+        var rest = ConsoleTools.Rest(args, "bc_import");
         switch (rest.ToLowerInvariant())
         {
             case "help":
-                Help(Output);
+                Help(output);
                 break;
             case "list":
-                List(Output);
+                List(output);
                 break;
             case "status":
-                PrintStatus(Output);
+                PrintStatus(output);
                 break;
             default:
-                Import(rest, Output);
+                Import(rest, output);
                 break;
         }
     }

@@ -492,12 +492,17 @@ public static class WorldExport
   }
 
   // Logs, and prints to the in-game console when there is one (a dedicated server's goes to its log only).
+  // The admin a dedicated server runs the export for (bc_export server ...): what Say says reaches their console too,
+  // until the export ends.
+  internal static Action<string>? Echo;
+
   internal static void Say(string message, bool warning = false)
   {
     if (warning)
       LogWarning(message);
     else
       Log(message);
+    Echo?.Invoke(message);
     try
     {
       Console.instance?.Print(message);
@@ -2357,6 +2362,8 @@ public static class WorldExport
         foreach (var line in LastSummary)
           Say("World export: " + line);
         Say("World export: README.txt in the folder says how to make a world from it, in three ways.");
+        // The admin who asked has their answer.
+        Echo = null;
         return;
       }
       DeletePartial();
@@ -2372,6 +2379,7 @@ public static class WorldExport
         LogError($"World export failed: {failure}");
         Say($"World export failed: {failure.Message}. Its partial files were deleted.", warning: true);
       }
+      Echo = null;
     }
 
     // What the export came to, a line each, for the console and the HUD's "Last export" panel.

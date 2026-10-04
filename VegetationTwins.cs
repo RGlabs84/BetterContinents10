@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-10-04 for the vegetation twin guard (0.10.0).
+// Added by Wubarrk on 2026-10-04 for the vegetation twin guard (0.10.0), and modified on 2026-10-04 for the unifying refactor (0.10.0).
 
 using System;
 using System.Collections;
@@ -287,9 +287,6 @@ public static class VegetationTwinCommands
   // Destroys per frame: ZDOMan sends each frame's as one message, 12 bytes an object, and one message tops out at 512 KiB.
   private const int BatchSize = 1000;
   private const float MaxRadius = 5f;
-  // The admin who sent "bc_twins server ...": ZNet.InternalCommand runs the command for them, so they are known only
-  // while it runs (RemoteCallerPatch); their console gets the answer through ZNet.RemotePrint.
-  internal static ZRpc? RemoteCaller;
   private static bool Removing;
 
   public static void Register()
@@ -302,40 +299,21 @@ public static class VegetationTwinCommands
       optionsFetcher: () => ["remove", "server", "help"]);
   }
 
-  private static void Run(Terminal.ConsoleEventArgs args)
+  // The answer goes to the console that asked, the log, and the admin a server runs it for (ConsoleTools).
+  private static void Run(Terminal.ConsoleEventArgs args) => RunLine(ConsoleTools.Rest(args, "bc_twins"), ConsoleTools.Output(args.Context));
+
+  // bc_twins, and "bc twins" in the host's debug tree.
+  internal static void RunLine(string text, Action<string> output)
   {
-    var caller = RemoteCaller;
-    var context = args.Context;
-    void Output(string line)
-    {
-      try
-      {
-        context?.AddString(line);
-      }
-      catch
-      {
-        // The console that asked is gone.
-      }
-      BetterContinents.Log(line);
-      if (caller == null) return;
-      try
-      {
-        ZNet.instance?.RemotePrint(caller, line);
-      }
-      catch
-      {
-        // The admin left.
-      }
-    }
-    var words = args.Args.Skip(1).Select(w => w.Trim().ToLowerInvariant()).Where(w => w != "").ToList();
+    var words = text.Split([' ', '\t'], StringSplitOptions.RemoveEmptyEntries).Select(w => w.Trim().ToLowerInvariant()).ToList();
     if (words.Count > 0 && words[0] == "server")
     {
-      SendToServer(string.Join(" ", words.Skip(1)), Output);
+      SendToServer(string.Join(" ", words.Skip(1)), output);
       return;
     }
     if (words.Count > 0 && (words[0] == "help" || words[0] == "?"))
     {
-      Help(Output);
+      Help(output);
       return;
     }
     bool remove = false, confirm = false;
@@ -347,31 +325,31 @@ public static class VegetationTwinCommands
       else if (float.TryParse(word, NumberStyles.Float, CultureInfo.InvariantCulture, out var r) && r >= VegetationTwins.ExactRadius && r <= MaxRadius) radius = r;
       else
       {
-        Output($"bc_twins: '{word}' is not understood (a radius is {VegetationTwins.ExactRadius:0.0#} to {MaxRadius:0} m).");
-        Output(Usage);
+        output($"bc_twins: '{word}' is not understood (a radius is {VegetationTwins.ExactRadius:0.0#} to {MaxRadius:0} m).");
+        output(Usage);
         return;
       }
     }
     if (confirm && !remove)
     {
-      Output("bc_twins: 'confirm' goes with 'remove': bc_twins remove confirm");
+      output("bc_twins: 'confirm' goes with 'remove': bc_twins remove confirm");
       return;
     }
     var net = ZNet.instance;
     if (net == null || ZDOMan.instance == null || ZoneSystem.instance == null || ZNetScene.instance == null)
     {
-      Output("bc_twins: load a world first.");
+      output("bc_twins: load a world first.");
       return;
     }
     if (Removing)
     {
-      Output("bc_twins: a removal is still running.");
+      output("bc_twins: a removal is still running.");
       return;
     }
     bool server = net.IsServer();
     if (remove && !server)
     {
-      Output("bc_twins: removal runs where the world is. Ask the server: bc_twins server " + string.Join(" ", words) + " (admins only).");
+      output("bc_twins: removal runs where the world is. Ask the server: bc_twins server " + string.Join(" ", words) + " (admins only).");
       return;
     }
     // A plain remove takes exact twins only, the copies of a zone filled twice; a radius thins near twins too.
@@ -382,7 +360,7 @@ public static class VegetationTwinCommands
     var scan = VegetationTwins.Find(items, scanRadius, exactOnly, item => generator != null ? generator.GetHeight(item.X, item.Z) : float.NaN);
     if (!remove)
     {
-      Report(scan, names, scanRadius, server, Output);
+      Report(scan, names, scanRadius, server, output);
       return;
     }
     var rule = exactOnly
@@ -390,19 +368,19 @@ public static class VegetationTwinCommands
       : $"twins within {scanRadius:0.0#} m, crops players grow only on one spot";
     if (scan.Remove.Count == 0)
     {
-      Output($"bc_twins remove: nothing to remove ({rule}).");
+      output($"bc_twins remove: nothing to remove ({rule}).");
       return;
     }
     var zones = scan.Remove.Select(i => (i.ZoneX, i.ZoneZ)).Distinct().Count();
     if (!confirm)
     {
-      Output($"bc_twins remove: would delete {scan.Remove.Count:N0} extra copies in {zones:N0} zones ({rule}; the copy nearest the ground stays, player-made objects never go).");
-      Output("This cannot be undone: back up the world first, then run 'bc_twins remove confirm" + (radius != null ? $" {scanRadius.ToString("0.0#", CultureInfo.InvariantCulture)}" : "") + "'.");
+      output($"bc_twins remove: would delete {scan.Remove.Count:N0} extra copies in {zones:N0} zones ({rule}; the copy nearest the ground stays, player-made objects never go).");
+      output("This cannot be undone: back up the world first, then run 'bc_twins remove confirm" + (radius != null ? $" {scanRadius.ToString("0.0#", CultureInfo.InvariantCulture)}" : "") + "'.");
       return;
     }
     Removing = true;
-    Output($"bc_twins: removing {scan.Remove.Count:N0} extra copies in {zones:N0} zones ({rule}), {BatchSize} a frame.");
-    BetterContinents.instance.StartCoroutine(RemoveAll(scan.Remove.Select(i => ((ZDOID)i.Tag!, i.Prefab)).ToList(), Output));
+    output($"bc_twins: removing {scan.Remove.Count:N0} extra copies in {zones:N0} zones ({rule}), {BatchSize} a frame.");
+    BetterContinents.instance.StartCoroutine(RemoveAll(scan.Remove.Select(i => ((ZDOID)i.Tag!, i.Prefab)).ToList(), output));
   }
 
   private static IEnumerator RemoveAll(List<(ZDOID Id, int Prefab)> extra, Action<string> output)
@@ -490,12 +468,4 @@ public static class VegetationTwinCommands
     output("                                crops players grow only when on one spot. Back up the world first.");
     output("bc_twins server ...             the same on a dedicated server (admins only)");
   }
-}
-
-// Remembers who sent a remote console command while the server runs it (VegetationTwinCommands.RemoteCaller).
-[HarmonyPatch(typeof(ZNet), "InternalCommand")]
-internal static class RemoteCallerPatch
-{
-  private static void Prefix(ZRpc rpc) => VegetationTwinCommands.RemoteCaller = rpc;
-  private static void Finalizer() => VegetationTwinCommands.RemoteCaller = null;
 }

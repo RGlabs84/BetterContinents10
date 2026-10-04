@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-09-22 for alt-biome planting (0.8.1).
+// Added by Wubarrk on 2026-09-22 for alt-biome planting (0.8.1), and modified on 2026-10-04 for the unifying refactor (0.10.0).
 
 using System;
 using System.Collections.Generic;
@@ -24,7 +24,9 @@ public static class AltBiomeCommands
 
   private static void Run(Terminal.ConsoleEventArgs args)
   {
-    void Output(string line) => args.Context?.AddString(line);
+    // To the console that asked (not the log: the reports are long), and the admin a server runs it for.
+    var output = ConsoleTools.Output(args.Context, log: false);
+    void Output(string line) => output(line);
     void OutputAll(IEnumerable<string> lines)
     {
       foreach (var line in lines)

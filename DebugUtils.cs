@@ -175,59 +175,59 @@ public partial class DebugUtils
                     AddSettings(group, "g");
                 });
 
-            bc.AddGroup("h", "Heightmap", "Heightmap settings, get more info with 'bc param h help'",
+            bc.AddGroup("h", "Heightmap", "Heightmap settings, get more info with 'bc h help'",
                 group =>
                 {
                     AddMapFile(group, MapKind.Height);
                     AddSettings(group, "h");
                 });
 
-            bc.AddGroup("r", "Roughmap", "Roughmap settings, get more info with 'bc param r help'", group =>
+            bc.AddGroup("r", "Roughmap", "Roughmap settings, get more info with 'bc r help'", group =>
             {
                 AddMapFile(group, MapKind.Rough);
                 AddSettings(group, "r");
             });
-            bc.AddGroup("b", "Biomemap", "Biomemap settings, get more info with 'bc param b help'", group =>
+            bc.AddGroup("b", "Biomemap", "Biomemap settings, get more info with 'bc b help'", group =>
             {
                 AddMapFile(group, MapKind.Biome);
                 AddSettings(group, "b");
             });
-            bc.AddGroup("terrain", "Terrainmap", "Terrainmap settings, get more info with 'bc param terrain help'",
+            bc.AddGroup("terrain", "Terrainmap", "Terrainmap settings, get more info with 'bc terrain help'",
                 group =>
                 {
                     AddMapFile(group, MapKind.Terrain);
                 });
-            bc.AddGroup("l", "Locationmap", "Locationmap settings, get more info with 'bc param s help'", group =>
+            bc.AddGroup("l", "Locationmap", "Locationmap settings, get more info with 'bc l help'", group =>
             {
                 AddMapFile(group, MapKind.Location);
             });
 
-            bc.AddGroup("paint", "Paintmap", "Paintmap settings, get more info with 'bc param s help'", group =>
+            bc.AddGroup("paint", "Paintmap", "Paintmap settings, get more info with 'bc paint help'", group =>
             {
                 AddMapFile(group, MapKind.Paint);
             });
-            bc.AddGroup("lava", "Lavamap", "Lavamap settings, get more info with 'bc param s help'", group =>
+            bc.AddGroup("lava", "Lavamap", "Lavamap settings, get more info with 'bc lava help'", group =>
             {
                 AddMapFile(group, MapKind.Lava);
             });
-            bc.AddGroup("moss", "Mossmap", "Mossmap settings, get more info with 'bc param s help'", group =>
+            bc.AddGroup("moss", "Mossmap", "Mossmap settings, get more info with 'bc moss help'", group =>
             {
                 AddMapFile(group, MapKind.Moss);
             });
-            bc.AddGroup("vegetation", "Vegetationmap", "Vegetationmap settings, get more info with 'bc param s help'", group =>
+            bc.AddGroup("vegetation", "Vegetationmap", "Vegetationmap settings, get more info with 'bc vegetation help'", group =>
             {
                 AddMapFile(group, MapKind.Vegetation);
             });
-            bc.AddGroup("spawn", "Spawnmap", "Spawnmap settings, get more info with 'bc param s help'", group =>
+            bc.AddGroup("spawn", "Spawnmap", "Spawnmap settings, get more info with 'bc spawn help'", group =>
             {
                 AddMapFile(group, MapKind.Spawn);
             });
-            bc.AddGroup("heat", "Heatmap", "Heatmap settings, get more info with 'bc param s help'", group =>
+            bc.AddGroup("heat", "Heatmap", "Heatmap settings, get more info with 'bc heat help'", group =>
             {
                 AddMapFile(group, MapKind.Heat);
                 AddSettings(group, "heat");
             });
-            bc.AddGroup("fo", "Forest", "Forest settings, get more info with 'bc param fo help'", group =>
+            bc.AddGroup("fo", "Forest", "Forest settings, get more info with 'bc fo help'", group =>
             {
                 AddMapFile(group, MapKind.Forest);
                 AddSettings(group, "fo");
@@ -243,7 +243,7 @@ public partial class DebugUtils
             //     AddHeightmapSubcommand(subcmd, "bl", "ridge blend", "(between 0 and 1)", args => BetterContinents.Settings.RidgeBlend = float.Parse(args));
             //     AddHeightmapSubcommand(subcmd, "am", "ridge amount", "(between 0 and 1)", args => BetterContinents.Settings.RidgeAmount = float.Parse(args));
             // });
-            bc.AddGroup("st", "Start Position", "Start position settings, get more info with 'bc param st help'",
+            bc.AddGroup("st", "Start Position", "Start position settings, get more info with 'bc st help'",
                 group =>
                 {
                     AddSettings(group, "st");

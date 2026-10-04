@@ -1,4 +1,6 @@
-﻿using System;
+﻿// Modified by Wubarrk on 2026-10-04 for the unifying refactor (0.10.0).
+
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Drawing;
@@ -133,7 +135,8 @@ public partial class DebugUtils
 
             if (commandType == CommandType.Group)
             {
-                if (!hasArgs)
+                // "bc h help", as every group's description says, lists the group like "bc h".
+                if (!hasArgs || args == "help")
                 {
                     ShowSubcommandHelp();
                 }
