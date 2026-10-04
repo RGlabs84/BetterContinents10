@@ -3,6 +3,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using Splatform;
 using UnityEngine;
 
@@ -108,20 +109,7 @@ public partial class BetterContinents
     public bool HasSpawnMap => SpawnMap != null;
 
 
-    public bool AnyImageMap => HasHeightMap
-                               || HasRoughMap
-                               || HasFlatMap
-                               || HasBiomeMap
-                               || HasTerrainMap
-                               || HasLocationMap
-                               || HasForestMap
-                               || HasPaintMap
-                               || HasLavaMap
-                               || HasMossMap
-                               || HasVegetationMap
-                               || HasHeatMap
-                               || HasSpawnMap
-                               || HasAltBiomeMap;
+    public bool AnyImageMap => MapKind.All.Any(kind => kind.Has(this));
     public bool ShouldHeightMapOverrideAll => HasHeightMap && HeightmapOverrideAll;
 
     public static BetterContinentsSettings Create()
@@ -161,75 +149,16 @@ public partial class BetterContinents
         return "";
     }
 
-    private static readonly string HeightFile = "heightmap.png";
-    private static readonly string BiomeFile = "biomemap.png";
-    private static readonly string LocationFile = "locationmap.png";
-    private static readonly string RoughFile = "roughmap.png";
-    private static readonly string ForestFile = "forestmap.png";
-    private static readonly string HeatFile = "heatmap.png";
-    private static readonly string TerrainFile = "terrainmap.png";
-    private static readonly string PaintFile = "paintmap.png";
-    private static readonly string LavaFile = "lavamap.png";
-    private static readonly string MossFile = "mossmap.png";
-    private static readonly string VegetationFile = "vegetationmap.png";
-    private static readonly string SpawnFile = "spawnmap.png";
-    private static readonly string AltBiomeFile = "altbiomemap.png";
-
     // World export (WorldExport's sources/ folder): every image map this world carries, under the file name the
-    // Directory setting loads it from. The flat map is legacy (settings version 6 and older) and has no such name.
+    // Directory setting loads it from. The flat map (settings version 6 and older) has no such setting.
     internal List<(string FileName, ImageMapBase Map)> LoadedImageMaps()
     {
       var maps = new List<(string, ImageMapBase)>();
-      void Add(string fileName, ImageMapBase? map)
-      {
-        if (map != null)
-          maps.Add((fileName, map));
-      }
-      Add(HeightFile, HeightMap);
-      Add(BiomeFile, BiomeMap);
-      Add(TerrainFile, TerrainMap);
-      Add(LocationFile, LocationMap);
-      Add(RoughFile, RoughMap);
-      Add("flatmap.png", UseRoughInvertedAsFlat ? null : FlatMap);
-      Add(ForestFile, ForestMap);
-      Add(HeatFile, HeatMap);
-      Add(PaintFile, PaintMap);
-      Add(LavaFile, LavaMap);
-      Add(MossFile, MossMap);
-      Add(VegetationFile, VegetationMap);
-      Add(SpawnFile, SpawnMap);
-      Add(AltBiomeFile, AltBiomeMap);
+      foreach (var kind in MapKind.All)
+        if (kind.Listed(this) is { } map)
+          maps.Add((kind.FileName, map));
       return maps;
     }
-
-    private static string HeightPath(string defaultFilename, string projectDir) => GetPath(projectDir, HeightFile, defaultFilename);
-    private static string BiomePath(string defaultFilename, string projectDir) => GetPath(projectDir, BiomeFile, defaultFilename);
-    private static string LocationPath(string defaultFilename, string projectDir) => GetPath(projectDir, LocationFile, defaultFilename);
-    private static string RoughPath(string defaultFilename, string projectDir) => GetPath(projectDir, RoughFile, defaultFilename);
-    private static string ForestPath(string defaultFilename, string projectDir) => GetPath(projectDir, ForestFile, defaultFilename);
-    private static string HeatPath(string defaultFilename, string projectDir) => GetPath(projectDir, HeatFile, defaultFilename);
-    private static string TerrainPath(string defaultFilename, string projectDir) => GetPath(projectDir, TerrainFile, defaultFilename);
-    private static string PaintPath(string defaultFilename, string projectDir) => GetPath(projectDir, PaintFile, defaultFilename);
-    private static string LavaPath(string defaultFilename, string projectDir) => GetPath(projectDir, LavaFile, defaultFilename);
-    private static string MossPath(string defaultFilename, string projectDir) => GetPath(projectDir, MossFile, defaultFilename);
-    private static string VegetationPath(string defaultFilename, string projectDir) => GetPath(projectDir, VegetationFile, defaultFilename);
-    private static string SpawnPath(string defaultFilename, string projectDir) => GetPath(projectDir, SpawnFile, defaultFilename);
-    private static string AltBiomePath(string defaultFilename, string projectDir) => GetPath(projectDir, AltBiomeFile, defaultFilename);
-
-    private static string HeightConfigPath => HeightPath(ConfigHeightFile.Value, ConfigMapSourceDir.Value);
-    private static string BiomeConfigPath => BiomePath(ConfigBiomeFile.Value, ConfigMapSourceDir.Value);
-    private static string LocationConfigPath => LocationPath(ConfigLocationFile.Value, ConfigMapSourceDir.Value);
-    private static string RoughConfigPath => RoughPath(ConfigRoughFile.Value, ConfigMapSourceDir.Value);
-    private static string ForestConfigPath => ForestPath(ConfigForestFile.Value, ConfigMapSourceDir.Value);
-    private static string HeatConfigPath => HeatPath(ConfigHeatFile.Value, ConfigMapSourceDir.Value);
-    private static string TerrainConfigPath => TerrainPath(ConfigTerrainFile.Value, ConfigMapSourceDir.Value);
-    private static string PaintConfigPath => PaintPath(ConfigPaintFile.Value, ConfigMapSourceDir.Value);
-    private static string LavaConfigPath => LavaPath(ConfigLavaFile.Value, ConfigMapSourceDir.Value);
-    private static string MossConfigPath => MossPath(ConfigMossFile.Value, ConfigMapSourceDir.Value);
-    private static string VegetationConfigPath => VegetationPath(ConfigVegetationFile.Value, ConfigMapSourceDir.Value);
-    private static string SpawnConfigPath => SpawnPath(ConfigSpawnFile.Value, ConfigMapSourceDir.Value);
-    private static string AltBiomeConfigPath => AltBiomePath(ConfigAltBiomeFile.Value, ConfigMapSourceDir.Value);
-
 
     private void InitSettings(bool enabled)
     {
@@ -245,8 +174,8 @@ public partial class BetterContinents
 
     // Everything a new world takes from the config. ConfigValues.Live reads BetterContinents.cfg as it is now. Every
     // plain value comes from its definition in SettingsSchema, so a new world can only ever read the config's own
-    // defaults and ranges; then the maps, in the order they have always loaded in (the location loader may rename a
-    // legacy spawnmap.png first).
+    // defaults and ranges; then the maps, from their kinds (MapKind), in the order they have always loaded in. lean:
+    // a world import drops the decoded pixels a preset does not need (MapKind<T>).
     private void ReadConfig(ConfigValues c, bool lean)
     {
       foreach (var setting in SettingsSchema.Scalars)
@@ -254,29 +183,9 @@ public partial class BetterContinents
       BaseHeightNoise = new();
 
       var dir = c.Get(ConfigMapSourceDir);
-      HeightMap = ImageMapFloat.Create(HeightPath(c.Get(ConfigHeightFile), dir), HeightMapAlpha);
-      BiomeMap = ImageMapBiome.Create(BiomePath(c.Get(ConfigBiomeFile), dir));
-      LocationMap = ImageMapLocation.Create(LocationPath(c.Get(ConfigLocationFile), dir));
-      RoughMap = Lean(ImageMapFloat.Create(RoughPath(c.Get(ConfigRoughFile), dir), false), lean);
-      ForestMap = Lean(ImageMapFloat.Create(ForestPath(c.Get(ConfigForestFile), dir), false), lean);
-      TerrainMap = Lean(ImageMapTerrain.Create(TerrainPath(c.Get(ConfigTerrainFile), dir)), lean);
-      PaintMap = Lean(ImageMapPaint.Create(PaintPath(c.Get(ConfigPaintFile), dir)), lean);
-      LavaMap = Lean(ImageMapFloat.Create(LavaPath(c.Get(ConfigLavaFile), dir), false), lean);
-      MossMap = Lean(ImageMapFloat.Create(MossPath(c.Get(ConfigMossFile), dir), false), lean);
-      VegetationMap = ImageMapSpawn.Create(VegetationPath(c.Get(ConfigVegetationFile), dir));
-      HeatMap = Lean(ImageMapFloat.Create(HeatPath(c.Get(ConfigHeatFile), dir), false), lean);
-      SpawnMap = ImageMapSpawn.Create(SpawnPath(c.Get(ConfigSpawnFile), dir));
-      AltBiomeMap = ImageMapAltBiome.Create(AltBiomePath(c.Get(ConfigAltBiomeFile), dir));
+      foreach (var kind in MapKind.LoadOrder)
+        kind.Load(this, c, dir, lean);
       AltBiomes = AltBiomeSettings.FromConfig(c);
-    }
-
-    // The heightmap keeps its pixels (a preset's thumbnail is drawn from it); the biome, location, vegetation, spawn
-    // and alt-biome maps are stored decoded, so they keep theirs too.
-    private static T? Lean<T>(T? map, bool lean) where T : ImageMapBase
-    {
-      if (lean)
-        map?.ReleasePixels();
-      return map;
     }
 
     #region Setters
@@ -310,11 +219,6 @@ public partial class BetterContinents
       get => Mathf.InverseLerp(1, -1, ForestAmountOffset);
     }
 
-    public void SetHeightPath(string path) => HeightMap = ImageMapFloat.Create(path, HeightMapAlpha);
-    public string GetHeightPath() => SimplePath(HeightMap?.FilePath ?? string.Empty);
-
-    public string ResolveHeightPath(string path) => ResolvePath(path, HeightFile);
-
     // bc b fn: an empty path switches the biome map off. Any other path replaces the world's map only if its picture
     // and legend read cleanly; otherwise the world keeps its map (before 0.9.3 a wrong path or a legend error replaced
     // it, and the next save kept the damage). True when the new map is in use.
@@ -344,48 +248,6 @@ public partial class BetterContinents
         : $"The legend of {path} has errors (see above): the world keeps its current biome map. Fix the legend and reload.");
       return false;
     }
-    public string GetBiomePath() => SimplePath(BiomeMap?.FilePath ?? string.Empty);
-    public string ResolveBiomePath(string path) => ResolvePath(path, BiomeFile);
-
-    public void SetTerrainPath(string path) => TerrainMap = ImageMapTerrain.Create(path);
-    public string GetTerrainPath() => SimplePath(TerrainMap?.FilePath ?? string.Empty);
-    public string ResolveTerrainPath(string path) => ResolvePath(path, TerrainFile);
-
-    public void SetLocationPath(string path) => LocationMap = ImageMapLocation.Create(path);
-    public string GetLocationPath() => SimplePath(LocationMap?.FilePath ?? string.Empty);
-    public string ResolveLocationPath(string path) => ResolvePath(path, LocationFile);
-
-    public void SetRoughPath(string path) => RoughMap = ImageMapFloat.Create(path, false);
-    public string GetRoughPath() => SimplePath(RoughMap?.FilePath ?? string.Empty);
-    public string ResolveRoughPath(string path) => ResolvePath(path, RoughFile);
-
-    public void SetForestPath(string path) => ForestMap = ImageMapFloat.Create(path, false);
-    public string GetForestPath() => SimplePath(ForestMap?.FilePath ?? string.Empty);
-    public string ResolveForestPath(string path) => ResolvePath(path, ForestFile);
-
-    public void SetHeatPath(string path) => HeatMap = ImageMapFloat.Create(path, false);
-    public string GetHeatPath() => SimplePath(HeatMap?.FilePath ?? string.Empty);
-    public string ResolveHeatPath(string path) => ResolvePath(path, HeatFile);
-
-    public void SetPaintPath(string path) => PaintMap = ImageMapPaint.Create(path);
-    public string GetPaintPath() => SimplePath(PaintMap?.FilePath ?? string.Empty);
-    public string ResolvePaintPath(string path) => ResolvePath(path, PaintFile);
-
-    public void SetLavaPath(string path) => LavaMap = ImageMapFloat.Create(path, false);
-    public string GetLavaPath() => SimplePath(LavaMap?.FilePath ?? string.Empty);
-    public string ResolveLavaPath(string path) => ResolvePath(path, LavaFile);
-
-    public void SetMossPath(string path) => MossMap = ImageMapFloat.Create(path, false);
-    public string GetMossPath() => SimplePath(MossMap?.FilePath ?? string.Empty);
-    public string ResolveMossPath(string path) => ResolvePath(path, MossFile);
-
-    public void SetVegetationPath(string path) => VegetationMap = ImageMapSpawn.Create(path);
-    public string GetVegetationPath() => SimplePath(VegetationMap?.FilePath ?? string.Empty);
-    public string ResolveVegetationPath(string path) => ResolvePath(path, VegetationFile);
-
-    public void SetSpawnPath(string path) => SpawnMap = ImageMapSpawn.Create(path);
-    public string GetSpawnPath() => SimplePath(SpawnMap?.FilePath ?? string.Empty);
-    public string ResolveSpawnPath(string path) => ResolvePath(path, SpawnFile);
 
     public void SetAltBiomePath(string path)
     {
@@ -400,17 +262,15 @@ public partial class BetterContinents
       AltBiomeMapBlockAsRead = null;
       AltBiomeMapError = null;
     }
-    public string GetAltBiomePath() => SimplePath(AltBiomeMap?.FilePath ?? string.Empty);
-    public string ResolveAltBiomePath(string path) => ResolvePath(path, AltBiomeFile);
 
-    private string SimplePath(string path)
+    private static string SimplePath(string path)
     {
       path = CleanPath(path);
       if (path.StartsWith(ConfigMapSourceDir.Value))
         return path.Substring(ConfigMapSourceDir.Value.Length).TrimStart(Path.DirectorySeparatorChar);
       return path;
     }
-    private string ResolvePath(string path, string defaultName)
+    private static string ResolvePath(string path, string defaultName)
     {
       path = CleanPath(path);
       if (File.Exists(path))
@@ -848,180 +708,21 @@ public partial class BetterContinents
 
     public IEnumerable<Vector2> GetAllSpawns(string spawn) => LocationMap?.GetAllSpawns(spawn) ?? [];
 
-    public void ReloadHeightMap()
-    {
-      if (HeightMap == null) return;
-      if (!HeightMap.LoadSourceImage())
-      {
-        if (!File.Exists(HeightConfigPath) || File.Exists(HeightMap.FilePath)) return;
-        LogWarning($"Cannot find image {HeightMap.FilePath}: Using default path from config.");
-        HeightMap.FilePath = HeightConfigPath;
-        if (!HeightMap.LoadSourceImage()) return;
-      }
-      HeightMap.CreateMap(HeightMapAlpha);
-    }
-
     // bc reload bm: reads the picture and legend again into a new map, which replaces the world's only if both read
     // cleanly (before 0.9.3 a legend error reloaded the picture with the default colours, and the next save kept it).
     public void ReloadBiomeMap()
     {
       if (BiomeMap == null) return;
       var path = BiomeMap.FilePath;
-      if (!File.Exists(path) && File.Exists(BiomeConfigPath))
+      // The config's path only when the map's own file is gone.
+      if (!File.Exists(path) && File.Exists(MapKind.Biome.ConfigPath))
       {
         LogWarning($"Cannot find image {path}: Using default path from config.");
-        path = BiomeConfigPath;
+        path = MapKind.Biome.ConfigPath;
       }
       var map = ImageMapBiome.Create(path);
       if (UsableReload(map, path))
         BiomeMap = map;
-    }
-
-    public void ReloadLocationMap()
-    {
-      if (LocationMap == null) return;
-      if (!LocationMap.LoadSourceImage())
-      {
-        if (!File.Exists(LocationConfigPath) || File.Exists(LocationMap.FilePath)) return;
-        LogWarning($"Cannot find image {LocationMap.FilePath}: Using default path from config.");
-        LocationMap.FilePath = LocationConfigPath;
-        if (!LocationMap.LoadSourceImage()) return;
-      }
-      LocationMap.CreateMap();
-    }
-
-    public void ReloadRoughMap()
-    {
-      if (RoughMap == null) return;
-      if (!RoughMap.LoadSourceImage())
-      {
-        if (!File.Exists(RoughConfigPath) || File.Exists(RoughMap.FilePath)) return;
-        LogWarning($"Cannot find image {RoughMap.FilePath}: Using default path from config.");
-        RoughMap.FilePath = RoughConfigPath;
-        if (!RoughMap.LoadSourceImage()) return;
-      }
-      RoughMap.CreateMap(false);
-    }
-
-    public void ReloadFlatMap()
-    {
-      if (UseRoughInvertedAsFlat)
-      {
-        ReloadRoughMap();
-        return;
-      }
-      if (FlatMap == null) return;
-      if (!FlatMap.LoadSourceImage())
-      {
-        if (!File.Exists(RoughConfigPath) || File.Exists(FlatMap.FilePath)) return;
-        LogWarning($"Cannot find image {FlatMap.FilePath}: Using default path from config.");
-        FlatMap.FilePath = RoughConfigPath;
-        if (!FlatMap.LoadSourceImage()) return;
-      }
-      FlatMap.CreateMap(false);
-    }
-
-    public void ReloadForestMap()
-    {
-      if (ForestMap == null) return;
-      if (!ForestMap.LoadSourceImage())
-      {
-        if (!File.Exists(ForestConfigPath) || File.Exists(ForestMap.FilePath)) return;
-        LogWarning($"Cannot find image {ForestMap.FilePath}: Using default path from config.");
-        ForestMap.FilePath = ForestConfigPath;
-        if (!ForestMap.LoadSourceImage()) return;
-      }
-      ForestMap.CreateMap(false);
-    }
-    public void ReloadHeatMap()
-    {
-      if (HeatMap == null) return;
-      if (!HeatMap.LoadSourceImage())
-      {
-        if (!File.Exists(HeatConfigPath) || File.Exists(HeatMap.FilePath)) return;
-        LogWarning($"Cannot find image {HeatMap.FilePath}: Using default path from config.");
-        HeatMap.FilePath = HeatConfigPath;
-        if (!HeatMap.LoadSourceImage()) return;
-      }
-      HeatMap.CreateMap(false);
-    }
-
-    public void ReloadTerrainMap()
-    {
-      if (TerrainMap == null) return;
-      if (!TerrainMap.LoadSourceImage())
-      {
-        if (!File.Exists(TerrainConfigPath) || File.Exists(TerrainMap.FilePath)) return;
-        LogWarning($"Cannot find image {TerrainMap.FilePath}: Using default path from config.");
-        TerrainMap.FilePath = TerrainConfigPath;
-        if (!TerrainMap.LoadSourceImage()) return;
-      }
-      TerrainMap.CreateMap();
-    }
-
-    public void ReloadPaintMap()
-    {
-      if (PaintMap == null) return;
-      if (!PaintMap.LoadSourceImage())
-      {
-        if (!File.Exists(PaintConfigPath) || File.Exists(PaintMap.FilePath)) return;
-        LogWarning($"Cannot find image {PaintMap.FilePath}: Using default path from config.");
-        PaintMap.FilePath = PaintConfigPath;
-        if (!PaintMap.LoadSourceImage()) return;
-      }
-      PaintMap.CreateMap();
-    }
-
-    public void ReloadLavaMap()
-    {
-      if (LavaMap == null) return;
-      if (!LavaMap.LoadSourceImage())
-      {
-        if (!File.Exists(LavaConfigPath) || File.Exists(LavaMap.FilePath)) return;
-        LogWarning($"Cannot find image {LavaMap.FilePath}: Using default path from config.");
-        LavaMap.FilePath = LavaConfigPath;
-        if (!LavaMap.LoadSourceImage()) return;
-      }
-      LavaMap.CreateMap(false);
-    }
-
-    public void ReloadMossMap()
-    {
-      if (MossMap == null) return;
-      if (!MossMap.LoadSourceImage())
-      {
-        if (!File.Exists(MossConfigPath) || File.Exists(MossMap.FilePath)) return;
-        LogWarning($"Cannot find image {MossMap.FilePath}: Using default path from config.");
-        MossMap.FilePath = MossConfigPath;
-        if (!MossMap.LoadSourceImage()) return;
-      }
-      MossMap.CreateMap(false);
-    }
-
-    public void ReloadVegetationMap()
-    {
-      if (VegetationMap == null) return;
-      if (!VegetationMap.LoadSourceImage())
-      {
-        if (!File.Exists(VegetationConfigPath) || File.Exists(VegetationMap.FilePath)) return;
-        LogWarning($"Cannot find image {VegetationMap.FilePath}: Using default path from config.");
-        VegetationMap.FilePath = VegetationConfigPath;
-        if (!VegetationMap.LoadSourceImage()) return;
-      }
-      VegetationMap.CreateMap();
-    }
-
-    public void ReloadSpawnMap()
-    {
-      if (SpawnMap == null) return;
-      if (!SpawnMap.LoadSourceImage())
-      {
-        if (!File.Exists(SpawnConfigPath) || File.Exists(SpawnMap.FilePath)) return;
-        LogWarning($"Cannot find image {SpawnMap.FilePath}: Using default path from config.");
-        SpawnMap.FilePath = SpawnConfigPath;
-        if (!SpawnMap.LoadSourceImage()) return;
-      }
-      SpawnMap.CreateMap();
     }
 
     // Re-reads the image and its legend into a new map object. Planted sectors follow when the sectors are rebuilt,
@@ -1032,9 +733,10 @@ public partial class BetterContinents
       var path = AltBiomeMap.FilePath;
       if (!File.Exists(path))
       {
-        if (!File.Exists(AltBiomeConfigPath)) return;
+        var configPath = MapKind.AltBiome.ConfigPath;
+        if (!File.Exists(configPath)) return;
         LogWarning($"Cannot find image {path}: Using default path from config.");
-        path = AltBiomeConfigPath;
+        path = configPath;
       }
       var reloaded = ImageMapAltBiome.Create(path);
       if (reloaded != null)

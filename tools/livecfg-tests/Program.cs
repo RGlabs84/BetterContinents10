@@ -79,6 +79,7 @@ internal static class Program
       Package();
       Reload(cfg);
       SectionNumbers();
+      MapKinds();
       TransferRateTests();
       failures += CacheTests.Run();
       failures += MinimapTests.Run();
@@ -301,6 +302,29 @@ internal static class Program
     {
       try { File.Delete(path); } catch { }
     }
+  }
+
+  // Every image map is declared once (BetterContinentsSettings.MapKind, since the unifying refactor); what still names
+  // them by hand must agree with it.
+  static void MapKinds()
+  {
+    Section("map kinds");
+    var all = BC.BetterContinentsSettings.MapKind.All;
+    var named = all.Where(k => k.FileSetting != null).ToList();
+    C(all.Select(k => k.FileName).Distinct().Count() == all.Length && all.All(k => k.FileName == k.Name.ToLowerInvariant() + ".png"),
+      "every kind has its own file name: its name in lower case, .png");
+    C(all.Select(k => k.ReloadCommand).Distinct().Count() == all.Length && all.Where(k => k.Group != null).Select(k => k.Group).Distinct().Count() == all.Count(k => k.Group != null),
+      "every kind has its own bc reload command, and its own console group");
+    var fileSettings = SettingsSchema.All.OfType<SettingDef<string>>().Where(d => d.Key.EndsWith(" File", StringComparison.OrdinalIgnoreCase)).ToList();
+    C(fileSettings.Count == named.Count && fileSettings.All(d => named.Count(k => k.FileSetting == d) == 1),
+      $"every map file setting belongs to one kind ({string.Join(", ", fileSettings.Select(d => d.Key))})");
+    C(BC.BetterContinentsSettings.MapKind.LoadOrder.Length == named.Count && named.All(k => BC.BetterContinentsSettings.MapKind.LoadOrder.Count(l => l == k) == 1),
+      "a new world reads every kind with a file setting, once");
+    C(WorldImport.MapFiles.SequenceEqual(named.Select(k => k.FileName)), $"the import knows the same files: {string.Join(", ", WorldImport.MapFiles)}");
+    var text = SettingsSchema.Directory.Description;
+    int from = text.IndexOf("standard name: ", StringComparison.Ordinal) + "standard name: ".Length, to = text.IndexOf(" (and the legends", StringComparison.Ordinal);
+    var listed = from > 15 && to > from ? text.Substring(from, to - from).Split(", ") : [];
+    C(listed.SequenceEqual(named.Select(k => k.FileName)), $"the Directory setting lists them in their order: {string.Join(", ", listed)}");
   }
 
   static void TransferRateTests()

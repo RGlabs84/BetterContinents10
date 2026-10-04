@@ -1,10 +1,11 @@
-// Added by Wubarrk on 2026-09-22 for alt-biome planting (0.8.1), and on 2026-09-25 for version-agnostic wording (0.9.1).
+// Added by Wubarrk on 2026-09-22 for alt-biome planting (0.8.1), and on 2026-09-25 for version-agnostic wording (0.9.1), and modified on 2026-10-04 for the unifying refactor (0.10.0).
 
 using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using static BetterContinents.BetterContinents;
+using MapKind = BetterContinents.BetterContinents.BetterContinentsSettings.MapKind;
 
 namespace BetterContinents;
 
@@ -90,22 +91,13 @@ public partial class DebugUtils
                     Console.instance.Print("Rebuilding the alt-biome grid, sectors and placement. Connected clients keep theirs until they reconnect.");
                 });
 
-            ab.AddValue("fn", "Altbiomemap Filename",
+            AddMapFile(ab, MapKind.AltBiome,
                 "Sets the alt-biome map (full path, directory or file name); its legend is the .txt beside it, written with the default palette when missing. Empty removes the map",
-                defaultValue: string.Empty,
-                setter: path =>
+                set => path =>
                 {
-                    var fullPath = BetterContinents.Settings.ResolveAltBiomePath(path);
-                    BetterContinents.Settings.SetAltBiomePath(fullPath);
-                    if (BetterContinents.Settings.HasAltBiomeMap)
-                        Console.instance.Print("<color=#ffa500>Altbiomemap enabled!</color>");
-                    else if (string.IsNullOrEmpty(path))
-                        Console.instance.Print("<color=#ff0000>Altbiomemap disabled!</color>");
-                    else
-                        Console.instance.Print($"<color=#ff0000>ERROR: Path {path} not found!</color>");
+                    set(path);
                     ReplantAltBiomes("alt-biome map changed");
-                },
-                getter: () => BetterContinents.Settings.GetAltBiomePath());
+                });
             ab.AddValue("mode", "Mode", "Random = the game's random placement on unplanted land plus planted regions; PlantedOnly = only planted regions; Off = no alt biomes at all",
                 defaultValue: "Random", list: ["Random", "PlantedOnly", "Off"],
                 setter: SetAltBiomeValue<string>((s, v) => s.Mode = AltBiomeSettings.ParseEnum(v, s.Mode), AltBiomeControl.RebuildLevel.Sectors),

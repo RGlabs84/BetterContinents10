@@ -101,12 +101,9 @@ public static class WorldImport
   public const string ExportPrefix = "export-";
   public const int ThumbnailSize = 256;
 
-  /// <summary>The names BetterContinentsSettings loads from a Directory, in its order.</summary>
+  /// <summary>The names BetterContinentsSettings loads from a Directory: every map kind a setting names, in their order.</summary>
   internal static readonly string[] MapFiles =
-  [
-    "heightmap.png", "biomemap.png", "locationmap.png", "roughmap.png", "forestmap.png", "heatmap.png", "terrainmap.png",
-    "paintmap.png", "lavamap.png", "mossmap.png", "vegetationmap.png", "spawnmap.png", "altbiomemap.png",
-  ];
+    [.. BetterContinents.BetterContinentsSettings.MapKind.All.Where(kind => kind.FileSetting != null).Select(kind => kind.FileName)];
 
   private static readonly Regex StampPattern = new(@"^export-(\d{4}-\d{2}-\d{2}-\d{2}-\d{2}-\d{2})(?:-(\d+))?$", RegexOptions.CultureInvariant);
 

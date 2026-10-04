@@ -7,6 +7,7 @@ using System.Linq;
 using HarmonyLib;
 using UnityEngine;
 using static BetterContinents.BetterContinents;
+using MapKind = BetterContinents.BetterContinents.BetterContinentsSettings.MapKind;
 #nullable disable
 namespace BetterContinents;
 
@@ -64,73 +65,26 @@ public partial class DebugUtils
             {
                 bc.AddGroup("reload", "Reload", "Reloads and reapplies one or more of the image maps", reload =>
                 {
-                    if (BetterContinents.Settings.HasHeightMap)
-                        reload.AddCommand("hm", "Heightmap", "Reloads the heightmap",
-                            HeightmapCommand(_ => BetterContinents.Settings.ReloadHeightMap()));
-                    if (BetterContinents.Settings.HasRoughMap)
-                        reload.AddCommand("rm", "Roughmap", "Reloads the roughmap",
-                            HeightmapCommand(_ => BetterContinents.Settings.ReloadRoughMap()));
-                    if (BetterContinents.Settings.HasFlatMap)
-                        reload.AddCommand("fm", "Flatmap", "Reloads the flatmap",
-                            HeightmapCommand(_ => BetterContinents.Settings.ReloadFlatMap()));
-                    if (BetterContinents.Settings.HasBiomeMap)
-                        reload.AddCommand("bm", "Biomemap", "Reloads the biomemap",
-                            HeightmapCommand(_ => BetterContinents.Settings.ReloadBiomeMap()));
-                    if (BetterContinents.Settings.HasTerrainMap)
-                        reload.AddCommand("terrain", "Terrainmap", "Reloads the terrainmap",
-                            HeightmapCommand(_ => BetterContinents.Settings.ReloadTerrainMap()));
-                    if (BetterContinents.Settings.HasLocationMap)
-                        reload.AddCommand("lm", "Locationmap", "Reloads the locationmap",
-                            HeightmapCommand(_ => BetterContinents.Settings.ReloadLocationMap()));
-                    if (BetterContinents.Settings.HasForestMap)
-                        reload.AddCommand("fom", "Forestmap", "Reloads the forestmap",
-                            HeightmapCommand(_ => BetterContinents.Settings.ReloadForestMap()));
-                    if (BetterContinents.Settings.HasPaintMap)
-                        reload.AddCommand("paint", "Paintmap", "Reloads the paintmap",
-                            HeightmapCommand(_ => BetterContinents.Settings.ReloadPaintMap()));
-                    if (BetterContinents.Settings.HasLavaMap)
-                        reload.AddCommand("lava", "Lavamap", "Reloads the lavamap",
-                            HeightmapCommand(_ => BetterContinents.Settings.ReloadLavaMap()));
-                    if (BetterContinents.Settings.HasMossMap)
-                        reload.AddCommand("moss", "Mossmap", "Reloads the mossmap",
-                            HeightmapCommand(_ => BetterContinents.Settings.ReloadMossMap()));
-                    if (BetterContinents.Settings.HasVegetationMap)
-                        reload.AddCommand("vegetation", "Vegetationmap", "Reloads the vegetationmap",
-                            HeightmapCommand(_ => BetterContinents.Settings.ReloadVegetationMap()));
-                    if (BetterContinents.Settings.HasHeatMap)
-                        reload.AddCommand("heat", "Heatmap", "Reloads the heatmap",
-                            HeightmapCommand(_ => BetterContinents.Settings.ReloadHeatMap()));
-                    if (BetterContinents.Settings.HasSpawnMap)
-                        reload.AddCommand("spawn", "Spawnmap", "Reloads the spawnmap",
-                            HeightmapCommand(_ => BetterContinents.Settings.ReloadSpawnMap()));
-                    if (BetterContinents.Settings.HasAltBiomeMap)
-                        reload.AddCommand("ab", "Altbiomemap", "Reloads the alt-biome map and its legend, replants the alt biomes and resets the zones",
-                            _ =>
-                            {
-                                BetterContinents.Settings.ReloadAltBiomeMap();
-                                ReplantAltBiomes("alt-biome map reloaded");
-                            });
-                    if (BetterContinents.Settings.AnyImageMap)
+                    foreach (var kind in MapKind.All.Where(k => k.Has(BetterContinents.Settings)))
                     {
-                        reload.AddCommand("all", "All", "Reloads all image maps", HeightmapCommand(_ =>
-                        {
-                            if (BetterContinents.Settings.HasHeightMap) BetterContinents.Settings.ReloadHeightMap();
-                            if (BetterContinents.Settings.HasRoughMap) BetterContinents.Settings.ReloadRoughMap();
-                            if (BetterContinents.Settings.HasFlatMap) BetterContinents.Settings.ReloadFlatMap();
-                            if (BetterContinents.Settings.HasBiomeMap) BetterContinents.Settings.ReloadBiomeMap();
-                            if (BetterContinents.Settings.HasTerrainMap) BetterContinents.Settings.ReloadTerrainMap();
-                            if (BetterContinents.Settings.HasLocationMap) BetterContinents.Settings.ReloadLocationMap();
-                            if (BetterContinents.Settings.HasForestMap) BetterContinents.Settings.ReloadForestMap();
-                            if (BetterContinents.Settings.HasPaintMap) BetterContinents.Settings.ReloadPaintMap();
-                            if (BetterContinents.Settings.HasLavaMap) BetterContinents.Settings.ReloadLavaMap();
-                            if (BetterContinents.Settings.HasMossMap) BetterContinents.Settings.ReloadMossMap();
-                            if (BetterContinents.Settings.HasVegetationMap) BetterContinents.Settings.ReloadVegetationMap();
-                            if (BetterContinents.Settings.HasHeatMap) BetterContinents.Settings.ReloadHeatMap();
-                            if (BetterContinents.Settings.HasSpawnMap) BetterContinents.Settings.ReloadSpawnMap();
-                            // Planted regions follow on the grid rebuild that the reset runs.
-                            if (BetterContinents.Settings.HasAltBiomeMap) BetterContinents.Settings.ReloadAltBiomeMap();
-                        }));
+                        if (kind == MapKind.AltBiome)
+                            reload.AddCommand(kind.ReloadCommand, kind.Name, "Reloads the alt-biome map and its legend, replants the alt biomes and resets the zones",
+                                _ =>
+                                {
+                                    kind.Reload(BetterContinents.Settings);
+                                    ReplantAltBiomes("alt-biome map reloaded");
+                                });
+                        else
+                            reload.AddCommand(kind.ReloadCommand, kind.Name, $"Reloads the {kind.Name.ToLowerInvariant()}",
+                                HeightmapCommand(_ => kind.Reload(BetterContinents.Settings)));
                     }
+                    // Planted regions follow on the grid rebuild that the reset runs.
+                    reload.AddCommand("all", "All", "Reloads all image maps", HeightmapCommand(_ =>
+                    {
+                        foreach (var kind in MapKind.All)
+                            if (kind.Has(BetterContinents.Settings))
+                                kind.Reload(BetterContinents.Settings);
+                    }));
                 });
             }
 
@@ -224,228 +178,58 @@ public partial class DebugUtils
             bc.AddGroup("h", "Heightmap", "Heightmap settings, get more info with 'bc param h help'",
                 group =>
                 {
-                    group.AddValue("fn", "Heightmap filename",
-                        "Set heightmap filename (full path, directory or file name)",
-                        defaultValue: string.Empty,
-                        setter: SetHeightmapValue<string>(path =>
-                        {
-                            var fullPath = BetterContinents.Settings.ResolveHeightPath(path);
-                            BetterContinents.Settings.SetHeightPath(fullPath);
-                            if (BetterContinents.Settings.HasHeightMap)
-                                Console.instance.Print($"<color=#ffa500>Heightmap enabled!</color>");
-                            else if (string.IsNullOrEmpty(path))
-                                Console.instance.Print($"<color=#ff0000>Heightmap disabled!</color>");
-                            else
-                                Console.instance.Print($"<color=#ff0000>ERROR: Path {path} not found!</color>");
-                        }),
-                        getter: () => BetterContinents.Settings.GetHeightPath());
+                    AddMapFile(group, MapKind.Height);
                     AddSettings(group, "h");
                 });
 
             bc.AddGroup("r", "Roughmap", "Roughmap settings, get more info with 'bc param r help'", group =>
             {
-                group.AddValue("fn", "Roughmap Filename",
-                    "Sets roughmap filename (full path, directory or file name)",
-                    defaultValue: string.Empty,
-                    setter: SetHeightmapValue<string>(path =>
-                    {
-                        var fullPath = BetterContinents.Settings.ResolveRoughPath(path);
-                        BetterContinents.Settings.SetRoughPath(fullPath);
-                        if (BetterContinents.Settings.HasRoughMap)
-                            Console.instance.Print($"<color=#ffa500>Roughmap enabled!</color>");
-                        else if (string.IsNullOrEmpty(path))
-                            Console.instance.Print($"<color=#ff0000>Roughmap disabled!</color>");
-                        else
-                            Console.instance.Print($"<color=#ff0000>ERROR: Path {path} not found!</color>");
-                    }),
-                    getter: () => BetterContinents.Settings.GetRoughPath());
+                AddMapFile(group, MapKind.Rough);
                 AddSettings(group, "r");
             });
             bc.AddGroup("b", "Biomemap", "Biomemap settings, get more info with 'bc param b help'", group =>
             {
-                group.AddValue("fn", "Biomemap Filename",
-                    "Sets biomemap filename (full path, directory or file name)",
-                    defaultValue: string.Empty,
-                    setter: SetHeightmapValue<string>(path =>
-                    {
-                        var fullPath = BetterContinents.Settings.ResolveBiomePath(path);
-                        var applied = BetterContinents.Settings.SetBiomePath(fullPath);
-                        if (applied)
-                            Console.instance.Print($"<color=#ffa500>Biomemap enabled!</color>");
-                        else if (string.IsNullOrEmpty(path))
-                            Console.instance.Print($"<color=#ff0000>Biomemap disabled!</color>");
-                        else
-                            Console.instance.Print($"<color=#ff0000>ERROR: {path} was not loaded (not found, or its legend has errors: see the log). The world keeps its current biome map.</color>");
-                    }),
-                    getter: () => BetterContinents.Settings.GetBiomePath());
-
+                AddMapFile(group, MapKind.Biome);
                 AddSettings(group, "b");
             });
             bc.AddGroup("terrain", "Terrainmap", "Terrainmap settings, get more info with 'bc param terrain help'",
                 group =>
                 {
-                    group.AddValue("fn", "Terrainmap Filename",
-                        "Sets terrainmap filename (full path, directory or file name)",
-                        defaultValue: string.Empty,
-                        setter: SetHeightmapValue<string>(path =>
-                        {
-                            var fullPath = BetterContinents.Settings.ResolveTerrainPath(path);
-                            BetterContinents.Settings.SetTerrainPath(fullPath);
-                            if (BetterContinents.Settings.HasTerrainMap)
-                                Console.instance.Print($"<color=#ffa500>Terrainmap enabled!</color>");
-                            else if (string.IsNullOrEmpty(path))
-                                Console.instance.Print($"<color=#ff0000>Terrainmap disabled!</color>");
-                            else
-                                Console.instance.Print($"<color=#ff0000>ERROR: Path {path} not found!</color>");
-                        }),
-                        getter: () => BetterContinents.Settings.GetTerrainPath());
+                    AddMapFile(group, MapKind.Terrain);
                 });
             bc.AddGroup("l", "Locationmap", "Locationmap settings, get more info with 'bc param s help'", group =>
             {
-                group.AddValue("fn", "Locationmap Filename",
-                    "Sets locationmap filename (full path, directory or file name)",
-                    defaultValue: string.Empty,
-                    setter: SetHeightmapValue<string>(path =>
-                    {
-                        var fullPath = BetterContinents.Settings.ResolveLocationPath(path);
-                        BetterContinents.Settings.SetLocationPath(fullPath);
-                        if (BetterContinents.Settings.HasLocationMap)
-                            Console.instance.Print($"<color=#ffa500>Locationmap enabled!</color>");
-                        else if (string.IsNullOrEmpty(path))
-                            Console.instance.Print($"<color=#ff0000>Locationmap disabled!</color>");
-                        else
-                            Console.instance.Print($"<color=#ff0000>ERROR: Path {path} not found!</color>");
-                    }),
-                    getter: () => BetterContinents.Settings.GetLocationPath());
+                AddMapFile(group, MapKind.Location);
             });
 
             bc.AddGroup("paint", "Paintmap", "Paintmap settings, get more info with 'bc param s help'", group =>
             {
-                group.AddValue("fn", "Paintmap Filename",
-                    "Sets paintmap filename (full path, directory or file name)",
-                    defaultValue: string.Empty,
-                    setter: SetHeightmapValue<string>(path =>
-                    {
-                        var fullPath = BetterContinents.Settings.ResolvePaintPath(path);
-                        BetterContinents.Settings.SetPaintPath(fullPath);
-                        if (BetterContinents.Settings.HasPaintMap)
-                            Console.instance.Print($"<color=#ffa500>Paintmap enabled!</color>");
-                        else if (string.IsNullOrEmpty(path))
-                            Console.instance.Print($"<color=#ff0000>Paintmap disabled!</color>");
-                        else
-                            Console.instance.Print($"<color=#ff0000>ERROR: Path {path} not found!</color>");
-                    }),
-                    getter: () => BetterContinents.Settings.GetPaintPath());
+                AddMapFile(group, MapKind.Paint);
             });
             bc.AddGroup("lava", "Lavamap", "Lavamap settings, get more info with 'bc param s help'", group =>
             {
-                group.AddValue("fn", "Lavamap Filename",
-                    "Sets lavamap filename (full path, directory or file name)",
-                    defaultValue: string.Empty,
-                    setter: SetHeightmapValue<string>(path =>
-                    {
-                        var fullPath = BetterContinents.Settings.ResolveLavaPath(path);
-                        BetterContinents.Settings.SetLavaPath(fullPath);
-                        if (BetterContinents.Settings.HasLavaMap)
-                            Console.instance.Print($"<color=#ffa500>Lavamap enabled!</color>");
-                        else if (string.IsNullOrEmpty(path))
-                            Console.instance.Print($"<color=#ff0000>Lavamap disabled!</color>");
-                        else
-                            Console.instance.Print($"<color=#ff0000>ERROR: Path {path} not found!</color>");
-                    }),
-                    getter: () => BetterContinents.Settings.GetLavaPath());
+                AddMapFile(group, MapKind.Lava);
             });
             bc.AddGroup("moss", "Mossmap", "Mossmap settings, get more info with 'bc param s help'", group =>
             {
-                group.AddValue("fn", "Mossmap Filename",
-                    "Sets mossmap filename (full path, directory or file name)",
-                    defaultValue: string.Empty,
-                    setter: SetHeightmapValue<string>(path =>
-                    {
-                        var fullPath = BetterContinents.Settings.ResolveMossPath(path);
-                        BetterContinents.Settings.SetMossPath(fullPath);
-                        if (BetterContinents.Settings.HasMossMap)
-                            Console.instance.Print($"<color=#ffa500>Mossmap enabled!</color>");
-                        else if (string.IsNullOrEmpty(path))
-                            Console.instance.Print($"<color=#ff0000>Mossmap disabled!</color>");
-                        else
-                            Console.instance.Print($"<color=#ff0000>ERROR: Path {path} not found!</color>");
-                    }),
-                    getter: () => BetterContinents.Settings.GetMossPath());
+                AddMapFile(group, MapKind.Moss);
             });
             bc.AddGroup("vegetation", "Vegetationmap", "Vegetationmap settings, get more info with 'bc param s help'", group =>
             {
-                group.AddValue("fn", "Vegetationmap Filename",
-                    "Sets vegetationmap filename (full path, directory or file name)",
-                    defaultValue: string.Empty,
-                    setter: SetHeightmapValue<string>(path =>
-                    {
-                        var fullPath = BetterContinents.Settings.ResolveVegetationPath(path);
-                        BetterContinents.Settings.SetVegetationPath(fullPath);
-                        if (BetterContinents.Settings.HasVegetationMap)
-                            Console.instance.Print($"<color=#ffa500>Vegetationmap enabled!</color>");
-                        else if (string.IsNullOrEmpty(path))
-                            Console.instance.Print($"<color=#ff0000>Vegetationmap disabled!</color>");
-                        else
-                            Console.instance.Print($"<color=#ff0000>ERROR: Path {path} not found!</color>");
-                    }),
-                    getter: () => BetterContinents.Settings.GetVegetationPath());
+                AddMapFile(group, MapKind.Vegetation);
             });
             bc.AddGroup("spawn", "Spawnmap", "Spawnmap settings, get more info with 'bc param s help'", group =>
             {
-                group.AddValue("fn", "Spawnmap Filename",
-                    "Sets spawnmap filename (full path, directory or file name)",
-                    defaultValue: string.Empty,
-                    setter: SetHeightmapValue<string>(path =>
-                    {
-                        var fullPath = BetterContinents.Settings.ResolveSpawnPath(path);
-                        BetterContinents.Settings.SetSpawnPath(fullPath);
-                        if (BetterContinents.Settings.HasSpawnMap)
-                            Console.instance.Print($"<color=#ffa500>Spawnmap enabled!</color>");
-                        else if (string.IsNullOrEmpty(path))
-                            Console.instance.Print($"<color=#ff0000>Spawnmap disabled!</color>");
-                        else
-                            Console.instance.Print($"<color=#ff0000>ERROR: Path {path} not found!</color>");
-                    }),
-                    getter: () => BetterContinents.Settings.GetSpawnPath());
+                AddMapFile(group, MapKind.Spawn);
             });
             bc.AddGroup("heat", "Heatmap", "Heatmap settings, get more info with 'bc param s help'", group =>
             {
-                group.AddValue("fn", "Heatmap Filename",
-                    "Sets heatmap filename (full path, directory or file name)",
-                    defaultValue: string.Empty,
-                    setter: SetHeightmapValue<string>(path =>
-                    {
-                        var fullPath = BetterContinents.Settings.ResolveHeatPath(path);
-                        BetterContinents.Settings.SetHeatPath(fullPath);
-                        if (BetterContinents.Settings.HasHeatMap)
-                            Console.instance.Print($"<color=#ffa500>Heatmap enabled!</color>");
-                        else if (string.IsNullOrEmpty(path))
-                            Console.instance.Print($"<color=#ff0000>Heatmap disabled!</color>");
-                        else
-                            Console.instance.Print($"<color=#ff0000>ERROR: Path {path} not found!</color>");
-                    }),
-                    getter: () => BetterContinents.Settings.GetHeatPath());
-
+                AddMapFile(group, MapKind.Heat);
                 AddSettings(group, "heat");
             });
             bc.AddGroup("fo", "Forest", "Forest settings, get more info with 'bc param fo help'", group =>
             {
-                group.AddValue("fn", "Forestmap Filename",
-                    "Sets forestmap filename (full path, directory or file name)",
-                    defaultValue: string.Empty,
-                    setter: SetHeightmapValue<string>(path =>
-                    {
-                        var fullPath = BetterContinents.Settings.ResolveForestPath(path);
-                        BetterContinents.Settings.SetForestPath(fullPath);
-                        if (BetterContinents.Settings.HasForestMap)
-                            Console.instance.Print($"<color=#ffa500>Forestmap enabled!</color>");
-                        else if (string.IsNullOrEmpty(path))
-                            Console.instance.Print($"<color=#ff0000>Forestmap disabled!</color>");
-                        else
-                            Console.instance.Print($"<color=#ff0000>ERROR: Path {path} not found!</color>");
-                    }),
-                    getter: () => BetterContinents.Settings.GetForestPath());
+                AddMapFile(group, MapKind.Forest);
                 AddSettings(group, "fo");
             });
             // bc.AddGroup("ri", "ridge settings, get more info with 'bc param ri help'", 
@@ -873,6 +657,25 @@ public partial class DebugUtils
     {
         rootCommand.Run(text);
     }
+    // bc <group> fn: sets a map's file from a full path, a directory (its standard file name) or a file name in the
+    // Directory; empty switches the map off. Its value is the file the map came from.
+    private static void AddMapFile(Command.SubcommandBuilder group, MapKind kind) =>
+        AddMapFile(group, kind, $"Sets {kind.Name.ToLowerInvariant()} filename (full path, directory or file name)", SetHeightmapValue<string>);
+
+    private static void AddMapFile(Command.SubcommandBuilder group, MapKind kind, string description, Func<Action<string>, Action<string>> apply) =>
+        group.AddValue("fn", $"{kind.Name} Filename", description,
+            defaultValue: string.Empty,
+            setter: apply(path =>
+            {
+                if (kind.Set(BetterContinents.Settings, kind.Resolve(path)))
+                    Console.instance.Print($"<color=#ffa500>{kind.Name} enabled!</color>");
+                else if (string.IsNullOrEmpty(path))
+                    Console.instance.Print($"<color=#ff0000>{kind.Name} disabled!</color>");
+                else
+                    Console.instance.Print($"<color=#ff0000>{kind.NotLoaded(path)}</color>");
+            }),
+            getter: () => kind.Get(BetterContinents.Settings));
+
     private static Action<string> HeightmapCommand(Action<string> command) =>
         value =>
         {
