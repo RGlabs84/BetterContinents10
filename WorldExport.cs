@@ -1812,18 +1812,20 @@ public static class WorldExport
     }
 
     // A map's source as the world keeps it: the original image where the settings hold it (with its legend), else the
-    // decoded map written back out as an image. Only file names Better Continents itself would use.
+    // decoded map written back out as an image. Only file names Better Continents itself would use. A float or colour
+    // map of a world made since 0.10 keeps only its tiles, which it writes back out as the PNG it was read as.
     private void WriteSource(string file, ImageMapBase map, Action<string, Action<string>> output)
     {
       var stem = Path.GetFileNameWithoutExtension(file);
+      var source = map.SourceBytes();
       string? ImageExtension()
       {
-        if (map.SourceData == null || map.SourceData.Length < 8)
+        if (source == null || source.Length < 8)
           return null;
-        var format = ISImage.DetectFormat(map.SourceData);
+        var format = ISImage.DetectFormat(source);
         return format == null ? null : "." + (format.FileExtensions.FirstOrDefault() ?? "img");
       }
-      void Original(string ext) => output(stem + ext, p => File.WriteAllBytes(p, map.SourceData));
+      void Original(string ext) => output(stem + ext, p => File.WriteAllBytes(p, source));
       void Legend(IEnumerable<string> lines) => output(stem + ".txt", p => WorldExportPng.WriteText(p, lines));
       var ext = ImageExtension();
       switch (map)
@@ -1849,7 +1851,7 @@ public static class WorldExport
           }
         case ImageMapBiome biome:
           {
-            var colours = ImageMapBiome.ExportLegend(biome.LegendColors, biome.Biomes);
+            var colours = ImageMapBiome.ExportLegend(biome.LegendColors, biome.UsedBiomes);
             var legend = colours.Select(kv => $"{BiomeRegistry.Name(kv.Key)}: {kv.Value.r},{kv.Value.g},{kv.Value.b},{kv.Value.a}").ToList();
             if (ext != null)
             {
@@ -1861,14 +1863,13 @@ public static class WorldExport
             else
             {
               int size = biome.Size;
-              var grid = biome.Biomes;
-              if (size <= 0 || grid.Length != size * size)
+              if (size <= 0 || biome.HasTail)
                 break;
               var pixels = new Rgba32[size * size];
               for (int y = 0; y < size; y++)
                 for (int x = 0; x < size; x++)
                 {
-                  var b = grid[y * size + x];
+                  var b = biome.BiomeAt(x, y);
                   var c = colours.TryGetValue(b, out var found) ? found : new Color32(0, 0, 0, 255);
                   pixels[WorldExportMath.FlipRow(y, size) * size + x] = new Rgba32(c.r, c.g, c.b, c.a);
                 }

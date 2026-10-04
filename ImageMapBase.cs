@@ -6,6 +6,7 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Formats.Png;
 using SixLabors.ImageSharp.PixelFormats;
 using SixLabors.ImageSharp.Processing;
 using UnityEngine;
@@ -22,6 +23,11 @@ internal abstract class ImageMapBase()
   public byte[] SourceData = [];
 
   public int Size;
+
+  // Compact Maps (BetterContinentsSettings.CompactMaps): the map keeps its tiles compressed, decodes each when it is
+  // read, and a world made since 0.10 saves them as they are (MapTiles.cs). Otherwise every tile is decoded when the
+  // picture is read and kept, and the world saves the picture, as always.
+  internal bool Compact;
 
   public virtual bool LoadSourceImage()
   {
@@ -103,10 +109,64 @@ internal abstract class ImageMapBase()
     return true;
   }
 
-  // World import (BetterContinentsSettings.CreateForImport): drops the decoded pixels of a map whose settings store
-  // only SourceData, so a preset build does not hold every map at once. The map cannot be sampled afterwards.
+  // World import (BetterContinentsSettings.CreateForImport): lets go of the decoded pixels of a map whose settings store
+  // only SourceData, so a preset build does not hold every map at once. A compact map drops its decoded tiles (decoded
+  // again if it is read); any other cannot be sampled afterwards, as before.
   internal virtual void ReleasePixels()
   {
+  }
+
+  // The picture's bytes as a world saves them in the pictures' format (Serialize.cs): the file as it was read. A compact
+  // map read from a world's tiles holds no file, and the float and colour maps then write their tiles back out as a PNG.
+  internal virtual byte[] SourceBytes() => SourceData;
+
+  // One channel of a picture's row, into the band a map's tiles are made from: row[x]'s value at band[at + x].
+  protected delegate void RowValues<TPixel>(Span<TPixel> row, ushort[] band, int at) where TPixel : unmanaged, IPixel<TPixel>;
+
+  // The picture's pixels as rows for the tiles, a band of rows at a time, one RowValues per channel. median: the values
+  // are amounts (heights, densities, colours) the median predictor may suit when compressing, not categories.
+  protected static MapRows Rows<TPixel>(Image<TPixel> image, int bytes, bool median, params RowValues<TPixel>[] channels)
+    where TPixel : unmanaged, IPixel<TPixel>
+  {
+    int size = image.Width;
+    return new MapRows(size, channels.Length, bytes, median, (y0, rows, band) =>
+      image.ProcessPixelRows(accessor =>
+      {
+        for (int r = 0; r < rows; r++)
+        {
+          var row = accessor.GetRowSpan(y0 + r);
+          for (int c = 0; c < channels.Length; c++)
+            channels[c](row, band, (c * TileBlock.Side + r) * size);
+        }
+      }));
+  }
+
+  // A map's row y (row 0 = south, as maps hold them) into a picture's row.
+  protected delegate void RowFill<TPixel>(int y, Span<TPixel> row) where TPixel : unmanaged, IPixel<TPixel>;
+
+  // The map written out as a PNG, rows from the north as files have them (SourceBytes). record: the heightmap's
+  // record, kept as the text chunk it came in; no other chunk is written (gAMA would shift legend colours).
+  protected byte[] Png<TPixel>(RowFill<TPixel> fill, PngColorType type, PngBitDepth depth, HeightmapRecord? record = null)
+    where TPixel : unmanaged, IPixel<TPixel>
+  {
+    using var image = new Image<TPixel>(Size, Size);
+    image.ProcessPixelRows(accessor =>
+    {
+      for (int y = 0; y < Size; y++)
+        fill(y, accessor.GetRowSpan(Size - 1 - y));
+    });
+    var encoder = new PngEncoder
+    {
+      ColorType = type,
+      BitDepth = depth,
+      CompressionLevel = PngCompressionLevel.DefaultCompression,
+      ChunkFilter = record == null ? PngChunkFilter.ExcludeAll : PngChunkFilter.ExcludeAll & ~PngChunkFilter.ExcludeTextChunks,
+    };
+    if (record != null)
+      image.Metadata.GetPngMetadata().TextData.Add(new PngTextData(HeightmapRecord.Keyword, record.Text, "", ""));
+    using var stream = new MemoryStream();
+    image.Save(stream, encoder);
+    return stream.ToArray();
   }
 
   public virtual void SerializeLegacy(ZPackage pkg, int version, bool network)

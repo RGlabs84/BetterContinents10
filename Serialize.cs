@@ -83,6 +83,10 @@ public partial class BetterContinents
     AltBiomeMap,
     // AltBiomeMapPath: the map's file path. Disk only, like every other map path; never sent to clients.
     AltBiomeMapPath,
+    // 0.10 (67): a compact map (Compact Maps) of a world made since 0.10 (settings version 12) in its compressed tiles
+    // (MapTiles.cs), followed by the map's own key (HeightMap, BiomeMap, ...) and its block. Better Continents 0.9 stops at
+    // it ("Unknown feature") and treats the world as vanilla without re-saving its settings.
+    TiledMap,
   }
   public partial class BetterContinentsSettings
   {
@@ -99,8 +103,10 @@ public partial class BetterContinents
     // map follows when Expand World Data numbers them differently (in the alt-biome blob: AltBiomeSettings.Serialize,
     // ImageMapBiome.FollowNames); its biome precision goes up to 31 (FinerBiomePrecision); and its location map's pins
     // land exactly on their pixels, with the start position placed before them (ExactLocationPins,
-    // StartBeforeLocationPins). A world keeps its version: one read as 12 is saved as 12, any older one as 11, as
-    // always. Better Continents 0.9 reads a version 12 world as a version 11 one.
+    // StartBeforeLocationPins). Made with Compact Maps (experimental), it saves and sends its maps in compressed tiles
+    // (DataKey.TiledMap, MapTiles.cs) instead of the pictures' bytes. A world keeps its version: one read as 12 is saved as
+    // 12, any older one as 11, as always. Better Continents 0.9 reads a version 12 world as a version 11 one, and one with
+    // compact maps as vanilla (it stops at their tiles) without saving over its settings.
     public const int MaxVersion = 12;
     internal const int KeyedVersion = 11;
     internal const int UnifiedVersion = 12;
@@ -166,6 +172,12 @@ public partial class BetterContinents
     // (ZoneSystemPatch.PlaceLocations).
     internal bool StartBeforeLocationPins => Version >= UnifiedVersion;
 
+    // Compact Maps (experimental, off by default; [07 BetterContinents.Misc]): the world's maps keep their tiles compressed
+    // and decode each when it is read, under Map Memory's budget, and the world saves and sends those tiles
+    // (DataKey.TiledMap) instead of the pictures. Set when a world made since 0.10 is created with the setting on, or when
+    // a world's settings hold tiles; a world keeps it for good. Better Continents 0.9 cannot read such a world.
+    internal bool CompactMaps;
+
     // This world's World Size and Edge Size as a size; null when they make no world (no size at all, or not a number).
     internal WorldGeometry? OwnGeometry
     {
@@ -209,6 +221,9 @@ public partial class BetterContinents
         SerializeLegacy(pkg, version, network);
         return;
       }
+      // A compact map of a version 12 world is saved and sent in its tiles; every other map as the picture's bytes (the
+      // biome, spawn and vegetation maps one byte a pixel), as always.
+      bool tiled = version >= UnifiedVersion;
 
       if (GlobalScale != 0f)
       {
@@ -252,8 +267,13 @@ public partial class BetterContinents
       {
         if (HeightMapAlpha)
           pkg.Write((int)DataKey.HeightMapAlpha);
-        pkg.Write((int)DataKey.HeightMap);
-        pkg.Write(HeightMap.SourceData);
+        if (tiled && HeightMap.Compact)
+          WriteTiled(pkg, DataKey.HeightMap, HeightMap.ToBlock());
+        else
+        {
+          pkg.Write((int)DataKey.HeightMap);
+          pkg.Write(HeightMap.SourceBytes());
+        }
         if (!network)
         {
           pkg.Write((int)DataKey.HeightMapPath);
@@ -281,8 +301,13 @@ public partial class BetterContinents
 
       if (BiomeMap != null)
       {
-        pkg.Write((int)DataKey.BiomeMap);
-        pkg.Write(BiomeMap.Serialize(network));
+        if (tiled && BiomeMap.Compact)
+          WriteTiled(pkg, DataKey.BiomeMap, BiomeMap.ToBlock(network));
+        else
+        {
+          pkg.Write((int)DataKey.BiomeMap);
+          pkg.Write(BiomeMap.Serialize(network));
+        }
 
         if (!network)
         {
@@ -292,8 +317,13 @@ public partial class BetterContinents
       }
       if (SpawnMap != null)
       {
-        pkg.Write((int)DataKey.SpawnMap);
-        SpawnMap.Serialize(pkg);
+        if (tiled && SpawnMap.Compact)
+          WriteTiled(pkg, DataKey.SpawnMap, SpawnMap.ToBlock());
+        else
+        {
+          pkg.Write((int)DataKey.SpawnMap);
+          SpawnMap.Serialize(pkg);
+        }
 
         if (!network)
         {
@@ -303,8 +333,13 @@ public partial class BetterContinents
       }
       if (VegetationMap != null)
       {
-        pkg.Write((int)DataKey.VegetationMap);
-        VegetationMap.Serialize(pkg);
+        if (tiled && VegetationMap.Compact)
+          WriteTiled(pkg, DataKey.VegetationMap, VegetationMap.ToBlock());
+        else
+        {
+          pkg.Write((int)DataKey.VegetationMap);
+          VegetationMap.Serialize(pkg);
+        }
 
         if (!network)
         {
@@ -348,8 +383,13 @@ public partial class BetterContinents
 
       if (RoughMap != null)
       {
-        pkg.Write((int)DataKey.RoughMap);
-        pkg.Write(RoughMap.SourceData);
+        if (tiled && RoughMap.Compact)
+          WriteTiled(pkg, DataKey.RoughMap, RoughMap.ToBlock());
+        else
+        {
+          pkg.Write((int)DataKey.RoughMap);
+          pkg.Write(RoughMap.SourceBytes());
+        }
         if (!network)
         {
           pkg.Write((int)DataKey.RoughMapPath);
@@ -371,8 +411,13 @@ public partial class BetterContinents
       }
       if (!UseRoughInvertedAsFlat && FlatMap != null)
       {
-        pkg.Write((int)DataKey.FlatMap);
-        pkg.Write(FlatMap.SourceData);
+        if (tiled && FlatMap.Compact)
+          WriteTiled(pkg, DataKey.FlatMap, FlatMap.ToBlock());
+        else
+        {
+          pkg.Write((int)DataKey.FlatMap);
+          pkg.Write(FlatMap.SourceBytes());
+        }
         if (!network)
         {
           pkg.Write((int)DataKey.FlatMapPath);
@@ -382,8 +427,13 @@ public partial class BetterContinents
 
       if (ForestMap != null)
       {
-        pkg.Write((int)DataKey.ForestMap);
-        pkg.Write(ForestMap.SourceData);
+        if (tiled && ForestMap.Compact)
+          WriteTiled(pkg, DataKey.ForestMap, ForestMap.ToBlock());
+        else
+        {
+          pkg.Write((int)DataKey.ForestMap);
+          pkg.Write(ForestMap.SourceBytes());
+        }
         if (!network)
         {
           pkg.Write((int)DataKey.ForestMapPath);
@@ -431,9 +481,14 @@ public partial class BetterContinents
 
       if (TerrainMap != null)
       {
-        pkg.Write((int)DataKey.TerrainMap);
-        pkg.Write(TerrainMap.SourceColors);
-        pkg.Write(TerrainMap.SourceData);
+        if (tiled && TerrainMap.Compact)
+          WriteTiled(pkg, DataKey.TerrainMap, TerrainMap.ToBlock());
+        else
+        {
+          pkg.Write((int)DataKey.TerrainMap);
+          pkg.Write(TerrainMap.SourceColors);
+          pkg.Write(TerrainMap.SourceBytes());
+        }
         if (!network)
         {
           pkg.Write((int)DataKey.TerrainMapPath);
@@ -442,9 +497,14 @@ public partial class BetterContinents
       }
       if (PaintMap != null)
       {
-        pkg.Write((int)DataKey.PaintMap);
-        pkg.Write(PaintMap.SourceColors);
-        pkg.Write(PaintMap.SourceData);
+        if (tiled && PaintMap.Compact)
+          WriteTiled(pkg, DataKey.PaintMap, PaintMap.ToBlock());
+        else
+        {
+          pkg.Write((int)DataKey.PaintMap);
+          pkg.Write(PaintMap.SourceColors);
+          pkg.Write(PaintMap.SourceBytes());
+        }
         if (!network)
         {
           pkg.Write((int)DataKey.PaintMapPath);
@@ -453,8 +513,13 @@ public partial class BetterContinents
       }
       if (LavaMap != null)
       {
-        pkg.Write((int)DataKey.LavaMap);
-        pkg.Write(LavaMap.SourceData);
+        if (tiled && LavaMap.Compact)
+          WriteTiled(pkg, DataKey.LavaMap, LavaMap.ToBlock());
+        else
+        {
+          pkg.Write((int)DataKey.LavaMap);
+          pkg.Write(LavaMap.SourceBytes());
+        }
         if (!network)
         {
           pkg.Write((int)DataKey.LavaMapPath);
@@ -464,8 +529,13 @@ public partial class BetterContinents
 
       if (MossMap != null)
       {
-        pkg.Write((int)DataKey.MossMap);
-        pkg.Write(MossMap.SourceData);
+        if (tiled && MossMap.Compact)
+          WriteTiled(pkg, DataKey.MossMap, MossMap.ToBlock());
+        else
+        {
+          pkg.Write((int)DataKey.MossMap);
+          pkg.Write(MossMap.SourceBytes());
+        }
         if (!network)
         {
           pkg.Write((int)DataKey.MossMapPath);
@@ -475,8 +545,13 @@ public partial class BetterContinents
 
       if (HeatMap != null)
       {
-        pkg.Write((int)DataKey.HeatMap);
-        pkg.Write(HeatMap.SourceData);
+        if (tiled && HeatMap.Compact)
+          WriteTiled(pkg, DataKey.HeatMap, HeatMap.ToBlock());
+        else
+        {
+          pkg.Write((int)DataKey.HeatMap);
+          pkg.Write(HeatMap.SourceBytes());
+        }
         if (!network)
         {
           pkg.Write((int)DataKey.HeatMapPath);
@@ -538,6 +613,35 @@ public partial class BetterContinents
             pkg.Write(AltBiomeMap.FilePath);
           }
         }
+      }
+    }
+
+    // A map in tiles (a world made since 0.10): DataKey.TiledMap, the map's own key, its block.
+    private static void WriteTiled(ZPackage pkg, DataKey key, byte[] block)
+    {
+      pkg.Write((int)DataKey.TiledMap);
+      pkg.Write((int)key);
+      pkg.Write(block);
+    }
+
+    // Whether the key is one of a map this version reads in tiles.
+    private bool ReadTiledMap(DataKey key, byte[] block)
+    {
+      switch (key)
+      {
+        case DataKey.HeightMap: HeightMap = ImageMapFloat.FromBlock(block); return true;
+        case DataKey.BiomeMap: BiomeMap = ImageMapBiome.FromBlock(block); return true;
+        case DataKey.SpawnMap: SpawnMap = ImageMapSpawn.FromBlock(block); return true;
+        case DataKey.VegetationMap: VegetationMap = ImageMapSpawn.FromBlock(block); return true;
+        case DataKey.RoughMap: RoughMap = ImageMapFloat.FromBlock(block); return true;
+        case DataKey.FlatMap: FlatMap = ImageMapFloat.FromBlock(block); return true;
+        case DataKey.ForestMap: ForestMap = ImageMapFloat.FromBlock(block); return true;
+        case DataKey.TerrainMap: TerrainMap = ImageMapTerrain.FromBlock(block); return true;
+        case DataKey.PaintMap: PaintMap = ImageMapPaint.FromBlock(block); return true;
+        case DataKey.LavaMap: LavaMap = ImageMapFloat.FromBlock(block); return true;
+        case DataKey.MossMap: MossMap = ImageMapFloat.FromBlock(block); return true;
+        case DataKey.HeatMap: HeatMap = ImageMapFloat.FromBlock(block); return true;
+        default: return false;
       }
     }
 
@@ -826,6 +930,16 @@ public partial class BetterContinents
             path = pkg.ReadString();
             if (AltBiomeMap != null)
               AltBiomeMap.FilePath = path;
+            break;
+          case DataKey.TiledMap:
+            var mapKey = (DataKey)pkg.ReadInt();
+            if (!ReadTiledMap(mapKey, pkg.ReadByteArray()))
+            {
+              LogError("Failed to load the save file. Unknown feature: tiles of " + mapKey);
+              EnabledForThisWorld = false;
+              return;
+            }
+            CompactMaps = true;
             break;
           default:
             LogError("Failed to load the save file. Unknown feature: " + key);

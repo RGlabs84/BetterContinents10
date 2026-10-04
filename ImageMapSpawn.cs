@@ -13,13 +13,14 @@ namespace BetterContinents;
 
 internal class ImageMapSpawn() : ImageMapBase
 {
-  public static ImageMapSpawn? Create(string path)
+  public static ImageMapSpawn? Create(string path, bool compact = false)
   {
     if (string.IsNullOrEmpty(path))
       return null;
     ImageMapSpawn map = new()
     {
-      FilePath = path
+      FilePath = path,
+      Compact = compact
     };
     if (!map.LoadSourceImage())
       return null;
@@ -35,19 +36,56 @@ internal class ImageMapSpawn() : ImageMapBase
       FilePath = path
     };
     map.Deserialize(pkg);
-    // No need to create any texture.
-    map.Size = (int)Math.Sqrt(map.Map.Length);
     return map;
   }
 
-  private byte[] Map = [];
+  // Every pixel's legend index (255 = nothing), in tiles (MapTiles.cs); bytes past the square of a saved map whose
+  // length is no square number in tail, read only where a pixel past the map's edge lands on them (Index).
+  private ByteGrid? grid;
+  private byte[] tail = [];
   private readonly List<Color32> Colors = [];
   private readonly List<SpawnEntry> Entries = [];
   // World export (WorldExport): the legend index per pixel (row 0 = south, 255 = nothing) and the legend itself,
   // index 0 being the hardcoded white "none". Enough to write the map back out when the source image is gone.
-  internal byte[] Indices => Map;
+  // Indices is a new array each time.
+  internal byte[] Indices
+  {
+    get
+    {
+      var indices = new byte[Length];
+      if (grid != null)
+        for (int y = 0; y < Size; y++)
+          grid.CopyRow(y, indices, y * Size);
+      Array.Copy(tail, 0, indices, Size * Size, tail.Length);
+      return indices;
+    }
+  }
   internal IReadOnlyList<Color32> LegendColors => Colors;
   internal IReadOnlyList<SpawnEntry> LegendEntries => Entries;
+
+  private int Length => grid == null ? 0 : Size * Size + tail.Length;
+
+  // The index at i, counted row by row as the map was one array: as before, a pixel past the right edge reads the start
+  // of the next row, and one past the whole map throws.
+  private byte Index(int i)
+  {
+    if ((uint)i >= (uint)Length)
+      throw new IndexOutOfRangeException();
+    int square = Size * Size;
+    return i >= square ? tail[i - square] : grid!.Get(i % Size, i / Size);
+  }
+
+  // Builds the tiles from the indices as saved (in the pictures' format: every tile decoded).
+  private void SetIndices(byte[] indices)
+  {
+    Size = (int)Math.Sqrt(indices.Length);
+    grid = Size > 0 ? ByteGrid.FromBytes(Size, indices, null, compact: false) : null;
+    tail = [.. indices.Skip(Size * Size)];
+  }
+
+  // A map read from a world's settings has no picture, and its source is the indices as saved, as it always was (a world
+  // export writes them out as a picture with the legend).
+  internal override byte[] SourceBytes() => SourceData.Length > 0 || grid == null ? SourceData : Indices;
 
 
   public override bool LoadSourceImage()
@@ -92,6 +130,12 @@ internal class ImageMapSpawn() : ImageMapBase
   }
   public void Deserialize(ZPackage pkg)
   {
+    ReadLegend(pkg);
+    SetIndices(pkg.ReadByteArray());
+  }
+
+  private void ReadLegend(ZPackage pkg)
+  {
     Colors.Clear();
     Entries.Clear();
 
@@ -109,9 +153,6 @@ internal class ImageMapSpawn() : ImageMapBase
       Colors.Add(color);
       Entries.Add(new SpawnEntry(spawn));
     }
-
-    SourceData = pkg.ReadByteArray();
-    Map = SourceData;
   }
 
 
@@ -130,18 +171,75 @@ internal class ImageMapSpawn() : ImageMapBase
       var entry = Entries[i];
       pkg.Write(entry.Data);
     }
-    pkg.Write(Map);
+    pkg.Write(Indices);
+  }
+
+  // ---- a world made since 0.10 saves and sends its tiles (DataKey.TiledMap) -------------------------------------------
+
+  private const byte BlockVersion = 1;
+
+  // The legend as Serialize writes it, then the indices in tiles and the bytes past the square.
+  internal byte[] ToBlock()
+  {
+    var block = grid?.Block ?? throw new InvalidOperationException($"{FilePath} holds no compressed tiles to save");
+    var legend = new ZPackage();
+    legend.Write(Colors.Count);
+    for (int i = 0; i < Colors.Count; i++)
+    {
+      var color = Colors[i];
+      legend.Write(color.r);
+      legend.Write(color.g);
+      legend.Write(color.b);
+      legend.Write(color.a);
+      legend.Write(Entries[i].Data);
+    }
+    using var stream = new MemoryStream();
+    using var writer = new BinaryWriter(stream);
+    writer.Write(BlockVersion);
+    var legendBytes = legend.GetArray();
+    writer.Write(legendBytes.Length);
+    writer.Write(legendBytes);
+    block.WriteTo(writer);
+    writer.Write(tail.Length);
+    writer.Write(tail);
+    writer.Flush();
+    return stream.ToArray();
+  }
+
+  internal static ImageMapSpawn FromBlock(byte[] block)
+  {
+    using var reader = new BinaryReader(new MemoryStream(block, false));
+    var version = reader.ReadByte();
+    if (version != BlockVersion)
+      throw new InvalidDataException($"a spawn or vegetation map saved in format {version}, which this version of Better Continents cannot read");
+    int legendLength = reader.ReadInt32();
+    if (legendLength < 0 || legendLength > reader.BaseStream.Length - reader.BaseStream.Position)
+      throw new InvalidDataException("a spawn or vegetation map ends early");
+    var map = new ImageMapSpawn();
+    var legend = new ZPackage(reader.ReadBytes(legendLength));
+    map.ReadLegend(legend);
+    var tiles = TileBlock.ReadFrom(reader);
+    if (tiles.Channels != 1 || tiles.Bytes != 1)
+      throw new InvalidDataException("a spawn or vegetation map's tiles are not one byte a pixel");
+    int tailLength = reader.ReadInt32();
+    if (tailLength < 0 || tailLength > reader.BaseStream.Length - reader.BaseStream.Position)
+      throw new InvalidDataException("a spawn or vegetation map ends early");
+    map.grid = new ByteGrid(tiles);
+    map.tail = reader.ReadBytes(tailLength);
+    map.Size = tiles.Size;
+    map.Compact = true;
+    return map;
   }
 
   public SpawnEntry? GetEntry(float x, float y)
   {
-    if (Map == null || Map.Length == 0) return null;
+    if (Length == 0) return null;
     float xa = x * (Size - 1);
     float ya = y * (Size - 1);
 
     int xi = Mathf.RoundToInt(xa);
     int yi = Mathf.RoundToInt(ya);
-    var index = Map[yi * Size + xi];
+    var index = Index(yi * Size + xi);
 
     if (index >= Entries.Count) return null;
     return Entries[index];
@@ -169,7 +267,7 @@ internal class ImageMapSpawn() : ImageMapBase
     }
 
     bool warned = false;
-    Map = LoadPixels(img, pixel =>
+    byte IndexOf(Rgba32 pixel)
     {
       // Black color always means nothing is done.
       if (pixel.R == 0 && pixel.G == 0 && pixel.B == 0 && pixel.A == 255)
@@ -186,7 +284,13 @@ internal class ImageMapSpawn() : ImageMapBase
         }
         return (byte)255;
       }
-    });
+    }
+    grid = ByteGrid.From(Rows(img, 1, false, (row, band, at) =>
+    {
+      for (int x = 0; x < row.Length; x++)
+        band[at + x] = IndexOf(row[x]);
+    }), Compact);
+    tail = [];
 
     BetterContinents.Log($"Time to calculate colors from {FilePath}: {st.ElapsedMilliseconds} ms");
     return true;

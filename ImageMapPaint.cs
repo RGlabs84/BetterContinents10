@@ -10,7 +10,7 @@ namespace BetterContinents;
 
 internal class ImageMapPaint() : ImageMapColor()
 {
-    public static ImageMapPaint? Create(string path) => FromFile<ImageMapPaint>(path);
+    public static ImageMapPaint? Create(string path, bool compact = false) => FromFile<ImageMapPaint>(path, compact);
     public static ImageMapPaint? Create(byte[] data, string path, string colors) => FromSettings<ImageMapPaint>(data, path, colors);
     public static ImageMapPaint? LoadLegacy(ZPackage pkg)
     {
@@ -21,6 +21,8 @@ internal class ImageMapPaint() : ImageMapColor()
     }
 
     public static ImageMapPaint? Create(byte[] data, string colors) => Create(data, "", colors);
+    // A world made since 0.10: its legend and tiles (DataKey.TiledMap).
+    internal static ImageMapPaint FromBlock(byte[] block) => FromBlock<ImageMapPaint>(block);
     private static readonly string DefaultColors = "";
 
     public override bool LoadSourceImage() => LoadSourceImageAndColors(DefaultColors);

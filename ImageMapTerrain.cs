@@ -12,9 +12,11 @@ internal class ImageMapTerrain() : ImageMapColor()
 {
     public static ImageMapTerrain? Create(string path) => FromFile<ImageMapTerrain>(path);
     // A new world's (TerrainNamesEwdGrounds): its legend may name an Expand World Data biome for the ground (NameEwdGrounds).
-    public static ImageMapTerrain? Create(string path, bool namesEwdGrounds) => FromFile<ImageMapTerrain>(path, m => m.namesEwdGrounds = namesEwdGrounds);
+    public static ImageMapTerrain? Create(string path, bool namesEwdGrounds, bool compact = false) => FromFile<ImageMapTerrain>(path, compact, m => m.namesEwdGrounds = namesEwdGrounds);
     public static ImageMapTerrain? Create(byte[] data, string path, string colors) => FromSettings<ImageMapTerrain>(data, path, colors);
     public static ImageMapTerrain? Create(byte[] data, string colors) => Create(data, "", colors);
+    // A world made since 0.10: its legend and tiles (DataKey.TiledMap).
+    internal static ImageMapTerrain FromBlock(byte[] block) => FromBlock<ImageMapTerrain>(block);
     private static readonly string DefaultColors = "Default: 000000|Meadows: 00FF00|BlackForest: 007F00|Swamp: 7F7F00|Mountain: FFFFFF|Plains: FFFF00|Mistlands: 7F7F7F|AshLands: FF0000|DeepNorth: 00FFFF|Ocean: 0000FF";
 
     private static readonly Dictionary<string, Color32?> TerrainGrounds = new() {

@@ -10,6 +10,7 @@
 #   ewd-tests         Expand World Data biomes (vanilla and EWD processes)
 #   twin-tests        the vegetation twin guard, bc_twins' scan, the PlaceVegetation tracking on the game's IL
 #   size-tests        the world's size: WorldGeometry, SetSize, the edge-of-world patches on the game's IL
+#   tile-tests        the maps' tiles: the codec, every map kind sampling as before, saves in tiles, the cache
 # Usage: tools/run-tests.sh [suite ...]   (default: all). Exit code 1 when the build or any suite fails.
 set -u
 cd "$(dirname "$0")/.."
@@ -19,7 +20,7 @@ export DOTNET_ROOT="${DOTNET_ROOT:-$HOME/.dotnet}"
 export DOTNET_GCHeapHardLimit="${DOTNET_GCHeapHardLimit:-0xC0000000}"
 logs="$(mktemp -d "${TMPDIR:-/tmp}/bc-tests-XXXXXX")"
 suites=("$@")
-[ ${#suites[@]} -eq 0 ] && suites=(golden-tests altbiome-harness export-tests import-tests livecfg-tests ewd-tests twin-tests size-tests)
+[ ${#suites[@]} -eq 0 ] && suites=(golden-tests altbiome-harness export-tests import-tests livecfg-tests ewd-tests twin-tests size-tests tile-tests)
 
 echo "== building the plugin"
 if ! nice -n 10 dotnet build -c Release BetterContinents.csproj > "$logs/build.log" 2>&1; then

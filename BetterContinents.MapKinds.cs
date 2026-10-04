@@ -51,29 +51,29 @@ public partial class BetterContinents
       internal virtual string ConfigPath => GetPath(ConfigMapSourceDir.Value, FileName, FileSetting!.Entry.Value);
 
       public static readonly MapKind Height = new MapKind<ImageMapFloat>("Heightmap", "heightmap.png", SettingsSchema.HeightmapFile, "h", "hm",
-        s => s.HeightMap, (s, m) => s.HeightMap = m, (s, path) => ImageMapFloat.Create(path, s.HeightmapAlphaMode), false, (s, m) => m.CreateMap(s.HeightmapAlphaMode));
+        s => s.HeightMap, (s, m) => s.HeightMap = m, (s, path) => ImageMapFloat.Create(path, s.HeightmapAlphaMode, s.CompactMaps), false, (s, m) => m.CreateMap(s.HeightmapAlphaMode));
       public static readonly MapKind Biome = new BiomeMapKind();
       public static readonly MapKind Terrain = new MapKind<ImageMapTerrain>("Terrainmap", "terrainmap.png", SettingsSchema.TerrainmapFile, "terrain", "terrain",
-        s => s.TerrainMap, (s, m) => s.TerrainMap = m, (s, path) => ImageMapTerrain.Create(path, s.TerrainNamesEwdGrounds), true, (_, m) => m.CreateMap());
+        s => s.TerrainMap, (s, m) => s.TerrainMap = m, (s, path) => ImageMapTerrain.Create(path, s.TerrainNamesEwdGrounds, s.CompactMaps), true, (_, m) => m.CreateMap());
       public static readonly MapKind Location = new MapKind<ImageMapLocation>("Locationmap", "locationmap.png", SettingsSchema.LocationmapFile, "l", "lm",
         s => s.LocationMap, (s, m) => s.LocationMap = m, (s, path) => ImageMapLocation.Create(path, s.ExactLocationPins), false, (_, m) => m.CreateMap());
       public static readonly MapKind Rough = new MapKind<ImageMapFloat>("Roughmap", "roughmap.png", SettingsSchema.RoughmapFile, "r", "rm",
-        s => s.RoughMap, (s, m) => s.RoughMap = m, (_, path) => ImageMapFloat.Create(path, false), true, (_, m) => m.CreateMap(false));
+        s => s.RoughMap, (s, m) => s.RoughMap = m, (s, path) => ImageMapFloat.Create(path, false, s.CompactMaps), true, (_, m) => m.CreateMap(false));
       public static readonly MapKind Flat = new FlatMapKind();
       public static readonly MapKind Forest = new MapKind<ImageMapFloat>("Forestmap", "forestmap.png", SettingsSchema.ForestmapFile, "fo", "fom",
-        s => s.ForestMap, (s, m) => s.ForestMap = m, (_, path) => ImageMapFloat.Create(path, false), true, (_, m) => m.CreateMap(false));
+        s => s.ForestMap, (s, m) => s.ForestMap = m, (s, path) => ImageMapFloat.Create(path, false, s.CompactMaps), true, (_, m) => m.CreateMap(false));
       public static readonly MapKind Heat = new MapKind<ImageMapFloat>("Heatmap", "heatmap.png", SettingsSchema.HeatmapFile, "heat", "heat",
-        s => s.HeatMap, (s, m) => s.HeatMap = m, (_, path) => ImageMapFloat.Create(path, false), true, (_, m) => m.CreateMap(false));
+        s => s.HeatMap, (s, m) => s.HeatMap = m, (s, path) => ImageMapFloat.Create(path, false, s.CompactMaps), true, (_, m) => m.CreateMap(false));
       public static readonly MapKind Paint = new MapKind<ImageMapPaint>("Paintmap", "paintmap.png", SettingsSchema.PaintmapFile, "paint", "paint",
-        s => s.PaintMap, (s, m) => s.PaintMap = m, (_, path) => ImageMapPaint.Create(path), true, (_, m) => m.CreateMap());
+        s => s.PaintMap, (s, m) => s.PaintMap = m, (s, path) => ImageMapPaint.Create(path, s.CompactMaps), true, (_, m) => m.CreateMap());
       public static readonly MapKind Lava = new MapKind<ImageMapFloat>("Lavamap", "lavamap.png", SettingsSchema.LavamapFile, "lava", "lava",
-        s => s.LavaMap, (s, m) => s.LavaMap = m, (_, path) => ImageMapFloat.Create(path, false), true, (_, m) => m.CreateMap(false));
+        s => s.LavaMap, (s, m) => s.LavaMap = m, (s, path) => ImageMapFloat.Create(path, false, s.CompactMaps), true, (_, m) => m.CreateMap(false));
       public static readonly MapKind Moss = new MapKind<ImageMapFloat>("Mossmap", "mossmap.png", SettingsSchema.MossmapFile, "moss", "moss",
-        s => s.MossMap, (s, m) => s.MossMap = m, (_, path) => ImageMapFloat.Create(path, false), true, (_, m) => m.CreateMap(false));
+        s => s.MossMap, (s, m) => s.MossMap = m, (s, path) => ImageMapFloat.Create(path, false, s.CompactMaps), true, (_, m) => m.CreateMap(false));
       public static readonly MapKind Vegetation = new MapKind<ImageMapSpawn>("Vegetationmap", "vegetationmap.png", SettingsSchema.VegetationmapFile, "vegetation", "vegetation",
-        s => s.VegetationMap, (s, m) => s.VegetationMap = m, (_, path) => ImageMapSpawn.Create(path), false, (_, m) => m.CreateMap());
+        s => s.VegetationMap, (s, m) => s.VegetationMap = m, (s, path) => ImageMapSpawn.Create(path, s.CompactMaps), false, (_, m) => m.CreateMap());
       public static readonly MapKind Spawn = new MapKind<ImageMapSpawn>("Spawnmap", "spawnmap.png", SettingsSchema.SpawnmapFile, "spawn", "spawn",
-        s => s.SpawnMap, (s, m) => s.SpawnMap = m, (_, path) => ImageMapSpawn.Create(path), false, (_, m) => m.CreateMap());
+        s => s.SpawnMap, (s, m) => s.SpawnMap = m, (s, path) => ImageMapSpawn.Create(path, s.CompactMaps), false, (_, m) => m.CreateMap());
       public static readonly MapKind AltBiome = new AltBiomeMapKind();
 
       public static readonly MapKind[] All = [Height, Biome, Terrain, Location, Rough, Flat, Forest, Heat, Paint, Lava, Moss, Vegetation, Spawn, AltBiome];
@@ -124,14 +124,22 @@ public partial class BetterContinents
 
       public override void Redecode(BetterContinentsSettings settings)
       {
-        if (get(settings) is { } map)
-          rebuild(settings, map);
+        if (get(settings) is not { } map)
+          return;
+        // A compact map read from a world's tiles holds only them, decoded as they were: its picture is read again from
+        // its file for the new reading.
+        if (map.SourceData.Length == 0 && !map.LoadSourceImage())
+        {
+          LogWarning($"{Name}: the world holds only its decoded tiles and its picture {map.FilePath} cannot be read, so it keeps its current reading.");
+          return;
+        }
+        rebuild(settings, map);
       }
     }
 
     // The biome map is only ever replaced by one whose picture and legend read cleanly (SetBiomePath, ReloadBiomeMap).
     private sealed class BiomeMapKind() : MapKind<ImageMapBiome>("Biomemap", "biomemap.png", SettingsSchema.BiomemapFile, "b", "bm",
-        s => s.BiomeMap, (s, m) => s.BiomeMap = m, (_, path) => ImageMapBiome.Create(path), false, (_, m) => m.CreateMap())
+        s => s.BiomeMap, (s, m) => s.BiomeMap = m, (s, path) => ImageMapBiome.Create(path, s.CompactMaps), false, (_, m) => m.CreateMap())
     {
       public override bool Set(BetterContinentsSettings settings, string path) => settings.SetBiomePath(path);
       public override string NotLoaded(string path) =>
@@ -154,7 +162,7 @@ public partial class BetterContinents
     // The flat map: settings version 6 and older only, never from the config, and listed only when it is its own picture.
     // A world that inverts its rough map instead reloads that; otherwise it falls back to the rough map's file.
     private sealed class FlatMapKind() : MapKind<ImageMapFloat>("Flatmap", "flatmap.png", null, null, "fm",
-        s => s.FlatMap, (s, m) => s.FlatMap = m, (_, path) => ImageMapFloat.Create(path, false), false, (_, m) => m.CreateMap(false))
+        s => s.FlatMap, (s, m) => s.FlatMap = m, (s, path) => ImageMapFloat.Create(path, false, s.CompactMaps), false, (_, m) => m.CreateMap(false))
     {
       public override ImageMapBase? Listed(BetterContinentsSettings settings) => settings.UseRoughInvertedAsFlat ? null : settings.FlatMap;
       internal override void Load(BetterContinentsSettings settings, ConfigValues c, string dir, bool lean) { }

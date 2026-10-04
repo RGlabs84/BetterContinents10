@@ -249,7 +249,7 @@ public partial class BetterContinents
         BiomeMap = null;
         return false;
       }
-      var map = ImageMapBiome.Create(path);
+      var map = ImageMapBiome.Create(path, CompactMaps);
       if (!UsableReload(map, path))
         return false;
       BiomeMap = map;
@@ -348,6 +348,8 @@ public partial class BetterContinents
 
         output($"Map edge dropoff {MapEdgeDropoff}");
         output($"Mountains allowed at center {MountainsAllowedAtCenter}");
+        if (CompactMaps)
+          output("Compact Maps (experimental): the maps are held as compressed tiles, decoded as the world reads them, and saved so");
 
         if (HeightMap != null)
         {
@@ -735,7 +737,7 @@ public partial class BetterContinents
         LogWarning($"Cannot find image {path}: Using default path from config.");
         path = MapKind.Biome.ConfigPath;
       }
-      var map = ImageMapBiome.Create(path);
+      var map = ImageMapBiome.Create(path, CompactMaps);
       if (UsableReload(map, path))
         BiomeMap = map;
     }

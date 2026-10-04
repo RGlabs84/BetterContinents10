@@ -269,17 +269,13 @@ internal static class Program
   static T Map<T>(BC.BetterContinentsSettings s, string file) where T : class =>
     s.LoadedImageMaps().Where(m => m.FileName == file).Select(m => m.Map as T).FirstOrDefault();
 
-  // The decoded pixels a map keeps (the private Map array, declared on the map's class or a base class).
-  static float FieldLength(object map)
+  // The decoded tiles a map holds now (MapTiles.cs): every tile from the start, or with Compact Maps the ones read since.
+  static int Decoded(object map) => map switch
   {
-    for (var t = map.GetType(); t != null; t = t.BaseType)
-    {
-      var f = t.GetField("Map", BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly);
-      if (f != null)
-        return ((Array)f.GetValue(map)!).Length;
-    }
-    throw new InvalidOperationException("no Map field");
-  }
+    ImageMapFloat f => f.DecodedTiles,
+    ImageMapColor c => c.DecodedTiles,
+    _ => throw new InvalidOperationException($"no tiles on {map.GetType().Name}"),
+  };
 
   // ---- the preset --------------------------------------------------------------------------------------------------
 
@@ -402,14 +398,47 @@ internal static class Program
 
   static void Lean(string folder)
   {
-    Section("the lean build drops the pixels a preset does not need");
+    Section("the lean build holds no decoded pixels a preset does not need");
     var plan = WorldImport.MakePlan(folder);
     var lean = BC.BetterContinentsSettings.CreateForImport(plan.Values, lean: true);
     var full = BC.BetterContinentsSettings.CreateForImport(plan.Values, lean: false);
-    C(FieldLength(Map<ImageMapFloat>(lean, "forestmap.png")) == 0 && FieldLength(Map<ImageMapFloat>(full, "forestmap.png")) == N * N, "lean: the forest map keeps no decoded pixels");
-    C(FieldLength(Map<ImageMapPaint>(lean, "paintmap.png")) == 0, "lean: the paint map neither (8 bytes a pixel)");
-    C(FieldLength(Map<ImageMapFloat>(lean, "heightmap.png")) == N * N, "lean: the heightmap keeps its pixels for the picture");
+    // Compact Maps off (the default): every tile is decoded when the picture is read, and the lean build lets them go.
+    int tiles = TileBlock.TilesFor(N) * TileBlock.TilesFor(N);
+    C(!lean.CompactMaps && Decoded(Map<ImageMapFloat>(lean, "forestmap.png")) == 0 && Decoded(Map<ImageMapFloat>(full, "forestmap.png")) == tiles,
+      "lean: the forest map keeps no decoded pixels; the full build holds every tile");
+    C(Decoded(Map<ImageMapPaint>(lean, "paintmap.png")) == 0 && Decoded(Map<ImageMapPaint>(full, "paintmap.png")) == tiles, "lean: the paint map neither (8 bytes a pixel)");
+    var heights = Map<ImageMapFloat>(lean, "heightmap.png");
+    C(heights.Size == N && Decoded(heights) == tiles && heights.GetValue(0.5f, 0.5f) == Map<ImageMapFloat>(full, "heightmap.png").GetValue(0.5f, 0.5f),
+      "lean: the heightmap keeps its pixels for the picture");
     C(Map<ImageMapBase>(lean, "forestmap.png").SourceData.Length > 0, "lean: the file bytes the preset stores are kept");
+
+    // Compact Maps on: the maps hold compressed tiles, decoded only when read; the lean build drops what reading decoded.
+    // Only a world of the newest settings version: this export's (spanning 21000 m) is a version 11 one, and stays
+    // decoded; the same folder read as a new world's (version 12) is compact.
+    var compact = SettingsSchema.CompactMaps.Entry;
+    compact.Value = true;
+    try
+    {
+      var cplan = WorldImport.MakePlan(folder);
+      var v11 = BC.BetterContinentsSettings.CreateForImport(cplan.Values, lean: false);
+      C(v11.Version == 11 && !v11.CompactMaps && !Map<ImageMapFloat>(v11, "forestmap.png").Compact, "compact: a version 11 world stays decoded with Compact Maps on");
+      var values = cplan.Values.ForExport(null);
+      var clean = BC.BetterContinentsSettings.CreateForImport(values, lean: true);
+      var cfull = BC.BetterContinentsSettings.CreateForImport(values, lean: false);
+      var leanForest = Map<ImageMapFloat>(clean, "forestmap.png");
+      var fullForest = Map<ImageMapFloat>(cfull, "forestmap.png");
+      C(clean.Version == 12 && clean.CompactMaps && leanForest.Compact && Decoded(leanForest) == 0 && Decoded(fullForest) == 0 && Decoded(Map<ImageMapPaint>(clean, "paintmap.png")) == 0,
+        "compact: both builds of a version 12 world hold the forest and paint maps compressed, with no tile decoded");
+      float sample = fullForest.GetValue(0.3f, 0.7f);
+      C(Decoded(fullForest) > 0 && leanForest.GetValue(0.3f, 0.7f) == sample && sample == Map<ImageMapFloat>(full, "forestmap.png").GetValue(0.3f, 0.7f),
+        "compact: a map read decodes the tiles it reads, and every build reads the same");
+      leanForest.ReleasePixels();
+      C(Decoded(leanForest) == 0 && leanForest.GetValue(0.3f, 0.7f) == sample, "compact: dropping them frees them, and the map still reads the same");
+    }
+    finally
+    {
+      compact.Value = false;
+    }
   }
 
   static void NoConfig()

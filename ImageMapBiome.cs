@@ -14,7 +14,7 @@ namespace BetterContinents;
 
 internal class ImageMapBiome() : ImageMapBase
 {
-    public static ImageMapBiome? Create(string path)
+    public static ImageMapBiome? Create(string path, bool compact = false)
     {
         if (string.IsNullOrEmpty(path))
             return null;
@@ -23,7 +23,8 @@ internal class ImageMapBiome() : ImageMapBase
         BiomeRegistry.RefreshUsable();
         ImageMapBiome map = new()
         {
-            FilePath = path
+            FilePath = path,
+            Compact = compact
         };
         if (!map.LoadSourceImage())
             return null;
@@ -31,31 +32,28 @@ internal class ImageMapBiome() : ImageMapBase
             return null;
         return map;
     }
+    // From the bytes a world made before 0.10 saved (one per pixel, row by row). A byte that is no biome reads as None,
+    // and is saved back as 0, as always.
     public static ImageMapBiome? Create(byte[] data)
     {
-        var decode = new Heightmap.Biome[256];
-        for (int value = 0; value < decode.Length; value++)
-            decode[value] = BiomeRegistry.FromByte((byte)value);
-        var biomes = new Heightmap.Biome[data.Length];
-        var counts = new long[decode.Length];
-        for (int i = 0; i < data.Length; i++)
-        {
-            counts[data[i]]++;
-            biomes[i] = decode[data[i]];
-        }
-        var present = Heightmap.Biome.None;
-        for (int value = 0; value < counts.Length; value++)
-            if (counts[value] > 0)
-                present |= decode[value];
+        int size = (int)Math.Sqrt(data.Length);
+        var counts = new long[256];
+        foreach (var b in data)
+            counts[Stored(b)]++;
         ImageMapBiome map = new()
         {
-            Map = biomes,
-            Present = present,
-            Size = (int)Math.Sqrt(data.Length)
+            grid = size > 0 ? ByteGrid.FromBytes(size, data, Stored, compact: false) : null,
+            tail = [.. data.Skip(size * size).Select(Stored)],
+            counts = counts,
+            Size = size
         };
+        map.Present = map.PresentFrom(Identity);
         LogSummary(counts, data.Length);
         return map;
     }
+
+    // A byte as the map stores it: its biome's byte (BiomeRegistry.ToByte(FromByte(b))), 0 for one that is no biome.
+    private static byte Stored(byte b) => b >= 1 && b <= 32 ? b : (byte)0;
     public static ImageMapBiome? Create(byte[] data, string colors, string path)
     {
         var legend = ParseLegend(colors, $"Biome colors of {path}");
@@ -108,16 +106,28 @@ internal class ImageMapBiome() : ImageMapBase
         BetterContinents.Log($"Biome map ({(int)Math.Sqrt(total)} x {(int)Math.Sqrt(total)}): {string.Join(", ", parts)}");
     }
 
-    // The bytes a world saves (or, for network, sends): the map as read; the bytes the world saved when FollowNames moved
-    // biomes (a client gets the map as this game reads it).
-    public byte[] Serialize(bool network = false) => !network && StoredBytes != null ? StoredBytes : [.. Map.Select(BiomeRegistry.ToByte)];
+    // The bytes a world saves (or, for network, sends): the map as read, which is also what the world saved when
+    // FollowNames moved biomes; a client gets the map as this game reads it.
+    public byte[] Serialize(bool network = false)
+    {
+        var bytes = new byte[Size * Size + tail.Length];
+        if (grid != null)
+            for (int y = 0; y < Size; y++)
+                grid.CopyRow(y, bytes, y * Size);
+        Array.Copy(tail, 0, bytes, Size * Size, tail.Length);
+        if (network && decode != Identity)
+            for (int i = 0; i < bytes.Length; i++)
+                bytes[i] = BiomeRegistry.ToByte(decode[bytes[i]]);
+        return bytes;
+    }
 
     // A world made since 0.10 saves the names of the added biomes its map holds (Expand World Data numbers its biomes in
     // its yaml's order, so after the yaml changes the same bit can be another biome). FollowNames reads each by its name:
     // where Expand World Data numbers it differently now, the map follows; where it has no such biome now, its ground reads
-    // as None (the default generation decides) rather than as whatever biome holds that bit. The world's bytes and names
-    // stay as saved (StoredBytes, StoredNames), so nothing is lost when the yaml is put back.
-    private byte[]? StoredBytes;
+    // as None (the default generation decides) rather than as whatever biome holds that bit. The map's bytes and the names
+    // stay as saved (moved, StoredNames): only the biome each byte reads as changes (decode), so nothing is lost when the
+    // yaml is put back.
+    private bool moved;
     private Dictionary<Heightmap.Biome, string>? StoredNames;
 
     internal void FollowNames(Dictionary<Heightmap.Biome, string> names)
@@ -126,29 +136,25 @@ internal class ImageMapBiome() : ImageMapBase
         var to = new Heightmap.Biome[33];
         for (int value = 0; value < to.Length; value++)
             to[value] = BiomeRegistry.FromByte((byte)value);
-        bool moved = false;
+        bool any = false;
         foreach (var kv in names.OrderBy(kv => (uint)kv.Key))
         {
             var now = EWD.TryGetBiome(kv.Value, out var biome) && BiomeRegistry.IsSingleBit(biome) ? biome : Heightmap.Biome.None;
             if (now == kv.Key || (Present & kv.Key) == 0)
                 continue;
-            moved = true;
+            any = true;
             to[BiomeRegistry.ToByte(kv.Key)] = now;
             BetterContinents.Log(now == Heightmap.Biome.None
                 ? $"Biome map: {kv.Value} was biome 0x{(uint)kv.Key:X} when the world was saved, and Expand World Data has no such biome now: its ground reads as None (the default generation decides) until it has again."
                 : $"Biome map: {kv.Value} was biome 0x{(uint)kv.Key:X} when the world was saved, and Expand World Data numbers it 0x{(uint)now:X} now: the map follows the name.");
         }
-        if (!moved)
+        if (!any)
             return;
-        StoredBytes = Serialize();
-        var present = Heightmap.Biome.None;
-        for (int i = 0; i < Map.Length; i++)
-        {
-            var biome = to[BiomeRegistry.ToByte(Map[i])];
-            Map[i] = biome;
-            present |= biome;
-        }
-        Present = present;
+        moved = true;
+        var translated = (Heightmap.Biome[])Identity.Clone();
+        Array.Copy(to, translated, to.Length);
+        decode = translated;
+        Present = PresentFrom(translated);
     }
 
     // The names a world made since 0.10 saves beside the map's bytes: the ones it read with those bytes; for a map read from
@@ -156,7 +162,7 @@ internal class ImageMapBiome() : ImageMapBase
     // none now).
     internal Dictionary<Heightmap.Biome, string> NamesToSave()
     {
-        if (StoredBytes != null && StoredNames != null)
+        if (moved && StoredNames != null)
             return StoredNames;
         var names = new Dictionary<Heightmap.Biome, string>();
         for (int bit = 0; bit < 32; bit++)
@@ -172,9 +178,26 @@ internal class ImageMapBiome() : ImageMapBase
         return names;
     }
 
-    private Heightmap.Biome[] Map = [];
-    // Every biome in Map.
+    // Every pixel's biome as its byte (BiomeRegistry.ToByte, 0 for None), in tiles (MapTiles.cs).
+    private ByteGrid? grid;
+    // Bytes past the map's square, from a saved map whose length is no square number: kept and saved back, never read.
+    private byte[] tail = [];
+    // The biome each byte reads as: BiomeRegistry.FromByte, or as FollowNames moved them.
+    private Heightmap.Biome[] decode = Identity;
+    private static readonly Heightmap.Biome[] Identity = [.. Enumerable.Range(0, 256).Select(b => BiomeRegistry.FromByte((byte)b))];
+    // How many pixels hold each byte (tail included).
+    private long[] counts = new long[256];
+    // Every biome in the map.
     private Heightmap.Biome Present;
+
+    private Heightmap.Biome PresentFrom(Heightmap.Biome[] biomes)
+    {
+        var present = Heightmap.Biome.None;
+        for (int b = 0; b < counts.Length; b++)
+            if (counts[b] > 0)
+                present |= biomes[b];
+        return present;
+    }
     private Dictionary<Heightmap.Biome, Color32> Colors = [];
     // The legend entries that were skipped because their name is no biome here: their colour's pixels read as None,
     // the default generation deciding there, rather than as whichever biome's colour is nearest. A world export
@@ -185,7 +208,13 @@ internal class ImageMapBiome() : ImageMapBase
     internal int LegendErrors { get; private set; }
     // World export (WorldExport): the decoded map (row 0 = south, like every map after loading) and the legend
     // colours it was decoded with (empty for a map read back from a world's settings, which stores biomes only).
-    internal Heightmap.Biome[] Biomes => Map;
+    // Biomes is a new array each time, the bytes past the square included; BiomeAt reads one pixel.
+    internal Heightmap.Biome[] Biomes => [.. Serialize().Select(b => decode[b])];
+    internal Heightmap.Biome BiomeAt(int x, int y) => decode[grid!.Get(x, y)];
+    // Whether the saved map had bytes past its square (WorldExport then writes no picture of it, as before).
+    internal bool HasTail => tail.Length > 0;
+    // Every biome some pixel reads as (None included when one does).
+    internal IEnumerable<Heightmap.Biome> UsedBiomes => Enumerable.Range(0, counts.Length).Where(b => counts[b] > 0).Select(b => decode[b]).Distinct();
     internal IReadOnlyDictionary<Heightmap.Biome, Color32> LegendColors => Colors;
     public override bool LoadSourceImage()
     {
@@ -302,7 +331,7 @@ internal class ImageMapBiome() : ImageMapBase
     // World export of a map's own legend (the default one for a map read back from a world's settings, which stores
     // biomes only), plus a colour for each biome the map holds that the legend lacks (biomes beyond vanilla, even one
     // this game cannot use now), in its export colour unless another entry already has that.
-    internal static Dictionary<Heightmap.Biome, Color32> ExportLegend(IReadOnlyDictionary<Heightmap.Biome, Color32> legend, Heightmap.Biome[] map)
+    internal static Dictionary<Heightmap.Biome, Color32> ExportLegend(IReadOnlyDictionary<Heightmap.Biome, Color32> legend, IEnumerable<Heightmap.Biome> map)
     {
         var colours = legend.Count > 0 ? legend.ToDictionary(kv => kv.Key, kv => kv.Value) : DefaultColorTable();
         var used = new HashSet<Heightmap.Biome>();
@@ -343,21 +372,29 @@ internal class ImageMapBiome() : ImageMapBase
         var candidates = Colors.Select(d => (Biome: d.Key, Color: d.Value))
             .Concat(Unresolved.Select(u => (Biome: Heightmap.Biome.None, u.Color))).ToList();
         var img = (Image<Rgba32>)(Image)image;
-        Map = LoadPixels(img, pixel =>
-        {
-            var color = Convert(pixel);
-            if (!colorMapping.TryGetValue(color, out var biome))
-            {
-                biome = candidates.OrderBy(d => ColorDistance(color, d.Color)).First().Biome;
-                colorMapping.Add(color, biome);
-            }
-            return biome;
-        });
-        Present = colorMapping.Values.Aggregate(Heightmap.Biome.None, (all, biome) => all | biome);
         var counts = new long[256];
-        foreach (var biome in Map)
-            counts[BiomeRegistry.ToByte(biome)]++;
-        LogSummary(counts, Map.Length);
+        var rows = Rows(img, 1, false, (row, band, at) =>
+        {
+            for (int x = 0; x < row.Length; x++)
+            {
+                var color = Convert(row[x]);
+                if (!colorMapping.TryGetValue(color, out var biome))
+                {
+                    biome = candidates.OrderBy(d => ColorDistance(color, d.Color)).First().Biome;
+                    colorMapping.Add(color, biome);
+                }
+                var b = BiomeRegistry.ToByte(biome);
+                counts[b]++;
+                band[at + x] = b;
+            }
+        });
+        grid = ByteGrid.From(rows, Compact);
+        tail = [];
+        decode = Identity;
+        moved = false;
+        this.counts = counts;
+        Present = colorMapping.Values.Aggregate(Heightmap.Biome.None, (all, biome) => all | biome);
+        LogSummary(counts, (long)Size * Size);
 
         BetterContinents.Log($"Time to calculate biomes from {FilePath}: {st.ElapsedMilliseconds} ms");
         return true;
@@ -382,17 +419,21 @@ internal class ImageMapBiome() : ImageMapBase
         Span<float> biomeWeights = stackalloc float[4];
         // A biome the world cannot use now reads as None (see BiomeRegistry.Usable).
         var usable = BiomeRegistry.Usable;
-        SampleBiomeWeighted(xi + 0, yi + 0, (1 - xd) * (1 - yd), usable, biomeWeights, biomes, ref numBiomes, ref topBiomeIdx);
-        SampleBiomeWeighted(xi + 1, yi + 0, xd * (1 - yd), usable, biomeWeights, biomes, ref numBiomes, ref topBiomeIdx);
-        SampleBiomeWeighted(xi + 0, yi + 1, (1 - xd) * yd, usable, biomeWeights, biomes, ref numBiomes, ref topBiomeIdx);
-        SampleBiomeWeighted(xi + 1, yi + 1, xd * yd, usable, biomeWeights, biomes, ref numBiomes, ref topBiomeIdx);
+        // The four pixels around the point, at the edge the edge pixel again.
+        int x0 = Mathf.Clamp(xi, 0, Size - 1), x1 = Mathf.Clamp(xi + 1, 0, Size - 1);
+        int y0 = Mathf.Clamp(yi, 0, Size - 1), y1 = Mathf.Clamp(yi + 1, 0, Size - 1);
+        grid!.Quad(x0, x1, y0, y1, out var b00, out var b10, out var b01, out var b11);
+        var biomeOf = decode;
+        SampleBiomeWeighted(biomeOf[b00] & usable, (1 - xd) * (1 - yd), biomeWeights, biomes, ref numBiomes, ref topBiomeIdx);
+        SampleBiomeWeighted(biomeOf[b10] & usable, xd * (1 - yd), biomeWeights, biomes, ref numBiomes, ref topBiomeIdx);
+        SampleBiomeWeighted(biomeOf[b01] & usable, (1 - xd) * yd, biomeWeights, biomes, ref numBiomes, ref topBiomeIdx);
+        SampleBiomeWeighted(biomeOf[b11] & usable, xd * yd, biomeWeights, biomes, ref numBiomes, ref topBiomeIdx);
 
         return biomes[topBiomeIdx];
     }
 
-    private void SampleBiomeWeighted(int xs, int ys, float weight, Heightmap.Biome usable, Span<float> biomeWeights, Span<Heightmap.Biome> biomes, ref int numBiomes, ref int topBiomeIdx)
+    private static void SampleBiomeWeighted(Heightmap.Biome biome, float weight, Span<float> biomeWeights, Span<Heightmap.Biome> biomes, ref int numBiomes, ref int topBiomeIdx)
     {
-        var biome = Map[Mathf.Clamp(ys, 0, Size - 1) * Size + Mathf.Clamp(xs, 0, Size - 1)] & usable;
         int i = 0;
         for (; i < numBiomes; ++i)
         {
@@ -426,6 +467,83 @@ internal class ImageMapBiome() : ImageMapBase
             pkg.Write(string.Join("|", colors));
         }
     }
+    // ---- a world made since 0.10 saves and sends its tiles (DataKey.TiledMap) -----------------------------------------
+
+    private const byte BlockVersion = 1;
+
+    // The map's bytes as saved, in tiles; for network also the biome each byte reads as here when FollowNames moved any
+    // (the client reads the map as the server does, without Expand World Data's names).
+    internal byte[] ToBlock(bool network)
+    {
+        var block = grid?.Block ?? throw new InvalidOperationException($"{FilePath} holds no compressed tiles to save");
+        using var stream = new MemoryStream();
+        using var writer = new BinaryWriter(stream);
+        writer.Write(BlockVersion);
+        block.WriteTo(writer);
+        writer.Write(tail.Length);
+        writer.Write(tail);
+        bool translated = network && decode != Identity;
+        writer.Write(translated);
+        if (translated)
+            for (int b = 0; b <= 32; b++)
+                writer.Write((uint)decode[b]);
+        writer.Flush();
+        return stream.ToArray();
+    }
+
+    internal static ImageMapBiome FromBlock(byte[] block)
+    {
+        using var reader = new BinaryReader(new MemoryStream(block, false));
+        var version = reader.ReadByte();
+        if (version != BlockVersion)
+            throw new InvalidDataException($"a biome map saved in format {version}, which this version of Better Continents cannot read");
+        var tiles = TileBlock.ReadFrom(reader);
+        if (tiles.Channels != 1 || tiles.Bytes != 1)
+            throw new InvalidDataException("a biome map's tiles are not one byte a pixel");
+        int tailLength = reader.ReadInt32();
+        if (tailLength < 0 || tailLength > reader.BaseStream.Length - reader.BaseStream.Position)
+            throw new InvalidDataException("a biome map ends early");
+        var map = new ImageMapBiome
+        {
+            grid = new ByteGrid(tiles),
+            tail = [.. reader.ReadBytes(tailLength).Select(Stored)],
+            Size = tiles.Size,
+            Compact = true
+        };
+        if (reader.ReadBoolean())
+        {
+            var translated = (Heightmap.Biome[])Identity.Clone();
+            for (int b = 0; b <= 32; b++)
+                translated[b] = (Heightmap.Biome)reader.ReadUInt32();
+            map.decode = translated;
+        }
+        // Every tile read once, for the summary the log gives and the biomes the map holds.
+        var counts = map.counts;
+        var values = new ushort[TileBlock.Pixels];
+        for (int t = 0; t < tiles.Count; t++)
+        {
+            long pixels = (long)tiles.Extent(t % tiles.Tiles) * tiles.Extent(t / tiles.Tiles);
+            if (tiles.IsUniform(t))
+            {
+                counts[Stored((byte)tiles.UniformValue(t, 0))] += pixels;
+                continue;
+            }
+            tiles.Decode(t, values);
+            int w = tiles.Extent(t % tiles.Tiles), h = tiles.Extent(t / tiles.Tiles);
+            for (int y = 0; y < h; y++)
+                for (int i = y << TileBlock.Shift, end = i + w; i < end; i++)
+                    counts[Stored((byte)values[i])]++;
+        }
+        foreach (var b in map.tail)
+            counts[b]++;
+        map.Present = map.PresentFrom(map.decode);
+        var read = new long[256];
+        for (int b = 0; b < counts.Length; b++)
+            read[BiomeRegistry.ToByte(map.decode[b])] += counts[b];
+        LogSummary(read, (long)map.Size * map.Size + map.tail.Length);
+        return map;
+    }
+
     public static ImageMapBiome? LoadLegacy(ZPackage pkg, int version)
     {
         var path = pkg.ReadString();

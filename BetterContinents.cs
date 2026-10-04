@@ -24,6 +24,8 @@ public partial class BetterContinents : BaseUnityPlugin
     public static ConfigEntry<int> NexusID;
     public static ConfigEntry<string> ConfigSelectedPreset;
     public static ConfigEntry<TransferRatePreset> ConfigSettingsTransferRate;
+    public static ConfigEntry<bool> ConfigCompactMaps;
+    public static ConfigEntry<int> ConfigMapMemory;
     public static ConfigEntry<int> ConfigFileVersion;
 
     public static ConfigEntry<bool> ConfigEnabled;

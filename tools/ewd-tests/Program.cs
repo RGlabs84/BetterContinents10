@@ -563,7 +563,16 @@ internal static class Program
     var back = Read(saved12);
     C(back.AltBiomes == null && Band(back, 1) == "DeadWastes" && Band(back, 2) == "AshenMarsh" && Save(back).SequenceEqual(saved12),
       "a new world saves the names with its map and reads it back the same: no alt-biome options of its own (the blob only carries the names), the same bytes saved again");
-    C(saved11.Length < saved12.Length && Read(saved11).AltBiomes == null, "an older world saves no names");
+    // The names are UTF-8 text in the alt-biome blob (a new world's maps are tiles, so lengths say nothing now).
+    bool Holds(byte[] bytes, string text)
+    {
+      var needle = System.Text.Encoding.UTF8.GetBytes(text);
+      for (int i = 0; i + needle.Length <= bytes.Length; i++)
+        if (bytes.AsSpan(i, needle.Length).SequenceEqual(needle))
+          return true;
+      return false;
+    }
+    C(Holds(saved12, "DeadWastes") && !Holds(saved11, "DeadWastes") && Read(saved11).AltBiomes == null, "an older world saves no names");
 
     // The yaml changes: DeadWastes and AshenMarsh swap their numbers.
     Names(new() { [AshenMarsh] = "DeadWastes", [DeadWastes] = "AshenMarsh", [LastBit] = "LastBit" });

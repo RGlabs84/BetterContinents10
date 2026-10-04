@@ -1,0 +1,33 @@
+<!-- Added by Wubarrk on 2026-10-04 for the unifying refactor (0.10.0). -->
+<!-- Offline checks of the maps' tiles (MapTiles.cs): the codec, every map kind sampling exactly as the whole decoded
+     picture did before, a world made since 0.10 saving its maps as tiles, and the cache under a small budget. Build
+     BetterContinents.csproj (Release) first: this references its pre-ILRepack DLL in obj/. Run from this folder with
+     "dotnet run -c Release"; "dotnet run -c Release (two dashes) measure FOLDER" measures a folder of real maps. -->
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <!-- Same name as the repo's harness so BetterContinents' InternalsVisibleTo("AltBiomeHarness") applies. -->
+    <AssemblyName>AltBiomeHarness</AssemblyName>
+    <RootNamespace>TileTests</RootNamespace>
+    <Nullable>disable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <ServerGarbageCollection>false</ServerGarbageCollection>
+    <NoWarn>$(NoWarn);MSB3277;CS8632;NU1701;MSB3243;CS1701;CS1702;CS0618</NoWarn>
+    <LibsTools>$(MSBuildThisFileDirectory)../../../libs-Tools/</LibsTools>
+    <BcDll>$(MSBuildThisFileDirectory)../../obj/Release/net4.8/BetterContinents.dll</BcDll>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="SixLabors.ImageSharp" Version="2.1.13" />
+    <PackageReference Include="Lib.Harmony" Version="2.3.6" />
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="BetterContinents"><HintPath>$(BcDll)</HintPath></Reference>
+    <Reference Include="assembly_valheim"><HintPath>$(LibsTools)1.0/client/assembly_valheim.dll</HintPath></Reference>
+    <Reference Include="assembly_utils"><HintPath>$(LibsTools)1.0/client/assembly_utils.dll</HintPath></Reference>
+    <Reference Include="UnityEngine"><HintPath>$(LibsTools)1.0/client/UnityEngine.dll</HintPath></Reference>
+    <Reference Include="UnityEngine.CoreModule"><HintPath>$(LibsTools)1.0/client/UnityEngine.CoreModule.dll</HintPath></Reference>
+    <Reference Include="BepInEx"><HintPath>$(LibsTools)BepInEx.dll</HintPath></Reference>
+  </ItemGroup>
+</Project>
