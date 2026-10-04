@@ -1,11 +1,14 @@
+<!-- Added by Wubarrk on 2026-10-04 for the vegetation twin guard (0.10.0). -->
+<!-- Offline checks of the vegetation twin guard and bc_twins' scan (VegetationTwins.cs), and of the PlaceVegetation
+     tracking against the real 1.0 assemblies. Build BetterContinents.csproj (Release) first: this references its
+     pre-ILRepack DLL in obj/. Run from this folder with "dotnet run -c Release". -->
 <Project Sdk="Microsoft.NET.Sdk">
-<!-- Added by Wubarrk on 2026-10-04 for the unifying refactor (0.10.0). -->
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>net8.0</TargetFramework>
     <!-- Same name as the repo's harness so BetterContinents' InternalsVisibleTo("AltBiomeHarness") applies. -->
     <AssemblyName>AltBiomeHarness</AssemblyName>
-    <RootNamespace>GoldenTest</RootNamespace>
+    <RootNamespace>TwinTests</RootNamespace>
     <Nullable>disable</Nullable>
     <LangVersion>latest</LangVersion>
     <ImplicitUsings>disable</ImplicitUsings>
@@ -14,7 +17,8 @@
     <BcDll>$(MSBuildThisFileDirectory)../../obj/Release/net4.8/BetterContinents.dll</BcDll>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="SixLabors.ImageSharp" Version="2.1.13" />
+    <!-- BetterContinents.dll is built against BepInEx's HarmonyX 0Harmony, which cannot initialise on .NET 8;
+         Lib.Harmony has the same assembly name and the API surface Better Continents touches here. -->
     <PackageReference Include="Lib.Harmony" Version="2.3.6" />
   </ItemGroup>
   <ItemGroup>
@@ -23,10 +27,8 @@
     <Reference Include="assembly_utils"><HintPath>$(LibsTools)1.0/client/assembly_utils.dll</HintPath></Reference>
     <Reference Include="UnityEngine"><HintPath>$(LibsTools)1.0/client/UnityEngine.dll</HintPath></Reference>
     <Reference Include="UnityEngine.CoreModule"><HintPath>$(LibsTools)1.0/client/UnityEngine.CoreModule.dll</HintPath></Reference>
+    <!-- PlaceVegetation's IL names Collider. -->
+    <Reference Include="UnityEngine.PhysicsModule"><HintPath>$(LibsTools)1.0/client/UnityEngine.PhysicsModule.dll</HintPath></Reference>
     <Reference Include="BepInEx"><HintPath>$(LibsTools)BepInEx.dll</HintPath></Reference>
-  </ItemGroup>
-  <ItemGroup>
-    <!-- The repo's shipped presets are fixtures: their bytes must keep loading the same way. -->
-    <None Include="../../assets/BCAssets/Presets/*.BetterContinents" LinkBase="presets" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

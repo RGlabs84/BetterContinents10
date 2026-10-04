@@ -1,4 +1,4 @@
-﻿// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0).
+﻿// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0), and on 2026-10-04 for the vegetation twin guard (0.10.0).
 
 using System.Collections.Generic;
 using System.Linq;
@@ -81,41 +81,62 @@ public partial class BetterContinents
       return false;
     }
 
-    /* Vegetation manipulation
-       Enabling is done for the whole zone. More precise solution would require entirely new implementation.
+    /* Vegetation placement, patched in every Better Continents world (Patcher.PatchVegetation): the vegetation map and
+       the twin guard (VegetationTwins).
+       The vegetation map's enabling is done for the whole zone. More precise solution would require entirely new implementation.
        Enabling is currently done by setting all biomes. This has to be reverted at end of the function.
        Disabling uses the clear area system so it's very precise. However transpiler is needed to keep track of the current vegetation.
        This technically should allow precise manipulation with enable + disable combo.
+       The twin guard uses the same clear-area check, the last one before an object is placed, and the same tracking.
     */
-    public static void PlaceVegetationEnable(ZoneSystem __instance, Vector3 zoneCenterPos)
+    public static void PlaceVegetationPrefix(ZoneSystem __instance, Vector2s zoneID, Vector3 zoneCenterPos)
     {
+      CurrentVegetation = null;
+      VegetationTwins.Begin(zoneID);
       Settings.ApplyVegetationMap(zoneCenterPos, __instance.m_vegetation);
     }
-    public static void PlaceVegetationRestore()
+    public static void PlaceVegetationPostfix()
     {
       Settings.RevertVegetationMap();
+      VegetationTwins.End();
+      CurrentVegetation = null;
     }
     private static ZoneSystem.ZoneVegetation? CurrentVegetation;
     private static ZoneSystem.ZoneVegetation SetCurrentVegetation(ZoneSystem.ZoneVegetation vegetation)
     {
       CurrentVegetation = vegetation;
+      VegetationTwins.Entry(vegetation);
       return vegetation;
     }
-    public static IEnumerable<CodeInstruction> PlaceVegetationSaveCurrent(IEnumerable<CodeInstruction> instructions) =>
-      new CodeMatcher(instructions)
-      .MatchForward(false, new CodeMatch(OpCodes.Ldfld, AccessTools.Field(typeof(ZoneSystem.ZoneVegetation), nameof(ZoneSystem.ZoneVegetation.m_enable))))
-      .Insert(new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(ZoneSystemPatch), nameof(SetCurrentVegetation))))
-      .InstructionEnumeration();
+    // The loop's first read of m_enable, once per entry. Expand World Data inserts its own tracking at the same place,
+    // which leaves the read in place. Should another mod have rewritten the loop, nothing is inserted: the vegetation
+    // map and the twin guard then do nothing, instead of the patch failing.
+    public static IEnumerable<CodeInstruction> PlaceVegetationSaveCurrent(IEnumerable<CodeInstruction> instructions)
+    {
+      var enable = AccessTools.Field(typeof(ZoneSystem.ZoneVegetation), nameof(ZoneSystem.ZoneVegetation.m_enable));
+      var codes = instructions.ToList();
+      int at = codes.FindIndex(code => code.LoadsField(enable));
+      if (at < 0)
+      {
+        LogWarning("ZoneSystem.PlaceVegetation has no m_enable read to track: the vegetation map and the twin guard are off.");
+        return codes;
+      }
+      // Takes the entry the read is about and leaves it on the stack for the read.
+      codes.Insert(at, new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(ZoneSystemPatch), nameof(SetCurrentVegetation))));
+      return codes;
+    }
 
 
     // Must be named __result (Harmony's reserved name for the original return value), not "result" -
     // ZoneSystem.InsideClearArea's own parameters are (areas, point), so a plain "result" parameter
     // does not bind to anything and Harmony throws "Parameter \"result\" not found" when this postfix
     // is applied (confirmed against 0Harmony.dll's HarmonyManipulator, which matches only "__result").
-    public static bool CheckVegetationMapClearArea(bool __result, Vector3 point)
+    // Expand World Data replaces the original with a prefix; postfixes still run after it.
+    public static bool InsideClearAreaPostfix(bool __result, Vector3 point)
     {
       if (__result || CurrentVegetation == null) return __result;
-      return Settings.CheckVegetationMap(point, CurrentVegetation);
+      if (Settings.CheckVegetationMap(point, CurrentVegetation)) return true;
+      return VegetationTwins.Skip(point);
     }
   }
 }

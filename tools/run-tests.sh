@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Added by Wubarrk on 2026-10-04 for the unifying refactor (0.10.0).
+# Added by Wubarrk on 2026-10-04 for the unifying refactor and the vegetation twin guard (0.10.0).
 #
 # Builds the plugin (Release) and runs every offline suite against it, one after another, memory-capped and niced:
 #   golden-tests      the reference recordings (tools/golden-tests/golden): any difference fails
@@ -8,6 +8,7 @@
 #   import-tests      world import, presets, export.cfg, the Directory way
 #   livecfg-tests     live config, transfer rate, world cache, minimap
 #   ewd-tests         Expand World Data biomes (vanilla and EWD processes)
+#   twin-tests        the vegetation twin guard, bc_twins' scan, the PlaceVegetation tracking on the game's IL
 # Usage: tools/run-tests.sh [suite ...]   (default: all). Exit code 1 when the build or any suite fails.
 set -u
 cd "$(dirname "$0")/.."
@@ -17,7 +18,7 @@ export DOTNET_ROOT="${DOTNET_ROOT:-$HOME/.dotnet}"
 export DOTNET_GCHeapHardLimit="${DOTNET_GCHeapHardLimit:-0xC0000000}"
 logs="$(mktemp -d "${TMPDIR:-/tmp}/bc-tests-XXXXXX")"
 suites=("$@")
-[ ${#suites[@]} -eq 0 ] && suites=(golden-tests altbiome-harness export-tests import-tests livecfg-tests ewd-tests)
+[ ${#suites[@]} -eq 0 ] && suites=(golden-tests altbiome-harness export-tests import-tests livecfg-tests ewd-tests twin-tests)
 
 echo "== building the plugin"
 if ! nice -n 10 dotnet build -c Release BetterContinents.csproj > "$logs/build.log" 2>&1; then

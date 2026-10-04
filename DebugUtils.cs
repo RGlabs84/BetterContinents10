@@ -1,4 +1,4 @@
-﻿// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and alt-biome planting (0.8.1), and on 2026-09-24 for world export and import (0.9.0), and on 2026-09-29 for Expand World Data biomes (0.9.3), and on 2026-10-04 for the unifying refactor (0.10.0).
+﻿// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and alt-biome planting (0.8.1), and on 2026-09-24 for world export and import (0.9.0), and on 2026-09-29 for Expand World Data biomes (0.9.3), and on 2026-10-04 for the unifying refactor and the vegetation twin guard (0.10.0).
 
 using System;
 using System.Collections.Generic;
@@ -48,6 +48,8 @@ public partial class DebugUtils
         // Any player, in the main menu too (InitTerminal runs when the menu's console wakes): it reads local folders and
         // writes the player's own presets and config only.
         WorldImportCommands.Register();
+        // Any player counts the twins their machine holds; removal runs only where the world is (bc_twins server ...).
+        VegetationTwinCommands.Register();
         rootCommand = new Command("bc", "Better Continents", "Better Continents command").Subcommands(bc =>
         {
             bc.AddCommand("info", "Dump Info", "Prints current settings to console", _ =>

@@ -1,5 +1,6 @@
-﻿// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and alt-biome planting (0.8.1), and on 2026-09-24 for world export and import (0.9.0), and on 2026-09-25 for version-agnostic wording (0.9.1), and on 2026-09-29 for Expand World Data biomes (0.9.3).
+﻿// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and alt-biome planting (0.8.1), and on 2026-09-24 for world export and import (0.9.0), and on 2026-09-25 for version-agnostic wording (0.9.1), and on 2026-09-29 for Expand World Data biomes (0.9.3), and on 2026-10-04 for the vegetation twin guard (0.10.0).
 
+using System;
 using System.Collections;
 using System.Reflection;
 using HarmonyLib;
@@ -29,7 +30,7 @@ public partial class BetterContinents
     PatchDeepNorthWaveFade();
     PatchGetAshlandsHeight();
     PatchColorTransition();
-    PatchVegetationMap();
+    PatchVegetation();
     PatchSpawnMap();
     // WorldGenerator caches GetBiome/GetBiomeArea results per grid cell for the lifetime of the
     // WorldGenerator instance (only cleared in its constructor). Any biome-affecting patch toggled
@@ -687,35 +688,54 @@ public partial class BetterContinents
       DeepNorthWaveFadePatched = true;
     }
   }
-  private static bool IsVegetationMapPatched = false;
-  private static void PatchVegetationMap()
+  private static bool IsVegetationPatched = false;
+  // Every Better Continents world: the vegetation map and the twin guard (VegetationTwins) share these patches.
+  private static void PatchVegetation()
   {
-    var toPatch = Settings.EnabledForThisWorld && Settings.HasVegetationMap;
-    if (toPatch == IsVegetationMapPatched)
+    var toPatch = Settings.EnabledForThisWorld;
+    if (toPatch == IsVegetationPatched)
       return;
     var method = AccessTools.Method(typeof(ZoneSystem), nameof(ZoneSystem.PlaceVegetation));
-    var prefixPatch = AccessTools.Method(typeof(ZoneSystemPatch), nameof(ZoneSystemPatch.PlaceVegetationEnable));
-    var postfixPatch = AccessTools.Method(typeof(ZoneSystemPatch), nameof(ZoneSystemPatch.PlaceVegetationRestore));
+    var prefixPatch = AccessTools.Method(typeof(ZoneSystemPatch), nameof(ZoneSystemPatch.PlaceVegetationPrefix));
+    var postfixPatch = AccessTools.Method(typeof(ZoneSystemPatch), nameof(ZoneSystemPatch.PlaceVegetationPostfix));
     var transpilerPatch = AccessTools.Method(typeof(ZoneSystemPatch), nameof(ZoneSystemPatch.PlaceVegetationSaveCurrent));
     var clearAreaMethod = AccessTools.Method(typeof(ZoneSystem), nameof(ZoneSystem.InsideClearArea));
-    var clearAreaPatch = AccessTools.Method(typeof(ZoneSystemPatch), nameof(ZoneSystemPatch.CheckVegetationMapClearArea));
+    var clearAreaPatch = AccessTools.Method(typeof(ZoneSystemPatch), nameof(ZoneSystemPatch.InsideClearAreaPostfix));
     if (!EnsurePatchTargetFound(method, "ZoneSystem.PlaceVegetation") || !EnsurePatchTargetFound(clearAreaMethod, "ZoneSystem.InsideClearArea"))
       return;
-    if (IsVegetationMapPatched)
+    if (IsVegetationPatched)
     {
-      Log("Unpatching ZoneSystem.PlaceVegetation");
+      Log("Unpatching ZoneSystem.PlaceVegetation (vegetation map, twin guard)");
       HarmonyInstance.Unpatch(method, prefixPatch);
       HarmonyInstance.Unpatch(method, postfixPatch);
       HarmonyInstance.Unpatch(method, transpilerPatch);
       HarmonyInstance.Unpatch(clearAreaMethod, clearAreaPatch);
-      IsVegetationMapPatched = false;
+      IsVegetationPatched = false;
     }
     if (toPatch)
     {
-      Log("Patching ZoneSystem.PlaceVegetation");
-      HarmonyInstance.Patch(method, prefix: new(prefixPatch), postfix: new(postfixPatch), transpiler: new(transpilerPatch));
-      HarmonyInstance.Patch(clearAreaMethod, postfix: new(clearAreaPatch));
-      IsVegetationMapPatched = true;
+      Log("Patching ZoneSystem.PlaceVegetation (vegetation map, twin guard)");
+      // Every world now, so a failure (another mod's rewrite of PlaceVegetation) must not stop the patches after this one.
+      try
+      {
+        HarmonyInstance.Patch(method, prefix: new(prefixPatch), postfix: new(postfixPatch), transpiler: new(transpilerPatch));
+        HarmonyInstance.Patch(clearAreaMethod, postfix: new(clearAreaPatch));
+        IsVegetationPatched = true;
+      }
+      catch (Exception e)
+      {
+        LogError($"Could not patch ZoneSystem.PlaceVegetation, so the vegetation map and the twin guard are off: {e.Message}");
+        try
+        {
+          HarmonyInstance.Unpatch(method, prefixPatch);
+          HarmonyInstance.Unpatch(method, postfixPatch);
+          HarmonyInstance.Unpatch(method, transpilerPatch);
+        }
+        catch (Exception)
+        {
+          // Nothing was applied.
+        }
+      }
     }
   }
   private static void PatchColorTransition()
