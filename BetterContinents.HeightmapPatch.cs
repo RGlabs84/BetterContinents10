@@ -101,9 +101,10 @@ public partial class BetterContinents
     }
   }
 
-  // The configured precision where it applies: 0 unless Better Continents is on for the world, at most MaxPrecision.
+  // The configured precision where it applies: 0 unless Better Continents is on for the world, at most the world's
+  // limit (BiomePrecisionGrid.MaxFor).
   internal static int EffectiveBiomePrecision(BetterContinentsSettings settings) =>
-    settings.EnabledForThisWorld ? Mathf.Clamp(settings.BiomePrecision, 0, BiomePrecisionGrid.MaxPrecision) : 0;
+    settings.EnabledForThisWorld ? Mathf.Clamp(settings.BiomePrecision, 0, BiomePrecisionGrid.MaxFor(settings)) : 0;
 
   // Valheim 1.0 stores biome sectors (biome plus alt biome data) in the corner array instead of
   // plain biomes. Sectors for points where the world data doesn't match the Better Continents biome,
@@ -133,7 +134,12 @@ public partial class BetterContinents
   // (constant z) after another. Made on the builder thread, read on the main thread, never changed.
   internal sealed class BiomePrecisionGrid
   {
+    // The finest precision: 5 (6 x 6 cells of 11 m), and 31 (32 x 32 cells of 2 m) on a world made since 0.10
+    // (FinerBiomePrecision). A zone samples (N + 2)^2 points once per build, 1089 at 31; past 63 cells would be finer
+    // than the terrain's 1 m vertices.
     public const int MaxPrecision = 5;
+    public const int MaxFinerPrecision = 31;
+    internal static int MaxFor(BetterContinentsSettings settings) => settings.FinerBiomePrecision ? MaxFinerPrecision : MaxPrecision;
 
     // The precision new builds sample at, 0 = off. Set on the main thread (PatchHeightmap), read once per build on
     // the builder thread.

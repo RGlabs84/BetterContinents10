@@ -85,6 +85,7 @@ internal static class Program
       TerrainTest.Run();
       EndToEnd.Run(work);
       LocationTest.Run();
+      PinTest.Run(work);
       // After TerrainTest, whose generator stubs it builds zones with.
       PrecisionTest.Run();
     }

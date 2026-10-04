@@ -1,5 +1,6 @@
-﻿// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0), and on 2026-10-04 for the vegetation twin guard (0.10.0).
+﻿// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0), and on 2026-10-04 for the vegetation twin guard (0.10.0), and on 2026-10-04 for the unifying refactor (0.10.0).
 
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection.Emit;
@@ -33,41 +34,73 @@ public partial class BetterContinents
       if (!Settings.EnabledForThisWorld) return;
       if (!Settings.HasLocationMap && !Settings.OverrideStartPosition) return;
       List<ZoneSystem.ZoneLocation> locs = [.. __instance.m_locations.Where(loc => loc.m_enable && loc.m_quantity != 0).OrderByDescending(x => x.m_prioritized)];
-      if (Settings.HasLocationMap)
-      {
-        foreach (var loc in locs)
-          HandleLocation(loc);
-      }
-      if (Settings.OverrideStartPosition)
-      {
-        var startLoc = locs.FirstOrDefault(loc => loc.m_prefabName == "StartTemple");
-        if (startLoc != null)
-        {
-          var y = WorldGenerator.instance.GetHeight(Settings.StartPositionX, Settings.StartPositionY);
-          Vector3 position = new(Settings.StartPositionX, y, Settings.StartPositionY);
-          __instance.RegisterLocation(startLoc, position, false);
-          Log($"Start position overriden: set to {position}");
-        }
-      }
+      PlaceLocations(__instance, locs, Settings, (x, z) => WorldGenerator.instance.GetHeight(x, z));
     }
 
-    private static void HandleLocation(ZoneSystem.ZoneLocation loc)
+    // The location map's pins and the start position override. A world made since 0.10 places the start first, so no
+    // pin can take its zone (StartBeforeLocationPins); an older one places it last, as it always has. The game keeps
+    // one location per 64 m zone and drops a second with only "Location already exist in zone": here a location that
+    // is not placed says which one holds its zone, the start loudly.
+    internal static void PlaceLocations(ZoneSystem zones, List<ZoneSystem.ZoneLocation> locs, BetterContinentsSettings settings, Func<float, float, float> height)
+    {
+      bool startFirst = settings.StartBeforeLocationPins;
+      if (settings.OverrideStartPosition && startFirst)
+        OverrideStart(zones, locs, settings, height);
+      if (settings.HasLocationMap)
+      {
+        foreach (var loc in locs)
+          HandleLocation(zones, loc, settings, height);
+      }
+      if (settings.OverrideStartPosition && !startFirst)
+        OverrideStart(zones, locs, settings, height);
+    }
+
+    private static void OverrideStart(ZoneSystem zones, List<ZoneSystem.ZoneLocation> locs, BetterContinentsSettings settings, Func<float, float, float> height)
+    {
+      var startLoc = locs.FirstOrDefault(loc => loc.m_prefabName == "StartTemple");
+      if (startLoc == null)
+        return;
+      Vector3 position = new(settings.StartPositionX, height(settings.StartPositionX, settings.StartPositionY), settings.StartPositionY);
+      if (TryRegister(zones, startLoc, position, out var holder))
+        Log($"Start position overriden: set to {position}");
+      else
+        LogError($"The start position override was NOT applied: {position} is in zone {ZoneSystem.GetZone(position)}, which already holds "
+                 + $"{holder}, and the game keeps one location per zone, so it places the start itself. Move the start position or {holder}.");
+    }
+
+    private static void HandleLocation(ZoneSystem zones, ZoneSystem.ZoneLocation loc, BetterContinentsSettings settings, Func<float, float, float> height)
     {
       var groupName = string.IsNullOrEmpty(loc.m_group) ? "<unnamed>" : loc.m_group;
       Log($"Generating location of group {groupName}, required {loc.m_quantity}, unique {loc.m_unique}, name {loc.m_prefabName}");
       // Place all locations specified by the spawn map, ignoring counts specified in the prefab
       int placed = 0;
-      foreach (var normalizedPosition in Settings.GetAllSpawns(loc.m_prefabName))
+      foreach (var normalizedPosition in settings.GetAllSpawns(loc.m_prefabName))
       {
         var worldPos = NormalizedToWorld(normalizedPosition);
         var position = new Vector3(
             worldPos.x,
-            WorldGenerator.instance.GetHeight(worldPos.x, worldPos.y),
+            height(worldPos.x, worldPos.y),
             worldPos.y
         );
-        ZoneSystem.instance.RegisterLocation(loc, position, false);
-        Log($"Position of {loc.m_prefabName} ({++placed}/{loc.m_quantity}) overriden: set to {position}");
+        if (TryRegister(zones, loc, position, out var holder))
+          Log($"Position of {loc.m_prefabName} ({++placed}/{loc.m_quantity}) overriden: set to {position}");
+        else
+          LogWarning($"Location map: {loc.m_prefabName} at {position} was NOT placed: its zone {ZoneSystem.GetZone(position)} already holds {holder} (the game keeps one location per zone).");
       }
+    }
+
+    // ZoneSystem.RegisterLocation, unless the zone already holds a location, which the game would keep (dropping this
+    // one with only "Location already exist in zone"): then false, and that location's name.
+    internal static bool TryRegister(ZoneSystem zones, ZoneSystem.ZoneLocation loc, Vector3 position, out string holder)
+    {
+      if (zones.m_locationInstances.TryGetValue(ZoneSystem.GetZone(position), out var there))
+      {
+        holder = there.m_location?.m_prefabName ?? "another location";
+        return false;
+      }
+      holder = "";
+      zones.RegisterLocation(loc, position, false);
+      return true;
     }
 
 

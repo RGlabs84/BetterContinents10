@@ -58,11 +58,11 @@ all/dump/049	Alt biomes: neighbour fix on, mean sector height on, min sector thi
 all/dump/050	Alt biome overrides: *Mistlands: chance=0.3, min=2; Wolf Mountain: enabled=false
 all/dump/count	50
 all/loaded-maps	heightmap.png, biomemap.png, terrainmap.png, locationmap.png, roughmap.png, forestmap.png, heatmap.png, paintmap.png, lavamap.png, mossmap.png, vegetationmap.png, spawnmap.png, altbiomemap.png
-all/v11/disk	len=52342 sha=1b264c5c6b0090589b0311fb
-all/v11/network	len=52018 sha=e3d338082868c6c45834877f
-all/v11/network-no-alt	len=50669 sha=475d606cc55b1fe804686e8f
-all/v11/config-version	len=52342 sha=eb87c9a0276947075c329de7
-all/cache-id	c9bc481288b0429db87a14fe6354343b
+all/v11/disk	len=52342 sha=5a659540f7ea26806c2baa24
+all/v11/network	len=52018 sha=b2c663993d84feb658718990
+all/v11/network-no-alt	len=50669 sha=04e1631054ca697d444ae713
+all/v11/config-version	len=52342 sha=c5fc01b16361b1a306a02bb7
+all/cache-id	4083b515314ab169b4c1299484f0e581
 all/v11/disk-roundtrip	same
 all/v11/network-roundtrip	same
 all/v11/dump-after-load	n=49 sha=13ec5496cf89ce0e0747036b
@@ -72,29 +72,29 @@ all/v1/dump-after-load	n=30 sha=f6e3ce4306d19b2a51c60d9e
 all/v2/disk	len=14556 sha=a7deda92cf5b44371342f5a9
 all/v2/network	len=14519 sha=360cb177fc27e45a7fd70a33
 all/v2/dump-after-load	n=31 sha=f25ddf83d79cf369bb3e3e30
-all/v3/disk	len=14721 sha=c56cfbf9ee4d9c87cb680aff
-all/v3/network	len=14663 sha=bebff5dac9a2107ea635749f
+all/v3/disk	len=14721 sha=53db3984554674a885ab5310
+all/v3/network	len=14663 sha=a6322c3e52e88f5446eae5b7
 all/v3/dump-after-load	n=32 sha=855eebce93e47ed32028e989
-all/v4/disk	len=14721 sha=ea35f631ad1cb90d21a963d7
-all/v4/network	len=14663 sha=bff4362d7740ff9c187c55bb
+all/v4/disk	len=14721 sha=68654b3171f70ac5ca6eb44e
+all/v4/network	len=14663 sha=495decfc5f8983ed649b9402
 all/v4/dump-after-load	n=32 sha=277b7a6b28b4bc47d7f319b4
-all/v5/disk	len=22401 sha=bda7a3888b29430e049e992e
-all/v5/network	len=22306 sha=381fec8c441cc1297148e65c
+all/v5/disk	len=22401 sha=120398e3e0437ebeff938684
+all/v5/network	len=22306 sha=434f7e12eef1c4c513759121
 all/v5/dump-after-load	n=35 sha=58c7f166820212e91a99ff23
-all/v6/disk	len=22406 sha=02a789ca9fcfb49be8b7b4fc
-all/v6/network	len=22311 sha=c46911fc3df599ddf1b91216
+all/v6/disk	len=22406 sha=b0d835c90b5a042c22879fd6
+all/v6/network	len=22311 sha=66cb7805005c922caebed3a1
 all/v6/dump-after-load	n=35 sha=d14cabb601321ec04ae1fb29
-all/v7/disk	len=22410 sha=b9c5644a8b77976bfb962c11
-all/v7/network	len=22315 sha=b44368affc275c4475936454
+all/v7/disk	len=22410 sha=f350e8103798679193718bac
+all/v7/network	len=22315 sha=5f485d98b097586774a1b1fb
 all/v7/dump-after-load	n=35 sha=c4236aabace554698533457a
-all/v8/disk	len=22797 sha=92bde0ed709fad389e9e05c7
-all/v8/network	len=22702 sha=6e24a0bb79b6003c57eb3610
+all/v8/disk	len=22797 sha=8e131f1ea1b011687f14c0bd
+all/v8/network	len=22702 sha=b9b6db9bc457877af4354901
 all/v8/dump-after-load	n=35 sha=797fba0106394666fff1d4b8
-all/v9/disk	len=22801 sha=d7af11aab71fc1a421b1ff00
-all/v9/network	len=22706 sha=8100d0c3d254adc05563adcb
+all/v9/disk	len=22801 sha=5353a9b02f46856d9bd9c1fe
+all/v9/network	len=22706 sha=bed3396abc69741c904755a1
 all/v9/dump-after-load	n=35 sha=7cb8e8f41491b165d6557235
-all/v10/disk	len=23205 sha=f0e3cd1c58cec0c7382df73c
-all/v10/network	len=23092 sha=20e5a55d327837683972b019
+all/v10/disk	len=23205 sha=0f70d17137942aeb48626792
+all/v10/network	len=23092 sha=693b7038fd05cb846d3662e8
 all/v10/dump-after-load	n=36 sha=e76c2e88e29a4cafbdbeb97e
 all-defaults/build-log/001	[Error] [BetterContinents] fx/all/biomemap.txt: invalid biome name DeadWastes, skipped: its colour reads as None. The biomes are None, Meadows, Swamp, Mountain, BlackForest, Plains, AshLands, DeepNorth, Ocean, Mistlands; the biomes Expand World Data adds need Expand World Data installed.
 all-defaults/build-log/002	[Log] [BetterContinents] Biome map (96 x 96): Meadows 13.45%, Swamp 1.02%, Mountain 3.33%, BlackForest 12.43%, Plains 13.68%, AshLands 1.77%, DeepNorth 1.81%, Ocean 38.54%, Mistlands 12.93%, None 1.02%
@@ -150,11 +150,11 @@ all-defaults/dump/045	Alt biomes: chance x1, amount x1, region size x1, distance
 all-defaults/dump/046	Alt biomes: neighbour fix off, mean sector height off, min sector thickness 0
 all-defaults/dump/count	46
 all-defaults/loaded-maps	heightmap.png, biomemap.png, terrainmap.png, locationmap.png, roughmap.png, forestmap.png, heatmap.png, paintmap.png, lavamap.png, mossmap.png, vegetationmap.png, spawnmap.png, altbiomemap.png
-all-defaults/v11/disk	len=52091 sha=cd0045384799092e208ad812
-all-defaults/v11/network	len=51767 sha=99e6c6a95a501709a68b932b
-all-defaults/v11/network-no-alt	len=50513 sha=0bb7157d792cb306920f8a03
-all-defaults/v11/config-version	len=52091 sha=9b17b0eb69e03b3b7bc6b4d2
-all-defaults/cache-id	e072a453d701951f5194141a2512eee5
+all-defaults/v11/disk	len=52091 sha=e57dc85a729f68b08d6b3bfe
+all-defaults/v11/network	len=51767 sha=26015cae59342ff7e946e051
+all-defaults/v11/network-no-alt	len=50513 sha=b66abf97868f5438de3787e2
+all-defaults/v11/config-version	len=52091 sha=2233dc681c64838582453cf2
+all-defaults/cache-id	2796da51d82d50e7e17d62186d1bef61
 all-defaults/v11/disk-roundtrip	same
 all-defaults/v11/network-roundtrip	same
 all-defaults/v11/dump-after-load	n=44 sha=5c1cf6d2caf6de3a6ba680b8
@@ -164,29 +164,29 @@ all-defaults/v1/dump-after-load	n=30 sha=ffa609fead46e95e957da55c
 all-defaults/v2/disk	len=14556 sha=a1b0709f8f92181aca4dbc31
 all-defaults/v2/network	len=14519 sha=3ee91cfc72e750194fa78233
 all-defaults/v2/dump-after-load	n=30 sha=cbcbd064c47c8595ddc728f3
-all-defaults/v3/disk	len=14721 sha=1ebfba6b8056672474faa381
-all-defaults/v3/network	len=14663 sha=f3b0bfc79a9f58e6db7c21fe
+all-defaults/v3/disk	len=14721 sha=6eb1039612017286e2c149e4
+all-defaults/v3/network	len=14663 sha=3039e83cd136c35824f5c481
 all-defaults/v3/dump-after-load	n=31 sha=7185789056a212bb392d5aa2
-all-defaults/v4/disk	len=14721 sha=293a5117422f231ae7039952
-all-defaults/v4/network	len=14663 sha=aed25e962268855500e193ac
+all-defaults/v4/disk	len=14721 sha=4a69a6abaac507d51d1ef6fd
+all-defaults/v4/network	len=14663 sha=17cccab8eec1d5c05c925b06
 all-defaults/v4/dump-after-load	n=31 sha=a471ffbb13b3081d1854d442
-all-defaults/v5/disk	len=22401 sha=af2d9e17adb739098b2d7eec
-all-defaults/v5/network	len=22306 sha=a74e5e4d55688d11dbd23a22
+all-defaults/v5/disk	len=22401 sha=6cb161e8ca05c9111e2a2756
+all-defaults/v5/network	len=22306 sha=0accb0879aa4e899606ea6d5
 all-defaults/v5/dump-after-load	n=34 sha=48865d3a54fb0ca279f03876
-all-defaults/v6/disk	len=22406 sha=7aa46f55b786572da90b0246
-all-defaults/v6/network	len=22311 sha=e70bfcc7ae132835f04bebfb
+all-defaults/v6/disk	len=22406 sha=e31ce6058a68747398166958
+all-defaults/v6/network	len=22311 sha=387174fae4df9cb81dc4f1a1
 all-defaults/v6/dump-after-load	n=35 sha=656e3fae7c41d67e52498a7c
-all-defaults/v7/disk	len=22410 sha=d3dc7061c0ebf51b7d41ee65
-all-defaults/v7/network	len=22315 sha=b4bf2985143b12e79d1760d2
+all-defaults/v7/disk	len=22410 sha=8e1f7d8279cfa156b17e7ab4
+all-defaults/v7/network	len=22315 sha=dc427ae3c60196b2bdf9f211
 all-defaults/v7/dump-after-load	n=35 sha=cd515914652d0eacaf01d685
-all-defaults/v8/disk	len=22797 sha=e115bbadb8c9ee16d213ccbd
-all-defaults/v8/network	len=22702 sha=579e04f0d4fd9d40f2e4642a
+all-defaults/v8/disk	len=22797 sha=3f7055d19fcaf9d8b3745ddd
+all-defaults/v8/network	len=22702 sha=9280d142e7f29f452afe4c68
 all-defaults/v8/dump-after-load	n=35 sha=d5f71953621c475a71e23c3e
-all-defaults/v9/disk	len=22801 sha=a9faff31a361e482ac15203b
-all-defaults/v9/network	len=22706 sha=08531326cefa74fa31681bf1
+all-defaults/v9/disk	len=22801 sha=e7945ff0c22e46fd14f6f3c0
+all-defaults/v9/network	len=22706 sha=2cde4fc85e880c13719c6ecd
 all-defaults/v9/dump-after-load	n=35 sha=b6a9f9d92df8f6f882fd7819
-all-defaults/v10/disk	len=23205 sha=70dd0ae7f1891d690199fa16
-all-defaults/v10/network	len=23092 sha=1a8efe70cf3de27283b22d24
+all-defaults/v10/disk	len=23205 sha=c37b952d306418b5de304789
+all-defaults/v10/network	len=23092 sha=0245b0e3266326128ab6ea5d
 all-defaults/v10/dump-after-load	n=36 sha=f42c60aac75b7ef089f34b26
 heightonly/build-log/count	0
 heightonly/dump/001	Version 12
@@ -615,11 +615,11 @@ legacy-flat/dump/044	Alt biomes: chance x1, amount x1, region size x1, distance 
 legacy-flat/dump/045	Alt biomes: neighbour fix off, mean sector height off, min sector thickness 0
 legacy-flat/dump/count	45
 legacy-flat/loaded-maps	heightmap.png, biomemap.png, terrainmap.png, locationmap.png, roughmap.png, flatmap.png, forestmap.png, heatmap.png, paintmap.png, lavamap.png, mossmap.png, vegetationmap.png, spawnmap.png, altbiomemap.png
-legacy-flat/v11/disk	len=59502 sha=8beff0885ad87b0e0a1eea9b
-legacy-flat/v11/network	len=59153 sha=adc2a679ffe6d04d39022145
-legacy-flat/v11/network-no-alt	len=57899 sha=3e0e55489d00c99dd3b26570
-legacy-flat/v11/config-version	len=59502 sha=bf46a2aa5dff2d5d9b83f0a6
-legacy-flat/cache-id	4c4d753e5c3e9dea4fe01489a9232c12
+legacy-flat/v11/disk	len=59502 sha=4597dd9ab9aa36ce51bce165
+legacy-flat/v11/network	len=59153 sha=f53baf2f644e31d2c19daf71
+legacy-flat/v11/network-no-alt	len=57899 sha=21ea14893279eb2e2e04568c
+legacy-flat/v11/config-version	len=59502 sha=87210657973c2446f4e456ab
+legacy-flat/cache-id	b7b20557f291d109463c53e5c3744d4d
 legacy-flat/v11/disk-roundtrip	same
 legacy-flat/v11/network-roundtrip	same
 legacy-flat/v11/dump-after-load	n=43 sha=564b839d7e27b45c81f8c859
@@ -629,27 +629,27 @@ legacy-flat/v1/dump-after-load	n=30 sha=ffa609fead46e95e957da55c
 legacy-flat/v2/disk	len=14556 sha=a1b0709f8f92181aca4dbc31
 legacy-flat/v2/network	len=14519 sha=3ee91cfc72e750194fa78233
 legacy-flat/v2/dump-after-load	n=30 sha=cbcbd064c47c8595ddc728f3
-legacy-flat/v3/disk	len=14721 sha=1ebfba6b8056672474faa381
-legacy-flat/v3/network	len=14663 sha=f3b0bfc79a9f58e6db7c21fe
+legacy-flat/v3/disk	len=14721 sha=6eb1039612017286e2c149e4
+legacy-flat/v3/network	len=14663 sha=3039e83cd136c35824f5c481
 legacy-flat/v3/dump-after-load	n=31 sha=7185789056a212bb392d5aa2
-legacy-flat/v4/disk	len=14721 sha=293a5117422f231ae7039952
-legacy-flat/v4/network	len=14663 sha=aed25e962268855500e193ac
+legacy-flat/v4/disk	len=14721 sha=4a69a6abaac507d51d1ef6fd
+legacy-flat/v4/network	len=14663 sha=17cccab8eec1d5c05c925b06
 legacy-flat/v4/dump-after-load	n=31 sha=a471ffbb13b3081d1854d442
-legacy-flat/v5/disk	len=29791 sha=99f4a0e428250acade49fba6
-legacy-flat/v5/network	len=29677 sha=9941e4f97ca4d79fb1c5aade
+legacy-flat/v5/disk	len=29791 sha=1bfa615bc808e3664ce79c5a
+legacy-flat/v5/network	len=29677 sha=5707d21325a8c79b0203f167
 legacy-flat/v5/dump-after-load	n=35 sha=c1e869b6317894e7b7cdd29f
-legacy-flat/v6/disk	len=29796 sha=38a650799d4e42f359b19e8c
-legacy-flat/v6/network	len=29682 sha=3654d54acba074aa365c7d5b
+legacy-flat/v6/disk	len=29796 sha=8092ca392fecea5b3884652c
+legacy-flat/v6/network	len=29682 sha=5ef9bdd385b96a28b55c26ab
 legacy-flat/v6/dump-after-load	n=35 sha=e15476f9bbba2152e858e97d
-legacy-flat/v7/disk	len=29800 sha=7fe3950b9310d13a5d0afbf5
-legacy-flat/v7/network	len=29686 sha=d245bcdafc30db5db5db869f
+legacy-flat/v7/disk	len=29800 sha=77cf82e5292b0327bd006c07
+legacy-flat/v7/network	len=29686 sha=8fc8f96e81185d1df3385a97
 legacy-flat/v7/dump-after-load	n=34 sha=a36dbec3903b86967f3a65fc
-legacy-flat/v8/disk	len=30187 sha=e8c489ff17db957a0c5b7673
-legacy-flat/v8/network	len=30073 sha=80e2390c3d68e9f4c3c8cf5b
+legacy-flat/v8/disk	len=30187 sha=aa0d7ab8eb53468e9f420179
+legacy-flat/v8/network	len=30073 sha=a50b55414df4f4ce2b82eedb
 legacy-flat/v8/dump-after-load	n=34 sha=75585310f559c3a20e103e9e
-legacy-flat/v9/disk	len=30191 sha=1b9722f6590de4cf7447ef20
-legacy-flat/v9/network	len=30077 sha=1d4cec48b9f9a631af78e26f
+legacy-flat/v9/disk	len=30191 sha=38bbec9fdee6a04524f644d6
+legacy-flat/v9/network	len=30077 sha=0fdb92a19ba428ed7f215569
 legacy-flat/v9/dump-after-load	n=34 sha=af41edb96e697645354c774d
-legacy-flat/v10/disk	len=30595 sha=89b8a7eabff4539435fe1a54
-legacy-flat/v10/network	len=30463 sha=878073bbeb0f2235c6f00d6a
+legacy-flat/v10/disk	len=30595 sha=f2895ed112bbd3f769071f02
+legacy-flat/v10/network	len=30463 sha=7e143ced042cfc926c73ee7c
 legacy-flat/v10/dump-after-load	n=35 sha=7a76bace177c0220ce4cb91b

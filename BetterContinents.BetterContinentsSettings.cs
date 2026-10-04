@@ -152,6 +152,7 @@ public partial class BetterContinents
     private void FromConfig(ConfigValues values, bool overridable, bool lean)
     {
       Version = NewWorldVersion(values, overridable);
+      MapsFromExport = values.FromExport;
       ReadConfig(values, lean);
       WarnHeightmapRecord();
     }
@@ -401,7 +402,7 @@ public partial class BetterContinents
           output($"Biomemap file ({BiomeMap.Size}) {BiomeMap.FilePath}");
         else output($"Biomemap disabled");
         // Applies with or without a biome map (EffectiveBiomePrecision, BiomePrecisionGrid).
-        var precision = Mathf.Clamp(BiomePrecision, 0, BiomePrecisionGrid.MaxPrecision);
+        var precision = Mathf.Clamp(BiomePrecision, 0, BiomePrecisionGrid.MaxFor(this));
         output(precision > 0
           ? $"Biome precision {precision}: the ground follows the biomes on {precision + 1} x {precision + 1} cells per 64 m terrain zone ({64f / (precision + 1):0.#} m)"
           : "Biome precision 0: the ground takes its biomes from the 4 corners of each 64 m terrain zone (vanilla)");

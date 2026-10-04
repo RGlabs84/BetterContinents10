@@ -509,6 +509,19 @@ internal static class PrecisionTest
     C(State() == (1, 1, 1, 1), $"3 -> 1 at run time: the same patches, new builds sample 1 {State()}");
     Apply(true, 9);
     C(State() == (1, 1, 1, Grid.MaxPrecision), $"a stored 9 is clamped to {Grid.MaxPrecision} {State()}");
+    // A world made since 0.10 goes on to 31.
+    void ApplyNew(int precision)
+    {
+      BC.Settings = new BC.BetterContinentsSettings { EnabledForThisWorld = true, BiomePrecision = precision, Version = 12 };
+      BC.PatchHeightmap();
+      BC.PatchBiomeColor();
+    }
+    ApplyNew(9);
+    C(State() == (1, 1, 1, 9), $"a world made since 0.10: a stored 9 stays 9 {State()}");
+    ApplyNew(40);
+    C(State() == (1, 1, 1, Grid.MaxFinerPrecision), $"and a stored 40 is clamped to {Grid.MaxFinerPrecision} {State()}");
+    C(BC.EffectiveBiomePrecision(new BC.BetterContinentsSettings { EnabledForThisWorld = true, BiomePrecision = 31, Version = 11 }) == Grid.MaxPrecision,
+      "a world made before 0.10 still stops at 5");
     Grid.Add(new BiomeSector[4], new Grid(1, new BiomeSector[4].Select(_ => BC.PlainSectors[1]).ToArray()));
     Apply(false, 3);
     C(State() == (0, 0, 0, 0) && Grid.Count == 0, $"a world without Better Continents: everything unpatched and the grids dropped {State()}");

@@ -786,7 +786,37 @@ internal static class Program
       "Directory set to the 0.9 export: the new world is a version 11 one");
     BC.ConfigMapSourceDir.Value = fresh;
     C(WorldImport.DirectoryValues()!.SettingsVersion == null, "Directory set to the 0.10 export: a new world's version");
+    C(WorldImport.DirectoryValues()!.FromExport, "and the values are an export's");
     BC.ConfigMapSourceDir.Value = "";
+
+    // The location map: an export's pins are read where the export wrote each one, at its pixel's corner, as every
+    // version reads them; a folder of hand-made maps on a new world puts them exactly on their pixels.
+    void Pin(string dir)
+    {
+      using (var image = new Image<Rgba32>(32, 32, new Rgba32(0, 0, 0, 255)))
+      {
+        image[31, 0] = new Rgba32(0, 255, 0, 255);
+        image.SaveAsPng(Path.Combine(dir, "locationmap.png"));
+      }
+      File.WriteAllLines(Path.Combine(dir, "locationmap.txt"), ["PinA: 0,255,0"]);
+    }
+    var handMade = Path.Combine(root, "Versions", "hand-made maps");
+    Directory.CreateDirectory(handMade);
+    using (var h = new Image<L16>(32, 32))
+      h.SaveAsPng(Path.Combine(handMade, "heightmap.png"), new PngEncoder { ColorType = PngColorType.Grayscale, BitDepth = PngBitDepth.Bit16 });
+    Pin(handMade);
+    Pin(fresh);
+    var exportValues = WorldImport.MakePlan(fresh).Values;
+    var handValues = WorldImport.MakePlan(handMade).Values;
+    C(exportValues.FromExport && !handValues.FromExport, "an export folder's values are an export's; a folder of maps without export.cfg or manifest.json is not");
+    var fromExport = BC.BetterContinentsSettings.CreateForImport(exportValues, lean: false);
+    var fromHand = BC.BetterContinentsSettings.CreateForImport(handValues, lean: false);
+    C(fromExport.Version == 12 && !fromExport.ExactLocationPins && fromExport.GetAllSpawns("PinA").SequenceEqual([new Vector2(31f / 32f, 31f / 32f)]),
+      $"a new world from a 0.10 export: its pin where the export wrote it, at the pixel's corner (31/32) ({string.Join(" ", fromExport.GetAllSpawns("PinA"))})");
+    C(fromHand.Version == 12 && fromHand.ExactLocationPins && fromHand.GetAllSpawns("PinA").SequenceEqual([new Vector2(1f, 1f)]),
+      $"a new world from hand-made maps: exactly on its pixel, the map's corner (31/31) ({string.Join(" ", fromHand.GetAllSpawns("PinA"))})");
+    var olderHand = BC.BetterContinentsSettings.CreateForImport(handValues.ForExport(11), lean: false);
+    C(olderHand.Version == 11 && !olderHand.ExactLocationPins, "a version 11 world: at the corner, as always");
   }
 
   // ---- a new world's settings: the From Config rule, and the heightmap's record ------------------------------------

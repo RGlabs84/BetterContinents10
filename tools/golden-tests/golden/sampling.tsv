@@ -10,11 +10,11 @@ all/paint-Meadows	n=16040 min=0 max=1 sha=933ca1cd4e6a10fd14687d4c
 all/terrain	n=20050 min=0 max=1 sha=4696c5f424425da5bce3575a
 all/VegetationMap	n=4010 sha=e95dff8b31da09aa4c6d8792
 all/SpawnMap	n=4010 sha=996590bf9197394deb1e6e90
-all/locations/StartTemple	(0.5,0.48958334)
-all/locations/Eikthyrnir	(0.3125,0.36458334)
-all/locations/Vendor_BlackForest	(0.7291667,0.7604167)
-all/locations/Runestone_Meadows:alias	(0.20833333,0.6770833)
-all/locations/Hildir_camp	(0.78125,0.20833333)
+all/locations/StartTemple	(0.50526315,0.49473685)
+all/locations/Eikthyrnir	(0.31578946,0.36842105)
+all/locations/Vendor_BlackForest	(0.7368421,0.76842105)
+all/locations/Runestone_Meadows:alias	(0.21052632,0.68421054)
+all/locations/Hildir_camp	(0.7894737,0.21052632)
 all/locations/Runestone_Meadows	
 all/base-height-v3	n=4010 min=-0.35000005 max=0.2904891 sha=f8e92c132b69d6292bf4a210
 all/getbiome-prefix	n=8020 min=0 max=512 sha=258116ca7cb93c9abfdb690d
@@ -40,11 +40,11 @@ all-defaults/paint-Meadows	n=16040 min=0 max=1 sha=933ca1cd4e6a10fd14687d4c
 all-defaults/terrain	n=20050 min=0 max=1 sha=4696c5f424425da5bce3575a
 all-defaults/VegetationMap	n=4010 sha=e95dff8b31da09aa4c6d8792
 all-defaults/SpawnMap	n=4010 sha=996590bf9197394deb1e6e90
-all-defaults/locations/StartTemple	(0.5,0.48958334)
-all-defaults/locations/Eikthyrnir	(0.3125,0.36458334)
-all-defaults/locations/Vendor_BlackForest	(0.7291667,0.7604167)
-all-defaults/locations/Runestone_Meadows:alias	(0.20833333,0.6770833)
-all-defaults/locations/Hildir_camp	(0.78125,0.20833333)
+all-defaults/locations/StartTemple	(0.50526315,0.49473685)
+all-defaults/locations/Eikthyrnir	(0.31578946,0.36842105)
+all-defaults/locations/Vendor_BlackForest	(0.7368421,0.76842105)
+all-defaults/locations/Runestone_Meadows:alias	(0.21052632,0.68421054)
+all-defaults/locations/Hildir_camp	(0.7894737,0.21052632)
 all-defaults/locations/Runestone_Meadows	
 all-defaults/base-height-v3	n=4010 min=-2 max=0.33522585 sha=796fde1051b898667ba28208
 all-defaults/getbiome-prefix	n=8020 min=0 max=512 sha=258116ca7cb93c9abfdb690d
@@ -220,11 +220,11 @@ legacy-flat/paint-Meadows	n=16040 min=0 max=1 sha=933ca1cd4e6a10fd14687d4c
 legacy-flat/terrain	n=20050 min=0 max=1 sha=4696c5f424425da5bce3575a
 legacy-flat/VegetationMap	n=4010 sha=e95dff8b31da09aa4c6d8792
 legacy-flat/SpawnMap	n=4010 sha=996590bf9197394deb1e6e90
-legacy-flat/locations/StartTemple	(0.5,0.48958334)
-legacy-flat/locations/Eikthyrnir	(0.3125,0.36458334)
-legacy-flat/locations/Vendor_BlackForest	(0.7291667,0.7604167)
-legacy-flat/locations/Runestone_Meadows:alias	(0.20833333,0.6770833)
-legacy-flat/locations/Hildir_camp	(0.78125,0.20833333)
+legacy-flat/locations/StartTemple	(0.50526315,0.49473685)
+legacy-flat/locations/Eikthyrnir	(0.31578946,0.36842105)
+legacy-flat/locations/Vendor_BlackForest	(0.7368421,0.76842105)
+legacy-flat/locations/Runestone_Meadows:alias	(0.21052632,0.68421054)
+legacy-flat/locations/Hildir_camp	(0.7894737,0.21052632)
 legacy-flat/locations/Runestone_Meadows	
 legacy-flat/base-height-v3	n=4010 min=-2 max=0.33522585 sha=796fde1051b898667ba28208
 legacy-flat/getbiome-prefix	n=8020 min=0 max=512 sha=258116ca7cb93c9abfdb690d

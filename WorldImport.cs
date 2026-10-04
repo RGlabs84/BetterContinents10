@@ -30,10 +30,15 @@ public sealed class ConfigValues
   /// export folder's (WorldImport.ExportVersion), or null for a new world's own.</summary>
   public int? SettingsVersion { get; }
 
-  private ConfigValues(Dictionary<ConfigEntryBase, object?>? values, int? settingsVersion = null)
+  /// <summary>Whether these values are an export folder's (its export.cfg or manifest.json over the config): its location
+  /// map's pins are read where the export put them (BetterContinentsSettings.ExactLocationPins).</summary>
+  public bool FromExport { get; }
+
+  private ConfigValues(Dictionary<ConfigEntryBase, object?>? values, int? settingsVersion = null, bool fromExport = false)
   {
     this.values = values;
     SettingsVersion = settingsVersion;
+    FromExport = fromExport;
   }
 
   public T Get<T>(ConfigEntry<T> entry)
@@ -55,7 +60,8 @@ public sealed class ConfigValues
   }
 
   /// <summary>The same values, for a world of this settings version.</summary>
-  internal ConfigValues WithSettingsVersion(int? settingsVersion) => new(values, settingsVersion);
+  /// <summary>These values as an export folder's, with the settings version its world gets.</summary>
+  internal ConfigValues ForExport(int? settingsVersion) => new(values, settingsVersion, fromExport: true);
 }
 
 /// <summary>A folder of Better Continents maps the import can read: an export (BetterContinents/&lt;world&gt;/export-&lt;time&gt;/)
@@ -546,7 +552,7 @@ public static class WorldImport
     plan.Values = ConfigValues.Snapshot(config, overrides);
     if (plan.HadConfig || exportTotal != null || File.Exists(Path.Combine(folder, ManifestFileName)))
     {
-      plan.Values = plan.Values.WithSettingsVersion(ExportVersion(folder, plan.Values, exportTotal, out var note));
+      plan.Values = plan.Values.ForExport(ExportVersion(folder, plan.Values, exportTotal, out var note));
       if (note != null)
         plan.Notes.Add(note);
     }
@@ -596,7 +602,7 @@ public static class WorldImport
     foreach (var line in ignored)
       LogWarning($"  {ConfigFileName}: ignored {line}");
     var values = ConfigValues.Snapshot(config, overrides);
-    values = values.WithSettingsVersion(ExportVersion(dir, values, null, out var note));
+    values = values.ForExport(ExportVersion(dir, values, null, out var note));
     if (note != null)
       Log("  " + note);
     return values;

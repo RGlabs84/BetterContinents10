@@ -95,9 +95,11 @@ public partial class BetterContinents
     // with the game's own terrain by its alpha (HeightmapAlphaMode); Expand World Data's altitude rules apply over the
     // maps' heights (HeightBeforeBiomeRules); its lava biomes are hot where the biome map puts them (EwdLavaBiomesHot);
     // a terrain legend can name its biomes' grounds (TerrainNamesEwdGrounds); biome precision keeps its territories'
-    // ground colours (PrecisionKeepsTerritories); and its biome map's added biomes are saved with their names, which the
+    // ground colours (PrecisionKeepsTerritories); its biome map's added biomes are saved with their names, which the
     // map follows when Expand World Data numbers them differently (in the alt-biome blob: AltBiomeSettings.Serialize,
-    // ImageMapBiome.FollowNames). A world keeps its version: one read as 12 is saved as 12, any older one as 11, as
+    // ImageMapBiome.FollowNames); its biome precision goes up to 31 (FinerBiomePrecision); and its location map's pins
+    // land exactly on their pixels, with the start position placed before them (ExactLocationPins,
+    // StartBeforeLocationPins). A world keeps its version: one read as 12 is saved as 12, any older one as 11, as
     // always. Better Continents 0.9 reads a version 12 world as a version 11 one.
     public const int MaxVersion = 12;
     internal const int KeyedVersion = 11;
@@ -143,6 +145,26 @@ public partial class BetterContinents
     // colorTerrain), as vanilla's corner blend does: a world made since 0.10. On an older one the precision grid's colour
     // replaces it (Patcher's BiomeColor toggles).
     internal bool PrecisionKeepsTerritories => Version >= UnifiedVersion;
+
+    // Whether biome precision goes up to 31 (cells of 2 m in a 64 m zone), or stops at 5 (11 m) as it always has: a world
+    // made since 0.10 (BiomePrecisionGrid.MaxFor).
+    internal bool FinerBiomePrecision => Version >= UnifiedVersion;
+
+    // Whether a location map's pin lands exactly on its pixel, where the height and biome maps put that pixel (its
+    // position i / (size - 1) across the map), and a pin of several pixels on the one nearest its middle, with the
+    // locations sharing a colour dealt out the same way every time; or, as always, at the corner of a pixel of the
+    // pin picked at random (i / size: up to a pixel to the south-west of where the maps put it). A world made since
+    // 0.10 (ImageMapLocation), unless its maps are a world export's: an export writes each location's pixel for the
+    // corner, so its pins are read there, as every version reads them. That is known only while the new world reads
+    // its maps (FromConfig), which is when the pins are placed; a debug-mode reload of its location map reads them
+    // exactly.
+    internal bool ExactLocationPins => Version >= UnifiedVersion && !MapsFromExport;
+    private bool MapsFromExport;
+
+    // Whether the start position override is placed before the location map's pins, so that a pin in its zone cannot
+    // take it (the game keeps one location per zone); an older world places it after them, as it always has
+    // (ZoneSystemPatch.PlaceLocations).
+    internal bool StartBeforeLocationPins => Version >= UnifiedVersion;
 
     // This world's World Size and Edge Size as a size; null when they make no world (no size at all, or not a number).
     internal WorldGeometry? OwnGeometry

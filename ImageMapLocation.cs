@@ -13,13 +13,16 @@ namespace BetterContinents;
 
 internal class ImageMapLocation() : ImageMapBase()
 {
-    public static ImageMapLocation? Create(string path)
+    public static ImageMapLocation? Create(string path) => Create(path, false);
+    // A new world's (ExactLocationPins): every pin lands exactly on its pixel (PinPosition).
+    public static ImageMapLocation? Create(string path, bool exactPins)
     {
         if (string.IsNullOrEmpty(path))
             return null;
         ImageMapLocation map = new()
         {
-            FilePath = path
+            FilePath = path,
+            exactPins = exactPins
         };
         if (!map.LoadSourceImage())
             return null;
@@ -44,6 +47,7 @@ internal class ImageMapLocation() : ImageMapBase()
     }
     public Dictionary<string, List<Vector2>> RemainingAreas = [];
     private Dictionary<string, Color32> Colors = [];
+    private bool exactPins;
     // World export (WorldExport): the legend this map was decoded with (empty for a map read back from a world's
     // settings, which stores the chosen positions only).
     internal IReadOnlyDictionary<string, Color32> LegendColors => Colors;
@@ -237,10 +241,10 @@ internal class ImageMapLocation() : ImageMapBase()
                 var color = pixels[i];
                 if (!color.Equals(black))
                 {
-                    var area = new List<Vector2>();
+                    var area = new List<Vector2Int>();
 
                     // Do this AFTER determining the SpawnColorMapping, as it changes the color in pixels to black
-                    FloodFill(x, y, (fx, fy) => area.Add(new Vector2(fx / (float)Size, fy / (float)Size)));
+                    FloodFill(x, y, (fx, fy) => area.Add(new Vector2Int(fx, fy)));
 
                     if (!colorSpawns.TryGetValue(color, out var areas))
                     {
@@ -249,14 +253,16 @@ internal class ImageMapLocation() : ImageMapBase()
                     }
 
                     // Just select the actual position from the area now, there is no point delaying this until later
-                    var position = area[PickIndex(area.Count)];
+                    var position = exactPins ? PinPosition(Middle(area)) : Corner(area[PickIndex(area.Count)]);
                     areas.Add(position);
                     BetterContinents.Log($"Found #{ColorUtility.ToHtmlStringRGB(color)} area of {area.Count} size at {x}, {Size - y}, selected position {position.x}, {position.y}");
                 }
             }
         }
 
-        // Now we need to divvy up the color spawn areas between the associated spawn types 
+        // Now we need to divvy up the color spawn areas between the associated spawn types. A new world deals them out
+        // with its own seeded random, so the same map gives the same world every time.
+        var dealer = exactPins ? new System.Random(PinSeed) : null;
         RemainingAreas = [];
         foreach (var colorPositions in colorSpawns)
         {
@@ -265,7 +271,7 @@ internal class ImageMapLocation() : ImageMapBase()
             {
                 foreach (var position in colorPositions.Value)
                 {
-                    var location = locations[PickIndex(locations.Count)].Key;
+                    var location = locations[dealer?.Next(locations.Count) ?? PickIndex(locations.Count)].Key;
                     if (!RemainingAreas.TryGetValue(location, out var positions))
                     {
                         positions = [];
@@ -286,6 +292,42 @@ internal class ImageMapLocation() : ImageMapBase()
 
         return true;
     }
+
+    // As always: the corner of the pixel, i / size across the map (up to a pixel south-west of where the other maps put
+    // it, ImageMapFloat.Sample).
+    private Vector2 Corner(Vector2Int pixel) => new(pixel.x / (float)Size, pixel.y / (float)Size);
+
+    // Exactly where the height and biome maps put the pixel: i / (size - 1) across the map, so a map of 10501 pixels
+    // over 21000 m puts its pins on the same 2 m grid as its heights.
+    internal Vector2 PinPosition(Vector2Int pixel) =>
+        Size > 1 ? new Vector2(pixel.x / (float)(Size - 1), pixel.y / (float)(Size - 1)) : new Vector2(0.5f, 0.5f);
+
+    // The pixel of a pin nearest its middle (the first of those as near, in the order the pin was filled).
+    internal static Vector2Int Middle(List<Vector2Int> area)
+    {
+        double sx = 0, sy = 0;
+        foreach (var p in area)
+        {
+            sx += p.x;
+            sy += p.y;
+        }
+        double cx = sx / area.Count, cy = sy / area.Count;
+        var best = area[0];
+        double nearest = double.MaxValue;
+        foreach (var p in area)
+        {
+            double d = (p.x - cx) * (p.x - cx) + (p.y - cy) * (p.y - cy);
+            if (d < nearest)
+            {
+                nearest = d;
+                best = p;
+            }
+        }
+        return best;
+    }
+
+    // The seed a new world's pins are dealt out with: any fixed number does.
+    private const int PinSeed = 0x0BC10;
 
     // UnityEngine.Random is main-thread only, and a world import decodes this map on a worker (WorldImport), where a
     // thread's own System.Random picks instead. On the main thread the pick is exactly as before. An exported location

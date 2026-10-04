@@ -56,7 +56,7 @@ public partial class BetterContinents
       public static readonly MapKind Terrain = new MapKind<ImageMapTerrain>("Terrainmap", "terrainmap.png", SettingsSchema.TerrainmapFile, "terrain", "terrain",
         s => s.TerrainMap, (s, m) => s.TerrainMap = m, (s, path) => ImageMapTerrain.Create(path, s.TerrainNamesEwdGrounds), true, (_, m) => m.CreateMap());
       public static readonly MapKind Location = new MapKind<ImageMapLocation>("Locationmap", "locationmap.png", SettingsSchema.LocationmapFile, "l", "lm",
-        s => s.LocationMap, (s, m) => s.LocationMap = m, (_, path) => ImageMapLocation.Create(path), false, (_, m) => m.CreateMap());
+        s => s.LocationMap, (s, m) => s.LocationMap = m, (s, path) => ImageMapLocation.Create(path, s.ExactLocationPins), false, (_, m) => m.CreateMap());
       public static readonly MapKind Rough = new MapKind<ImageMapFloat>("Roughmap", "roughmap.png", SettingsSchema.RoughmapFile, "r", "rm",
         s => s.RoughMap, (s, m) => s.RoughMap = m, (_, path) => ImageMapFloat.Create(path, false), true, (_, m) => m.CreateMap(false));
       public static readonly MapKind Flat = new FlatMapKind();
