@@ -618,16 +618,25 @@ public partial class DebugUtils
 
     private static void AddSetting<T>(Command.SubcommandBuilder group, SettingDef<T> setting) where T : IComparable
     {
-        Action<T> set = setting.OnLiveChange == LiveChange.Precision
+        Action<T> set = setting.OnLiveChange switch
+        {
             // Precision changes how a zone samples the biomes, not the biomes, so no minimap, noise or alt-biome rebuild:
             // DynamicPatch rebuilds the loaded terrain and grass, and the zone reset places the vegetation again.
-            ? value =>
+            LiveChange.Precision => value =>
             {
                 setting.Set(BetterContinents.Settings, value);
                 DynamicPatch();
                 GameUtils.ResetZones();
-            }
-            : SetHeightmapValue<T>(value => setting.Set(BetterContinents.Settings, value));
+            },
+            // Heightmap Alpha changes how the heightmap is read: it is decoded again before DynamicPatch, which picks the
+            // blend by the map it now holds.
+            LiveChange.HeightmapDecode => SetHeightmapValue<T>(value =>
+            {
+                setting.Set(BetterContinents.Settings, value);
+                MapKind.Height.Redecode(BetterContinents.Settings);
+            }),
+            _ => SetHeightmapValue<T>(value => setting.Set(BetterContinents.Settings, value)),
+        };
         Func<T> get = () => setting.Get(BetterContinents.Settings);
         if (setting.Limits is { } limits)
             group.AddValue(setting.ConsoleName, setting.ConsoleLabel, setting.Description, setting.Default, limits.Min, limits.Max, set, get);

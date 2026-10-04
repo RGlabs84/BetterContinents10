@@ -100,6 +100,29 @@ internal static class AlphaTest
     C(freshBack.Version == 12 && freshBack.BlendsHeightmapAlpha && freshBack.HeightmapAlphaAt(1f, 0f) == 1f && freshBack.HeightmapAlphaAt(0f, 0f) == 0f,
       "a version 12 alpha world read back: blended, the alpha as it was");
 
+    // bc h alpha in debug mode: the heightmap the world holds is decoded again in its new mode (MapKind.Redecode), from the
+    // bytes it holds, so the change shows at once, as the world reads it when it is loaded next.
+    BC.BetterContinentsSettings Toggled(int version)
+    {
+      var s = new BC.BetterContinentsSettings { EnabledForThisWorld = true, Version = version, HeightMapAlpha = false };
+      HeightMapField.SetValue(s, ImageMapFloat.Create(Png(true), s.HeightmapAlphaMode));
+      s.HeightMapAlpha = true;
+      BC.BetterContinentsSettings.MapKind.Height.Redecode(s);
+      return s;
+    }
+    bool Reads(BC.BetterContinentsSettings s, ImageMapFloat as_) =>
+      HeightMapField.GetValue(s) is ImageMapFloat m && corners.All(p => Same(m.GetValue(p.Item1, p.Item2), as_.GetValue(p.Item1, p.Item2)));
+    var on12 = Toggled(12);
+    C(on12.BlendsHeightmapAlpha && on12.HeightmapAlphaAt(0f, 0f) == 0f && on12.HeightmapAlphaAt(1f, 0f) == 1f && Reads(on12, blend),
+      "switched on live in a version 12 world: blended at once, the heights at full precision");
+    var on11 = Toggled(11);
+    C(!on11.BlendsHeightmapAlpha && on11.HeightmapAlphaAt(0f, 0f) == 1f && Reads(on11, legacy),
+      "switched on live in a version 11 world: read the old way at once (8 bits, no blend), as its next load reads it");
+    on12.HeightMapAlpha = false;
+    BC.BetterContinentsSettings.MapKind.Height.Redecode(on12);
+    C(!on12.BlendsHeightmapAlpha && on12.HeightmapAlphaAt(0f, 0f) == 1f && Reads(on12, grey),
+      "switched off again: a plain grey heightmap, no blend");
+
     // The blend, as Harmony calls it: the prefix answers alone where the heightmap is opaque; elsewhere the game's own
     // formula runs (stood in for here by a value) and the postfix blends.
     var saved = BC.Settings;

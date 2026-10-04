@@ -28,6 +28,8 @@ internal enum LiveChange
   Regenerate,
   /// <summary>Biome precision: how zones sample the biomes, not the biomes - patches and the zones only.</summary>
   Precision,
+  /// <summary>Heightmap Alpha: how the heightmap is read - decode it again, then everything Regenerate redoes.</summary>
+  HeightmapDecode,
 }
 
 /// <summary>One setting, declared once: its config section, key, type, default, range and description; for a world
@@ -162,7 +164,7 @@ internal static class SettingsSchema
   public static readonly SettingDef<bool> HeightmapOverrideAll = new("Heightmap Override All", "All other aspects of the height calculation will be disabled, so the world will perfectly conform to your heightmap", SettingScope.World, true, e => ConfigHeightmapOverrideAll = e)
   { Get = s => s.HeightmapOverrideAll, Set = (s, v) => s.HeightmapOverrideAll = v, ConsoleGroup = "h", ConsoleName = "ov", ConsoleLabel = "Heightmap Override All" };
   public static readonly SettingDef<bool> HeightmapAlpha = new("Heightmap Alpha", "Enables alpha channel for the heightmap file to blend vanilla generation with the heightmap. A new world reads the heightmap at full precision and blends it by its alpha: where a pixel is transparent, the game's own terrain shows. A world made by an older Better Continents keeps reading the heightmap at 8 bits, without the blend.", SettingScope.World, false, e => ConfigHeightmapAlpha = e)
-  { Get = s => s.HeightMapAlpha, Set = (s, v) => s.HeightMapAlpha = v, ConsoleGroup = "h", ConsoleName = "alpha", ConsoleLabel = "Heightmap Alpha" };
+  { Get = s => s.HeightMapAlpha, Set = (s, v) => s.HeightMapAlpha = v, ConsoleGroup = "h", ConsoleName = "alpha", ConsoleLabel = "Heightmap Alpha", OnLiveChange = LiveChange.HeightmapDecode };
   public static readonly SettingDef<string> RoughmapFile = S("Roughmap File", "Path to a roughmap: a square grey image of where the biomes' own rough ground shows through the heightmap (white) and where the heightmap stays smooth (black). Only used with Heightmap Override All off. Not used when Directory is set: its roughmap.png is used.", SettingScope.World, "", e => ConfigRoughFile = e);
   public static readonly SettingDef<float> RoughmapBlend = new("Roughmap Blend", "How strongly to apply the roughmap file", SettingScope.World, 1f, e => ConfigRoughmapBlend = e)
   { Range = R(0f, 1f), Get = s => s.RoughmapBlend, Set = (s, v) => s.RoughmapBlend = v, ConsoleGroup = "r", ConsoleName = "bl", ConsoleLabel = "Roughmap Blend" };

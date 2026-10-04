@@ -40,6 +40,8 @@ public partial class BetterContinents
       public virtual string NotLoaded(string path) => $"ERROR: Path {path} not found!";
       // bc reload: reads the picture (and its legend) again.
       public abstract void Reload(BetterContinentsSettings settings);
+      // Decodes the picture it holds again, for a setting that changes how it is read (bc h alpha). No file is read.
+      public virtual void Redecode(BetterContinentsSettings settings) { }
 
       // The file the map came from, under the Directory when it is there (bc <group> fn's value).
       public string Get(BetterContinentsSettings settings) => SimplePath(Map(settings)?.FilePath ?? string.Empty);
@@ -118,6 +120,12 @@ public partial class BetterContinents
           if (!map.LoadSourceImage()) return;
         }
         rebuild(settings, map);
+      }
+
+      public override void Redecode(BetterContinentsSettings settings)
+      {
+        if (get(settings) is { } map)
+          rebuild(settings, map);
       }
     }
 
