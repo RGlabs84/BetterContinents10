@@ -1,4 +1,4 @@
-// Modified by Wubarrk on 2026-09-22 for alt-biome planting (0.8.1), and on 2026-09-24 for world export and import (0.9.0).
+// Modified by Wubarrk on 2026-09-22 for alt-biome planting (0.8.1), and on 2026-09-24 for world export and import (0.9.0), and on 2026-10-04 for the unifying refactor (0.10.0).
 
 using System;
 
@@ -85,7 +85,38 @@ public partial class BetterContinents
   }
   public partial class BetterContinentsSettings
   {
-    public const int MaxVersion = 11;
+    // The settings versions. 1 to 10 are the old fixed layouts (DeserializeLegacy), and choose the base height formula
+    // (Patcher.PatchGetBaseHeight). 11 is the keyed format: each value under its DataKey. 12 is the same format, for a
+    // world made since the unifying refactor (0.10): its maps span its own World Size and Edge Size (MapsSpanWorldSize),
+    // where an older world's span vanilla's 21000 m whatever World Size says. A world keeps its version: one read as 12
+    // is saved as 12, any older one as 11, as always. Better Continents 0.9 reads a version 12 world as a version 11 one.
+    public const int MaxVersion = 12;
+    internal const int KeyedVersion = 11;
+    internal const int WorldSizeMapsVersion = 12;
+
+    // The version these settings are saved with when Override version says nothing.
+    internal int SavedVersion => Math.Max(Version, KeyedVersion);
+
+    // Whether the maps span this world's World Size and Edge Size (a world made since 0.10), or vanilla's 21000 m.
+    // Expand World Size's size wins over both (BetterContinents.MapGeometry).
+    public bool MapsSpanWorldSize => Version >= WorldSizeMapsVersion;
+
+    // This world's World Size and Edge Size as a size; null when they make no world (no size at all, or not a number).
+    internal WorldGeometry? OwnGeometry
+    {
+      get
+      {
+        var size = new WorldGeometry(WorldSize, EdgeSize);
+        return size.TotalRadius > 0f && !float.IsInfinity(size.TotalSize) && !float.IsNaN(size.TotalSize) ? size : null;
+      }
+    }
+
+    // The version a new world gets: what an export folder's maps were encoded for (ConfigValues.SettingsVersion), else
+    // the newest; for a world made "From Config", Override version when it names a keyed version (the version the world
+    // is saved with, so the world plays the same before and after it is saved).
+    internal static int NewWorldVersion(ConfigValues values, bool overridable) =>
+      values.SettingsVersion
+      ?? (overridable && int.TryParse(ConfigOverrideVersion.Value, out var v) && v >= KeyedVersion ? v : MaxVersion);
 
     // Set when a planted alt-biome map could not be read: the world load then stops (AltBiomeControl) instead of
     // generating zones without the author's alt biomes.
@@ -94,8 +125,8 @@ public partial class BetterContinents
     private static int BlockVersionOf(byte[] block) => block.Length >= 4 ? BitConverter.ToInt32(block, 0) : 0;
 
     // includeAltBiomes: false leaves the alt-biome keys out. The biome cache fingerprint uses that, because the
-    // alt-biome options and map never change the biome point grid the cache holds. formatVersion: the settings format
-    // to write; null takes Override version from the config (the newest format when it is empty).
+    // alt-biome options and map never change the biome point grid the cache holds. formatVersion: the settings version
+    // to write; null takes Override version from the config (the world's own, SavedVersion, when it is empty).
     public void Serialize(ZPackage pkg, bool network, bool includeAltBiomes = true, int? formatVersion = null)
     {
       if (!EnabledForThisWorld)
@@ -103,7 +134,7 @@ public partial class BetterContinents
         pkg.Write(-1);
         return;
       }
-      var version = formatVersion ?? (int.TryParse(ConfigOverrideVersion.Value, out var v) ? v : MaxVersion);
+      var version = formatVersion ?? (int.TryParse(ConfigOverrideVersion.Value, out var v) ? v : SavedVersion);
       pkg.Write(version);
       if (version < 11)
       {

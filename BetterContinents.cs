@@ -113,21 +113,55 @@ public partial class BetterContinents : BaseUnityPlugin
 
     public static BetterContinents instance;
 #nullable enable
-    // Expand World Size calls this by reflection (its compatibility/BetterContinents.cs) with its own world size: the
-    // size Better Continents' maps then span.
+    // Expand World Size calls this by reflection (its compatibility/BetterContinents.cs) with its own world size, when it
+    // reads its config and as each world loads (a WorldGenerator.VersionSetup postfix, after the world's settings are
+    // read). From then on its size is the one the maps span (MapGeometry).
     public static void SetSize(float size, float edge)
     {
         Log($"Received world size {size} and edge size {edge}");
         var geometry = new WorldGeometry(size, edge);
+        ExpandWorldSizeGeometry = geometry;
+        SetGeometry(geometry);
+    }
+    // The size Better Continents' maps span (WorldGeometry; MapGeometry chooses it). It can be swapped on another
+    // thread, so a reader takes it once and uses that.
+    internal static volatile WorldGeometry Geometry = WorldGeometry.Vanilla;
+    // Expand World Size's size, once it has sent one.
+    internal static volatile WorldGeometry? ExpandWorldSizeGeometry;
+
+    // The size a world's maps span: Expand World Size's when it is installed; for a world made since 0.10 its own World
+    // Size and Edge Size (BetterContinentsSettings.MapsSpanWorldSize); for any other world vanilla's, as always.
+    internal static WorldGeometry MapGeometry(BetterContinentsSettings settings) =>
+        ExpandWorldSizeGeometry
+        ?? (settings.EnabledForThisWorld && settings.MapsSpanWorldSize && settings.OwnGeometry is { } own ? own : WorldGeometry.Vanilla);
+
+    // DynamicPatch: the maps follow the world's settings.
+    private static string? ExpandWorldSizeNote;
+    internal static void UpdateGeometry()
+    {
+        var geometry = MapGeometry(Settings);
+        if (ExpandWorldSizeGeometry is { } ews && Settings.EnabledForThisWorld && Settings.MapsSpanWorldSize
+            && Settings.OwnGeometry is { } own && !own.SameAs(ews))
+        {
+            var note = $"World Size: Expand World Size sets the world's size ({ews}), so the maps span {ews.TotalSize} m, not this world's {own.TotalSize} m ({own}).";
+            if (note != ExpandWorldSizeNote)
+                Log(note);
+            ExpandWorldSizeNote = note;
+        }
+        if (geometry.SameAs(Geometry))
+            return;
+        Log($"The maps span {geometry.TotalSize} m ({geometry}).");
+        SetGeometry(geometry);
+    }
+
+    private static void SetGeometry(WorldGeometry geometry)
+    {
         Geometry = geometry;
         TotalRadius = geometry.TotalRadius;
         TotalSize = geometry.TotalSize;
         WorldRadius = geometry.WorldRadius;
         WorldGeneratorPatch.ApplyNoiseSettings();
     }
-    // The size Better Continents' maps span (WorldGeometry): vanilla's, or Expand World Size's. It can be swapped on
-    // another thread, so a reader takes it once and uses that.
-    internal static volatile WorldGeometry Geometry = WorldGeometry.Vanilla;
     // The same size, for other mods that read these fields; Better Continents itself reads Geometry.
     public static float TotalRadius = 10500f;
     public static float TotalSize = TotalRadius * 2f;

@@ -26,7 +26,15 @@ public sealed class ConfigValues
 
   private readonly Dictionary<ConfigEntryBase, object?>? values;
 
-  private ConfigValues(Dictionary<ConfigEntryBase, object?>? values) => this.values = values;
+  /// <summary>The settings version a world built from these values gets (BetterContinentsSettings.NewWorldVersion): an
+  /// export folder's (WorldImport.ExportVersion), or null for a new world's own.</summary>
+  public int? SettingsVersion { get; }
+
+  private ConfigValues(Dictionary<ConfigEntryBase, object?>? values, int? settingsVersion = null)
+  {
+    this.values = values;
+    SettingsVersion = settingsVersion;
+  }
 
   public T Get<T>(ConfigEntry<T> entry)
   {
@@ -45,6 +53,9 @@ public sealed class ConfigValues
       values[kv.Key] = kv.Value;
     return new ConfigValues(values);
   }
+
+  /// <summary>The same values, for a world of this settings version.</summary>
+  internal ConfigValues WithSettingsVersion(int? settingsVersion) => new(values, settingsVersion);
 }
 
 /// <summary>A folder of Better Continents maps the import can read: an export (BetterContinents/&lt;world&gt;/export-&lt;time&gt;/)
@@ -510,7 +521,8 @@ public static class WorldImport
   /// <summary>Main thread: reads the folder's export.cfg (or <paramref name="configLines"/>, which the export passes before
   /// it writes the file) over a snapshot of the config. Directory is always the folder itself, wherever export.cfg says
   /// the export was made. Throws when the folder holds no map Better Continents loads.</summary>
-  internal static Plan MakePlan(string folder, IEnumerable<string>? configLines = null, string? presetName = null)
+  /// <paramref name="exportTotal"/>: the span of the export's maps, which an export passes before it writes manifest.json.
+  internal static Plan MakePlan(string folder, IEnumerable<string>? configLines = null, string? presetName = null, float? exportTotal = null)
   {
     folder = Path.GetFullPath(folder.Trim()).TrimEnd('/', '\\');
     if (!Directory.Exists(folder))
@@ -532,6 +544,12 @@ public static class WorldImport
     overrides[ConfigMapSourceDir] = ConfigDirectory(folder);
     overrides[ConfigEnabled] = true;
     plan.Values = ConfigValues.Snapshot(config, overrides);
+    if (plan.HadConfig || exportTotal != null || File.Exists(Path.Combine(folder, ManifestFileName)))
+    {
+      plan.Values = plan.Values.WithSettingsVersion(ExportVersion(folder, plan.Values, exportTotal, out var note));
+      if (note != null)
+        plan.Notes.Add(note);
+    }
     if (!plan.HadConfig)
       plan.Notes.Add("There is no export.cfg in the folder, so every setting but Directory comes from your BetterContinents.cfg.");
     return plan;
@@ -577,7 +595,31 @@ public static class WorldImport
       Log("  " + line);
     foreach (var line in ignored)
       LogWarning($"  {ConfigFileName}: ignored {line}");
-    return ConfigValues.Snapshot(config, overrides);
+    var values = ConfigValues.Snapshot(config, overrides);
+    values = values.WithSettingsVersion(ExportVersion(dir, values, null, out var note));
+    if (note != null)
+      Log("  " + note);
+    return values;
+  }
+
+  /// <summary>The settings version of a world made from an export folder: null for a new world's own (the newest), or
+  /// the version that spans the maps the way the exported world did. An export's maps span what its world's maps spanned
+  /// (manifest.json's totalSize; <paramref name="exportTotal"/> before the manifest is written). Before 0.10 that was
+  /// 21000 m whatever World Size said; since, a world's maps span its own World Size and Edge Size. So the world is a new
+  /// one when the export's span is the one its World Size and Edge Size give, and otherwise a version 11 one, spanning
+  /// 21000 m like the world that was exported. An export without manifest.json (it did not finish) is taken to span
+  /// 21000 m. <paramref name="note"/> says so when it matters.</summary>
+  internal static int? ExportVersion(string folder, ConfigValues values, float? exportTotal, out string? note)
+  {
+    note = null;
+    float total = exportTotal ?? JsonFloatFromFile(Path.Combine(folder, ManifestFileName), "totalSize") ?? WorldGeometry.Vanilla.TotalSize;
+    var own = new WorldGeometry(values.Get(ConfigWorldSize), values.Get(ConfigEdgeSize));
+    if (total == own.TotalSize)
+      return null;
+    note = string.Format(CultureInfo.InvariantCulture,
+      "The export's maps span {0} m, not the {1} m its World Size and Edge Size give, so the new world spans them the way the exported world did (settings version {2}).",
+      total, own.TotalSize, BetterContinentsSettings.KeyedVersion);
+    return BetterContinentsSettings.KeyedVersion;
   }
 
   /// <summary>Any thread: builds the settings a new world would get from the plan, and writes the preset and its picture.
@@ -1028,6 +1070,25 @@ public static class WorldImport
   {
     var m = Regex.Match(json, "\"" + Regex.Escape(key) + "\"\\s*:\\s*(-?\\d+)");
     return m.Success && long.TryParse(m.Groups[1].Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var n) ? n : null;
+  }
+
+  // A float as WorldExportJson writes it ("R", invariant: 21000, 26246.6, 1E+30).
+  internal static float? JsonFloat(string json, string key)
+  {
+    var m = Regex.Match(json, "\"" + Regex.Escape(key) + "\"\\s*:\\s*(-?[0-9][0-9.eE+-]*)");
+    return m.Success && float.TryParse(m.Groups[1].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out var f) ? f : null;
+  }
+
+  private static float? JsonFloatFromFile(string path, string key)
+  {
+    try
+    {
+      return File.Exists(path) ? JsonFloat(File.ReadAllText(path), key) : null;
+    }
+    catch
+    {
+      return null;
+    }
   }
 
   private static string Unescape(string s)

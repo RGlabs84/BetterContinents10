@@ -1,7 +1,8 @@
 // Added by Wubarrk on 2026-10-04 for the unifying refactor (0.10.0).
 //
 // Offline checks of the world's size: WorldGeometry against 0.9.4's maths, BetterContinents.SetSize (Expand World
-// Size's way in), and WorldSizeHelper, which moves the game's edge of the world: when a group is patched (again), its
+// Size's way in), the size a world's maps span (MapGeometry: Expand World Size's, a world's own since 0.10, or
+// vanilla's), and WorldSizeHelper, which moves the game's edge of the world: when a group is patched (again), its
 // transpilers on the installed game's IL, which group's size each one reads, and the world-size group patched for real.
 // "dotnet run -c Release -- dump" lists the constants of every method the transpilers rewrite.
 
@@ -86,6 +87,7 @@ internal static class Program
     Debug.unityLogger.logHandler = new CapturingLogHandler();
     GeometryTests();
     SetSizeTests();
+    MapGeometryTests();
     GroupTests();
     TranspilerTests();
     OwnSizeTests();
@@ -197,6 +199,73 @@ internal static class Program
     BC.SetSize(10000f, 500f);
     Check(BC.Geometry.SameAs(WorldGeometry.Vanilla) && BC.TotalRadius == 10500f && BC.TotalSize == 21000f && BC.WorldRadius == 10000f,
       "SetSize(10000, 500) is vanilla's size again");
+  }
+
+  // ------------------------------------------------------------------------------------------------ the maps' size
+  private static BC.BetterContinentsSettings World(int version, float worldSize, float edgeSize, bool enabled = true) =>
+    new() { EnabledForThisWorld = enabled, Version = version, WorldSize = worldSize, EdgeSize = edgeSize };
+
+  private static void MapGeometryTests()
+  {
+    var settings = BC.Settings;
+    var ews = BC.ExpandWorldSizeGeometry;
+    try
+    {
+      BC.ExpandWorldSizeGeometry = null;
+      Check(BC.MapGeometry(World(11, 20000f, 500f)).IsVanilla && !World(11, 20000f, 500f).MapsSpanWorldSize,
+        "a world made before 0.10 (version 11) with World Size 20000: its maps span vanilla's 21000 m, as they always did");
+      Check(BC.MapGeometry(World(6, 20000f, 500f)).IsVanilla, "a legacy world (version 6): vanilla's");
+      var own = BC.MapGeometry(World(12, 20000f, 500f));
+      Check(World(12, 20000f, 500f).MapsSpanWorldSize && own.WorldRadius == 20000f && own.EdgeSize == 500f && own.TotalSize == 41000f,
+        "a world made since 0.10 (version 12): its maps span its World Size and Edge Size, 41000 m");
+      Check(BC.MapGeometry(World(12, 5000f, 250f)).TotalSize == 10500f, "a smaller one: 10500 m");
+      Check(BC.MapGeometry(World(12, 20000f, 500f, enabled: false)).IsVanilla, "Better Continents off for the world: vanilla's");
+      Check(BC.MapGeometry(World(12, 0f, 0f)).IsVanilla && BC.MapGeometry(World(12, float.NaN, 500f)).IsVanilla
+            && BC.MapGeometry(World(12, -600f, 500f)).IsVanilla && BC.MapGeometry(World(12, float.MaxValue, float.MaxValue)).IsVanilla,
+        "a World Size and Edge Size that make no world (nothing, NaN, negative, infinite): vanilla's");
+      BC.ExpandWorldSizeGeometry = new WorldGeometry(15000f, 500f);
+      Check(BC.MapGeometry(World(12, 20000f, 500f)).TotalRadius == 15500f && BC.MapGeometry(World(11, 20000f, 500f)).TotalRadius == 15500f
+            && BC.MapGeometry(World(12, 20000f, 500f, enabled: false)).TotalRadius == 15500f,
+        "Expand World Size installed: its size wins, for every world");
+
+      // DynamicPatch's step: the maps follow the loaded world, and only a change rebuilds the noise.
+      BC.ExpandWorldSizeGeometry = null;
+      BC.Settings = World(12, 20000f, 500f);
+      int mark = CapturingLogHandler.Lines.Count;
+      BC.UpdateGeometry();
+      var noise = BC.WorldGeneratorPatch.BaseHeightNoise;
+      Check(BC.Geometry.TotalSize == 41000f && BC.TotalSize == 41000f && BC.TotalRadius == 20500f && BC.WorldRadius == 20000f,
+        "UpdateGeometry: a version 12 world with World Size 20000 has its maps span 41000 m (and the old fields say so)");
+      Check(CapturingLogHandler.Lines.Skip(mark).Any(l => l.Contains("The maps span 41000 m")), "and says so in the log");
+      BC.UpdateGeometry();
+      Check(ReferenceEquals(noise, BC.WorldGeneratorPatch.BaseHeightNoise), "the same size again: nothing rebuilt");
+      Check(Same(BC.Geometry.Normalize(20500f), 1f) && Same(BC.Geometry.Normalize(10250f), 0.75f),
+        "the map's edge is at the world's edge (20500 m), a quarter of the way in at 10250 m");
+      Check(Same(BC.Geometry.DropOff(1f, 19000f), 1f) && BC.Geometry.DropOff(1f, 20250f) < 1f,
+        "the land drops off past World Size (20000 m), not at vanilla's 10000 m");
+      BC.Settings = World(11, 20000f, 500f);
+      BC.UpdateGeometry();
+      Check(BC.Geometry.IsVanilla && BC.TotalSize == 21000f, "back to a version 11 world: vanilla's 21000 m");
+      BC.Settings = new BC.BetterContinentsSettings();
+      BC.UpdateGeometry();
+      Check(BC.Geometry.IsVanilla, "the main menu (Better Continents off): vanilla's");
+
+      // Expand World Size's size wins over the world's own, and the log says so once.
+      BC.ExpandWorldSizeGeometry = WorldGeometry.Vanilla;
+      BC.Settings = World(12, 20000f, 500f);
+      mark = CapturingLogHandler.Lines.Count;
+      BC.UpdateGeometry();
+      BC.UpdateGeometry();
+      Check(BC.Geometry.IsVanilla, "with Expand World Size at vanilla's size, a version 12 world with World Size 20000 spans 21000 m");
+      Check(CapturingLogHandler.Lines.Skip(mark).Count(l => l.Contains("Expand World Size sets the world's size")) == 1,
+        "the log says once that Expand World Size's size wins over the world's");
+    }
+    finally
+    {
+      BC.Settings = settings;
+      BC.ExpandWorldSizeGeometry = ews;
+      BC.UpdateGeometry();
+    }
   }
 
   // ------------------------------------------------------------------------------------------------ groups

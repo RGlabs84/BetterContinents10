@@ -102,6 +102,7 @@ internal static class Program
       DirectoryWay(folder, preset);
       Listing(folder);
       ExportStep();
+      WorldSizeVersions();
     }
     catch (Exception e)
     {
@@ -300,7 +301,8 @@ internal static class Program
       "building it changed no config value and did not touch BetterContinents.cfg");
 
     var s = BC.BetterContinentsSettings.Load(plan.PresetPath);
-    C(s.EnabledForThisWorld && s.Version == BC.BetterContinentsSettings.MaxVersion, $"it loads, enabled, in the newest settings format ({s.Version})");
+    C(s.EnabledForThisWorld && s.Version == 11 && !s.MapsSpanWorldSize,
+      $"it loads, enabled, as a settings version 11 world ({s.Version}): this 0.9.0 export of a World Size 9000 world spans 21000 m, so the new world spans its maps the same way");
     C(s.WorldSize == 9000f && s.EdgeSize == 400f, "World Size 9000, Edge Size 400");
     C(Mathf.Abs(s.SeaLevel - 0.45f) < 1e-5f && s.HeightmapAmount == 2.5f && s.HeightmapBlend == 1f && s.HeightmapAdd == 0f && s.HeightmapMask == 0f
       && s.HeightmapOverrideAll && !s.HeightMapAlpha, "sea level 0.45, Heightmap Amount 2.5, blend 1, add 0, mask 0, override all, no alpha");
@@ -665,6 +667,8 @@ internal static class Program
     C(s.HeightmapAmount == 1f && s.SeaLevel == 0.5f && s.HasHeightMap && s.HasBiomeMap && s.AltBiomes?.Mode == BC.AltBiomeMode.PlantedOnly,
       "built from the export's own settings lines (the default amount 1, sea level 0.5, PlantedOnly) before export.cfg exists");
     C(BC.ConfigSelectedPreset.Value == "Disabled", "the export does not select its preset: it only appears in the New World list");
+    C(s.Version == BC.BetterContinentsSettings.MaxVersion && s.MapsSpanWorldSize,
+      $"its maps span 21000 m, which World Size 10000 and Edge Size 500 give, so the preset is a new world's, version 12 ({s.Version})");
     Drain(job, "TextPass", config);
     var readme = File.ReadAllText(Path.Combine(dir, "README.txt"));
     var header = File.ReadLines(Path.Combine(dir, "export.cfg")).TakeWhile(l => l.StartsWith("##")).ToList();
@@ -690,5 +694,97 @@ internal static class Program
     // Cancelled before the files are written: the builder writes nothing.
     var early = WorldImport.BuildPreset(WorldImport.MakePlan(dir, config, "Cancelled early"), () => true);
     C(early.Error == "cancelled" && !File.Exists(Path.Combine(presetsDir, "Cancelled early.BetterContinents")), "a cancel before writing: no file, error 'cancelled'");
+  }
+
+  // ---- the settings version: a new world's maps span its World Size and Edge Size (0.10) ----------------------------
+
+  static void WorldSizeVersions()
+  {
+    Section("the settings version of a new world (0.10: its maps span its World Size and Edge Size)");
+    var live = ConfigValues.Snapshot(cfg, []);
+    C(BC.BetterContinentsSettings.NewWorldVersion(live, overridable: true) == 12 && BC.BetterContinentsSettings.NewWorldVersion(live, overridable: false) == 12,
+      "a world made From Config, or from a folder that is not an export: version 12");
+    BC.ConfigOverrideVersion.Value = "11";
+    C(BC.BetterContinentsSettings.NewWorldVersion(live, overridable: true) == 11 && BC.BetterContinentsSettings.NewWorldVersion(live, overridable: false) == 12,
+      "Override version 11: a From Config world is made, and saved, as version 11; an import's preset ignores it, as before");
+    BC.ConfigOverrideVersion.Value = "6";
+    C(BC.BetterContinentsSettings.NewWorldVersion(live, overridable: true) == 12, "Override version 6 (an old layout) does not make the new world an old one in play");
+    BC.ConfigOverrideVersion.Value = "";
+
+    // The version a world is saved with: its own, and never below the keyed format.
+    var world = new BC.BetterContinentsSettings { EnabledForThisWorld = true };
+    int Saved(int? version = null)
+    {
+      var pkg = new ZPackage();
+      world.Serialize(pkg, false, true, version);
+      return BitConverter.ToInt32(pkg.GetArray(), 0);
+    }
+    var versions = new[] { 0, 6, 11, 12, 13 }.Select(v => { world.Version = v; return Saved(); }).ToArray();
+    C(versions.SequenceEqual([11, 11, 11, 12, 13]), $"saved as: made in memory 11, legacy 11, 11 as 11, 12 as 12, a later one as itself ({string.Join(", ", versions)})");
+    world.Version = 12;
+    BC.ConfigOverrideVersion.Value = "11";
+    C(Saved() == 11 && Saved(12) == 12, "Override version still writes what it says; an explicit version wins over it");
+    BC.ConfigOverrideVersion.Value = "";
+    var pkg12 = new ZPackage();
+    world.Serialize(pkg12, false);
+    var back = BC.BetterContinentsSettings.Load(new ZPackage(pkg12.GetArray()));
+    world.Version = 11;
+    var pkg11 = new ZPackage();
+    world.Serialize(pkg11, false);
+    var back11 = BC.BetterContinentsSettings.Load(new ZPackage(pkg11.GetArray()));
+    C(back.EnabledForThisWorld && back.Version == 12 && back.MapsSpanWorldSize && back11.Version == 11 && !back11.MapsSpanWorldSize,
+      "read back, a version 12 world spans its World Size, a version 11 one does not");
+    C(pkg12.GetArray().Skip(4).SequenceEqual(pkg11.GetArray().Skip(4)), "and the two are the same bytes after the version");
+
+    // An export folder: its maps span what manifest.json says.
+    string Export(string name, float worldSize, float edgeSize, string? totalSize)
+    {
+      var dir = Path.Combine(root, "Versions", name);
+      Directory.CreateDirectory(dir);
+      using (var h = new Image<L16>(32, 32))
+        h.SaveAsPng(Path.Combine(dir, "heightmap.png"), new PngEncoder { ColorType = PngColorType.Grayscale, BitDepth = PngBitDepth.Bit16 });
+      File.WriteAllLines(Path.Combine(dir, "export.cfg"),
+        ["[00 BetterContinents.Debug]", "Enabled = true", "Override version = ",
+         "[01 BetterContinents.Global]", $"World Size = {worldSize.ToString(System.Globalization.CultureInfo.InvariantCulture)}",
+         $"Edge Size = {edgeSize.ToString(System.Globalization.CultureInfo.InvariantCulture)}"]);
+      if (totalSize != null)
+        File.WriteAllText(Path.Combine(dir, "manifest.json"),
+          $"{{\n  \"format\": \"bc-export/1\",\n  \"worldName\": \"{name}\",\n  \"size\": 32,\n  \"totalSize\": {totalSize},\n  \"worldRadius\": 1\n}}");
+      return dir;
+    }
+    int? VersionOf(string dir, float? exportTotal = null) => WorldImport.MakePlan(dir, exportTotal: exportTotal).Values.SettingsVersion;
+    var old = Export("0.9 export of a World Size 20000 world", 20000f, 500f, "21000");
+    var fresh = Export("0.10 export of a World Size 20000 world", 20000f, 500f, "41000");
+    var odd = Export("0.10 export of an odd size", 12345.6f, 777.7f, ((12345.6f + 777.7f) * 2f).ToString("R", System.Globalization.CultureInfo.InvariantCulture));
+    var plain = Export("0.9 export of a vanilla-size world", 10000f, 500f, "21000");
+    var unfinished = Export("unfinished export of a World Size 20000 world", 20000f, 500f, null);
+    var ews = Export("export of an Expand World Size world", 10000f, 500f, "61000");
+    C(VersionOf(old) == 11, "an export whose maps span 21000 m while its World Size gives 41000 m (made before 0.10): version 11, as the world it came from");
+    C(VersionOf(fresh) == null, "an export whose maps span the 41000 m its World Size gives (a version 12 world's): a new world's version");
+    C(VersionOf(odd) == null, "the same for an odd size, float for float");
+    C(VersionOf(plain) == null, "a vanilla-size world's: a new world's version (both span 21000 m)");
+    C(VersionOf(unfinished) == 11, "an export with no manifest.json (it did not finish), World Size 20000: taken to span 21000 m, version 11");
+    C(VersionOf(unfinished, exportTotal: 41000f) == null, "unless the export itself says its span (its own preset, made before manifest.json is written)");
+    C(VersionOf(ews) == 11, "an Expand World Size world's (maps 61000 m, World Size 10000): version 11, as before; Expand World Size sets the size where it is installed");
+    var plan = WorldImport.MakePlan(old);
+    C(plan.Notes.Any(n => n.Contains("span 21000 m, not the 41000 m")), "the plan says why");
+
+    var preset = WorldImport.BuildPreset(plan);
+    var made = BC.BetterContinentsSettings.Load(preset.PresetPath!);
+    C(preset.Error == null && made.Version == 11 && !made.MapsSpanWorldSize && made.WorldSize == 20000f,
+      $"bc_import of the 0.9 export: a version 11 preset, World Size 20000, maps over 21000 m ({preset.Error ?? made.Version.ToString()})");
+    preset = WorldImport.BuildPreset(WorldImport.MakePlan(fresh));
+    made = BC.BetterContinentsSettings.Load(preset.PresetPath!);
+    C(preset.Error == null && made.Version == 12 && made.MapsSpanWorldSize, $"bc_import of the 0.10 export: a version 12 preset ({preset.Error ?? made.Version.ToString()})");
+
+    // The Directory way reads the same.
+    BC.ConfigMapSourceDir.Value = old;
+    var values = WorldImport.DirectoryValues();
+    var fromDirectory = BC.BetterContinentsSettings.CreateForImport(values!, lean: true);
+    C(values!.SettingsVersion == 11 && fromDirectory.Version == 11 && !fromDirectory.MapsSpanWorldSize,
+      "Directory set to the 0.9 export: the new world is a version 11 one");
+    BC.ConfigMapSourceDir.Value = fresh;
+    C(WorldImport.DirectoryValues()!.SettingsVersion == null, "Directory set to the 0.10 export: a new world's version");
+    BC.ConfigMapSourceDir.Value = "";
   }
 }

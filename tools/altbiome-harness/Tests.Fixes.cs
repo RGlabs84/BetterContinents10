@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-09-22 for alt-biome planting (0.8.1), and on 2026-09-25 for version-agnostic wording (0.9.1).
+// Added by Wubarrk on 2026-09-22 for alt-biome planting (0.8.1), and on 2026-09-25 for version-agnostic wording (0.9.1), and modified on 2026-10-04 for the unifying refactor (0.10.0).
 
 using System;
 using System.Collections.Generic;
@@ -188,6 +188,20 @@ internal static partial class Tests
       "map edge drop-off disabled (0.8.0 worlds too): the grid keeps 10500 m and GetBiomeSector falls back to the real biome beyond it");
     Use(NewSettings());
     Check(Control.CutoffRadius == 0f && !Control.ExternalGrid, "a standard world: no cut-off, BC owns the grid");
+    // A world made since 0.10 (settings version 12) has its maps span its World Size and Edge Size, so World Size 20000
+    // takes BC terrain past the grid's 10500 m disc: GetBiomeSector falls back to the real biome there.
+    var big = NewSettings();
+    big.WorldSize = 20000f;
+    big.Version = BC.BetterContinentsSettings.WorldSizeMapsVersion;
+    Use(big);
+    Check(BC.Geometry.TotalRadius == 20500f && !Control.ExternalGrid && Control.CutoffRadius == 0f && Control.SampledRadius == 10500f
+          && Control.FallbackActive && Control.FallbackRadiusSq == 10500f * 10500f,
+      "a version 12 world with World Size 20000: its maps reach 20500 m, the grid keeps its 10500 m disc (still ours), and the real biome beyond it");
+    big.Version = 11;
+    Use(big);
+    Check(BC.Geometry.TotalRadius == 10500f && !Control.FallbackActive && Control.SampledRadius == 10500f,
+      "the same world made before 0.10 (version 11): its maps stay in the disc, and no fallback, as in 0.9.4");
+    Use(NewSettings());
   }
 
   // ------------------------------------------------------------------------------------------------ Deep North

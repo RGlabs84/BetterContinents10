@@ -1967,7 +1967,7 @@ public static class WorldExport
       WorldImport.Plan? plan = null;
       try
       {
-        plan = WorldImport.MakePlan(Dir, config, PresetName);
+        plan = WorldImport.MakePlan(Dir, config, PresetName, Total);
       }
       catch (Exception e)
       {

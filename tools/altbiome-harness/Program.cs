@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-09-22 for alt-biome planting (0.8.1), and on 2026-09-25 for version-agnostic wording (0.9.1).
+// Added by Wubarrk on 2026-09-22 for alt-biome planting (0.8.1), and on 2026-09-25 for version-agnostic wording (0.9.1), and modified on 2026-10-04 for the unifying refactor (0.10.0).
 
 using System;
 using System.Collections.Generic;
@@ -208,10 +208,12 @@ internal static class H
   public static BC.BetterContinentsSettings NewSettings(BC.AltBiomeSettings altBiomes = null, bool enabled = true) =>
     new() { EnabledForThisWorld = enabled, AltBiomes = altBiomes };
 
-  // Makes these settings the active world's and runs Better Continents' own Configure(), as a world load does.
+  // Makes these settings the active world's and runs Better Continents' own Configure(), as a world load does (after
+  // DynamicPatch's UpdateGeometry: the size the world's maps span).
   public static void Use(BC.BetterContinentsSettings settings, BC.IAltBiomePlanting planting = null)
   {
     BC.Settings = settings;
+    BC.UpdateGeometry();
     BC.AltBiomeControl.PlantingProvider = planting == null ? DefaultProvider : _ => planting;
     BC.AltBiomeControl.Configure();
   }

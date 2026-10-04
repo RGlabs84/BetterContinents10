@@ -67,7 +67,7 @@ public partial class BetterContinents
       WorldEnabled = Settings.EnabledForThisWorld;
       Active = Settings.EffectiveAltBiomes;
       var size = Geometry;
-      ExternalGrid = DetectExternalGrid(size);
+      ExternalGrid = DetectExternalGrid();
       CutoffRadius = 0f;
       SampledRadius = ExternalGrid ? size.TotalRadius : VanillaSampleRadius;
       FallbackActive = false;
@@ -77,18 +77,19 @@ public partial class BetterContinents
         return;
       if (!ExternalGrid)
       {
-        // Better Continents alone never moves its maps: Geometry only changes when Expand World Size calls
-        // SetSize, in which case EWS owns the grid (ExternalGrid). So here the content always spans the vanilla
-        // 10500 m disc, and "World Size" only moves the edge of the world. When that edge is inside the disc,
-        // WorldEdge stops sampling at it. With the drop-off disabled there is no edge to stop at.
+        // Without Expand World Size the grid is vanilla's: it samples the 10500 m disc, and "World Size" moves the
+        // edge of the world. When that edge is inside the disc, WorldEdge stops sampling at it. With the drop-off
+        // disabled there is no edge to stop at. The maps span vanilla's disc too, except on a world made since 0.10,
+        // whose maps span its World Size and Edge Size (MapGeometry), and so can reach past the disc.
         var edge = Settings.WorldSize + Settings.EdgeSize;
         if (Active.Grid == AltBiomeGridMode.WorldEdge && !Settings.DisableMapEdgeDropoff && edge > 0f && edge < VanillaSampleRadius)
           CutoffRadius = edge;
         SampledRadius = CutoffRadius > 0f ? CutoffRadius : VanillaSampleRadius;
         // Past the sampled disc every grid point is forced to Ocean. That is right while the terrain is ocean
-        // there too; it is wrong beyond a WorldEdge cut-off and on a world without the edge drop-off, where
-        // BC terrain can continue. There GetBiomeSector falls back to the real biome, without alt biomes.
-        FallbackActive = CutoffRadius > 0f || Settings.DisableMapEdgeDropoff;
+        // there too; it is wrong beyond a WorldEdge cut-off, on a world without the edge drop-off, and on a world
+        // whose maps reach past the disc, where BC terrain can continue. There GetBiomeSector falls back to the real
+        // biome, without alt biomes.
+        FallbackActive = CutoffRadius > 0f || Settings.DisableMapEdgeDropoff || size.TotalRadius > SampledRadius;
         FallbackRadiusSq = SampledRadius * SampledRadius;
       }
       CustomEligibility = Active.FixNeighbourCheck || Active.MeanSectorHeight || Active.MinSectorThickness > 0f;
@@ -104,10 +105,11 @@ public partial class BetterContinents
     }
 
     // Expand World Size retargets MapSpaceToWorldSpace / WorldSpaceToMapSpace / GenerateBiomePoints itself and
-    // pushes its radius into BC through SetSize. When either is visible, the grid geometry is not ours.
-    private static bool DetectExternalGrid(WorldGeometry size)
+    // pushes its radius into BC through SetSize. When either is visible, the grid geometry is not ours. (A world's own
+    // World Size never is: Better Continents leaves the grid as it is.)
+    private static bool DetectExternalGrid()
     {
-      if (size.TotalRadius != VanillaSampleRadius)
+      if (ExpandWorldSizeGeometry is { } ews && ews.TotalRadius != VanillaSampleRadius)
         return true;
       try
       {

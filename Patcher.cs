@@ -13,11 +13,12 @@ namespace BetterContinents;
 
 public partial class BetterContinents
 {
-  // Switches Better Continents' Harmony patches to match the world's settings (Settings): at world load, when the
-  // settings change, and back off in the main menu. Most patches are simply on or off (Toggle, declared below in the
+  // Switches Better Continents' Harmony patches, and the size its maps span (UpdateGeometry), to match the world's
+  // settings (Settings): at world load, when the settings change, and back off in the main menu. Most patches are simply on or off (Toggle, declared below in the
   // order they are switched); biome precision, the base height version and the world size are more than that.
   public static void DynamicPatch()
   {
+    UpdateGeometry();
     PatchHeightmap();
     PatchBiomeColor();
     PatchGetBaseHeight();

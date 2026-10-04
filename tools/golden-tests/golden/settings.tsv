@@ -6,7 +6,7 @@ all/build-log/003	[Log] [BetterContinents] No spawns are mapped to color #ABCDEF
 all/build-log/004	[Log] [BetterContinents] Alt-biome legend altbiomemap.txt: 4 colours, 1 points.
 all/build-log/005	[Log] [BetterContinents] Alt-biome map fx/all/altbiomemap.png: 96x96, 7376 planted pixels, decoded in <n> ms.
 all/build-log/count	5
-all/dump/001	Version 0
+all/dump/001	Version 12
 all/dump/002	Continent size 0.29999998
 all/dump/003	Mountains amount 0
 all/dump/004	Sea level adjustment 0.6
@@ -16,51 +16,52 @@ all/dump/007	Deep North gap enabled True
 all/dump/008	Rivers enabled False
 all/dump/009	World size 12000
 all/dump/010	Edge size 600
-all/dump/011	Fix water color False
-all/dump/012	Map edge dropoff False
-all/dump/013	Mountains allowed at center True
-all/dump/014	Heightmap file (96) fx/all/heightmap.png
-all/dump/015	Heightmap amount 1.7, blend 0.8, add 0.1, mask 0.2
-all/dump/016	Flatmap disabled
-all/dump/017	Roughmap file (96) fx/all/roughmap.png
-all/dump/018	Roughmap blend 0.7
-all/dump/019	Biomemap file (96) fx/all/biomemap.png
-all/dump/020	Biome precision 3: the ground follows the biomes on 4 x 4 cells per 64 m terrain zone (16 m)
-all/dump/021	Terrainmap file (96) fx/all/terrainmap.png
-all/dump/022	Terrain map colors Meadows: 00FF00|Ocean: 0000FF|Mountain: FFFFFF|FF8800FF: 123456|Default: 000000
-all/dump/023	Forest scale 0.70000005
-all/dump/024	Forest amount 0.4
-all/dump/025	Forestmap file (96) fx/all/forestmap.png
-all/dump/026	Forestmap multiply 0.5, add 0.25
-all/dump/027	Forest Factor overrides all trees
-all/dump/028	Location file (96) fx/all/locationmap.png
-all/dump/029	Locationmap includes spawns for 5 types
-all/dump/030	StartPosition 123.5, -456.25
-all/dump/031	Paintmap file (96) fx/all/paintmap.png
-all/dump/032	Paintmap colors 80808080: FF0000|FF000000: 102030
-all/dump/033	Lavamap file (96) fx/all/lavamap.png
-all/dump/034	Mossmap file (96) fx/all/mossmap.png
-all/dump/035	Vegetationmap file (96) fx/all/vegetationmap.png
-all/dump/036	Heatmap file fx/all/heatmap.png
-all/dump/037	Heatmap size 96x96
-all/dump/038	Heatmap scale 7.5
-all/dump/039	Spawnmap file (96) fx/all/spawnmap.png
-all/dump/040	Altbiomemap file (96) fx/all/altbiomemap.png
-all/dump/041	    #6A8CA0: Wolf Mountain
-all/dump/042	    #3C5A28: Dark Meadows + Lantern
-all/dump/043	    #A05A3C: !Drake Mountain
-all/dump/044	    #101010: none
-all/dump/045	    point at 100, -200: Wolf Mountain
-all/dump/046	Alt biomes: mode PlantedOnly, grid Vanilla, placement seed 1099313834
-all/dump/047	Alt biomes: chance x1.5, amount x2, region size x3, distance x0.5
-all/dump/048	Alt biomes: neighbour fix on, mean sector height on, min sector thickness 2
-all/dump/049	Alt biome overrides: *Mistlands: chance=0.3, min=2; Wolf Mountain: enabled=false
-all/dump/count	49
+all/dump/011	The maps span World Size and Edge Size: 25200 m across
+all/dump/012	Fix water color False
+all/dump/013	Map edge dropoff False
+all/dump/014	Mountains allowed at center True
+all/dump/015	Heightmap file (96) fx/all/heightmap.png
+all/dump/016	Heightmap amount 1.7, blend 0.8, add 0.1, mask 0.2
+all/dump/017	Base height noise stack:
+all/dump/018	Roughmap file (96) fx/all/roughmap.png
+all/dump/019	Roughmap blend 0.7
+all/dump/020	Biomemap file (96) fx/all/biomemap.png
+all/dump/021	Biome precision 3: the ground follows the biomes on 4 x 4 cells per 64 m terrain zone (16 m)
+all/dump/022	Terrainmap file (96) fx/all/terrainmap.png
+all/dump/023	Terrain map colors Meadows: 00FF00|Ocean: 0000FF|Mountain: FFFFFF|FF8800FF: 123456|Default: 000000
+all/dump/024	Forest scale 0.70000005
+all/dump/025	Forest amount 0.4
+all/dump/026	Forestmap file (96) fx/all/forestmap.png
+all/dump/027	Forestmap multiply 0.5, add 0.25
+all/dump/028	Forest Factor overrides all trees
+all/dump/029	Location file (96) fx/all/locationmap.png
+all/dump/030	Locationmap includes spawns for 5 types
+all/dump/031	StartPosition 123.5, -456.25
+all/dump/032	Paintmap file (96) fx/all/paintmap.png
+all/dump/033	Paintmap colors 80808080: FF0000|FF000000: 102030
+all/dump/034	Lavamap file (96) fx/all/lavamap.png
+all/dump/035	Mossmap file (96) fx/all/mossmap.png
+all/dump/036	Vegetationmap file (96) fx/all/vegetationmap.png
+all/dump/037	Heatmap file fx/all/heatmap.png
+all/dump/038	Heatmap size 96x96
+all/dump/039	Heatmap scale 7.5
+all/dump/040	Spawnmap file (96) fx/all/spawnmap.png
+all/dump/041	Altbiomemap file (96) fx/all/altbiomemap.png
+all/dump/042	    #6A8CA0: Wolf Mountain
+all/dump/043	    #3C5A28: Dark Meadows + Lantern
+all/dump/044	    #A05A3C: !Drake Mountain
+all/dump/045	    #101010: none
+all/dump/046	    point at 100, -200: Wolf Mountain
+all/dump/047	Alt biomes: mode PlantedOnly, grid Vanilla, placement seed 1099313834
+all/dump/048	Alt biomes: chance x1.5, amount x2, region size x3, distance x0.5
+all/dump/049	Alt biomes: neighbour fix on, mean sector height on, min sector thickness 2
+all/dump/050	Alt biome overrides: *Mistlands: chance=0.3, min=2; Wolf Mountain: enabled=false
+all/dump/count	50
 all/loaded-maps	heightmap.png, biomemap.png, terrainmap.png, locationmap.png, roughmap.png, forestmap.png, heatmap.png, paintmap.png, lavamap.png, mossmap.png, vegetationmap.png, spawnmap.png, altbiomemap.png
 all/v11/disk	len=52342 sha=1b264c5c6b0090589b0311fb
 all/v11/network	len=52018 sha=e3d338082868c6c45834877f
 all/v11/network-no-alt	len=50669 sha=475d606cc55b1fe804686e8f
-all/v11/config-version	len=52342 sha=1b264c5c6b0090589b0311fb
+all/v11/config-version	len=52342 sha=eb87c9a0276947075c329de7
 all/cache-id	c9bc481288b0429db87a14fe6354343b
 all/v11/disk-roundtrip	same
 all/v11/network-roundtrip	same
@@ -101,7 +102,7 @@ all-defaults/build-log/003	[Log] [BetterContinents] No spawns are mapped to colo
 all-defaults/build-log/004	[Log] [BetterContinents] Alt-biome legend altbiomemap.txt: 4 colours, 1 points.
 all-defaults/build-log/005	[Log] [BetterContinents] Alt-biome map fx/all/altbiomemap.png: 96x96, 7376 planted pixels, decoded in <n> ms.
 all-defaults/build-log/count	5
-all-defaults/dump/001	Version 0
+all-defaults/dump/001	Version 12
 all-defaults/dump/002	Continent size 0.50000006
 all-defaults/dump/003	Mountains amount 0
 all-defaults/dump/004	Sea level adjustment 0.5
@@ -115,7 +116,7 @@ all-defaults/dump/011	Mountains allowed at center False
 all-defaults/dump/012	Heightmap file (96) fx/all/heightmap.png
 all-defaults/dump/013	Heightmap amount 1, blend 1, add 0, mask 0
 all-defaults/dump/014	Heightmap overrides ALL
-all-defaults/dump/015	Flatmap disabled
+all-defaults/dump/015	Base height noise stack:
 all-defaults/dump/016	Roughmap file (96) fx/all/roughmap.png
 all-defaults/dump/017	Roughmap blend 1
 all-defaults/dump/018	Biomemap file (96) fx/all/biomemap.png
@@ -152,7 +153,7 @@ all-defaults/loaded-maps	heightmap.png, biomemap.png, terrainmap.png, locationma
 all-defaults/v11/disk	len=52091 sha=cd0045384799092e208ad812
 all-defaults/v11/network	len=51767 sha=99e6c6a95a501709a68b932b
 all-defaults/v11/network-no-alt	len=50513 sha=0bb7157d792cb306920f8a03
-all-defaults/v11/config-version	len=52091 sha=cd0045384799092e208ad812
+all-defaults/v11/config-version	len=52091 sha=9b17b0eb69e03b3b7bc6b4d2
 all-defaults/cache-id	e072a453d701951f5194141a2512eee5
 all-defaults/v11/disk-roundtrip	same
 all-defaults/v11/network-roundtrip	same
@@ -188,7 +189,7 @@ all-defaults/v10/disk	len=23205 sha=70dd0ae7f1891d690199fa16
 all-defaults/v10/network	len=23092 sha=1a8efe70cf3de27283b22d24
 all-defaults/v10/dump-after-load	n=36 sha=f42c60aac75b7ef089f34b26
 heightonly/build-log/count	0
-heightonly/dump/001	Version 0
+heightonly/dump/001	Version 12
 heightonly/dump/002	Continent size 0.50000006
 heightonly/dump/003	Mountains amount 0
 heightonly/dump/004	Sea level adjustment 0.5
@@ -202,7 +203,7 @@ heightonly/dump/011	Mountains allowed at center False
 heightonly/dump/012	Heightmap file (96) fx/heightonly/heightmap.png
 heightonly/dump/013	Heightmap amount 1, blend 1, add 0, mask 0
 heightonly/dump/014	Heightmap overrides ALL
-heightonly/dump/015	Flatmap disabled
+heightonly/dump/015	Base height noise stack:
 heightonly/dump/016	Roughmap disabled
 heightonly/dump/017	Biomemap disabled
 heightonly/dump/018	Biome precision 0: the ground takes its biomes from the 4 corners of each 64 m terrain zone (vanilla)
@@ -226,7 +227,7 @@ heightonly/loaded-maps	heightmap.png
 heightonly/v11/disk	len=13383 sha=c3dc7f691f25961a020f7cc8
 heightonly/v11/network	len=13351 sha=f9284b15286966c7e4694380
 heightonly/v11/network-no-alt	len=13351 sha=f9284b15286966c7e4694380
-heightonly/v11/config-version	len=13383 sha=c3dc7f691f25961a020f7cc8
+heightonly/v11/config-version	len=13383 sha=e14265395f1a48dc3143321d
 heightonly/cache-id	4d6594a795a76407c6ec55a3d92e8693
 heightonly/v11/disk-roundtrip	same
 heightonly/v11/network-roundtrip	same
@@ -262,7 +263,7 @@ heightonly/v10/disk	len=13454 sha=9086def102f857d92f411c19
 heightonly/v10/network	len=13428 sha=1489ad691f27db6d62df899a
 heightonly/v10/dump-after-load	n=31 sha=652c4f5fbf4c11de42f58262
 alpha/build-log/count	0
-alpha/dump/001	Version 0
+alpha/dump/001	Version 12
 alpha/dump/002	Continent size 0.50000006
 alpha/dump/003	Mountains amount 0
 alpha/dump/004	Sea level adjustment 0.5
@@ -275,7 +276,7 @@ alpha/dump/010	Map edge dropoff True
 alpha/dump/011	Mountains allowed at center False
 alpha/dump/012	Heightmap file (96) fx/alpha/heightmap.png
 alpha/dump/013	Heightmap amount 1, blend 1, add 0, mask 0
-alpha/dump/014	Flatmap disabled
+alpha/dump/014	Base height noise stack:
 alpha/dump/015	Roughmap disabled
 alpha/dump/016	Biomemap disabled
 alpha/dump/017	Biome precision 0: the ground takes its biomes from the 4 corners of each 64 m terrain zone (vanilla)
@@ -299,7 +300,7 @@ alpha/loaded-maps	heightmap.png
 alpha/v11/disk	len=16645 sha=70f85b182cb839bf1d0df11a
 alpha/v11/network	len=16618 sha=325adbcc790b405c84235cd4
 alpha/v11/network-no-alt	len=16618 sha=325adbcc790b405c84235cd4
-alpha/v11/config-version	len=16645 sha=70f85b182cb839bf1d0df11a
+alpha/v11/config-version	len=16645 sha=86efd880ce979e084d00a959
 alpha/cache-id	402316138b97b46d1911d0a8e82949ac
 alpha/v11/disk-roundtrip	same
 alpha/v11/network-roundtrip	same
@@ -337,7 +338,7 @@ alpha/v10/dump-after-load	n=30 sha=95f9cacd16128f4f4fe29614
 files/build-log/001	[Error] [BetterContinents] fx/files/biomes.txt: invalid biome name DeadWastes, skipped: its colour reads as None. The biomes are None, Meadows, Swamp, Mountain, BlackForest, Plains, AshLands, DeepNorth, Ocean, Mistlands; the biomes Expand World Data adds need Expand World Data installed.
 files/build-log/002	[Log] [BetterContinents] Biome map (96 x 96): Meadows 13.45%, Swamp 1.02%, Mountain 3.33%, BlackForest 12.43%, Plains 13.68%, AshLands 1.77%, DeepNorth 1.81%, Ocean 38.54%, Mistlands 12.93%, None 1.02%
 files/build-log/count	2
-files/dump/001	Version 0
+files/dump/001	Version 12
 files/dump/002	Continent size 0.50000006
 files/dump/003	Mountains amount 0
 files/dump/004	Sea level adjustment 0.5
@@ -351,7 +352,7 @@ files/dump/011	Mountains allowed at center False
 files/dump/012	Heightmap file (96) fx/files/h.png
 files/dump/013	Heightmap amount 2, blend 1, add 0, mask 0
 files/dump/014	Heightmap overrides ALL
-files/dump/015	Flatmap disabled
+files/dump/015	Base height noise stack:
 files/dump/016	Roughmap disabled
 files/dump/017	Biomemap file (96) fx/files/biomes.png
 files/dump/018	Biome precision 0: the ground takes its biomes from the 4 corners of each 64 m terrain zone (vanilla)
@@ -377,7 +378,7 @@ files/loaded-maps	heightmap.png, biomemap.png, forestmap.png
 files/v11/disk	len=22876 sha=91aa771c37a4408c9997d393
 files/v11/network	len=22809 sha=d2fcc65ad8db05a5f620a46e
 files/v11/network-no-alt	len=22809 sha=d2fcc65ad8db05a5f620a46e
-files/v11/config-version	len=22876 sha=91aa771c37a4408c9997d393
+files/v11/config-version	len=22876 sha=15d1aa2aa79c0b2166a5be05
 files/cache-id	783b1fb929da2919f074faa62c9edd3e
 files/v11/disk-roundtrip	same
 files/v11/network-roundtrip	same
@@ -413,7 +414,7 @@ files/v10/disk	len=15065 sha=199e355d60a11038759c6deb
 files/v10/network	len=15016 sha=473c6acdae95f1c19a98663e
 files/v10/dump-after-load	n=33 sha=ce8c7afe6d700ab8cb0c2dc2
 scalars/build-log/count	0
-scalars/dump/001	Version 0
+scalars/dump/001	Version 12
 scalars/dump/002	Continent size 0.90000004
 scalars/dump/003	Mountains amount 0
 scalars/dump/004	Sea level adjustment 0.099999994
@@ -423,35 +424,36 @@ scalars/dump/007	Deep North gap enabled False
 scalars/dump/008	Rivers enabled False
 scalars/dump/009	World size 8000
 scalars/dump/010	Edge size 250
-scalars/dump/011	Fix water color True
-scalars/dump/012	Map edge dropoff False
-scalars/dump/013	Mountains allowed at center False
-scalars/dump/014	Heightmap disabled
-scalars/dump/015	Flatmap disabled
-scalars/dump/016	Roughmap disabled
-scalars/dump/017	Biomemap disabled
-scalars/dump/018	Biome precision 5: the ground follows the biomes on 6 x 6 cells per 64 m terrain zone (10.7 m)
-scalars/dump/019	Terrainmap disabled
-scalars/dump/020	Forest scale 2.5000002
-scalars/dump/021	Forest amount 0.9
-scalars/dump/022	Forestmap disabled
-scalars/dump/023	Locationmap disabled
-scalars/dump/024	Paintmap disabled
-scalars/dump/025	Lavamap disabled
-scalars/dump/026	Mossmap disabled
-scalars/dump/027	Vegetationmap disabled
-scalars/dump/028	Heatmap disabled
-scalars/dump/029	Spawnmap disabled
-scalars/dump/030	Altbiomemap disabled
-scalars/dump/031	Alt biomes: mode Random, grid WorldEdge, placement seed world seed
-scalars/dump/032	Alt biomes: chance x1, amount x1, region size x1, distance x1
-scalars/dump/033	Alt biomes: neighbour fix off, mean sector height off, min sector thickness 0
-scalars/dump/count	33
+scalars/dump/011	The maps span World Size and Edge Size: 16500 m across
+scalars/dump/012	Fix water color True
+scalars/dump/013	Map edge dropoff False
+scalars/dump/014	Mountains allowed at center False
+scalars/dump/015	Heightmap disabled
+scalars/dump/016	Base height noise stack:
+scalars/dump/017	Roughmap disabled
+scalars/dump/018	Biomemap disabled
+scalars/dump/019	Biome precision 5: the ground follows the biomes on 6 x 6 cells per 64 m terrain zone (10.7 m)
+scalars/dump/020	Terrainmap disabled
+scalars/dump/021	Forest scale 2.5000002
+scalars/dump/022	Forest amount 0.9
+scalars/dump/023	Forestmap disabled
+scalars/dump/024	Locationmap disabled
+scalars/dump/025	Paintmap disabled
+scalars/dump/026	Lavamap disabled
+scalars/dump/027	Mossmap disabled
+scalars/dump/028	Vegetationmap disabled
+scalars/dump/029	Heatmap disabled
+scalars/dump/030	Spawnmap disabled
+scalars/dump/031	Altbiomemap disabled
+scalars/dump/032	Alt biomes: mode Random, grid WorldEdge, placement seed world seed
+scalars/dump/033	Alt biomes: chance x1, amount x1, region size x1, distance x1
+scalars/dump/034	Alt biomes: neighbour fix off, mean sector height off, min sector thickness 0
+scalars/dump/count	34
 scalars/loaded-maps	
 scalars/v11/disk	len=117 sha=fe8d70ab6dc604b8c6b3dbc1
 scalars/v11/network	len=117 sha=fe8d70ab6dc604b8c6b3dbc1
 scalars/v11/network-no-alt	len=72 sha=031e3f499093e7913651f3a3
-scalars/v11/config-version	len=117 sha=fe8d70ab6dc604b8c6b3dbc1
+scalars/v11/config-version	len=117 sha=85ff7dee78a954157a7d7764
 scalars/cache-id	5eed445dfcae461fa6739de535823bd1
 scalars/v11/disk-roundtrip	same
 scalars/v11/network-roundtrip	same
@@ -488,7 +490,7 @@ scalars/v10/network	len=88 sha=b00eee2a946fd1bf25faa4f1
 scalars/v10/dump-after-load	n=29 sha=2c5bc10670e3aedbd16157d6
 legacy-spawnmap/build-log/001	[Warning] [BetterContinents] Cannot find image fx/legacy/locationmap.png: Image was not reloaded.
 legacy-spawnmap/build-log/count	1
-legacy-spawnmap/dump/001	Version 0
+legacy-spawnmap/dump/001	Version 12
 legacy-spawnmap/dump/002	Continent size 0.50000006
 legacy-spawnmap/dump/003	Mountains amount 0
 legacy-spawnmap/dump/004	Sea level adjustment 0.5
@@ -500,7 +502,7 @@ legacy-spawnmap/dump/009	Fix water color True
 legacy-spawnmap/dump/010	Map edge dropoff True
 legacy-spawnmap/dump/011	Mountains allowed at center False
 legacy-spawnmap/dump/012	Heightmap disabled
-legacy-spawnmap/dump/013	Flatmap disabled
+legacy-spawnmap/dump/013	Base height noise stack:
 legacy-spawnmap/dump/014	Roughmap disabled
 legacy-spawnmap/dump/015	Biomemap disabled
 legacy-spawnmap/dump/016	Biome precision 0: the ground takes its biomes from the 4 corners of each 64 m terrain zone (vanilla)
@@ -524,7 +526,7 @@ legacy-spawnmap/loaded-maps
 legacy-spawnmap/v11/disk	len=20 sha=a60f8a74e91d5a40a8a58e53
 legacy-spawnmap/v11/network	len=20 sha=a60f8a74e91d5a40a8a58e53
 legacy-spawnmap/v11/network-no-alt	len=20 sha=a60f8a74e91d5a40a8a58e53
-legacy-spawnmap/v11/config-version	len=20 sha=a60f8a74e91d5a40a8a58e53
+legacy-spawnmap/v11/config-version	len=20 sha=fb33cb04ab2a5365dfbc6124
 legacy-spawnmap/cache-id	d8f0541acef57f0de2422d34a053ede0
 legacy-spawnmap/v11/disk-roundtrip	same
 legacy-spawnmap/v11/network-roundtrip	same
@@ -565,7 +567,7 @@ legacy-flat/build-log/003	[Log] [BetterContinents] No spawns are mapped to color
 legacy-flat/build-log/004	[Log] [BetterContinents] Alt-biome legend altbiomemap.txt: 4 colours, 1 points.
 legacy-flat/build-log/005	[Log] [BetterContinents] Alt-biome map fx/all/altbiomemap.png: 96x96, 7376 planted pixels, decoded in <n> ms.
 legacy-flat/build-log/count	5
-legacy-flat/dump/001	Version 0
+legacy-flat/dump/001	Version 12
 legacy-flat/dump/002	Continent size 0.50000006
 legacy-flat/dump/003	Mountains amount 0
 legacy-flat/dump/004	Sea level adjustment 0.5
@@ -578,45 +580,44 @@ legacy-flat/dump/010	Map edge dropoff True
 legacy-flat/dump/011	Mountains allowed at center False
 legacy-flat/dump/012	Heightmap file (96) fx/all/heightmap.png
 legacy-flat/dump/013	Heightmap amount 1, blend 1, add 0, mask 0
-legacy-flat/dump/014	Flatmap file fx/all/forestmap.png
-legacy-flat/dump/015	Flatmap size 96x96, blend 0.6
-legacy-flat/dump/016	Roughmap file (96) fx/all/roughmap.png
-legacy-flat/dump/017	Roughmap blend 1
-legacy-flat/dump/018	Biomemap file (96) fx/all/biomemap.png
-legacy-flat/dump/019	Biome precision 0: the ground takes its biomes from the 4 corners of each 64 m terrain zone (vanilla)
-legacy-flat/dump/020	Terrainmap file (96) fx/all/terrainmap.png
-legacy-flat/dump/021	Terrain map colors Meadows: 00FF00|Ocean: 0000FF|Mountain: FFFFFF|FF8800FF: 123456|Default: 000000
-legacy-flat/dump/022	Forest scale 1
-legacy-flat/dump/023	Forest amount 0.5
-legacy-flat/dump/024	Forestmap file (96) fx/all/forestmap.png
-legacy-flat/dump/025	Forestmap multiply 1, add 1
-legacy-flat/dump/026	Forest Factor applies only to the same trees as vanilla
-legacy-flat/dump/027	Location file (96) fx/all/locationmap.png
-legacy-flat/dump/028	Locationmap includes spawns for 5 types
-legacy-flat/dump/029	Paintmap file (96) fx/all/paintmap.png
-legacy-flat/dump/030	Paintmap colors 80808080: FF0000|FF000000: 102030
-legacy-flat/dump/031	Lavamap file (96) fx/all/lavamap.png
-legacy-flat/dump/032	Mossmap file (96) fx/all/mossmap.png
-legacy-flat/dump/033	Vegetationmap file (96) fx/all/vegetationmap.png
-legacy-flat/dump/034	Heatmap file fx/all/heatmap.png
-legacy-flat/dump/035	Heatmap size 96x96
-legacy-flat/dump/036	Heatmap scale 10
-legacy-flat/dump/037	Spawnmap file (96) fx/all/spawnmap.png
-legacy-flat/dump/038	Altbiomemap file (96) fx/all/altbiomemap.png
-legacy-flat/dump/039	    #6A8CA0: Wolf Mountain
-legacy-flat/dump/040	    #3C5A28: Dark Meadows + Lantern
-legacy-flat/dump/041	    #A05A3C: !Drake Mountain
-legacy-flat/dump/042	    #101010: none
-legacy-flat/dump/043	    point at 100, -200: Wolf Mountain
-legacy-flat/dump/044	Alt biomes: mode Random, grid WorldEdge, placement seed world seed
-legacy-flat/dump/045	Alt biomes: chance x1, amount x1, region size x1, distance x1
-legacy-flat/dump/046	Alt biomes: neighbour fix off, mean sector height off, min sector thickness 0
-legacy-flat/dump/count	46
+legacy-flat/dump/014	Base height noise stack:
+legacy-flat/dump/015	Roughmap file (96) fx/all/roughmap.png
+legacy-flat/dump/016	Roughmap blend 1
+legacy-flat/dump/017	Biomemap file (96) fx/all/biomemap.png
+legacy-flat/dump/018	Biome precision 0: the ground takes its biomes from the 4 corners of each 64 m terrain zone (vanilla)
+legacy-flat/dump/019	Terrainmap file (96) fx/all/terrainmap.png
+legacy-flat/dump/020	Terrain map colors Meadows: 00FF00|Ocean: 0000FF|Mountain: FFFFFF|FF8800FF: 123456|Default: 000000
+legacy-flat/dump/021	Forest scale 1
+legacy-flat/dump/022	Forest amount 0.5
+legacy-flat/dump/023	Forestmap file (96) fx/all/forestmap.png
+legacy-flat/dump/024	Forestmap multiply 1, add 1
+legacy-flat/dump/025	Forest Factor applies only to the same trees as vanilla
+legacy-flat/dump/026	Location file (96) fx/all/locationmap.png
+legacy-flat/dump/027	Locationmap includes spawns for 5 types
+legacy-flat/dump/028	Paintmap file (96) fx/all/paintmap.png
+legacy-flat/dump/029	Paintmap colors 80808080: FF0000|FF000000: 102030
+legacy-flat/dump/030	Lavamap file (96) fx/all/lavamap.png
+legacy-flat/dump/031	Mossmap file (96) fx/all/mossmap.png
+legacy-flat/dump/032	Vegetationmap file (96) fx/all/vegetationmap.png
+legacy-flat/dump/033	Heatmap file fx/all/heatmap.png
+legacy-flat/dump/034	Heatmap size 96x96
+legacy-flat/dump/035	Heatmap scale 10
+legacy-flat/dump/036	Spawnmap file (96) fx/all/spawnmap.png
+legacy-flat/dump/037	Altbiomemap file (96) fx/all/altbiomemap.png
+legacy-flat/dump/038	    #6A8CA0: Wolf Mountain
+legacy-flat/dump/039	    #3C5A28: Dark Meadows + Lantern
+legacy-flat/dump/040	    #A05A3C: !Drake Mountain
+legacy-flat/dump/041	    #101010: none
+legacy-flat/dump/042	    point at 100, -200: Wolf Mountain
+legacy-flat/dump/043	Alt biomes: mode Random, grid WorldEdge, placement seed world seed
+legacy-flat/dump/044	Alt biomes: chance x1, amount x1, region size x1, distance x1
+legacy-flat/dump/045	Alt biomes: neighbour fix off, mean sector height off, min sector thickness 0
+legacy-flat/dump/count	45
 legacy-flat/loaded-maps	heightmap.png, biomemap.png, terrainmap.png, locationmap.png, roughmap.png, flatmap.png, forestmap.png, heatmap.png, paintmap.png, lavamap.png, mossmap.png, vegetationmap.png, spawnmap.png, altbiomemap.png
 legacy-flat/v11/disk	len=59502 sha=8beff0885ad87b0e0a1eea9b
 legacy-flat/v11/network	len=59153 sha=adc2a679ffe6d04d39022145
 legacy-flat/v11/network-no-alt	len=57899 sha=3e0e55489d00c99dd3b26570
-legacy-flat/v11/config-version	len=59502 sha=8beff0885ad87b0e0a1eea9b
+legacy-flat/v11/config-version	len=59502 sha=bf46a2aa5dff2d5d9b83f0a6
 legacy-flat/cache-id	4c4d753e5c3e9dea4fe01489a9232c12
 legacy-flat/v11/disk-roundtrip	same
 legacy-flat/v11/network-roundtrip	same

@@ -132,9 +132,9 @@ internal static class SettingsSchema
   { Get = s => s.SkipDefaultLocations, Set = (s, v) => s.SkipDefaultLocations = v, ConsoleGroup = "g", ConsoleName = "skipdefaultlocations", ConsoleLabel = "Skip default locations" };
   public static readonly SettingDef<float> ContinentSize = new("Continent Size", "Continent size", SettingScope.World, 0.5f, e => ConfigContinentSize = e)
   { Range = R(0f, 1f), Get = s => s.ContinentSize, Set = (s, v) => s.ContinentSize = v, ConsoleGroup = "g", ConsoleName = "cs", ConsoleLabel = "Continent size adjustment" };
-  public static readonly SettingDef<float> WorldSize = new("World Size", "The world's radius in metres (vanilla 10000)", SettingScope.World, 10000f, e => ConfigWorldSize = e)
+  public static readonly SettingDef<float> WorldSize = new("World Size", "The world's radius in metres (vanilla 10000). A new world's maps span World Size + Edge Size; a world made by an older Better Continents keeps them at vanilla's 21000 m, and World Size only moves its edge. Expand World Size, when installed, sets the size the maps span.", SettingScope.World, 10000f, e => ConfigWorldSize = e)
   { ConsoleRange = (0f, 1000000f), Get = s => s.WorldSize, Set = (s, v) => s.WorldSize = v, ConsoleGroup = "g", ConsoleName = "worldsize", ConsoleLabel = "World size" };
-  public static readonly SettingDef<float> EdgeSize = new("Edge Size", "How far the world's edge reaches past World Size, in metres (vanilla 500)", SettingScope.World, 500f, e => ConfigEdgeSize = e)
+  public static readonly SettingDef<float> EdgeSize = new("Edge Size", "How far the world's edge reaches past World Size, in metres (vanilla 500). On a new world the land drops away over it.", SettingScope.World, 500f, e => ConfigEdgeSize = e)
   { ConsoleRange = (0f, 1000000f), Get = s => s.EdgeSize, Set = (s, v) => s.EdgeSize = v, ConsoleGroup = "g", ConsoleName = "edgesize", ConsoleLabel = "Edge size" };
   public static readonly SettingDef<float> SeaLevel = new("Sea Level Adjustment", "Modify sea level, which changes the land:sea ratio", SettingScope.World, 0.5f, e => ConfigSeaLevelAdjustment = e)
   { Range = R(0f, 1f), Get = s => s.SeaLevel, Set = (s, v) => s.SeaLevel = v, ConsoleGroup = "g", ConsoleName = "sl", ConsoleLabel = "Sea level adjustment" };

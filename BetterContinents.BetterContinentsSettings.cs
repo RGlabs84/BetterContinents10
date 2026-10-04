@@ -126,7 +126,7 @@ public partial class BetterContinents
     // memory an import holds; such settings are only good for Save.
     internal static BetterContinentsSettings CreateForImport(ConfigValues values, bool lean)
     {
-      var settings = new BetterContinentsSettings { EnabledForThisWorld = true };
+      var settings = new BetterContinentsSettings { EnabledForThisWorld = true, Version = NewWorldVersion(values, overridable: false) };
       settings.ReadConfig(values, lean);
       return settings;
     }
@@ -168,7 +168,11 @@ public partial class BetterContinents
 
       // A Directory that holds an export.cfg (a world export) brings the settings its maps were encoded for.
       if (EnabledForThisWorld)
-        ReadConfig(WorldImport.DirectoryValues() ?? ConfigValues.Live, false);
+      {
+        var values = WorldImport.DirectoryValues() ?? ConfigValues.Live;
+        Version = NewWorldVersion(values, overridable: true);
+        ReadConfig(values, false);
+      }
       DynamicPatch();
     }
 
@@ -321,6 +325,8 @@ public partial class BetterContinents
           output($"World size {WorldSize}");
         if (EdgeSize != 500f)
           output($"Edge size {EdgeSize}");
+        if (MapsSpanWorldSize && OwnGeometry is { IsVanilla: false } own)
+          output($"The maps span World Size and Edge Size: {own.TotalSize} m across");
         output($"Fix water color {FixWaterColor}");
 
         output($"Map edge dropoff {MapEdgeDropoff}");
@@ -470,12 +476,12 @@ public partial class BetterContinents
 
     public void Save(string path) => Save(path, false);
 
-    // currentFormat: the newest settings format whatever Override version says (a preset is only a container; the
-    // world made from it is saved in the configured format anyway).
+    // currentFormat: the settings' own version (SavedVersion) whatever Override version says (a preset is only a
+    // container; the world made from it is saved in the configured format anyway).
     internal void Save(string path, bool currentFormat)
     {
       var zpackage = new ZPackage();
-      Serialize(zpackage, false, true, currentFormat ? MaxVersion : null);
+      Serialize(zpackage, false, true, currentFormat ? SavedVersion : null);
 
       byte[] binaryData = zpackage.GetArray();
       Directory.CreateDirectory(Path.GetDirectoryName(path));
