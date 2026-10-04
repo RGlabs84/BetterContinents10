@@ -1022,6 +1022,11 @@ public static class WorldExport
     // One file row of the terrain. With the zone blend this is HeightmapBuilder.Build's non-LOD path evaluated at the
     // pixel: the zone's four corner biomes, each corner's height formula at the point, blended with a smoothstep across
     // the zone (the same DUtils calls, so equal inputs give bit-equal heights), and the terrain masks blended the same way.
+    // Ashlands or Mistlands ground: the biome's own, or the one whose ground an Expand World Data biome has (its `terrain`).
+    // The lava and moss maps apply there when the world is rebuilt (ApplyPaintMap reads the biome GetBiomeHeight passes on).
+    private static bool AshlandsGround(Heightmap.Biome b) => b == Heightmap.Biome.AshLands || EWD.Terrain(b) == Heightmap.Biome.AshLands;
+    private static bool MistlandsGround(Heightmap.Biome b) => b == Heightmap.Biome.Mistlands || EWD.Terrain(b) == Heightmap.Biome.Mistlands;
+
     private void TerrainRow(int fileRow, Heightmap.Biome[]? corners, L16[]? heights, L8[]? lava, L8[]? moss, Rgb24[]? paint, TerrainRowStats[] stats)
     {
       int n = Size;
@@ -1048,8 +1053,8 @@ public static class WorldExport
           if (b01 == b00 && b10 == b00 && b11 == b00)
           {
             h = Wg.GetBiomeHeight(b00, wx, wz, out mask);
-            hasAsh = b00 == Heightmap.Biome.AshLands;
-            hasMist = b00 == Heightmap.Biome.Mistlands;
+            hasAsh = AshlandsGround(b00);
+            hasMist = MistlandsGround(b00);
             ashA = mistA = mask.a;
           }
           else
@@ -1072,22 +1077,22 @@ public static class WorldExport
             mask = Color.Lerp(Color.Lerp(m00, m10, tx), Color.Lerp(m01, m11, tx), tz);
             // Lava and moss maps replace the alpha of the Ashlands / Mistlands corners before the blend, so they hold
             // those corners' own alpha here.
-            if (b00 == Heightmap.Biome.AshLands) { hasAsh = true; ashA = m00.a; }
-            else if (b10 == Heightmap.Biome.AshLands) { hasAsh = true; ashA = m10.a; }
-            else if (b01 == Heightmap.Biome.AshLands) { hasAsh = true; ashA = m01.a; }
-            else if (b11 == Heightmap.Biome.AshLands) { hasAsh = true; ashA = m11.a; }
-            if (b00 == Heightmap.Biome.Mistlands) { hasMist = true; mistA = m00.a; }
-            else if (b10 == Heightmap.Biome.Mistlands) { hasMist = true; mistA = m10.a; }
-            else if (b01 == Heightmap.Biome.Mistlands) { hasMist = true; mistA = m01.a; }
-            else if (b11 == Heightmap.Biome.Mistlands) { hasMist = true; mistA = m11.a; }
+            if (AshlandsGround(b00)) { hasAsh = true; ashA = m00.a; }
+            else if (AshlandsGround(b10)) { hasAsh = true; ashA = m10.a; }
+            else if (AshlandsGround(b01)) { hasAsh = true; ashA = m01.a; }
+            else if (AshlandsGround(b11)) { hasAsh = true; ashA = m11.a; }
+            if (MistlandsGround(b00)) { hasMist = true; mistA = m00.a; }
+            else if (MistlandsGround(b10)) { hasMist = true; mistA = m10.a; }
+            else if (MistlandsGround(b01)) { hasMist = true; mistA = m01.a; }
+            else if (MistlandsGround(b11)) { hasMist = true; mistA = m11.a; }
           }
         }
         else
         {
           var biome = Wg.GetBiome(wx, wz);
           h = Wg.GetBiomeHeight(biome, wx, wz, out mask);
-          hasAsh = biome == Heightmap.Biome.AshLands;
-          hasMist = biome == Heightmap.Biome.Mistlands;
+          hasAsh = AshlandsGround(biome);
+          hasMist = MistlandsGround(biome);
           ashA = mistA = mask.a;
         }
 

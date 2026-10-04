@@ -83,16 +83,16 @@ public partial class BetterContinents
 
   private enum HookKind { Prefix, Postfix, Transpiler }
 
-  // One patch method on one game method. priority and after are the HarmonyMethod's, when it needs them.
+  // One patch method on one game method. priority, before and after are the HarmonyMethod's, when it needs them.
   private sealed class Hook(Func<MethodBase?> target, string targetDescription, Type patchType, string patchName, HookKind kind,
-      int priority = -1, string[]? after = null)
+      int priority = -1, string[]? after = null, string[]? before = null)
   {
     public readonly Func<MethodBase?> Target = target;
     public readonly string TargetDescription = targetDescription;
     public readonly HookKind Kind = kind;
     public MethodInfo Patch() => AccessTools.Method(patchType, patchName);
     public HarmonyMethod Method(MethodInfo patch) =>
-      priority == -1 && after == null ? new HarmonyMethod(patch) : new HarmonyMethod(patch, priority, after: after);
+      priority == -1 && after == null && before == null ? new HarmonyMethod(patch) : new HarmonyMethod(patch, priority, before: before, after: after);
   }
 
   private sealed class Toggle(string name, Func<BetterContinentsSettings, bool> wanted, params Hook[] hooks)
@@ -204,10 +204,11 @@ public partial class BetterContinents
       HarmonyInstance.Patch(target, prefix: prefix, postfix: postfix, transpiler: transpiler);
   }
 
-  private static Hook OnWorldGenerator(string method, Type[]? arguments, string patch, HookKind kind, int priority = -1, string[]? after = null) =>
+  private static Hook OnWorldGenerator(string method, Type[]? arguments, string patch, HookKind kind, int priority = -1, string[]? after = null,
+      string[]? before = null) =>
     new(() => arguments == null ? AccessTools.Method(typeof(WorldGenerator), method) : AccessTools.Method(typeof(WorldGenerator), method, arguments),
       "WorldGenerator." + method + (arguments == null ? "" : $"({string.Join(",", arguments.Select(a => a == typeof(float) ? "float" : a == typeof(bool) ? "bool" : a.Name))})"),
-      typeof(WorldGeneratorPatch), patch, kind, priority, after);
+      typeof(WorldGeneratorPatch), patch, kind, priority, after, before);
 
   // Heightmap.GetBiomeColor(float, float) has one prefix for both features that use it, the terrain map and biome
   // precision (GetBiomeColorPatch picks per vertex), so neither can unpatch the other.
@@ -218,28 +219,43 @@ public partial class BetterContinents
   { ViaProcessor = true };
   internal static void PatchBiomeColor() => BiomeColor.Update(Settings);
 
-  // WorldGenerator.GetBiomeHeight: five postfixes, chosen by whether the world paints the ground (a paint, lava, moss
-  // or vegetation map), whether its heightmap overrides everything, and whether it has a rough map.
+  // WorldGenerator.GetBiomeHeight: five postfixes on a world made before 0.10, chosen by whether the world paints the
+  // ground (a paint, lava, moss or vegetation map), whether its heightmap overrides everything, and whether it has a rough
+  // map. A newer one (HeightBeforeBiomeRules) has its heights from a postfix of their own, before Expand World Data's,
+  // whose altitude rules then apply over them, and its paint from one after Expand World Data's ground colours (painting
+  // once: an older world with a height or rough postfix paints twice, which paints the same).
   private static bool Paints(BetterContinentsSettings s) => s.HasPaintMap || s.HasLavaMap || s.HasMossMap || s.HasVegetationMap;
 
   // In the order DynamicPatch switches them, before and after the world size.
   private static readonly Toggle[] TogglesBeforeWorldSize =
   [
     new("WorldGenerator.GetBiomeHeight with rough",
-      s => s.EnabledForThisWorld && !Paints(s) && !s.ShouldHeightMapOverrideAll && s.HasRoughMap,
+      s => s.EnabledForThisWorld && !s.HeightBeforeBiomeRules && !Paints(s) && !s.ShouldHeightMapOverrideAll && s.HasRoughMap,
       OnWorldGenerator(nameof(WorldGenerator.GetBiomeHeight), null, nameof(WorldGeneratorPatch.GetBiomeHeightWithRough), HookKind.Postfix)),
     new("WorldGenerator.GetBiomeHeight with rough and paint",
-      s => s.EnabledForThisWorld && Paints(s) && !s.ShouldHeightMapOverrideAll && s.HasRoughMap,
+      s => s.EnabledForThisWorld && !s.HeightBeforeBiomeRules && Paints(s) && !s.ShouldHeightMapOverrideAll && s.HasRoughMap,
       OnWorldGenerator(nameof(WorldGenerator.GetBiomeHeight), null, nameof(WorldGeneratorPatch.GetBiomeHeightWithRoughPaint), HookKind.Postfix)),
     new("WorldGenerator.GetBiomeHeight with height",
-      s => s.EnabledForThisWorld && !Paints(s) && s.ShouldHeightMapOverrideAll,
+      s => s.EnabledForThisWorld && !s.HeightBeforeBiomeRules && !Paints(s) && s.ShouldHeightMapOverrideAll,
       OnWorldGenerator(nameof(WorldGenerator.GetBiomeHeight), null, nameof(WorldGeneratorPatch.GetBiomeHeightWithHeight), HookKind.Postfix)),
     new("WorldGenerator.GetBiomeHeight with height and paint",
-      s => s.EnabledForThisWorld && Paints(s) && s.ShouldHeightMapOverrideAll,
+      s => s.EnabledForThisWorld && !s.HeightBeforeBiomeRules && Paints(s) && s.ShouldHeightMapOverrideAll,
       OnWorldGenerator(nameof(WorldGenerator.GetBiomeHeight), null, nameof(WorldGeneratorPatch.GetBiomeHeightWithHeightPaint), HookKind.Postfix)),
+    new("WorldGenerator.GetBiomeHeight with rough, before Expand World Data",
+      s => s.EnabledForThisWorld && s.HeightBeforeBiomeRules && !s.ShouldHeightMapOverrideAll && s.HasRoughMap,
+      OnWorldGenerator(nameof(WorldGenerator.GetBiomeHeight), null, nameof(WorldGeneratorPatch.GetBiomeHeightBeforeEwdWithRough), HookKind.Postfix,
+        before: [EWD.GUID])),
+    new("WorldGenerator.GetBiomeHeight with height, before Expand World Data",
+      s => s.EnabledForThisWorld && s.HeightBeforeBiomeRules && s.ShouldHeightMapOverrideAll,
+      OnWorldGenerator(nameof(WorldGenerator.GetBiomeHeight), null, nameof(WorldGeneratorPatch.GetBiomeHeightBeforeEwdWithHeight), HookKind.Postfix,
+        before: [EWD.GUID])),
     new("WorldGenerator.GetBiomeHeight with paint",
-      s => s.EnabledForThisWorld && Paints(s),
+      s => s.EnabledForThisWorld && !s.HeightBeforeBiomeRules && Paints(s),
       OnWorldGenerator(nameof(WorldGenerator.GetBiomeHeight), null, nameof(WorldGeneratorPatch.GetBiomeHeightWithPaint), HookKind.Postfix)),
+    new("WorldGenerator.GetBiomeHeight with paint, after Expand World Data",
+      s => s.EnabledForThisWorld && s.HeightBeforeBiomeRules && Paints(s),
+      OnWorldGenerator(nameof(WorldGenerator.GetBiomeHeight), null, nameof(WorldGeneratorPatch.GetBiomeHeightAfterEwdWithPaint), HookKind.Postfix,
+        after: [EWD.GUID])),
     // After Expand World Data's prefix, which answers from its own world yaml and skips the original: every prefix runs
     // and the last to set the result wins, so the biome map overrides it wherever it has a biome, and a None pixel
     // leaves its answer.

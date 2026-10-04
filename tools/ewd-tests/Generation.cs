@@ -66,6 +66,8 @@ internal static class Generation
     Export();
     Section("terrain height of an added biome with Better Continents' height patches");
     Heights();
+    Section("Expand World Data's lava biomes on a biome map");
+    Lava();
   }
 
   // ---- the two DLLs, loaded from memory with a few call sites changed --------------------------------------------------
@@ -197,9 +199,10 @@ internal static class Generation
   }
 
   // What a loaded world's settings hold: the maps (their fields are private to Better Continents).
-  static BC.BetterContinentsSettings MakeSettings(bool enabled = true, object? biomeMap = null, object? heightMap = null, bool overrideAll = true, object? roughMap = null, object? paintMap = null)
+  static BC.BetterContinentsSettings MakeSettings(bool enabled = true, object? biomeMap = null, object? heightMap = null, bool overrideAll = true, object? roughMap = null, object? paintMap = null,
+    int version = 0)
   {
-    var s = new BC.BetterContinentsSettings { EnabledForThisWorld = enabled, HeightmapOverrideAll = overrideAll };
+    var s = new BC.BetterContinentsSettings { EnabledForThisWorld = enabled, HeightmapOverrideAll = overrideAll, Version = version };
     void Set(string field, object? value) => typeof(BC.BetterContinentsSettings).GetField(field, BindingFlags.NonPublic | BindingFlags.Instance)!.SetValue(s, value);
     Set("BiomeMap", biomeMap);
     Set("HeightMap", heightMap);
@@ -470,7 +473,22 @@ internal static class Generation
   // The names of Better Continents' postfixes on GetBiomeHeight, as the log says it patched them.
   static string BcHeightPatches() =>
     string.Join(" + ", Harmony.GetPatchInfo(GetBiomeHeightMethod).Postfixes.Where(p => p.owner == BC.HarmonyInstance.Id)
-      .Select(p => p.PatchMethod.Name.Replace("GetBiomeHeightWith", "")).OrderBy(n => n));
+      .Select(p => p.PatchMethod.Name.Replace("GetBiomeHeightBeforeEwdWith", "BeforeEwd ").Replace("GetBiomeHeightAfterEwdWith", "AfterEwd ")
+        .Replace("GetBiomeHeightWith", "")).OrderBy(n => n));
+
+  // The ground and its paint at the samples, for DeadWastes and Meadows.
+  static (float[] Heights, Color[] Masks) Ground(WorldGenerator wg)
+  {
+    var heights = new List<float>();
+    var masks = new List<Color>();
+    foreach (var (x, z) in Samples)
+      foreach (var biome in new[] { DeadWastes, Meadows })
+      {
+        heights.Add(wg.GetBiomeHeight(biome, x, z, out var mask));
+        masks.Add(mask);
+      }
+    return (heights.ToArray(), masks.ToArray());
+  }
 
   // Expand World Data's BiomeHeight (real, patched first as in the game: it registers in Awake) against Better Continents' own
   // GetBiomeHeight patches (registered by BetterContinents.DynamicPatch, later), in every combination of maps that changes which of
@@ -491,32 +509,67 @@ internal static class Generation
       ("a heightmap without Override All and a rough map", MakeSettings(biomeMap: biomes, heightMap: height, overrideAll: false, roughMap: rough), "Rough"),
       ("a heightmap without Override All, a rough map and a paint map", MakeSettings(biomeMap: biomes, heightMap: height, overrideAll: false, roughMap: rough, paintMap: paint), "Paint + RoughPaint"),
       ("a paint map only", MakeSettings(biomeMap: biomes, paintMap: paint), "Paint"),
+      // A world made since 0.10 (settings version 12): the maps' heights from void postfixes ordered before Expand World Data's,
+      // so its altitude rules apply over them; the paint from the paint postfix alone, after its ground colours.
+      ("a new world, a heightmap with Override All", MakeSettings(biomeMap: biomes, heightMap: height, version: 12), "BeforeEwd Height"),
+      ("a new world, a heightmap with Override All and a paint map", MakeSettings(biomeMap: biomes, heightMap: height, paintMap: paint, version: 12), "AfterEwd Paint + BeforeEwd Height"),
+      ("a new world, a heightmap without Override All and a rough map", MakeSettings(biomeMap: biomes, heightMap: height, overrideAll: false, roughMap: rough, version: 12), "BeforeEwd Rough"),
+      ("a new world, a heightmap without Override All, a rough map and a paint map", MakeSettings(biomeMap: biomes, heightMap: height, overrideAll: false, roughMap: rough, paintMap: paint, version: 12), "AfterEwd Paint + BeforeEwd Rough"),
+      ("a new world, a paint map only", MakeSettings(biomeMap: biomes, paintMap: paint, version: 12), "AfterEwd Paint"),
     ];
     var overrideAll = new List<(string Name, float Delta)>();
+    var fresh = new List<(string Name, float Delta)>();
+    var grounds = new Dictionary<string, (float[] Heights, Color[] Masks)>();
     foreach (var (name, settings, patches) in configs)
     {
       LogHandler.Clear();
       Load(settings);
       C(BcHeightPatches() == patches, $"{name}: Better Continents patches GetBiomeHeight with [{patches}] (got [{BcHeightPatches()}])");
+      grounds[name] = Ground(NewGenerator());
       var delta = HeightChecks(name, NewGenerator(), patches, settings.HasBiomeMap);
       if (patches.StartsWith("Height"))
       {
         overrideAll.Add((name, delta));
         Info($"{name}: the postfixes on GetBiomeHeight run in this order: {PostfixOrderText()}");
       }
+      if (patches.Contains("BeforeEwd"))
+      {
+        fresh.Add((name, delta));
+        var order = PostfixOrderText();
+        Info($"{name}: the postfixes on GetBiomeHeight run in this order: {order}");
+        int bcAt = order.IndexOf("GetBiomeHeightBeforeEwdWith"), ewdAt = order.IndexOf("EWD.BiomeHeight"), paintAt = order.IndexOf("GetBiomeHeightAfterEwdWithPaint");
+        C(bcAt >= 0 && ewdAt > bcAt && (paintAt < 0 || paintAt > ewdAt),
+          $"{name}: Better Continents' height runs before Expand World Data's postfix{(paintAt < 0 ? "" : ", and its paint after it")}");
+      }
     }
 
-    // PINS A KNOWN GAP, kept on purpose in 0.9.3. Expand World Data's postfix (BiomeHeight.cs:63-112: altitude modifiers, lava, paint) is a
+    // A new world: Expand World Data's altitude rules apply over the maps' heights; where it has none, the ground and its paint are
+    // an older world's.
+    C(fresh.Count == 4 && fresh.All(d => Math.Abs(d.Delta + 10f) < 0.01f),
+      $"a new world: Expand World Data's altitudeDelta -10 for DeadWastes lowers the maps' ground by 10 m, under Override All and under a rough map (got {string.Join(", ", fresh.Select(d => $"{d.Delta:0.###} m"))})");
+    foreach (var (older, newer) in new[] {
+      ("a heightmap with Override All", "a new world, a heightmap with Override All"),
+      ("a heightmap with Override All and a paint map", "a new world, a heightmap with Override All and a paint map"),
+      ("a heightmap without Override All and a rough map", "a new world, a heightmap without Override All and a rough map"),
+      ("a heightmap without Override All, a rough map and a paint map", "a new world, a heightmap without Override All, a rough map and a paint map"),
+      ("a paint map only", "a new world, a paint map only") })
+    {
+      var (a, b) = (grounds[older], grounds[newer]);
+      C(a.Heights.Zip(b.Heights).All(p => Math.Abs(p.First - p.Second) < 1e-3f) && a.Masks.SequenceEqual(b.Masks),
+        $"{newer}: with no altitude rules in Expand World Data's yaml, the ground and its paint are an older world's");
+    }
+
+    // PINS A KNOWN GAP, kept on purpose for worlds made before 0.10 (a new one has it fixed, above). Expand World Data's postfix (BiomeHeight.cs:63-112: altitude modifiers, lava, paint) is a
     // void postfix and Better Continents' Height postfixes (WorldGeneratorPatch.cs:94-102, registered by Patcher.cs:339-340 and :354-355) are
     // pass-through postfixes (they return a float): Harmony writes all void postfixes first and pass-through ones after them, and these
     // ignore their `result` argument and return GetBaseHeight(...) * 200, so what Expand World Data wrote to __result is thrown away.
     // Letting it through (the remedy below) would move the ground of every existing Override All world with Expand World Data altitude
-    // settings in the zones not generated yet, so it waits for a decision. This check fails the day that changes: update it then.
+    // settings in the zones not generated yet, so only a new world gets the remedy. This check fails the day that changes.
     C(overrideAll.Count == 2 && overrideAll.All(d => Math.Abs(d.Delta) < 0.01f),
       $"KNOWN GAP (kept for existing worlds): on a heightmap Override All world Expand World Data's altitudeDelta does not move the ground (got {string.Join(", ", overrideAll.Select(d => $"{d.Delta:0.###} m"))}: Better Continents' pass-through Height postfix runs after Expand World Data's void one and replaces its result)");
 
-    // The remedy, registered by hand: the same ground from a void postfix (ref __result) ordered `before: expand_world_data`. Ordering
-    // alone does not do it: the pass-through postfix above cannot be ordered before a void one.
+    // Why a new world's height postfixes are void ones (ref __result) ordered `before: expand_world_data`, checked by hand: ordering
+    // alone does not do it, as a pass-through postfix cannot be ordered before a void one.
     Load(MakeSettings(biomeMap: biomes, heightMap: height));
     var bc = BC.HarmonyInstance;
     var heightPostfix = AccessTools.Method(typeof(BC.WorldGeneratorPatch), nameof(BC.WorldGeneratorPatch.GetBiomeHeightWithHeight));
@@ -571,7 +624,7 @@ internal static class Generation
   [MethodImpl(MethodImplOptions.NoInlining)]
   static float HeightChecks(string name, WorldGenerator wg, string patches, bool biomeMap)
   {
-    bool replaces = patches.StartsWith("Height"), blends = patches.Contains("Rough");
+    bool replaces = patches.Contains("Height"), blends = patches.Contains("Rough");
     int same = 0, sameMask = 0, notMeadows = 0, notFlat = 0, likeMeadows = 0, viaGetHeight = 0;
     foreach (var (x, z) in Samples)
     {
@@ -606,11 +659,65 @@ internal static class Generation
     terrain[DeadWastes] = Mountain;
     float Delta(float[] a) => a.Select((h, i) => h - mapped[i]).Average();
     Info($"{name}: altitudeDelta -10 for DeadWastes changes the ground by {Delta(lowered):0.###} m; with no `terrain` it is {unmapped[0]:0.###} m at {Samples[0]} (mapped {mapped[0]:0.###} m)");
-    if (patches is "" or "Paint")
+    if (patches is "" or "Paint" or "AfterEwd Paint")
       C(lowered.Select((h, i) => Math.Abs(h - (mapped[i] - 10f)) < 0.01f).All(ok => ok), $"{name}: Expand World Data's altitudeDelta -10 for DeadWastes still lowers the ground by 10 m (Better Continents does not touch the height here)");
     if (!blends && !replaces)
       C(unmapped.All(h => h == 0f), $"{name}: a biome with no `terrain` in the yaml is flat 0 m ground (Expand World Data's own default: the biome is its own terrain, and the game's switch has no case for it)");
     return Delta(lowered);
+  }
+
+  // ---- lava biomes ------------------------------------------------------------------------------------------------
+
+  // Expand World Data's lava biomes (its yaml's `lava: true`, BiomeManager.LavaBiomes) where Better Continents' biome map puts
+  // them: hot (WorldGenerator.IsAshlands: lava burns) in a world made since 0.10, as Expand World Data's own world makes them;
+  // in an older one only the Ashlands are, as before. And the export keeps the lava and moss of ground an added biome takes
+  // from the Ashlands or the Mistlands (its `terrain`), where the lava and moss maps paint it again when the world is rebuilt;
+  // the export's own run cannot show that here, as the game's Ashlands and Mistlands ground calls Unity's native noise.
+  [MethodImpl(MethodImplOptions.NoInlining)]
+  static void Lava()
+  {
+    var map = MakeBiomeMap();
+    var lavaField = AccessTools.Field(ewd.GetType("ExpandWorldData.BiomeManager"), "LavaBiomes");
+    var savedLava = lavaField.GetValue(null)!;
+    float dead = BandX(1), meadows = BandX(0);
+    try
+    {
+      lavaField.SetValue(null, Heightmap.Biome.AshLands | DeadWastes);
+      C(EWD.IsLavaBiome(DeadWastes) && EWD.IsLavaBiome(Heightmap.Biome.AshLands) && !EWD.IsLavaBiome(Meadows),
+        "Expand World Data's lava biomes as Better Continents reads them: DeadWastes and the Ashlands, not Meadows");
+      Load(MakeSettings(biomeMap: map));
+      C(!WorldGenerator.IsAshlands(dead, 0f) && !WorldGenerator.IsAshlands(meadows, 0f),
+        "a world made before 0.10: a lava DeadWastes on the biome map is not hot (only the Ashlands are, as before)");
+      Load(MakeSettings(biomeMap: map, version: 12));
+      C(WorldGenerator.IsAshlands(dead, 0f) && !WorldGenerator.IsAshlands(meadows, 0f),
+        "a new world: the lava DeadWastes is hot (IsAshlands), as Expand World Data's own world makes it; Meadows is not");
+      lavaField.SetValue(null, Heightmap.Biome.AshLands);
+      C(!WorldGenerator.IsAshlands(dead, 0f), "a new world: DeadWastes without `lava: true` is not hot");
+    }
+    finally
+    {
+      lavaField.SetValue(null, savedLava);
+    }
+
+    var job = typeof(WorldExport).GetNestedType("Job", BindingFlags.NonPublic)!;
+    bool Ground(string test, Heightmap.Biome biome) => (bool)job.GetMethod(test, BindingFlags.NonPublic | BindingFlags.Static)!.Invoke(null, [biome])!;
+    var terrain = (Dictionary<Heightmap.Biome, Heightmap.Biome>)Manager("BiomeToTerrain");
+    var savedTerrain = terrain[DeadWastes];
+    try
+    {
+      terrain[DeadWastes] = Heightmap.Biome.AshLands;
+      C(Ground("AshlandsGround", DeadWastes) && !Ground("MistlandsGround", DeadWastes), "the export keeps the lava of DeadWastes with `terrain: AshLands`");
+      terrain[DeadWastes] = Heightmap.Biome.Mistlands;
+      C(Ground("MistlandsGround", DeadWastes) && !Ground("AshlandsGround", DeadWastes), "the export keeps the moss of DeadWastes with `terrain: Mistlands`");
+      terrain[DeadWastes] = Mountain;
+      C(!Ground("AshlandsGround", DeadWastes) && !Ground("MistlandsGround", DeadWastes) && Ground("AshlandsGround", Heightmap.Biome.AshLands)
+        && Ground("MistlandsGround", Heightmap.Biome.Mistlands) && !Ground("AshlandsGround", Meadows),
+        "with `terrain: Mountain` it keeps neither; the Ashlands and the Mistlands keep theirs, as before");
+    }
+    finally
+    {
+      terrain[DeadWastes] = savedTerrain;
+    }
   }
 
   // ---- world export ------------------------------------------------------------------------------------------------

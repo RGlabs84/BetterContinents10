@@ -140,6 +140,21 @@ public partial class BetterContinents
             Settings.ApplyPaintMap(wx, wy, biome, ref mask);
         }
 
+        // A new world's heights (HeightBeforeBiomeRules): the same as GetBiomeHeightWithHeight's and
+        // GetBiomeHeightWithRough's, from postfixes that run before Expand World Data's, so its altitude rules apply over
+        // them. Void ones writing __result: Harmony runs every void postfix before any that returns a value, whatever their
+        // order says. Its paint, GetBiomeHeightWithPaint's, comes after Expand World Data's ground colours, as on an older
+        // world, from a postfix ordered so (an older world's is after them by the order the patches were added).
+        public static void GetBiomeHeightBeforeEwdWithHeight(WorldGenerator __instance, float wx, float wy, ref float __result) =>
+            __result = __instance.GetBaseHeight(wx, wy, false) * 200f;
+        public static void GetBiomeHeightBeforeEwdWithRough(WorldGenerator __instance, float wx, float wy, ref float __result)
+        {
+            var smoothHeight = __instance.GetBaseHeight(wx, wy, false) * 200f;
+            __result = Settings.ApplyRoughmap(Normalize(wx), Normalize(wy), smoothHeight, __result);
+        }
+        public static void GetBiomeHeightAfterEwdWithPaint(ref Color mask, Heightmap.Biome biome, float wx, float wy) =>
+            Settings.ApplyPaintMap(wx, wy, biome, ref mask);
+
         public static void GetAshlandsHeight(ref Color mask, float wx, float wy)
         {
             Settings.ApplyPaintMap(wx, wy, Heightmap.Biome.AshLands, ref mask);
@@ -344,7 +359,8 @@ public partial class BetterContinents
             __result = heat > 0f;
             return false;
         }
-        // Usually lava requires heat so this is a fallback solution when people are using biome map but no heat map.
+        // Usually lava requires heat so this is a fallback solution when people are using biome map but no heat map. A new
+        // world's Expand World Data lava biomes are hot too (EwdLavaBiomesHot), as its own world makes them.
         // Read the biome map directly rather than going back through WorldGenerator.GetBiome: vanilla GetBiome
         // calls IsAshlands itself, so asking it would re-enter this prefix with the same arguments forever. That
         // is a StackOverflowException, which .NET cannot catch - it takes the game down with no usable log.
@@ -355,7 +371,7 @@ public partial class BetterContinents
             // original is how we honour that without re-entering ourselves.
             if (biome == Heightmap.Biome.None)
                 return true;
-            __result = biome == Heightmap.Biome.AshLands;
+            __result = biome == Heightmap.Biome.AshLands || (Settings.EwdLavaBiomesHot && EWD.IsLavaBiome(biome));
             return false;
         }
 

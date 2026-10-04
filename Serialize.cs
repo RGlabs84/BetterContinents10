@@ -90,8 +90,10 @@ public partial class BetterContinents
     // world made since the unifying refactor (0.10), with the fixes that change what a world is like, which only a new
     // world gets: its maps span its own World Size and Edge Size (MapsSpanWorldSize), where an older world's span
     // vanilla's 21000 m whatever World Size says; and Heightmap Alpha reads the heightmap at full precision and blends it
-    // with the game's own terrain by its alpha (HeightmapAlphaMode). A world keeps its version: one read as 12 is saved as
-    // 12, any older one as 11, as always. Better Continents 0.9 reads a version 12 world as a version 11 one.
+    // with the game's own terrain by its alpha (HeightmapAlphaMode); Expand World Data's altitude rules apply over the
+    // maps' heights (HeightBeforeBiomeRules); and its lava biomes are hot where the biome map puts them
+    // (EwdLavaBiomesHot). A world keeps its version: one read as 12 is saved as 12, any older one as 11, as always.
+    // Better Continents 0.9 reads a version 12 world as a version 11 one.
     public const int MaxVersion = 12;
     internal const int KeyedVersion = 11;
     internal const int UnifiedVersion = 12;
@@ -109,6 +111,17 @@ public partial class BetterContinents
       !HeightMapAlpha ? ImageMapFloat.HeightAlpha.None
       : Version >= UnifiedVersion ? ImageMapFloat.HeightAlpha.Blend
       : ImageMapFloat.HeightAlpha.Legacy;
+
+    // Whether Expand World Data's altitude rules (its GetBiomeHeight postfix: a biome's or a territory's altitude multiplier
+    // and delta, water depth, height limits and lava dip) apply over the heights the maps give, as they do over the game's
+    // own: on a world made since 0.10, Better Continents' height postfix runs before Expand World Data's; on an older one
+    // after it, so the maps' heights replace them (Patcher's GetBiomeHeight toggles).
+    internal bool HeightBeforeBiomeRules => Version >= UnifiedVersion;
+
+    // Whether Expand World Data's lava biomes (its yaml's `lava: true`) are hot where the biome map puts them, as its own
+    // world makes them: WorldGenerator.IsAshlands, which lets lava burn and samples the weather as in the Ashlands. A world
+    // made since 0.10; on an older one only the Ashlands are (WorldGeneratorPatch.IsAshlandsFallbackPrefix).
+    internal bool EwdLavaBiomesHot => Version >= UnifiedVersion;
 
     // This world's World Size and Edge Size as a size; null when they make no world (no size at all, or not a number).
     internal WorldGeometry? OwnGeometry
