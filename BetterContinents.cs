@@ -135,10 +135,41 @@ public partial class BetterContinents : BaseUnityPlugin
         ExpandWorldSizeGeometry
         ?? (settings.EnabledForThisWorld && settings.MapsSpanWorldSize && settings.OwnGeometry is { } own ? own : WorldGeometry.Vanilla);
 
+    // Whether Expand World Size sizes the world: it is installed, or has sent its size.
+    internal static bool ExpandWorldSizeSizes => EWS.Installed || ExpandWorldSizeGeometry != null;
+
+    // The size the rest of a world is laid out to (WorldSizeHelper.Layout: the alt-biome grid, the locations, the game's
+    // own biome bands, Ashlands, Deep North, lakes and rivers, and the minimap): a world made since 0.10 has its own World
+    // Size and Edge Size, as its maps do (BetterContinentsSettings.LayoutFollowsWorldSize), unless Expand World Size is
+    // installed, which lays out the world itself. Any other world keeps vanilla's layout, as always.
+    internal static WorldGeometry LayoutGeometry(BetterContinentsSettings settings) =>
+        !ExpandWorldSizeSizes && settings.EnabledForThisWorld && settings.LayoutFollowsWorldSize && settings.OwnGeometry is { } own
+            ? own
+            : WorldGeometry.Vanilla;
+
+    // Expand World Size's World Stretch (WorldSizeHelper.SetStretch) on a Better Continents world: said once per world.
+    private static string? ExpandWorldSizeStretchNote;
+    internal static void NoteExpandWorldSizeStretch()
+    {
+        var stretch = WorldSizeHelper.ExpandWorldSizeStretch;
+        if (!Settings.EnabledForThisWorld)
+        {
+            ExpandWorldSizeStretchNote = null;
+            return;
+        }
+        if (stretch == 1f)
+            return;
+        var note = $"Expand World Size's World Stretch is {stretch}: it moves the positions Better Continents reads its maps at, so the maps are magnified and only their centre shows. Keep World Stretch at 1 on a Better Continents world: its maps already span the world's size.";
+        if (note != ExpandWorldSizeStretchNote)
+            LogWarning(note);
+        ExpandWorldSizeStretchNote = note;
+    }
+
     // DynamicPatch: the maps follow the world's settings.
     private static string? ExpandWorldSizeNote;
     internal static void UpdateGeometry()
     {
+        NoteExpandWorldSizeStretch();
         var geometry = MapGeometry(Settings);
         if (ExpandWorldSizeGeometry is { } ews && Settings.EnabledForThisWorld && Settings.MapsSpanWorldSize
             && Settings.OwnGeometry is { } own && !own.SameAs(ews))
@@ -260,6 +291,14 @@ public partial class BetterContinents : BaseUnityPlugin
         catch (Exception e)
         {
             LogError($"EWD compatibility failed: {e}");
+        }
+        try
+        {
+            EWS.Run();
+        }
+        catch (Exception e)
+        {
+            LogError($"Expand World Size compatibility failed: {e}");
         }
         try
         {

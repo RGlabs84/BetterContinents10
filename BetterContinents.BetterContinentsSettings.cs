@@ -341,7 +341,8 @@ public partial class BetterContinents
         if (EdgeSize != 500f)
           output($"Edge size {EdgeSize}");
         if (MapsSpanWorldSize && OwnGeometry is { IsVanilla: false } own)
-          output($"The maps span World Size and Edge Size: {own.TotalSize} m across");
+          output($"The maps span World Size and Edge Size: {own.TotalSize} m across"
+                 + (LayoutFollowsWorldSize && !ExpandWorldSizeSizes ? ", and the world is laid out to that size" : ""));
         output($"Fix water color {FixWaterColor}");
 
         output($"Map edge dropoff {MapEdgeDropoff}");

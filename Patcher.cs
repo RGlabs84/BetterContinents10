@@ -520,5 +520,7 @@ public partial class BetterContinents
       WorldSizeHelper.PatchWorldSize(HarmonyInstance, 10000f, 500f);
     else
       WorldSizeHelper.PatchWorldSize(HarmonyInstance, Settings.WorldSize, Settings.EdgeSize);
+
+    WorldSizeHelper.PatchLayout(HarmonyInstance, LayoutGeometry(Settings));
   }
 }

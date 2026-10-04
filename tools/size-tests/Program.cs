@@ -3,7 +3,8 @@
 // Offline checks of the world's size: WorldGeometry against 0.9.4's maths, BetterContinents.SetSize (Expand World
 // Size's way in), the size a world's maps span (MapGeometry: Expand World Size's, a world's own since 0.10, or
 // vanilla's), and WorldSizeHelper, which moves the game's edge of the world: when a group is patched (again), its
-// transpilers on the installed game's IL, which group's size each one reads, and the world-size group patched for real.
+// transpilers on the installed game's IL, which group's size each one reads, and the world-size group patched for real;
+// and the layout a world made since 0.10 gets at its own size (Layout.cs).
 // "dotnet run -c Release -- dump" lists the constants of every method the transpilers rewrite.
 
 using System;
@@ -21,7 +22,7 @@ using UnityEngine;
 using BC = BetterContinents.BetterContinents;
 using Group = BetterContinents.WorldSizeHelper.Group;
 
-internal static class Program
+internal static partial class Program
 {
   private static int checks, failures;
 
@@ -53,29 +54,46 @@ internal static class Program
   }
 
   // The methods WorldSizeHelper's transpilers rewrite (the test project sees the game's own, unpublicized assembly).
-  private static MethodBase Target(Type type, string name) => AccessTools.Method(type, name);
-  private static readonly (string name, Type type, string method)[] Targets =
+  private static MethodBase Target(Type type, string name, Type[] args = null) => AccessTools.Method(type, name, args);
+  private static readonly Type[] XY = [typeof(float), typeof(float)];
+  private static readonly (string name, Func<MethodBase> method)[] Targets =
   [
-    ("Ship.ApplyEdgeForce", typeof(Ship), "ApplyEdgeForce"),
-    ("Player.EdgeOfWorldKill", typeof(Player), "EdgeOfWorldKill"),
-    ("EnvMan.UpdateWind", typeof(EnvMan), "UpdateWind"),
-    ("WaterVolume.GetWaterSurface", typeof(WaterVolume), "GetWaterSurface"),
-    ("WorldGenerator.GetBiomeHeight", typeof(WorldGenerator), "GetBiomeHeight"),
-    ("WorldGenerator.GetBaseHeight", typeof(WorldGenerator), "GetBaseHeight"),
-    ("WorldGenerator.GetAshlandsHeight", typeof(WorldGenerator), "GetAshlandsHeight"),
+    ("Ship.ApplyEdgeForce", () => Target(typeof(Ship), "ApplyEdgeForce")),
+    ("Player.EdgeOfWorldKill", () => Target(typeof(Player), "EdgeOfWorldKill")),
+    ("EnvMan.UpdateWind", () => Target(typeof(EnvMan), "UpdateWind")),
+    ("WaterVolume.GetWaterSurface", () => Target(typeof(WaterVolume), "GetWaterSurface")),
+    ("WorldGenerator.GetBiomeHeight", () => Target(typeof(WorldGenerator), "GetBiomeHeight")),
+    ("WorldGenerator.GetBaseHeight", () => Target(typeof(WorldGenerator), "GetBaseHeight")),
+    ("WorldGenerator.GetAshlandsHeight", () => Target(typeof(WorldGenerator), "GetAshlandsHeight")),
+    // The layout's.
+    ("AltBiomeWorldData.MapSpaceToWorldSpace", () => Target(typeof(AltBiomeWorldData), "MapSpaceToWorldSpace", [typeof(float)])),
+    ("AltBiomeWorldData.WorldSpaceToMapSpace", () => Target(typeof(AltBiomeWorldData), "WorldSpaceToMapSpace", [typeof(float)])),
+    ("AltBiomeWorldData.GenerateBiomePoints", () => Target(typeof(AltBiomeWorldData), "GenerateBiomePoints")),
+    ("ZoneSystem.GetRandomZone", () => Target(typeof(ZoneSystem), "GetRandomZone")),
+    ("ZoneSystem.GenerateLocationsTimeSliced", () => AccessTools.EnumeratorMoveNext(Target(typeof(ZoneSystem), "GenerateLocationsTimeSliced",
+      [typeof(ZoneSystem.ZoneLocation), typeof(System.Diagnostics.Stopwatch), typeof(ZPackage)]))),
+    ("WorldGenerator.GetBiome", () => Target(typeof(WorldGenerator), "GetBiome", [typeof(float), typeof(float), typeof(float), typeof(bool)])),
+    ("WorldGenerator.IsAshlands", () => Target(typeof(WorldGenerator), "IsAshlands", XY)),
+    ("WorldGenerator.GetAshlandsOceanGradient", () => Target(typeof(WorldGenerator), "GetAshlandsOceanGradient", XY)),
+    ("WorldGenerator.CreateAshlandsGap", () => Target(typeof(WorldGenerator), "CreateAshlandsGap", XY)),
+    ("WorldGenerator.IsDeepnorth", () => Target(typeof(WorldGenerator), "IsDeepnorth", XY)),
+    ("WorldGenerator.CreateDeepNorthGap", () => Target(typeof(WorldGenerator), "CreateDeepNorthGap", XY)),
+    ("WorldGenerator.DeepNorthWaveFade", () => Target(typeof(WorldGenerator), "DeepNorthWaveFade", XY)),
+    ("WorldGenerator.FindLakes", () => Target(typeof(WorldGenerator), "FindLakes")),
+    ("WorldGenerator.FindStreamStartPoint", () => Target(typeof(WorldGenerator), "FindStreamStartPoint")),
   ];
 
   // Not inlined, so nothing of Better Continents is resolved before the handler above is in place.
   [MethodImpl(MethodImplOptions.NoInlining)]
   private static int Dump()
   {
-    foreach (var (name, type, method) in Targets)
+    foreach (var (name, method) in Targets)
     {
-      var codes = PatchProcessor.GetOriginalInstructions(Target(type, method));
+      var codes = PatchProcessor.GetOriginalInstructions(method());
       System.Console.WriteLine($"{name}: {codes.Count} instructions");
       for (int i = 0; i < codes.Count; i++)
-        if (codes[i].opcode == OpCodes.Ldc_R4 || codes[i].opcode == OpCodes.Ldc_R8
-            || codes[i].opcode == OpCodes.Ldfld && codes[i].operand is FieldInfo { Name: "m_offset1" or "m_edgeOfWorldWidth" })
+        if (codes[i].opcode == OpCodes.Ldc_R4 || codes[i].opcode == OpCodes.Ldc_R8 || codes[i].opcode == OpCodes.Ldc_I4 || codes[i].opcode == OpCodes.Ldsfld
+            || codes[i].opcode == OpCodes.Ldfld && codes[i].operand is FieldInfo { Name: "m_offset1" or "m_edgeOfWorldWidth" or "maxMarshDistance" or "m_minDistance" or "m_maxDistance" })
           System.Console.WriteLine($"  {i,4} {codes[i]}");
     }
     return 0;
@@ -92,8 +110,10 @@ internal static class Program
     TranspilerTests();
     OwnSizeTests();
     PatchTests();
+    LayoutTests();
     WorldSizeHelper.EdgeChecks.Assume(WorldGeometry.Vanilla);
     WorldSizeHelper.WorldSize.Assume(WorldGeometry.Vanilla);
+    WorldSizeHelper.Layout.Assume(WorldGeometry.Vanilla);
     System.Console.WriteLine($"size-tests: {checks - failures}/{checks} checks passed");
     return failures == 0 ? 0 : 1;
   }
@@ -295,7 +315,7 @@ internal static class Program
       .Invoke(null, [instructions.Select(i => new CodeInstruction(i)).ToList()])).ToList();
 
   private static List<CodeInstruction> Original(string type) =>
-    PatchProcessor.GetOriginalInstructions(Targets.Where(t => t.name == type).Select(t => Target(t.type, t.method)).Single());
+    PatchProcessor.GetOriginalInstructions(Targets.Single(t => t.name == type).method());
 
   private static string Show(CodeInstruction code) => code.operand switch
   {
@@ -438,7 +458,7 @@ internal static class Program
     var kill = Target(typeof(Player), "EdgeOfWorldKill");
     var setup = Target(typeof(WaterVolume), "SetupMaterial");
     var awake = Target(typeof(EnvMan), "Awake");
-    Check(Targets.All(t => Target(t.type, t.method) != null) && setup != null && awake != null,
+    Check(Targets.All(t => t.method() != null) && setup != null && awake != null,
       "every method the two groups patch is in the installed game");
     Check(!kill.IsStatic && !setup.IsStatic && !awake.IsStatic, "the prefixes' and postfix's __instance: EdgeOfWorldKill, SetupMaterial and Awake are instance methods");
   }

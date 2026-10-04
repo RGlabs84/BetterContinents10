@@ -1,4 +1,4 @@
-﻿// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and alt-biome planting (0.8.1).
+﻿// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and alt-biome planting (0.8.1), and on 2026-10-04 for the unifying refactor (0.10.0).
 
 using System;
 using System.Collections;
@@ -53,11 +53,12 @@ public static class GameUtils
             if (MinimapOrigTextureSize == 0)
             {
                 MinimapOrigTextureSize = map.m_textureSize;
-                MinimapOrigPixelSize = map.m_pixelSize;
+                // The game's pixels, without what a world laid out to its own size multiplied them by.
+                MinimapOrigPixelSize = map.m_pixelSize / WorldSizeHelper.MinimapScale;
             }
             var size = MinimapOrigTextureSize / MinimapDownscaling;
             map.m_textureSize = size;
-            map.m_pixelSize = MinimapOrigPixelSize * MinimapDownscaling;
+            map.m_pixelSize = MinimapOrigPixelSize * MinimapDownscaling * WorldSizeHelper.MinimapScale;
             // Formats must match Minimap.Start, otherwise the map shaders get the wrong data.
             map.m_mapTexture = new(size, size, TextureFormat.RGB24, false)
             {

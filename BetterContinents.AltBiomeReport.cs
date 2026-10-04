@@ -64,6 +64,8 @@ public partial class BetterContinents
       var s = AltBiomeControl.Active;
       var grid = AltBiomeControl.ExternalGrid
         ? $"external grid {data.Size} x {F(AltBiomeControl.GridPixelSize())} m (Expand World Size)"
+        : AltBiomeControl.OwnGrid
+        ? $"grid {data.Size} x {F(AltBiomeControl.GridPixelSize())} m to {F(AltBiomeControl.SampledRadius)} m (the world's size)"
         : $"grid {data.Size} x {F(AltBiomeControl.GridPixelSize())} m to {F(AltBiomeControl.SampledRadius)} m ({s.Grid})";
       int plantedRegions = data.Sectors.Count(IsPlanted);
       int withAlt = data.Sectors.Count(x => x.AltBiomes.Count > 0);

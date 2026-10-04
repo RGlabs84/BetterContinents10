@@ -90,7 +90,8 @@ public partial class BetterContinents
     // (Patcher.PatchGetBaseHeight). 11 is the keyed format: each value under its DataKey. 12 is the same format, for a
     // world made since the unifying refactor (0.10), with the fixes that change what a world is like, which only a new
     // world gets: its maps span its own World Size and Edge Size (MapsSpanWorldSize), where an older world's span
-    // vanilla's 21000 m whatever World Size says; and Heightmap Alpha reads the heightmap at full precision and blends it
+    // vanilla's 21000 m whatever World Size says, and the rest of the world is laid out to that size too
+    // (LayoutFollowsWorldSize); and Heightmap Alpha reads the heightmap at full precision and blends it
     // with the game's own terrain by its alpha (HeightmapAlphaMode); Expand World Data's altitude rules apply over the
     // maps' heights (HeightBeforeBiomeRules); its lava biomes are hot where the biome map puts them (EwdLavaBiomesHot);
     // a terrain legend can name its biomes' grounds (TerrainNamesEwdGrounds); biome precision keeps its territories'
@@ -108,6 +109,12 @@ public partial class BetterContinents
     // Whether the maps span this world's World Size and Edge Size (a world made since 0.10), or vanilla's 21000 m.
     // Expand World Size's size wins over both (BetterContinents.MapGeometry).
     public bool MapsSpanWorldSize => Version >= UnifiedVersion;
+
+    // Whether the rest of the world follows its World Size and Edge Size as its maps do: the alt-biome grid, where the
+    // locations go, the game's own biome bands, Ashlands and Deep North, its lakes and rivers, and the minimap
+    // (WorldSizeHelper.Layout). A world made since 0.10; an older one keeps vanilla's layout, and World Size moves only its
+    // edge. Expand World Size, when installed, lays out every world itself (BetterContinents.LayoutGeometry).
+    internal bool LayoutFollowsWorldSize => Version >= UnifiedVersion;
 
     // How the heightmap's alpha is read: not at all without Heightmap Alpha; with it, blended on a world made since 0.10,
     // and as it always was (8-bit heights, the alpha unused) on an older one.

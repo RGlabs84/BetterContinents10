@@ -16,7 +16,7 @@ all/dump/007	Deep North gap enabled True
 all/dump/008	Rivers enabled False
 all/dump/009	World size 12000
 all/dump/010	Edge size 600
-all/dump/011	The maps span World Size and Edge Size: 25200 m across
+all/dump/011	The maps span World Size and Edge Size: 25200 m across, and the world is laid out to that size
 all/dump/012	Fix water color False
 all/dump/013	Map edge dropoff False
 all/dump/014	Mountains allowed at center True
@@ -425,7 +425,7 @@ scalars/dump/007	Deep North gap enabled False
 scalars/dump/008	Rivers enabled False
 scalars/dump/009	World size 8000
 scalars/dump/010	Edge size 250
-scalars/dump/011	The maps span World Size and Edge Size: 16500 m across
+scalars/dump/011	The maps span World Size and Edge Size: 16500 m across, and the world is laid out to that size
 scalars/dump/012	Fix water color True
 scalars/dump/013	Map edge dropoff False
 scalars/dump/014	Mountains allowed at center False

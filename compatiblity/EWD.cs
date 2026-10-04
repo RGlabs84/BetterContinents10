@@ -12,6 +12,8 @@ public class EWD
 {
   public const string GUID = "expand_world_data";
   private static Assembly? Assembly;
+  // Whether Expand World Data is installed (found by Run).
+  internal static bool Installed => Assembly != null;
   private static MethodInfo? SetSize;
   // Expand World Data's biome names (BiomeManager.TryGetBiome / TryGetDisplayName): the biomes it adds from its
   // expand_biomes yaml, by name, in both directions. It also patches Enum.TryParse and Enum.GetName for biomes, but

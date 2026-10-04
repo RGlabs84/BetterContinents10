@@ -54,28 +54,37 @@ public partial class BetterContinents
     internal static bool WorldEnabled;
     internal static AltBiomeSettings Active = AltBiomeSettings.Legacy;
     internal static bool ExternalGrid;
+    internal static bool OwnGrid;
     internal static float CutoffRadius;
     internal static float SampledRadius = VanillaSampleRadius;
     internal static bool FallbackActive;
     internal static float FallbackRadiusSq = VanillaSampleRadius * VanillaSampleRadius;
     internal static bool CustomEligibility;
 
-    // Called at the end of DynamicPatch (settings loaded or changed) and again right before the grid is
-    // verified at world load, because Expand World Size applies its grid transpilers per world.
+    // Called at the end of DynamicPatch (settings loaded or changed, after the layout is patched) and again right before
+    // the grid is verified at world load, because Expand World Size applies its grid transpilers per world.
     public static void Configure()
     {
       WorldEnabled = Settings.EnabledForThisWorld;
       Active = Settings.EffectiveAltBiomes;
       var size = Geometry;
-      ExternalGrid = DetectExternalGrid();
+      // A world laid out to its own size (WorldSizeHelper.Layout) has a grid of that size: its points reach the world's
+      // edge, so nothing is cut off, and only a world without the edge drop-off goes on past them.
+      OwnGrid = WorldSizeHelper.Layout.Patched;
+      ExternalGrid = !OwnGrid && DetectExternalGrid();
       CutoffRadius = 0f;
-      SampledRadius = ExternalGrid ? size.TotalRadius : VanillaSampleRadius;
+      SampledRadius = OwnGrid ? WorldSizeHelper.Layout.Size.TotalRadius : ExternalGrid ? size.TotalRadius : VanillaSampleRadius;
       FallbackActive = false;
       CustomEligibility = false;
       Planting = null;
       if (!WorldEnabled)
         return;
-      if (!ExternalGrid)
+      if (OwnGrid)
+      {
+        FallbackActive = Settings.DisableMapEdgeDropoff;
+        FallbackRadiusSq = SampledRadius * SampledRadius;
+      }
+      else if (!ExternalGrid)
       {
         // Without Expand World Size the grid is vanilla's: it samples the 10500 m disc, and "World Size" moves the
         // edge of the world. When that edge is inside the disc, WorldEdge stops sampling at it. With the drop-off
@@ -105,8 +114,8 @@ public partial class BetterContinents
     }
 
     // Expand World Size retargets MapSpaceToWorldSpace / WorldSpaceToMapSpace / GenerateBiomePoints itself and
-    // pushes its radius into BC through SetSize. When either is visible, the grid geometry is not ours. (A world's own
-    // World Size never is: Better Continents leaves the grid as it is.)
+    // pushes its radius into BC through SetSize. When either is visible, the grid geometry is not ours. (A world laid
+    // out to its own size has its own grid: OwnGrid, asked first.)
     private static bool DetectExternalGrid()
     {
       if (ExpandWorldSizeGeometry is { } ews && ews.TotalRadius != VanillaSampleRadius)

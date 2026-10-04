@@ -1295,8 +1295,9 @@ public static class WorldExport
       // level) clears and refills in place on the main thread (ClearAssignments then GenerateAltBiomes) whenever a
       // host runs one while an export is in flight - reading it from a worker at the same time is a collection-
       // modified-during-enumeration race, not just a slow one. This walk is bounded by the game's own alt-biome grid
-      // (at most 2048 x 2048 points, regardless of the export's own pixel size) and runs in a frame or two even at
-      // that size, so doing it here costs nothing worth moving to a worker.
+      // (2048 x 2048 points on a world of vanilla's size, regardless of the export's own pixel size; up to 8192 x 8192
+      // on a world laid out to a bigger one) and runs in a frame or two at vanilla's size, so doing it here costs
+      // nothing worth moving to a worker.
       var byKey = new Dictionary<string, int>();
       for (int y = 0; y < gh && !cancelRequested; y++)
       {
@@ -1375,8 +1376,11 @@ public static class WorldExport
       AltForced = classes.Count(c => c.Names.Any(x => x.StartsWith("!")));
       if (AltDropped > 0)
         Notes.Add($"Alt biomes: more than {ImageMapAltBiome.MaxEntries} different alt-biome combinations; {AltDropped} region(s) past that were left unplanted.");
-      if (Size < 2048)
-        Notes.Add("Alt biomes: below 2048 pixels a pixel is wider than the game's 12 m alt-biome grid, so region borders move by up to a pixel.");
+      // On vanilla's grid (12 m points from -12282 m), below 2048 pixels; on any other, wherever a pixel is wider than a point.
+      if (g0 == -12282f && cell == 12f ? Size < 2048 : Total / Size > cell)
+        Notes.Add(g0 == -12282f && cell == 12f
+          ? "Alt biomes: below 2048 pixels a pixel is wider than the game's 12 m alt-biome grid, so region borders move by up to a pixel."
+          : $"Alt biomes: a pixel ({Inv(Total / Size)} m) is wider than the game's {Inv(cell)} m alt-biome grid, so region borders move by up to a pixel.");
       var legend = AltLegend(classes);
       foreach (var step in Write("altbiomemap.png", W(0.3), 3L * n * n, p =>
                {
