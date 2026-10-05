@@ -1,14 +1,19 @@
-# Alt biomes in Better Continents 0.8.1
+# Alt biomes in Better Continents
 
 Valheim 1.0 gives parts of each biome an *alt biome*: Dark Meadows, Troll Black Forest, Fortress
 Mountain and 29 more, each changing creatures, vegetation, locations or weather. The game picks
-them at random. Better Continents 0.8.1 lets a map author **plant** them with colours, the way the
-biome map plants biomes, gives world owners control over the game's random placement, and fixes
-three bugs in the pipeline that decides them.
+them at random. Better Continents lets a map author **plant** them with colours, the way the
+biome map plants biomes (since 0.8.1), gives world owners control over the game's random
+placement, and fixes three bugs in the pipeline that decides them. This edition is for Better
+Continents 0.10.x. A world made with 0.10 usually is a settings version 12 world (a few are
+version 11), and one made by 0.9.x is a version 11 world; the README's "Upgrading from 0.9" says
+which is which. A version 12 world whose size is not vanilla's has a point grid of its own size
+(1.11), and the options saved with such a world can carry the names of Expand World Data's biomes
+(2.8).
 
 Part 1 describes the design. Part 2 is the reference: every file, legend rule, colour, config key,
-command, save key and log line, with exact names and defaults. Part 3 covers the three fixes (and
-two smaller ones in the same pipeline), and Part 4 the offline test harness.
+command, save key and log line, with exact names and defaults. Part 3 covers the three fixes of
+0.8.1 (and two smaller ones in the same pipeline), and Part 4 the offline test harness.
 
 Contents
 
@@ -28,7 +33,8 @@ on every client separately (nothing about it is sent over the network):
 
 1. **Point grid.** `GenerateBiomePoints` samples the biome and height on a 2048 x 2048 grid of
    12 m cells centred on the world origin. Points further than 10500 m from the centre are
-   marked as ocean with height -1000.
+   marked as ocean with height -1000. (A world laid out to its World Size has a grid of its
+   own size: see 1.11.)
 2. **Regions.** `GenerateSectors` flood-fills 4-connected points of one biome into regions
    (`BiomeSector`). Ashlands, Deep North and Ocean are special: each is **one** world-wide region,
    however many separate patches it has. Per region the game records its border length
@@ -136,6 +142,11 @@ keeps the three *content* rules by default, because breaking them is almost alwa
 A `none` region is protected in every mode: nothing is planted on it and random placement stays off
 it.
 
+`Off` switches the alt biomes off, not the grid. Valheim builds its point grid and its regions for
+every world (1.1), and a world laid out to its World Size builds a grid of its own size (1.11),
+whatever the mode: with `Off` the grid and the regions exist, and no alt biome is assigned to any
+of them.
+
 ### 1.7 Per-world options
 
 The options in the config section `[08 BetterContinents.AltBiomes]` (section 2.5) are defaults for
@@ -178,8 +189,8 @@ The world carries its own baked copy of the map, so editing the image or the leg
 world whose stored map is damaged: restore the world's Better Continents settings from a backup (the
 previous save's copy ends in `.old`). Any other failure is a bug to report with the log.
 
-During a live edit in debug mode (section 2.6) a planting error keeps the previous regions and
-placement instead.
+During a live edit with the `bc` commands (section 2.6) a planting error keeps the previous
+regions and placement instead.
 
 ### 1.10 Compatibility
 
@@ -188,12 +199,49 @@ placement instead.
 * **Existing Better Continents worlds**: the same regions and the same random alt biomes as in
   0.8.0, and their settings are saved byte for byte as 0.8.0 saves them (checked on two real 0.8.0
   worlds, 4.8 MB and 10 MB of settings). What does change for them are the fixes: Deep North
-  weather on worlds with a biome map (3.3), live edits in debug mode (3.2), land beyond 10500 m on
+  weather on worlds with a biome map (3.3), live edits with the `bc` commands (3.2), land beyond 10500 m on
   worlds with the edge drop-off disabled and locations that accept several biomes (3.4).
 * **Worlds that use an alt-biome feature** (a planted map, or any option that differs from 0.8.0
   behaviour, see 2.8) need 0.8.1 or later. Better Continents 0.8.0 stops reading the world's
   settings at the first key it does not know and loads the world *without* Better Continents: it
   leaves the settings file alone, but zones generated in that session get vanilla terrain.
+* **0.10**: a version 11 world (every world made before 0.10, and a few made since: see the
+  README's "Upgrading from 0.9") keeps the grid, the regions and the random alt biomes it had. A
+  version 12 world whose World Size or Edge Size is not vanilla's has the grid of 1.11 (without
+  Expand World Size). The alt-biome keys are saved as before (2.8), except that a version 12 world
+  whose biome map holds Expand World Data biomes also carries their names in the options blob
+  (format 2). Better Continents 0.9 opens a version 12 world as a version 11 one: it reads the
+  blob's format 1 part, warns, and keeps the blob, and its next save writes the world as version
+  11, so 0.10 then treats it as made by 0.9.
+
+### 1.11 A world laid out to its World Size
+
+A version 12 world whose World Size or Edge Size is not vanilla's has a point grid of its own
+size, unless Expand World Size is installed, which owns the grid then. Better Continents keeps the
+game's 12 m points and its margin and changes their number: an even number a side,
+`2 x ceil(1024 x (World Size + Edge Size) / 10500)`, which is 4000 for a radius of 20500 m and
+1074 for one of 5500 m. Past 8192 points a side (a radius over 42000 m) the points grow instead of
+their number. The grid reaches the edge of the world, so:
+
+* nothing is cut off: `Grid` has no effect (2.5), and a plain region past the grid applies only on
+  a world without the edge drop-off (2.12);
+* the game places its locations at the grid's points, so they reach the whole world. They are
+  searched for within World Size, and each one's distances from the centre are scaled to the
+  world (Expand World Data, when installed, applies the radius itself);
+* the game's own biome bands, its Ashlands and Deep North rings and the area it looks for lakes
+  and stream sources in follow World Size, and the minimap, like the grid, follows World Size +
+  Edge Size.
+
+The rules of the alt biomes themselves are not scaled: their counts, minimum distances and region
+sizes stay what the game says, in metres and grid cells. `Amount Multiplier`, `Distance Scale` and
+`Region Size Scale` (2.5) change them.
+
+A bigger grid costs memory and time each time the world loads, on the server and on every client
+as it joins (1.1). The game's own grid holds 4.2 million points; at the practical maximum, a World
+Size + Edge Size of 16350 m (3190 x 3190 points), it holds 10.2 million and takes about 0.2 GB. The
+build samples the biome and height of every point, so a load takes longer in proportion, and `Off`
+does not spare it (1.6). The maximum is the game's own: it files every object beyond about 16.35 km
+from the centre under one shared sector.
 
 ---
 
@@ -203,7 +251,7 @@ placement instead.
 
 | File | Where | Notes |
 |:--|:--|:--|
-| `altbiomemap.png` | the path in `Altbiomemap File` (section `[08 BetterContinents.AltBiomes]`); when `Directory` (section `[00 BetterContinents.Debug]`) is set, only a file of this name in that folder is used, as for every map | Square, any size. Covers the same square as every Better Continents map: 21000 m x 21000 m centred on the origin on a standard world, top of the image north (+z). Use PNG: a lossy format shifts colours. |
+| `altbiomemap.png` | the path in `Altbiomemap File` (section `[08 BetterContinents.AltBiomes]`); when `Directory` (section `[00 BetterContinents.Debug]`) is set, only a file of this name in that folder is used, as for every map | Square, any size. Covers the same square as every Better Continents map: centred on the origin, top of the image north (+z), 2 x (World Size + Edge Size) across, which is 21000 m on a vanilla-sized world and on every version 11 world (Expand World Size, when installed, sets its own). Use PNG: a lossy format shifts colours. |
 | `altbiomemap.txt` | beside the image, named after it (`<image name>.txt`) | Written with the default palette when missing (UTF-8, `\n` line endings, identical to `palettes/altbiomemap.txt`). |
 | `palettes/BetterContinents.gpl` | repository | GIMP palette "Better Continents": the 10 base-biome colours, then the 32 alt-biome colours grouped by base biome (`Biome: Meadows`, `Alt: Troll Black Forest`). |
 | `palettes/altbiomemap.txt` | repository | The default legend, byte for byte as Better Continents writes it. |
@@ -214,8 +262,10 @@ The three `palettes/` files are generated from the built DLL by the harness (Par
 them by hand.
 
 A pixel at column `px`, row `py` of an `N x N` image covers world position
-`x = (px / (N - 1) - 0.5) * 21000`, `z = (0.5 - py / (N - 1)) * 21000` (standard world; Expand
-World Size changes the 21000). The grid is sampled at the nearest pixel.
+`x = (px / (N - 1) - 0.5) * S`, `z = (0.5 - py / (N - 1)) * S`, where `S` is the span of the map:
+21000 on a vanilla-sized world and on every version 11 world, 2 x (World Size + Edge Size) on a
+version 12 world, and Expand World Size's own when it is installed. The grid is sampled at the
+nearest pixel.
 
 ### 2.2 Legend syntax
 
@@ -359,7 +409,7 @@ new worlds, baked into the world when it is created (1.7).
 |:--|:--|:--|:--|:--|
 | `Altbiomemap File` | string | *(empty)* | | Path of the alt-biome map. Its legend is the `.txt` beside it. |
 | `Mode` | string | `Random` | `Random`, `PlantedOnly`, `Off` | See 1.6. |
-| `Grid` | string | `WorldEdge` | `WorldEdge`, `Vanilla` | `WorldEdge`: when the edge of the world (`World Size` + `Edge Size`) is inside 10500 m and the edge drop-off is on, grid points beyond it are marked as outside-the-world ocean, so alt biomes and the game's biome-point location candidates cannot land beyond the edge. `Vanilla`: always the 10500 m disc. No effect when Expand World Size owns the grid. |
+| `Grid` | string | `WorldEdge` | `WorldEdge`, `Vanilla` | `WorldEdge`: when the edge of the world (`World Size` + `Edge Size`) is inside 10500 m and the edge drop-off is on, grid points beyond it are marked as outside-the-world ocean, so alt biomes and the game's biome-point location candidates cannot land beyond the edge. `Vanilla`: always the 10500 m disc. No effect when Expand World Size owns the grid, and none on a world laid out to its World Size (1.11), whose grid covers the world. |
 | `Fixed Seed` | string | *(empty)* | | Seed for the game's random placement. Empty or `world`: the world seed (vanilla). A whole number is used as is; any other text is hashed like a world seed name. The same map then gets the same random layout whatever the world seed. |
 | `Chance Multiplier` | float | `1` | 0 to 10 | Multiplies every alt biome's chance (result capped at 1). |
 | `Amount Multiplier` | float | `1` | 0 to 10 | Multiplies every alt biome's minimum and maximum count, rounded to whole numbers. |
@@ -409,12 +459,14 @@ Examples: `Fortress Mountain: enabled=false`, `*Mistlands: chance=0.5; Hare Mist
 
 ### 2.6 Commands
 
-`bc ...` is Better Continents' existing debug command: a cheat (devcommands, or Better Continents'
-`Debug Mode`) that runs on the machine that hosts the world. Edits change the loaded world's
-settings, are saved with the world, and redo only as much of the pipeline as they affect
+`bc ...` is Better Continents' command: a cheat command (cheats come from `devcommands`, which
+Better Continents' `Debug Mode` types for you when you spawn) that runs on the machine that hosts
+the world. Edits change the loaded world's settings, are saved with the world, and redo only as
+much of the pipeline as they affect
 (**Assignment**: placement only; **Sectors**: regions and placement; **Points**: the whole grid),
-then reset the zones. Connected clients keep their placement until they reconnect. A value
-command without an argument prints the current value.
+then regenerate the zones (the README's *Debug Mode & Zone Regeneration* says which). Connected
+clients keep their placement until they reconnect. A value command without an argument prints the
+current value.
 
 | Command | Does | Redoes |
 |:--|:--|:--|
@@ -423,7 +475,7 @@ command without an argument prints the current value.
 | `bc ab here` | The region you stand in, what was planted on it, and how each alt biome of its biome fared. | |
 | `bc ab show [filter]` | Map pins on every region with an alt biome (optional alt-biome name filter). | |
 | `bc ab hide` | Removes those pins. | |
-| `bc ab export` | Writes `altbiomes-<time>.png` (the region grid, north up, alt-biome regions tinted with their alt biome's colour, planted ones striped magenta, borders darkened) and a `.txt` report. | |
+| `bc ab export` | Writes `altbiomes-<time>.png` (the region grid, one pixel per grid point: 2048 x 2048 on the game's grid, the grid of 1.11 on a laid-out world; north up, alt-biome regions tinted with their alt biome's colour, planted ones striped magenta, borders darkened) and a `.txt` report. | |
 | `bc ab hash` | This machine's grid and placement hashes. | |
 | `bc ab names [filter]` | The game's alt biomes with their default colours and random-placement rules. | |
 | `bc ab rebuild` | Regenerates grid, regions and placement from the current settings. | Points |
@@ -462,17 +514,19 @@ command without an argument prints the current value.
   `CanAddModifier` gate while it runs.
 * `PlantedOnly`: the same regions and planting; the random placement does not run.
 * `Off`: no region is split, nothing is planted, the random placement does not run, and alt biomes
-  already assigned are cleared. An unreadable alt-biome map does not stop the load in this mode.
+  already assigned are cleared. The point grid and the game's regions are still built (1.6). An
+  unreadable alt-biome map does not stop the load in this mode.
 
 ### 2.8 Save format
 
-Three new keys in Better Continents' tagged settings stream, after `SkipDefaultLocations` (63). The
-settings format version stays 11. Each key is written only when used, so a world that uses no
-alt-biome feature is saved byte for byte as 0.8.0 saves it.
+Three keys in Better Continents' tagged settings stream, added in 0.8.1 after
+`SkipDefaultLocations` (63). They are the same in the settings format versions 11 and 12 (12 is the
+version 0.10 gives a world it creates; the keyed format is the same). Each key is written only when
+used, so a world that uses no alt-biome feature is saved byte for byte as 0.8.0 saves it.
 
 | Key | Value | Written when |
 |:--|:--|:--|
-| `AltBiomes` = 64 | byte array: the options blob | the world has alt-biome options that differ from 0.8.0 behaviour for its edge of the world, or a blob this build could not fully read was kept |
+| `AltBiomes` = 64 | byte array: the options blob | the world has alt-biome options that differ from 0.8.0 behaviour for its edge of the world, or a blob this build could not fully read was kept, or (a version 12 world) its biome map holds Expand World Data biomes, whose names the blob carries |
 | `AltBiomeMap` = 65 | byte array: the baked map block | the world has an alt-biome map (or an unreadable block was kept) |
 | `AltBiomeMapPath` = 66 | string: the image path | after key 65, on disk only; never sent to clients |
 
@@ -482,7 +536,7 @@ beyond. A new world created with the default config on the standard World Size (
 Size (500) therefore writes no key 64; a new world whose edge is inside 10500 m writes it, because
 `Grid` defaults to `WorldEdge`.
 
-**Options blob** (a `ZPackage`, format 1): `int` format version, `byte` mode (0 Random,
+**Options blob** (a `ZPackage`, format 1; format 2 below): `int` format version, `byte` mode (0 Random,
 1 PlantedOnly, 2 Off), `byte` grid (0 Vanilla, 1 WorldEdge), `bool` fixed seed, `int` seed, `bool`
 neighbour fix, `bool` mean sector height, `float` min sector thickness, `float` chance multiplier,
 `float` amount multiplier, `float` region size scale, `float` distance scale, `int` override count,
@@ -490,6 +544,13 @@ then one byte array per override, sorted by name (ordinal): `string` name, `int`
 the fields whose bit is set, in bit order: bit 0 `enabled` (bool), 1 `chance` (float), 2 `min`
 (int), 3 `max` (int), 4 `mindist` (float), 5 `minedge` (int), 6 `maxedge` (int), 7 `minheight`
 (float), 8 `maxheight` (float), 9 `ignorebounds` (bool).
+
+Format 2 is written only by a version 12 world whose biome map holds Expand World Data biomes,
+and every other blob stays format 1, byte for byte. Expand World Data numbers its biomes in
+its yaml's order and a world stores the number, so the world also saves the names, and its biome
+map follows them if the numbering changes. After the overrides: `bool` carries-only (true when the
+world has no alt-biome options of its own and the blob exists only to carry the names; it is read
+back as absent), `int` name count, then per name `int` biome bit and `string` name.
 
 **Map block** (a `ZPackage`, version 1): `int` block version, `int` class count (class 0,
 unplanted, is implicit), per class `byte` r, g, b, a, `byte` flags (1 point plant, 2 none), `int`
@@ -555,6 +616,18 @@ At world load (from the dedicated-server test with a planted copy of a real worl
 [BetterContinents] Alt biomes:   #1681 Meadows [planted #2D4613 [Dark Meadows]] centre (3100.3, -4566.7) edge 244 area 4401 thick 18 h 40.9 (mean 66.4) dist 5519.7 -> Dark Meadows
 ```
 
+On a world laid out to its World Size (1.11) the load also logs how it was laid out, and the
+summary names the grid as the world's:
+
+```
+[BetterContinents] The world is laid out to its size (world radius 20000, edge 500): the alt-biome grid is 4000 points of 12 m, the locations are placed within 20000 m and their distances from the centre are x2, and the game's own biome bands, Ashlands, Deep North, lakes and rivers are x2.
+[BetterContinents] Alt biomes (world load): mode Random, placement seed world seed, grid 4000 x 12 m to 20500 m (the world's size), ...
+```
+
+A layout part that cannot be patched (another mod changed the same game method first) is logged
+by name, `World size: could not patch <Type.method>: <cause>`, and the other parts are still
+patched.
+
 The summary is followed by one line per base biome, the biomes absent from the map, and per alt
 biome why it did or did not place ("+N planted (counted toward the maximum)" where planting
 counts). In multiplayer the server logs `Sending alt-biome placement to client ...` and `Alt biomes:
@@ -570,21 +643,26 @@ the world failed to load (see the error above).`
 * 254 legend entries (distinct colours plus point lines). Images up to 16384 x 16384.
 * The grid is 12 m: a patch narrower than a cell or two can vanish or break into several regions.
   Paint patches at least a few cells wide.
-* Only the sampled disc has regions: 10500 m, the world edge with `Grid` `WorldEdge`, or Expand
-  World Size's radius. Planting beyond it does nothing. Beyond the WorldEdge cut-off, and beyond
-  10500 m on a world with the edge drop-off disabled, `GetBiomeSector` returns a plain region of
-  the real biome, without alt biomes.
+* Only the sampled disc has regions: 10500 m, the world edge with `Grid` `WorldEdge`, Expand
+  World Size's radius, or the radius of a world laid out to its World Size (1.11). Planting beyond
+  it does nothing. Beyond the WorldEdge cut-off, beyond 10500 m on a world with the edge drop-off
+  disabled, and beyond the radius of a laid-out world with the edge drop-off disabled,
+  `GetBiomeSector` returns a plain region of the real biome, without alt biomes.
 * Ashlands, Deep North and Ocean are one region per colour: two Deep North areas painted with the
   same colour are one region (and count once toward the maximum); use two colours to make two.
 * Planting chooses alt biomes, not terrain or base biomes.
 * Colours are matched when the map is baked. Editing the PNG or the legend later changes nothing
   until `bc reload ab` (or `bc ab fn`) bakes it again.
 * Zones the game has already generated keep the vegetation and locations they got. Plant before a
-  world is explored.
+  world is explored. Better Continents regenerates the zones after each `bc` change, apart from
+  those around what players built or worked, and around other players (the README's *Debug Mode &
+  Zone Regeneration*).
 
 ---
 
 ## 3. The three fixes
+
+Made in 0.8.1.
 
 ### 3.1 `GetBiomeSector` on resized grids (Expand World Size issue #26)
 
@@ -596,7 +674,8 @@ bigger one every lookup past index 2047 lands on the wrong column or row (radius
 x = 14000 m is index 2629, read from column 2047 at x = 7014 m).
 
 0.8.1 prefixes that overload: on a grid whose size is not 2048 it clamps to the real size; a
-2048 grid runs the original untouched. The harness checks radius 6000, 10500 and 15000.
+2048 grid runs the original untouched. The harness checks radius 6000, 10500 and 15000. The grid
+of a world laid out to its World Size (1.11) is such a grid too, and the same prefix serves it.
 
 ### 3.2 Stale biome grid
 
@@ -618,11 +697,11 @@ mod. A vanilla world whose cache carries a Better Continents trailer is rebuilt 
 run). A grid can therefore never be stale across loads, and the two fingerprint patches bind but
 never run; they stay as a guard for any game version that reads the cache again.
 
-What does matter is staleness *within* a session. The game builds the grid only at world
-load, but Better Continents' debug commands change maps and settings live. 0.8.1 rebuilds the grid,
-regions and placement whenever they change (on a worker thread for the grid), and only then resets
-the zones; the zone reset also clears each terrain chunk's cached corner regions, which the game
-only ever appends to.
+What does matter is staleness *within* a session. The game builds the grid each time a world
+loads (on the server, and on every client as it joins), but Better Continents' `bc` commands
+change maps and settings live. 0.8.1 rebuilds the grid, regions and placement whenever they change
+(on a worker thread for the grid), and only then regenerates the zones; the same step also clears
+each terrain chunk's cached corner regions, which the game only ever appends to.
 
 ### 3.3 Deep North weather
 
@@ -676,6 +755,9 @@ cd tools/altbiome-harness
 dotnet run -c Release                  # every check; regenerates ../../palettes
 dotnet run -c Release -- help          # the tools used for the dedicated-server test
 ```
+
+`tools/run-tests.sh` builds the plugin and runs every offline suite in turn, this harness among
+them.
 
 It needs `libs-Tools` next to the repository and the 1.0.15 alt-biome data extraction
 (`altbiomes_1.0.15_full.json`, path overridable with the `ALTBIOMES_JSON` environment variable).

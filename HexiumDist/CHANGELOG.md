@@ -1,3 +1,224 @@
+- v0.10.0
+  - Every existing world and preset keeps its terrain, biomes and locations exactly as in 0.9.4, and a
+    world is saved byte for byte as before. What else changes for them is listed under "For every
+    world". Everything under "For new worlds only" belongs to new worlds, those of settings version
+    12, which is what 0.10 gives a world it creates, and never reaches a world marked with an older
+    version. A preset keeps the version it was saved with, so it makes the world it always made: the
+    four presets that ship with the mod are version 7 and make version 11 worlds. A new world made
+    from map files of your own is a version 12 world, which reads them the 0.10 way; setting
+    [00 BetterContinents.Debug] Override version to 11 before you make it gives a version 11 world,
+    which gets none of the new-world changes, as 0.9.4 would have made it. While Override version is
+    set it is also the version every world is saved in and sent to joining players, so leave it empty.
+    The README's "Upgrading from 0.9" section sets out which worlds get what.
+  - A world made from an export folder (the export's own preset, "bc_import", or a Directory with an
+    export.cfg) is version 12 when the export's maps span what its own World Size and Edge Size give,
+    which an export of a version 12 world and a 0.9.x export of a world of vanilla's size do. Otherwise
+    (an export of a resized 0.9.x world, or one made under Expand World Size at another size) it is
+    version 11: its maps span 21,000 m, as a version 11 world's do (an export made under Expand World
+    Size is rebuilt as it was only with Expand World Size installed at that size), and it gets none of
+    the new-world changes.
+  - Play a version 12 world with 0.10. Better Continents 0.9 still opens it, but as an older world (its
+    maps span 21,000 m whatever its World Size says, for one), and its next save writes the world as
+    version 11, so 0.10 then treats it as made by 0.9. It cannot read a world made with the experimental
+    Compact Maps below: it generates that world's terrain as vanilla and leaves the world's settings file
+    alone. It refuses a .bcworld file of a version 12 world as a bad header. On a world that uses Better
+    Continents the server and every player must run exactly the same version, so update them together.
+  - The README, ALTBIOMES.md and the three guides in the package (the Better Continents Guide, "Export &
+    Import, the easy guide" and "Map-making: a skill for AI agents") describe 0.10: the guides are rebuilt
+    as the Valheim 1.0 / Better Continents 0.10.x editions.
+  - For every world
+    - Better Continents regenerates the zones itself, after each change made with the "bc" commands or
+      the debug menu (Alt+F8) and on "bc regen". It resets the world's generated zones on the machine
+      that runs the world (single player or the host), in a world that uses Better Continents: in a
+      world without it, which is the game's own, the zones are left alone and the console says so. This
+      comes with the "bc" commands, not with Debug Mode: they need cheats, which Debug Mode turns on at
+      spawn (or type devcommands). The work is spread over frames, with a start line, progress lines and
+      a finish line in the console, and a new change or a new "bc regen" while it runs starts it over,
+      after the zone it was in is finished.
+      Each reset zone generates again with the new settings, locations included, when someone comes near.
+      Players, what players built, tombstones and tamed animals are never removed, and a creature that a
+      creature spawner made goes with its spawner unless it is tamed or stands in a zone that is left
+      alone. If an error stops the work, the zones it had emptied and left waiting for their neighbours
+      are finished, so they generate again when someone comes near, and the zones it had not reached are
+      as they were: "bc regen" resets them.
+    - What zone regeneration leaves alone. Every generated zone is reset except zones within one zone
+      (3 x 3) of something a player built, a tombstone, ground a player has worked (fields, paths, roads,
+      levelled or dug ground), or you while you are inside a dungeon; the ground around your own character
+      on the surface is regenerated too. A player connected from another machine keeps the zones their
+      game has loaded around them (their simulation distance: the 5 x 5 block by default, never less than
+      the 3 x 3), checked as the work goes, so a player who moves keeps the zones around where they are
+      now; something you build while it runs keeps its zone from then on. A location that reaches into
+      more than one zone is kept or regenerated whole: if one of its zones stays, the others stay with it,
+      and the parts of a location that stand in a zone nobody has generated yet are cleared with it, so
+      regenerating again does not leave a second copy. Crops are kept with their field. A tree a player
+      grew from a sapling counts as the world's, so it goes unless something nearby keeps its zone, and a
+      zone that was already reset is not brought back when something is built beside it later. A location
+      whose home zone the game generates while the work is running (someone came near it) can end up half
+      placed, or placed twice; "bc regen" again sets it right.
+    - Zone regeneration and saves. A zone is never saved half emptied, and a location is never saved half
+      cleared: if the world is saved while the regeneration is going, the zones it has emptied are saved
+      as not generated and generate again when someone comes near. A reset zone also waits to generate
+      again until the zones around it that are being reset have been cleared, so a location that reaches
+      over a zone edge is built once, whole. Where a zone that stays meets a zone that was reset, the
+      height edits along the shared edge are cleared on the side that stays (the paint stays), so that
+      the two grounds meet; this follows the zones actually reset, also when the regeneration is cut short.
+    - "bc regen" does what a change does to the zones, on demand: it rebuilds the terrain that is loaded
+      and regenerates the zones. It does not redraw the minimap or rebuild the alt-biome grid, which "bc
+      reset" still does before it.
+    - The whole ground follows a change at once. After a "bc" change, "bc reset" or "bc regen", the
+      distant terrain, the grass and a zone that is loading at that moment take the new settings
+      straight away; before, they could keep the old shape until the game redrew them or the zone loaded
+      again.
+    - "bc h alpha", "bc reload lm" and "bc reload terrain" read a map by the loaded world's own rule. "bc
+      h alpha" decodes the loaded heightmap again at once, in every world: a version 11 world re-reads it
+      the old way (8-bit grey, the alpha unused) with Heightmap Alpha on, and as 16-bit grey with it off;
+      before, a change did nothing until the world was loaded again. "bc reload lm" reads the location
+      map's pins exactly, and "bc reload terrain" reads the terrain legend's Expand World Data ground
+      names, on a version 12 world; a version 11 world reads both as it always did.
+    - [00 BetterContinents.Debug] Debug Reset Command, which held the console command that regenerated
+      the zones (zones_reset start), is empty by default now: Better Continents regenerates the zones
+      itself. A console command written there runs instead, after each change and on "bc regen" (for
+      example zones_reset start), and a BetterContinents.cfg that still holds the old default is set to
+      empty once, with a line in the log that says how to go back. The hidden [07 BetterContinents.Misc]
+      Config Version records it, so a zones_reset start you write afterwards stays.
+    - Water follows its ground. Each 64 m zone's water works out how deep the sea is under it once, when
+      the zone loads, so ground rebuilt in place afterwards (a "bc" change, "bc reset", "bc regen", or a
+      terrain edit that loads after its zone) left a square of sea with straight edges looking deep
+      among shallow-looking water, or the other way round. Now each zone's water takes the depth of its
+      rebuilt ground. Worlds without Better Continents are untouched.
+    - Vegetation is no longer placed twice. The game fills a zone with trees, bushes, rocks and the like
+      from the world seed, the zone and each prefab's name, so a zone filled a second time over its own
+      objects (a command that fills zones again, or a save put back together from mismatched files) draws
+      every spot again and doubles everything in it: "a clone of everything within inches or 1 m", as a
+      player put it. Now a plant is not placed within 1 m of the same kind of object already standing in
+      its zone, or placed there by another vegetation entry in the same pass, in every world made with
+      Better Continents, old ones included. It changes vegetation only, never terrain, and only in zones
+      generated from now on: zones that are already generated keep what they have. One entry never blocks
+      itself, so vanilla's densities and groups stay for every prefab with one entry, except beside an
+      object of that prefab that already stands in its zone (one of a location placed just before, or of
+      an earlier fill); where two entries place the same prefab (for example a vegetation map's, or an alt
+      biome's added vegetation) a second plant within 1 m of the first is dropped, so a zone generated
+      from now on can hold fewer plants than in 0.9.4.
+    - Adds "bc_twins" (any player; "bc twins" in the host's bc tree) to find and remove the doubled
+      vegetation a world already has. "bc_twins [radius]" counts twins by prefab and zone: exact twins
+      (two copies on one spot) and near ones (within the radius, 1 m unless given, 0.1 to 5 m). "bc_twins
+      remove [radius]" shows what a cleanup would delete and "bc_twins remove confirm [radius]" deletes
+      it, 1000 objects a frame: the copy nearest the ground stays, nothing a player built is ever removed,
+      crops players grow go only when they stand on one spot, and without a radius only exact twins go.
+      Removal runs where the world is: single player, the host, or a dedicated server ("bc_twins server
+      ...", admins only). Back the world up first. If another mod has changed the game's vegetation code
+      so that the guard cannot be installed, the log says so (the vegetation map is off then too) and the
+      rest of Better Continents still works.
+    - Maps take far less memory. Better Continents now holds the float maps (height, rough, forest, heat,
+      lava and moss), the biome map, the spawn and vegetation maps and the paint and terrain maps in tiles
+      of 128 x 128 pixels, and a tile of one value (open sea, the empty canvas around a painted area) is
+      held as that one value. Every value reads exactly as before, and as fast. Measured on a real set of
+      10,501 px maps (a heightmap, a forest map and a biome map), a world holds about 99 MB where 0.9.4
+      held about 1.32 GB. The world file and what is sent to joining players are unchanged.
+    - Heightmap Amount is 1 everywhere. [02 BetterContinents.Heightmap] Heightmap Amount and the bc
+      console already used 1; [09 BetterContinents.Export] Default Heightmap Amount, which was 2, is 1 now
+      too. With Sea Level 0.5 an export's heights then span -30 m to 170 m on the game's height scale,
+      where the sea is at 30 m (60 m below the water to 140 m above it), and clip higher ground (the export
+      says how many pixels); "amount=2" (or Default Heightmap Amount 2) keeps the old encoding of -30 m to
+      370 m (up to 340 m above the water), which keeps every vanilla mountain. A BetterContinents.cfg that
+      still holds the old default of 2 is set to 1 once, and the log says so; the hidden
+      [07 BetterContinents.Misc] Config Version records it, so a 2 you choose afterwards stays.
+    - A world export's heightmap.png now records the Heightmap Amount and Sea Level Adjustment its heights
+      are encoded for, in a PNG text chunk that image editors show and often keep. A new world that reads
+      a heightmap with such a record at other settings says so in the log, and "bc info" shows the record.
+      Nothing changes by itself, and a heightmap without a record (every existing one) reads exactly as
+      before.
+    - A world export, with Expand World Data installed, treats an added biome whose terrain is the
+      Ashlands or the Mistlands as that ground for the lava and moss maps, so rebuilding the world paints
+      them again. Worlds without such biomes export as before.
+    - [05 BetterContinents.StartPosition] Start Position X and Y accept -1,000,000 to 1,000,000 m (the
+      config stopped at +-10,500 and the console's x and y at 0 to 1), for worlds bigger than vanilla's.
+    - When a location cannot be placed because its zone already holds one (the game keeps one location per
+      64 m zone and drops a second with only "Location already exist in zone"), the log now says which: an
+      error when the start position override was refused, a warning for a pin of the location map. Before,
+      it claimed the position was "overriden".
+    - The edge of the world keeps to each world's own size within one game session. Before, a world loaded
+      after another one of a different World Size kept the first world's edge (the ship's push back, the
+      kill zone and the water's edge), and with [01 BetterContinents.Global] Map Edge Drop-off off another
+      mod's patching of the same game code could put the edge back at World Size.
+    - When Expand World Size's World Stretch is not 1, the log warns once, in any Better Continents world,
+      that it magnifies the maps so that only their centre shows: keep it at 1.
+    - Console tools answer where they were asked. "bc_export", "bc_cache", "bc_import", "bc_altbiomes" and
+      "bc_twins" share one set of plumbing: what an admin sends to a dedicated server ("bc_export server
+      ...", "bc_twins server ...") now answers in the admin's own console as well as in the server's log,
+      and a server export tells the admin when it ends. "bc cache" and "bc twins" join "bc export", "bc
+      import" and "bc ab" in the host's bc tree. The group descriptions that said "get more info with 'bc
+      param X help'" now name their own group ("bc h help"), and "help" on a group lists it instead of
+      first printing "argument help is not recognized".
+    - The bc console's defaults and ranges now come from the same place as the config's, so they agree:
+      Heightmap Override All, Forest Scale, Forestmap Add and Start Position X and Y had drifted.
+    - Fix Water Color and Ocean Channels are no longer in BetterContinents.cfg, and the "bc g
+      fixwatercolor" command is gone. The first was never implemented and the second is read only by the
+      oldest height formulas (settings formats 1 to 6); worlds that saved them still load them.
+    - [06 BetterContinents.Maps] Spawnmap File is the creature spawn map, and Better Continents no longer
+      treats it as the old name of the location map. Before, a BetterContinents.cfg with a Spawnmap File
+      and no Locationmap File had the Spawnmap File moved into Locationmap File when the game started, and
+      a missing locationmap.png with a spawnmap.png beside it had the spawn map renamed to
+      locationmap.png.
+    - A new BetterContinents.cfg selects the preset "Disabled". Its old default, "Vanilla", named no
+      preset: a new world was made without Better Continents and logged an error saying so. An existing
+      BetterContinents.cfg that holds "Vanilla" keeps it and still logs that error. The map-file settings'
+      descriptions say what each file is and that Directory wins, and none refers to Nexusmods any more.
+  - For new worlds only
+    - World Size lays out the whole world. Until now a world's maps always spanned vanilla's 21,000 m and
+      World Size only moved the game's edge (the kill zone, the ship's push back and the water's edge), so
+      a World Size 20000 world had its land end at 10,500 m, ringed by ocean out to its edge. On a new
+      world the maps span World Size + Edge Size in each direction, the land drops away over the edge, and
+      the rest of the world is laid out to the size too: the alt-biome grid (12 m points out to the edge,
+      so the locations reach the whole world too) and the minimap's pixels (its texture keeps its size)
+      follow World Size + Edge Size; where locations are searched for and how far from the centre each may
+      be, the game's own biome bands, its Ashlands and Deep North rings with their gaps and the Deep
+      North's calm sea, and the area lakes and stream sources are searched for in follow World Size.
+      Terrain detail (hills, rocks, noise) keeps its size. [08 BetterContinents.AltBiomes] Grid has no
+      effect on such a world, and "bc info" says when a world is laid out to its size.
+    - A bigger world builds a bigger alt-biome grid each time it loads, on the server and on every client
+      as it joins: slower, and about 0.2 GB at a radius of 16,350 m. Valheim builds the grid for every
+      world, so [08 BetterContinents.AltBiomes] Mode = Off means no alt biomes, not no grid. The practical
+      maximum is a World Size + Edge Size of 16,350 m: the game files every object beyond about 16.35 km
+      from the centre under one shared sector.
+    - With Expand World Size installed, it lays out the world as before (its size, grid, minimap and
+      locations) and Better Continents leaves the layout to it. Install it on every machine that plays the
+      world or on none, and do not add it to a world Better Continents laid out. Its World Stretch
+      magnifies Better Continents' maps, so that only their centre shows, and it should be 1.
+    - [02 BetterContinents.Heightmap] Heightmap Alpha now blends. Before, a heightmap with it on was read
+      as 8-bit grey (heights in 256 steps) and its 8-bit alpha was never used. A new world reads 16-bit
+      grey with a 16-bit alpha, and the alpha blends the heightmap with the game's own terrain: where a
+      pixel is opaque the heightmap alone decides, where it is transparent the game's terrain shows. A
+      version 11 world keeps the old reading with it on: 8 bits, the alpha unused (with it off every world
+      reads 16-bit grey).
+    - Expand World Data's rules reach the maps. Its altitude rules (a biome's or territory's altitude
+      multiplier and delta, water depth, height limits and lava dip) apply over the heightmap's heights as
+      they do over the game's own; before, Better Continents' heights replaced them everywhere but where
+      the rough map is white. On a world with a biome map and no heat map (or Heatmap Scale 0), its lava
+      biomes ("lava: true" in its yaml) are hot where the biome map puts them, so lava burns there; before,
+      only the Ashlands were hot on a biome map. With a heat map the heat decides. The terrain map's
+      legend (terrainmap.txt) may name one of its biomes for a ground colour ("DeadWastes: 8B4513"), and
+      Biome precision keeps its territories' ground colours instead of replacing them. A new world also
+      saves the names of the biomes its biome map adds and follows them when Expand World Data numbers its
+      biomes differently (it numbers them in its yaml's order, and a world stored the number): a biome it
+      no longer has reads as None, where before it read as whichever biome held its number.
+    - [03 BetterContinents.Biomemap] Biome precision goes up to 31: cells of 2 m in each 64 m terrain
+      zone. A version 11 world stops at 5.
+    - The location map's pins land exactly on their pixel, where the height and biome maps put it (before,
+      at the pixel's corner, up to a pixel to the south-west). A pin of several pixels is placed on the
+      one nearest its middle, and locations that share a colour are dealt out the same way every time, so
+      one set of maps gives one world. Maps from a world export are still read where the export wrote
+      them. The start position override is placed before the pins, so a pin in its zone can no longer take
+      it.
+    - [07 BetterContinents.Misc] Compact Maps (EXPERIMENTAL, off by default). On, a world made while it is
+      on keeps its maps compressed in memory, decodes each tile when it is first read, and saves and sends
+      its maps compressed. On the same 10,501 px maps as above the world file shrinks from 126 MB to 10.5
+      MB and a loaded world holds about 21 MB. It is read only when a world is made (From Config,
+      "bc_import" or a Directory's export.cfg), and a world keeps it for good: Better Continents 0.9
+      cannot read such a world. [07 BetterContinents.Misc] Map Memory (default 512 MB, 64 to 65536) is how
+      much memory this machine lets the decoded tiles of those worlds take. Past it the tiles read least
+      recently are dropped and decoded again when read again. It applies at once and does nothing for any
+      other world.
 - v0.9.4
   - A world export loads correctly when the Directory setting points at it. Setting only Directory to an
     export folder and creating the world with "From Config" loaded the maps but not the settings in the
