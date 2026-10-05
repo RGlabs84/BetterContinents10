@@ -9,7 +9,7 @@
 #   livecfg-tests     live config, transfer rate, world cache, minimap
 #   ewd-tests         Expand World Data biomes (vanilla and EWD processes)
 #   twin-tests        the vegetation twin guard, bc_twins' scan, the PlaceVegetation tracking on the game's IL
-#   size-tests        the world's size: WorldGeometry, SetSize, the edge-of-world patches on the game's IL
+#   size-tests        the world's size: WorldGeometry, SetSize, the edge-of-world patches on the game's IL; the water depth patch
 #   tile-tests        the maps' tiles: the codec, every map kind sampling as before, saves in tiles, the cache
 # Usage: tools/run-tests.sh [suite ...]   (default: all). Exit code 1 when the build or any suite fails.
 set -u
