@@ -48,6 +48,9 @@ internal class ImageMapLocation() : ImageMapBase()
     public Dictionary<string, List<Vector2>> RemainingAreas = [];
     private Dictionary<string, Color32> Colors = [];
     private bool exactPins;
+    // A reload in a loaded world (MapKind.Reload) reads the picture again by that world's rule; a map read back from a
+    // world's settings holds only its pins and was made without it.
+    internal bool ExactPins { get => exactPins; set => exactPins = value; }
     // World export (WorldExport): the legend this map was decoded with (empty for a map read back from a world's
     // settings, which stores the chosen positions only).
     internal IReadOnlyDictionary<string, Color32> LegendColors => Colors;

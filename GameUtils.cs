@@ -24,9 +24,30 @@ public static class GameUtils
         BetterContinents.AltBiomeControl.RequestRebuild(BetterContinents.AltBiomeControl.RebuildLevel.Points, "settings changed", ResetZones);
     }
 
+    // The game's own calls that ResetZones makes, as fields that tools/zone-tests stands in for: the console runs a command,
+    // and Better Continents' regeneration is requested.
+    internal static Action<string> RunConsoleCommand = command => Console.instance.TryRunCommand(command);
+    internal static Action RequestRegeneration = () => ZoneRegen.Request();
+    // Poke takes the amount of frames to delay by, 1 matches the old "delayed" flag.
+    internal static Action<Heightmap> PokeHeightmap = hm => hm.Poke(1);
+
+    // After every "bc" change, and on "bc regen": the loaded terrain is built again and the zones generate again. Better
+    // Continents regenerates the zones itself (ZoneRegen) unless Debug Reset Command holds a console command, which runs
+    // instead, as it always has.
     public static void ResetZones()
     {
-        Console.instance.TryRunCommand(BetterContinents.ConfigDebugResetCommand.Value);
+        var command = BetterContinents.ConfigDebugResetCommand.Value;
+        bool own = ZoneRegen.RunsOwn(command);
+        if (!own)
+            RunConsoleCommand(command);
+        PokeHeightmaps();
+        if (own)
+            RequestRegeneration();
+    }
+
+    // The terrain that is loaded was built from the settings before the change.
+    internal static void PokeHeightmaps()
+    {
         foreach (var hm in Heightmap.s_heightmaps)
         {
             hm.m_buildData = null;
@@ -34,10 +55,68 @@ public static class GameUtils
             // the sectors and alt biomes of every earlier build; SpawnSystem reads m_cornerAltBiomes.
             hm.m_cornerBiomeList.Clear();
             hm.m_cornerAltBiomes.Clear();
-            // Poke takes the amount of frames to delay by, 1 matches the old "delayed" flag.
-            hm.Poke(1);
+            PokeHeightmap(hm);
         }
+        // The distant terrain is not in s_heightmaps (Heightmap.cs:184-189, 220-225), and TerrainLod builds it again only once the
+        // camera has moved 256 m (TerrainLod.cs:172), so it would show the old settings until then.
+        PokeDistantTerrain(Heightmap.Instances, PokeHeightmap);
+        DropStaleTerrain();
     }
+
+    // The distant terrain TerrainLod has built (its nine heightmaps), to be built again where it is. One it has not built yet has
+    // nothing old to show, and is left to it. How many were poked.
+    internal static int PokeDistantTerrain(IEnumerable<IMonoUpdater> heightmaps, Action<Heightmap> poke)
+    {
+        int poked = 0;
+        foreach (var updater in heightmaps)
+        {
+            if (updater is Heightmap { IsDistantLod: true, m_buildData: not null } hm)
+            {
+                hm.m_buildData = null;
+                poke(hm);
+                poked++;
+            }
+        }
+        return poked;
+    }
+
+    // What was made from the settings before the change and is still around, for the terrain that was just poked to build again
+    // (a delayed Poke runs in this frame's LateUpdate): the terrain builder's ready list holds up to 16 builds that the rebuild would
+    // take as its own (HeightmapBuilder.cs:51-60, 110-146, 260-306), and the grass is cut from the ground as it is after that
+    // rebuild, so it is cleared once the frame has run. The ready list is emptied now and again then, because a build that was under
+    // way is added to it when it returns. In the menu or a closed world there is nothing of either to drop.
+    internal static void DropStaleTerrain()
+    {
+        ClearReadyBuilds();
+        var host = BetterContinents.instance;
+        if (host)
+            host.StartCoroutine(DropStaleTerrainLater());
+    }
+
+    private static IEnumerator DropStaleTerrainLater()
+    {
+        yield return null;
+        ClearReadyBuilds();
+        var clutter = ClutterSystem.instance;
+        if (clutter)
+            clutter.ClearAll();
+    }
+
+    // The builder's own lock guards its lists, and the build thread adds a finished build and trims the list in one hold of it. Only the
+    // ready list is emptied: the thread reads m_toBuild[0] in a second hold after it has seen the list is not empty (:117-127), so a
+    // list emptied from here in between would throw there and end the thread, and every terrain request would then wait for ever; and
+    // what is still queued is built after the change anyway. A builder that was never made, or that was disposed of (which clears its
+    // lock), has nothing to clear, and asking the game for it would make one.
+    internal static void ClearReadyBuilds()
+    {
+        var builder = HeightmapBuilder.m_instance;
+        var padlock = builder?.m_lock;
+        if (builder == null || padlock == null)
+            return;
+        lock (padlock)
+            builder.m_ready.Clear();
+    }
+
     private static int MinimapOrigTextureSize = 0;
     private static float MinimapOrigPixelSize = 0;
 

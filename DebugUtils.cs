@@ -145,8 +145,15 @@ public partial class DebugUtils
                     GameUtils.FastMinimapRegen();
                 });
             bc.AddCommand("reset", "reset",
-                "Resets whole map (done automatically on every change)",
+                "Redraws the minimap, rebuilds the alt-biome grid and regenerates the zones (as every change does)",
                 _ => GameUtils.Reset());
+            bc.AddCommand("regen", "Regenerate zones",
+                "Regenerates the zones now, the way every change here does: every generated zone is reset and generates again with the current settings when somebody comes near, "
+                + "except zones within one zone of something a player built or worked on (a field, a path, levelled ground), a tombstone, a player connected from another machine "
+                + "(as far as their game keeps zones loaded around them), or you inside a dungeon. A location that reaches into one of those zones is kept whole. "
+                + "Players, what players built, tombstones and tamed animals are never removed. A console command in Debug Reset Command runs instead. "
+                + "'bc reset' does this after redrawing the minimap and rebuilding the alt-biome grid",
+                args => ZoneRegen.RunCommand(args, line => Console.instance.Print(line), GameUtils.ResetZones));
             bc.AddCommand("scr", "Save map screenshot",
                 "Saves the minimap to a png, optionally pass resolution, default is 2048", arg =>
                 {

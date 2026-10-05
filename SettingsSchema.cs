@@ -125,7 +125,7 @@ internal static class SettingsSchema
   // ---- 00 Debug -------------------------------------------------------------------------------------------------------
   public static readonly SettingDef<bool> Enabled = S("Enabled", "Whether this mod is enabled", SettingScope.World, true, e => ConfigEnabled = e);
   public static readonly SettingDef<bool> DebugMode = S("Debug Mode", "Automatically reveals the full map on respawn, enables cheat mode, and debug mode, for debugging purposes", SettingScope.Local, false, e => ConfigDebugModeEnabled = e);
-  public static readonly SettingDef<string> DebugResetCommand = S("Debug Reset Command", "The console command that regenerates the zones after a debug-mode change (bc ...): Upgrade World's, so it needs Upgrade World.", SettingScope.Local, "zones_reset start", e => ConfigDebugResetCommand = e);
+  public static readonly SettingDef<string> DebugResetCommand = S("Debug Reset Command", "Empty (the default): Better Continents regenerates the zones itself after a debug-mode change (bc ...) and on 'bc regen'. Every generated zone is reset, and generates again with the current settings when somebody comes near, except zones within one zone of something a player built or worked on (a field, a path, levelled ground), a tombstone, a player connected from another machine (as far as their game keeps zones loaded around them), or you inside a dungeon. A location that reaches into one of those zones is kept whole. Players, what players built, tombstones and tamed animals are never removed. A console command written here (for example zones_reset start) runs instead.", SettingScope.Local, "", e => ConfigDebugResetCommand = e);
   public static readonly SettingDef<string> OverrideVersion = S("Override version", "Empty (the default): every world is saved in its own settings version (one older than 11 as 11), and a new world gets the newest (12, made by 0.10). A number here saves every world in that version instead, and a new world made From Config gets it when it is 11 or more: 11 makes worlds as Better Continents 0.9 did. For testing only: a world saved in an older version than its own loses what its version added.", SettingScope.World, "", e => ConfigOverrideVersion = e);
   public static readonly SettingDef<string> Directory = S("Directory", "A folder of maps, each loaded by its standard name: heightmap.png, biomemap.png, terrainmap.png, locationmap.png, roughmap.png, forestmap.png, heatmap.png, paintmap.png, lavamap.png, mossmap.png, vegetationmap.png, spawnmap.png, altbiomemap.png (and the legends beside them). When it is set, the map file settings are not used. A folder with an export.cfg in it (a world export) also brings the settings in that file, which win over this one.", SettingScope.World, "", e => ConfigMapSourceDir = e);
 
@@ -293,7 +293,7 @@ internal static class SettingsSchema
 
   // ---- one-time changes to a player's file ----------------------------------------------------------------------------
 
-  public const int CurrentConfigVersion = 1;
+  public const int CurrentConfigVersion = 2;
 
   /// <summary>Awake, after <see cref="Bind"/> and before anything reads the values: the changes a file written by an older
   /// Better Continents needs, each made once (Config Version records how far a file has come).</summary>
@@ -309,6 +309,15 @@ internal static class SettingsSchema
       ExportHeightmapAmount.Entry.Value = 1f;
       Log("BetterContinents.cfg: [09 BetterContinents.Export] Default Heightmap Amount was 2 (the default of Better Continents 0.9.0 to 0.9.4) and is now 1, "
           + "Better Continents' default everywhere. Set it back to 2 to export at the old encoding (-30 m to 370 m).");
+    }
+    // 2, zone regeneration: Debug Reset Command is empty by default, which leaves the regeneration to Better Continents
+    // (ZoneRegen). 0.9.x shipped "zones_reset start", a console command of another mod, and every file they wrote holds
+    // it; only that exact text is the old default, anything else was chosen.
+    if (version < 2 && DebugResetCommand.Entry.Value == "zones_reset start")
+    {
+      DebugResetCommand.Entry.Value = "";
+      Log("BetterContinents.cfg: [00 BetterContinents.Debug] Debug Reset Command was \"zones_reset start\" (the default of Better Continents 0.9) and is now empty: "
+          + "debug mode regenerates the zones itself. Write \"zones_reset start\" there again to run that console command instead.");
     }
     ConfigVersion.Entry.Value = CurrentConfigVersion;
   }

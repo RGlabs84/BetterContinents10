@@ -32,6 +32,9 @@ internal class ImageMapTerrain() : ImageMapColor()
         {"ocean", new Color32(0, 0, 0, 0)}
     };
     private bool namesEwdGrounds;
+    // A reload in a loaded world (MapKind.Reload) reads the legend by that world's rule; a map read back from a world's
+    // settings was made without it.
+    internal bool NamesEwdGrounds { get => namesEwdGrounds; set => namesEwdGrounds = value; }
 
     public override bool LoadSourceImage() => LoadSourceImageAndColors(DefaultColors);
     protected override string PrepareLegend(string legend) => namesEwdGrounds ? NameEwdGrounds(legend) : legend;

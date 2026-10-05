@@ -73,6 +73,19 @@ internal static class PinTest
     bool inPin = Enumerable.Range(-1, 3).Any(dx => Enumerable.Range(-1, 3).Any(dy => c == Corner(500 + dx, 600 + dy)));
     C(inPin, "and a bigger pin at one of its own pixels");
 
+    // "bc reload lm" in a loaded world: the map the world holds was read back from its settings (made without the world's
+    // rule), and a reload reads the picture again by that world's own rule.
+    var locationField = typeof(BC.BetterContinentsSettings).GetField("LocationMap", BindingFlags.NonPublic | BindingFlags.Instance)!;
+    Vector2 ReloadedPinA(int version)
+    {
+      var s = new BC.BetterContinentsSettings { EnabledForThisWorld = true, Version = version };
+      locationField.SetValue(s, ImageMapLocation.Create(png, exactPins: false));
+      BC.BetterContinentsSettings.MapKind.Location.Reload(s);
+      return Only((ImageMapLocation)locationField.GetValue(s)!, "PinA");
+    }
+    C(ReloadedPinA(12) == Exact(0, 0), "bc reload lm in a world made since 0.10: the pins land exactly on their pixels again");
+    C(ReloadedPinA(11) == Corner(0, 0), "bc reload lm in a world made before 0.10: at the pixel's corner, as always");
+
     // VALtimaOnline's canvas: 10501 pixels over 21000 m, a pixel every 2 m.
     var canvas = new ImageMapLocation { Size = 10501 };
     int off = 0;

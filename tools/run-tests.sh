@@ -11,6 +11,10 @@
 #   twin-tests        the vegetation twin guard, bc_twins' scan, the PlaceVegetation tracking on the game's IL
 #   size-tests        the world's size: WorldGeometry, SetSize, the edge-of-world patches on the game's IL; the water depth patch
 #   tile-tests        the maps' tiles: the codec, every map kind sampling as before, saves in tiles, the cache
+#   zone-tests        zone regeneration: what protects a zone (pieces, tombstones, players, worked ground), locations kept whole,
+#                     the plan and the work, saves and stops in the middle, requests and errors (Unity's coroutines stood in for),
+#                     a world that closes in every phase, time-slicing and bandwidth, the ground at a border, the Debug Reset
+#                     Command migration, "bc regen", the game code it relies on, a whole made-up world
 # Usage: tools/run-tests.sh [suite ...]   (default: all). Exit code 1 when the build or any suite fails.
 set -u
 cd "$(dirname "$0")/.."
@@ -20,7 +24,7 @@ export DOTNET_ROOT="${DOTNET_ROOT:-$HOME/.dotnet}"
 export DOTNET_GCHeapHardLimit="${DOTNET_GCHeapHardLimit:-0xC0000000}"
 logs="$(mktemp -d "${TMPDIR:-/tmp}/bc-tests-XXXXXX")"
 suites=("$@")
-[ ${#suites[@]} -eq 0 ] && suites=(golden-tests altbiome-harness export-tests import-tests livecfg-tests ewd-tests twin-tests size-tests tile-tests)
+[ ${#suites[@]} -eq 0 ] && suites=(golden-tests altbiome-harness export-tests import-tests livecfg-tests ewd-tests twin-tests size-tests tile-tests zone-tests)
 
 echo "== building the plugin"
 if ! nice -n 10 dotnet build -c Release BetterContinents.csproj > "$logs/build.log" 2>&1; then

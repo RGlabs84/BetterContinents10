@@ -397,7 +397,9 @@ public partial class BetterContinents
   // Loaded terrain keeps the grid (or none) it was built with: rebuild the zone heightmaps (distant LOD never has a
   // grid) and let the grass read the biomes again, as the 0.7 code did before precision was switched off. In Valheim 1.0
   // that is Heightmap.s_heightmaps, a delayed Poke (Regenerate in LateUpdate, like GameUtils.ResetZones) and
-  // ClutterSystem.ClearAll. Only in a loaded world: at world load and in the main menu there is nothing to redo.
+  // ClutterSystem.ClearAll, a frame later (GameUtils.DropStaleTerrain: the grass is cut from the rebuilt ground, and the builds made
+  // at the old precision that the terrain builder still holds are dropped). Only in a loaded world: at world load and in the main
+  // menu there is nothing to redo.
   private static void RegenerateLoadedTerrain()
   {
     if (!ZoneSystem.instance)
@@ -409,9 +411,7 @@ public partial class BetterContinents
       hm.Poke(1);
       rebuilt++;
     }
-    var clutter = ClutterSystem.instance;
-    if (clutter)
-      clutter.ClearAll();
+    GameUtils.DropStaleTerrain();
     Log($"Biome precision: rebuilding {rebuilt} loaded terrain zone(s) and the grass");
   }
 

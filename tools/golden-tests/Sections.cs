@@ -568,12 +568,21 @@ internal static class Sections
   static void Migration()
   {
     const string S = "migration";
+    // Step 1 is the export's Default Heightmap Amount, step 2 the Debug Reset Command (zone regeneration); Config Version records the last made.
+    const string Debug = "[00 BetterContinents.Debug]\nDebug Reset Command = ";
     var cases = new (string Name, string? File)[]
     {
       ("new-file", null),
       ("0.9.x-file", "[09 BetterContinents.Export]\nDefault Heightmap Amount = 2\n"),
       ("0.9.x-file-amount-3", "[09 BetterContinents.Export]\nDefault Heightmap Amount = 3\n"),
-      ("already-migrated", "[07 BetterContinents.Misc]\nConfig Version = 1\n\n[09 BetterContinents.Export]\nDefault Heightmap Amount = 2\n"),
+      ("migrated-to-1", "[07 BetterContinents.Misc]\nConfig Version = 1\n\n[09 BetterContinents.Export]\nDefault Heightmap Amount = 2\n"),
+      ("already-migrated", "[07 BetterContinents.Misc]\nConfig Version = 2\n\n[09 BetterContinents.Export]\nDefault Heightmap Amount = 2\n"),
+      ("0.9.x-file-debug-default", Debug + "zones_reset start\n"),
+      ("0.9.x-file-debug-custom", Debug + "zones_reset start safezones=3\n"),
+      ("0.9.x-file-both-defaults", Debug + "zones_reset start\n\n[09 BetterContinents.Export]\nDefault Heightmap Amount = 2\n"),
+      ("migrated-to-1-debug-default", "[07 BetterContinents.Misc]\nConfig Version = 1\n\n" + Debug + "zones_reset start\n\n[09 BetterContinents.Export]\nDefault Heightmap Amount = 2\n"),
+      ("already-migrated-debug-default", "[07 BetterContinents.Misc]\nConfig Version = 2\n\n" + Debug + "zones_reset start\n"),
+      ("newer-file", "[07 BetterContinents.Misc]\nConfig Version = 3\n\n" + Debug + "zones_reset start\n\n[09 BetterContinents.Export]\nDefault Heightmap Amount = 2\n"),
     };
     foreach (var (name, text) in cases)
     {
@@ -589,6 +598,7 @@ internal static class Sections
       });
       Golden.Add(S, $"{name}/export-amount", F(BC.ConfigExportHeightmapAmount.Value));
       Golden.Add(S, $"{name}/config-version", BC.ConfigFileVersion.Value.ToString());
+      Golden.Add(S, $"{name}/debug-reset-command", BC.ConfigDebugResetCommand.Value);
       Golden.Lines(S, $"{name}/log", log);
     }
   }

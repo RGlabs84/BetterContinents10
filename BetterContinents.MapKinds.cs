@@ -54,9 +54,11 @@ public partial class BetterContinents
         s => s.HeightMap, (s, m) => s.HeightMap = m, (s, path) => ImageMapFloat.Create(path, s.HeightmapAlphaMode, s.CompactMaps), false, (s, m) => m.CreateMap(s.HeightmapAlphaMode));
       public static readonly MapKind Biome = new BiomeMapKind();
       public static readonly MapKind Terrain = new MapKind<ImageMapTerrain>("Terrainmap", "terrainmap.png", SettingsSchema.TerrainmapFile, "terrain", "terrain",
-        s => s.TerrainMap, (s, m) => s.TerrainMap = m, (s, path) => ImageMapTerrain.Create(path, s.TerrainNamesEwdGrounds, s.CompactMaps), true, (_, m) => m.CreateMap());
+        s => s.TerrainMap, (s, m) => s.TerrainMap = m, (s, path) => ImageMapTerrain.Create(path, s.TerrainNamesEwdGrounds, s.CompactMaps), true,
+        (s, m) => { m.NamesEwdGrounds = s.TerrainNamesEwdGrounds; m.CreateMap(); });
       public static readonly MapKind Location = new MapKind<ImageMapLocation>("Locationmap", "locationmap.png", SettingsSchema.LocationmapFile, "l", "lm",
-        s => s.LocationMap, (s, m) => s.LocationMap = m, (s, path) => ImageMapLocation.Create(path, s.ExactLocationPins), false, (_, m) => m.CreateMap());
+        s => s.LocationMap, (s, m) => s.LocationMap = m, (s, path) => ImageMapLocation.Create(path, s.ExactLocationPins), false,
+        (s, m) => { m.ExactPins = s.ExactLocationPins; m.CreateMap(); });
       public static readonly MapKind Rough = new MapKind<ImageMapFloat>("Roughmap", "roughmap.png", SettingsSchema.RoughmapFile, "r", "rm",
         s => s.RoughMap, (s, m) => s.RoughMap = m, (s, path) => ImageMapFloat.Create(path, false, s.CompactMaps), true, (_, m) => m.CreateMap(false));
       public static readonly MapKind Flat = new FlatMapKind();

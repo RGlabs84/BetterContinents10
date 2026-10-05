@@ -1,13 +1,49 @@
 new-file/export-amount	1
-new-file/config-version	1
+new-file/config-version	2
+new-file/debug-reset-command	
 new-file/log/count	0
 0.9.x-file/export-amount	1
-0.9.x-file/config-version	1
+0.9.x-file/config-version	2
+0.9.x-file/debug-reset-command	
 0.9.x-file/log/001	[Log] [BetterContinents] BetterContinents.cfg: [09 BetterContinents.Export] Default Heightmap Amount was 2 (the default of Better Continents 0.9.0 to 0.9.4) and is now 1, Better Continents' default everywhere. Set it back to 2 to export at the old encoding (-30 m to 370 m).
 0.9.x-file/log/count	1
 0.9.x-file-amount-3/export-amount	3
-0.9.x-file-amount-3/config-version	1
+0.9.x-file-amount-3/config-version	2
+0.9.x-file-amount-3/debug-reset-command	
 0.9.x-file-amount-3/log/count	0
+migrated-to-1/export-amount	2
+migrated-to-1/config-version	2
+migrated-to-1/debug-reset-command	
+migrated-to-1/log/count	0
 already-migrated/export-amount	2
-already-migrated/config-version	1
+already-migrated/config-version	2
+already-migrated/debug-reset-command	
 already-migrated/log/count	0
+0.9.x-file-debug-default/export-amount	1
+0.9.x-file-debug-default/config-version	2
+0.9.x-file-debug-default/debug-reset-command	
+0.9.x-file-debug-default/log/001	[Log] [BetterContinents] BetterContinents.cfg: [00 BetterContinents.Debug] Debug Reset Command was "zones_reset start" (the default of Better Continents 0.9) and is now empty: debug mode regenerates the zones itself. Write "zones_reset start" there again to run that console command instead.
+0.9.x-file-debug-default/log/count	1
+0.9.x-file-debug-custom/export-amount	1
+0.9.x-file-debug-custom/config-version	2
+0.9.x-file-debug-custom/debug-reset-command	zones_reset start safezones=3
+0.9.x-file-debug-custom/log/count	0
+0.9.x-file-both-defaults/export-amount	1
+0.9.x-file-both-defaults/config-version	2
+0.9.x-file-both-defaults/debug-reset-command	
+0.9.x-file-both-defaults/log/001	[Log] [BetterContinents] BetterContinents.cfg: [09 BetterContinents.Export] Default Heightmap Amount was 2 (the default of Better Continents 0.9.0 to 0.9.4) and is now 1, Better Continents' default everywhere. Set it back to 2 to export at the old encoding (-30 m to 370 m).
+0.9.x-file-both-defaults/log/002	[Log] [BetterContinents] BetterContinents.cfg: [00 BetterContinents.Debug] Debug Reset Command was "zones_reset start" (the default of Better Continents 0.9) and is now empty: debug mode regenerates the zones itself. Write "zones_reset start" there again to run that console command instead.
+0.9.x-file-both-defaults/log/count	2
+migrated-to-1-debug-default/export-amount	2
+migrated-to-1-debug-default/config-version	2
+migrated-to-1-debug-default/debug-reset-command	
+migrated-to-1-debug-default/log/001	[Log] [BetterContinents] BetterContinents.cfg: [00 BetterContinents.Debug] Debug Reset Command was "zones_reset start" (the default of Better Continents 0.9) and is now empty: debug mode regenerates the zones itself. Write "zones_reset start" there again to run that console command instead.
+migrated-to-1-debug-default/log/count	1
+already-migrated-debug-default/export-amount	1
+already-migrated-debug-default/config-version	2
+already-migrated-debug-default/debug-reset-command	zones_reset start
+already-migrated-debug-default/log/count	0
+newer-file/export-amount	2
+newer-file/config-version	3
+newer-file/debug-reset-command	zones_reset start
+newer-file/log/count	0
