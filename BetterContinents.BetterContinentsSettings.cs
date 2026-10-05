@@ -349,7 +349,7 @@ public partial class BetterContinents
         output($"Map edge dropoff {MapEdgeDropoff}");
         output($"Mountains allowed at center {MountainsAllowedAtCenter}");
         if (CompactMaps)
-          output("Compact Maps (experimental): the maps are held as compressed tiles, decoded as the world reads them, and saved so");
+          output("Compact Maps (experimental): the maps are held and saved as compressed tiles, each decoded when the world reads it");
 
         if (HeightMap != null)
         {
