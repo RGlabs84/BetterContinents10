@@ -1289,7 +1289,10 @@ internal static partial class Program
     int distant = pokes.FindIndex(c => c.Name == "PokeDistantTerrain");
     int drop = pokes.FindIndex(c => c.Name == "DropStaleTerrain");
     C(loop >= 0 && distant > loop && drop > distant, "PokeHeightmaps pokes the zones' heightmaps, then the distant ones, then drops what is stale");
-    C(FinalCalls(typeof(GameUtils).GetMethod("ResetZones")!).Any(c => c.Name == "PokeHeightmaps"), "(and ResetZones, for the command and for Better Continents' own regeneration alike, goes through it)");
+    C(FinalCalls(typeof(GameUtils).GetMethod("StartReset", Any)!).Any(c => c.Name == "PokeHeightmaps")
+      && FinalCalls(typeof(GameUtils).GetMethod("ResetZones")!).Any(c => c.Name == "StartReset")
+      && FinalCalls(typeof(GameUtils).GetMethod("RegenerateZones")!).Any(c => c.Name == "StartReset"),
+      "(and a change's ResetZones, for the command and for Better Continents' own regeneration alike, goes through it; bc regen's RegenerateZones shares the start and skips the terrain)");
     var precision = FinalCalls(typeof(BC).GetMethod("RegenerateLoadedTerrain", Any)!);
     C(precision.Any(c => c.Name == "DropStaleTerrain" && c.Type == typeof(GameUtils)) && !precision.Any(c => c.Name == "ClearAll") && precision.Count(c => c.Name == "Poke") == 1,
       "the biome precision's rebuild no longer clears the grass in the frame of its pokes: it drops what is stale, a frame later");

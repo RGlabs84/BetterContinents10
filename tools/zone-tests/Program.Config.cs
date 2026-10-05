@@ -119,7 +119,8 @@ internal static partial class Program
     // GameUtils.ResetZones itself, with its game calls in fields, is run by HardenTests (ResetZonesTests), and the game calls those
     // fields hold by default are read there too (DefaultSeamTests).
 
-    // Nothing but GameUtils.ResetZones reads the Debug Reset Command setting to run it: every other place goes through that method.
+    // Nothing but GameUtils.StartReset (ResetZones after a change, RegenerateZones for bc regen) reads the Debug Reset Command
+    // setting to run it: every other place goes through those methods.
     var readers = new List<string>();
     var field = typeof(BC).GetField("ConfigDebugResetCommand")!;
     foreach (var type in typeof(BC).Assembly.GetTypes())
@@ -135,7 +136,7 @@ internal static partial class Program
           // Not every method decodes offline.
         }
       }
-    C(readers.SequenceEqual(["GameUtils.ResetZones"]), "only GameUtils.ResetZones reads Debug Reset Command: " + string.Join(", ", readers));
+    C(readers.SequenceEqual(["GameUtils.StartReset"]), "only GameUtils.StartReset reads Debug Reset Command: " + string.Join(", ", readers));
 
     // The alt-biome rebuild comes first, and the zones are reset when it is done: GameUtils.Reset hands ResetZones to it.
     var resetCalls = PatchProcessor.GetOriginalInstructions(typeof(GameUtils).GetMethod(nameof(GameUtils.Reset))!).ToList();
@@ -177,7 +178,8 @@ internal static partial class Program
     ZoneRegen.RunCommand("  ", said.Add, () => started++);
     C(started == 3 && said.Count == 2, "bc regen alone starts it");
     var wired = PatchProcessor.GetOriginalInstructions(typeof(DebugUtils).GetNestedType("<>c", Any)!.GetMethods(Any).First(m => m.Name.Contains("b__") && Callees(m).Any(c => c.Name == "RunCommand")));
-    C(wired.Any(i => i.opcode == OpCodes.Ldftn && i.operand is MethodInfo m && m.Name == "ResetZones"), "and the command hands GameUtils.ResetZones to it");
+    C(wired.Any(i => i.opcode == OpCodes.Ldftn && i.operand is MethodInfo m && m.Name == "RegenerateZones") && !wired.Any(i => i.opcode == OpCodes.Ldftn && i.operand is MethodInfo r && r.Name == "ResetZones"),
+      "and the command hands GameUtils.RegenerateZones to it (the zones, not the loaded terrain, which nothing changed)");
 
     static bool banned(string text) => new[] { "replace", "obsolete", "no longer need", "Upgrade World", "Expand World" }.All(w => !text.Contains(w, StringComparison.OrdinalIgnoreCase));
   }

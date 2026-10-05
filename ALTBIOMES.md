@@ -479,7 +479,7 @@ current value.
 | `bc ab hash` | This machine's grid and placement hashes. | |
 | `bc ab names [filter]` | The game's alt biomes with their default colours and random-placement rules. | |
 | `bc ab rebuild` | Regenerates grid, regions and placement from the current settings. | Points |
-| `bc ab fn [path]` | Sets the alt-biome map (full path, directory or file name) and bakes it with its legend. Clearing the field in the Better Continents debug menu (Alt+F8) removes it. | Sectors |
+| `bc ab fn [path]` | Sets the alt-biome map (full path, directory or file name) and bakes it with its legend. Clearing the field in the Better Continents settings window (the Better Continents button in the Esc menu or on the large map; Alt+F8 there does the same) removes it. | Sectors |
 | `bc ab mode [Random\|PlantedOnly\|Off]` | Mode. | Sectors |
 | `bc ab grid [WorldEdge\|Vanilla]` | Grid. | Points |
 | `bc ab seed [value]` | Placement seed: a number or any text; `world` = the world seed. | Assignment |

@@ -31,16 +31,22 @@ public static class GameUtils
     // Poke takes the amount of frames to delay by, 1 matches the old "delayed" flag.
     internal static Action<Heightmap> PokeHeightmap = hm => hm.Poke(1);
 
-    // After every "bc" change, and on "bc regen": the loaded terrain is built again and the zones generate again. Better
-    // Continents regenerates the zones itself (ZoneRegen) unless Debug Reset Command holds a console command, which runs
-    // instead, as it always has.
-    public static void ResetZones()
+    // After every "bc" change: the loaded terrain is built again and the zones generate again. Better Continents regenerates
+    // the zones itself (ZoneRegen) unless Debug Reset Command holds a console command, which runs instead, as it always has.
+    public static void ResetZones() => StartReset(rebuildTerrain: true);
+
+    // "bc regen": the settings are as they were, so the loaded terrain is left as it was built. Building every loaded chunk
+    // again (the distant terrain too) happens in one frame and stalls the game for most of a second, for nothing here.
+    public static void RegenerateZones() => StartReset(rebuildTerrain: false);
+
+    private static void StartReset(bool rebuildTerrain)
     {
         var command = BetterContinents.ConfigDebugResetCommand.Value;
         bool own = ZoneRegen.RunsOwn(command);
         if (!own)
             RunConsoleCommand(command);
-        PokeHeightmaps();
+        if (rebuildTerrain)
+            PokeHeightmaps();
         if (own)
             RequestRegeneration();
     }

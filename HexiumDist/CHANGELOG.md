@@ -28,13 +28,17 @@
     as the Valheim 1.0 / Better Continents 0.10.x editions.
   - For every world
     - Better Continents regenerates the zones itself, after each change made with the "bc" commands or
-      the debug menu (Alt+F8) and on "bc regen". It resets the world's generated zones on the machine
-      that runs the world (single player or the host), in a world that uses Better Continents: in a
-      world without it, which is the game's own, the zones are left alone and the console says so. This
-      comes with the "bc" commands, not with Debug Mode: they need cheats, which Debug Mode turns on at
-      spawn (or type devcommands). The work is spread over frames, with a start line, progress lines and
-      a finish line in the console, and a new change or a new "bc regen" while it runs starts it over,
-      after the zone it was in is finished.
+      the settings window and on "bc regen". It resets the world's generated zones on the machine that
+      runs the world (single player or the host), in a world that uses Better Continents: in a world
+      without it, which is the game's own, the zones are left alone and the console says so. This comes
+      with the "bc" commands, not with Debug Mode: they need cheats, which Debug Mode turns on at spawn
+      (or type devcommands). The "bc" command is registered for the host only; the Server
+      Devcommands mod lets any player with devcommands type it on their own machine, but on a joined
+      player's machine a change alters only that player's copy of the settings and their own view of the
+      ground, never the world or the other players, and the regeneration refuses there ("it runs on the
+      machine that runs the world"). Make "bc" changes on the host or in single player. The work is
+      spread over frames, with a start line, progress lines and a finish line in the console, and a new
+      change or a new "bc regen" while it runs starts it over, after the zone it was in is finished.
       Each reset zone generates again with the new settings, locations included, when someone comes near.
       Players, what players built, tombstones and tamed animals are never removed, and a creature that a
       creature spawner made goes with its spawner unless it is tamed or stands in a zone that is left
@@ -55,6 +59,14 @@
       zone that was already reset is not brought back when something is built beside it later. A location
       whose home zone the game generates while the work is running (someone came near it) can end up half
       placed, or placed twice; "bc regen" again sets it right.
+    - The ground under what it leaves alone. The ground of every zone, the zones it keeps included, is
+      built from the world's settings, so after a change it follows the new settings; the edits players
+      made with the hoe, the cultivator or the pickaxe are stored as changes to the ground and ride on the
+      new ground. A change that lowers the ground under a base leaves its pieces standing in the air, and
+      the game breaks a piece that has lost its support a few seconds later (in a test, a workbench and a
+      floor left about 3 m up were gone 8 seconds later); a change that raises the ground buries them,
+      and trees and rocks in kept zones float or sink the same way. Make big height changes before
+      building, or away from what you want to keep. "bc regen" on its own changes no ground.
     - Zone regeneration and saves. A zone is never saved half emptied, and a location is never saved half
       cleared: if the world is saved while the regeneration is going, the zones it has emptied are saved
       as not generated and generate again when someone comes near. A reset zone also waits to generate
@@ -62,13 +74,19 @@
       over a zone edge is built once, whole. Where a zone that stays meets a zone that was reset, the
       height edits along the shared edge are cleared on the side that stays (the paint stays), so that
       the two grounds meet; this follows the zones actually reset, also when the regeneration is cut short.
-    - "bc regen" does what a change does to the zones, on demand: it rebuilds the terrain that is loaded
-      and regenerates the zones. It does not redraw the minimap or rebuild the alt-biome grid, which "bc
-      reset" still does before it.
-    - The whole ground follows a change at once. After a "bc" change, "bc reset" or "bc regen", the
-      distant terrain, the grass and a zone that is loading at that moment take the new settings
-      straight away; before, they could keep the old shape until the game redrew them or the zone loaded
-      again.
+    - "bc regen" does what a change does to the zones, on demand, and leaves the terrain that is loaded
+      as it is: nothing changed, so the ground already matches the settings, and the game does not stall
+      when it starts. It does not redraw the minimap or rebuild the alt-biome grid either, which "bc
+      reset" still does before it. In a world without Better Continents it answers "Zone regeneration:
+      this world does not use Better Continents." at once and rebuilds nothing.
+    - A change made with the "bc" commands or the settings window (any setting, "bc reset", an alt-biome
+      change, a map reload, Biome precision) rebuilds the loaded terrain once, the distant terrain and the
+      grass too, and then regenerates the zones. That stalls the game for a second or two (1.6 s
+      measured), as the rebuild after a change did in 0.9.4; the regeneration work itself is spread over
+      frames.
+    - The whole ground follows a change at once. After a "bc" change or "bc reset", the distant terrain,
+      the grass and a zone that is loading at that moment take the new settings straight away; before,
+      they could keep the old shape until the game redrew them or the zone loaded again.
     - "bc h alpha", "bc reload lm" and "bc reload terrain" read a map by the loaded world's own rule. "bc
       h alpha" decodes the loaded heightmap again at once, in every world: a version 11 world re-reads it
       the old way (8-bit grey, the alpha unused) with Heightmap Alpha on, and as 16-bit grey with it off;
@@ -81,11 +99,19 @@
       example zones_reset start), and a BetterContinents.cfg that still holds the old default is set to
       empty once, with a line in the log that says how to go back. The hidden [07 BetterContinents.Misc]
       Config Version records it, so a zones_reset start you write afterwards stays.
+    - [00 BetterContinents.Debug] Debug Mode's description says what it does. The old one, "Automatically
+      reveals the full map on respawn, enables cheat mode, and debug mode", named a map reveal that Debug
+      Mode does not do, and did not in 0.9.x either. In a world that uses Better Continents, on the
+      machine that runs the world (single player or the host), it turns devcommands on when you spawn,
+      shows "Better Continents Debug Mode Enabled!" at the top left, and adds a Better Continents button
+      to the Esc menu and the large map that opens the settings window (Alt+F8 does the same while the Esc
+      menu or the large map is open, and does nothing elsewhere). What reveals the whole map is a "bc"
+      change: most of them redraw the minimap and explore all of it.
     - Water follows its ground. Each 64 m zone's water works out how deep the sea is under it once, when
-      the zone loads, so ground rebuilt in place afterwards (a "bc" change, "bc reset", "bc regen", or a
-      terrain edit that loads after its zone) left a square of sea with straight edges looking deep
-      among shallow-looking water, or the other way round. Now each zone's water takes the depth of its
-      rebuilt ground. Worlds without Better Continents are untouched.
+      the zone loads, so ground rebuilt in place afterwards (a "bc" change, "bc reset", or a terrain edit
+      that loads after its zone) left a square of sea with straight edges looking deep among
+      shallow-looking water, or the other way round. Now each zone's water takes the depth of its rebuilt
+      ground. Worlds without Better Continents are untouched.
     - Vegetation is no longer placed twice. The game fills a zone with trees, bushes, rocks and the like
       from the world seed, the zone and each prefab's name, so a zone filled a second time over its own
       objects (a command that fills zones again, or a save put back together from mismatched files) draws

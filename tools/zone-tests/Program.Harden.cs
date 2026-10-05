@@ -211,6 +211,19 @@ internal static partial class Program
     BC.ConfigDebugResetCommand.Value = "zones_reset start";
     GameUtils.ResetZones();
     C(events.SequenceEqual(["run zones_reset start", "poke", "poke"]), "every loaded chunk of terrain is poked, once, after the command: " + string.Join(", ", events));
+    // bc regen: the settings are as they were, so the loaded terrain is left alone; the rest is ResetZones' choice.
+    foreach (var empty in new[] { "", "   " })
+    {
+      events.Clear();
+      BC.ConfigDebugResetCommand.Value = empty;
+      GameUtils.RegenerateZones();
+      C(events.SequenceEqual(["regenerate"]), $"bc regen, Debug Reset Command {(empty == "" ? "empty" : "blank")}: Better Continents regenerates the zones and no terrain is poked: " + string.Join(", ", events));
+    }
+    events.Clear();
+    BC.ConfigDebugResetCommand.Value = "zones_reset start";
+    GameUtils.RegenerateZones();
+    C(events.SequenceEqual(["run zones_reset start"]), "bc regen, Debug Reset Command 'zones_reset start': that command runs, and no terrain is poked: " + string.Join(", ", events));
+    BC.ConfigDebugResetCommand.Value = "";
   }
 
   // A Heightmap made without Unity: the lists it keeps, one entry in each, and a build it would redo.
@@ -1280,13 +1293,14 @@ internal static partial class Program
     var migrate = new List<string>();
     foreach (var method in typeof(SettingsSchema).GetMethods(AnyDeclared).Where(m => m.Name == nameof(SettingsSchema.Migrate)))
       migrate.AddRange(StringsOf(method));
-    var gameUtils = StringsOf(typeof(GameUtils).GetMethod(nameof(GameUtils.ResetZones))!).Concat(StringsOf(typeof(GameUtils).GetMethod(nameof(GameUtils.PokeHeightmaps), AnyDeclared)!)).ToList();
+    var gameUtils = new[] { nameof(GameUtils.ResetZones), nameof(GameUtils.RegenerateZones), "StartReset", nameof(GameUtils.PokeHeightmaps) }
+      .SelectMany(name => StringsOf(typeof(GameUtils).GetMethod(name, AnyDeclared)!)).ToList();
 
     // (The scan reads what it should: lines known to be in each are found.)
     C(regen.Any(t => t.StartsWith("Zone regeneration: ")) && regen.Any(t => t.Contains("it runs on the machine that runs the world")) && regen.Any(t => t.Contains("preparing to regenerate the zones")), $"the scan reads ZoneRegen's strings ({regen.Count})");
     C(reset.Any(t => t.Contains("left alone")) && reset.Any(t => t.Contains("generates again with the new settings")) && reset.Count > 15, $"and ZoneReset's ({reset.Count})");
     C(migrate.Any(t => t.Contains("Debug Reset Command") && t.Contains("zones_reset start")) && migrate.Any(t => t.Contains("Default Heightmap Amount")), $"and the migration's log lines ({migrate.Count})");
-    C(gameUtils.Count == 0, "(GameUtils.ResetZones says nothing itself)");
+    C(gameUtils.Count == 0, "(GameUtils.ResetZones, RegenerateZones and StartReset say nothing themselves)");
 
     foreach (var (name, strings) in new[] { ("ZoneRegen", regen), ("ZoneReset", reset), ("ZoneRegenPatch", patch), ("SettingsSchema.Migrate", migrate) })
     {
