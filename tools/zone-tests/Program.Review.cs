@@ -422,7 +422,7 @@ internal static partial class Program
         while (guard++ < 1000 && run.MoveNext())
           w.Flush();
       });
-      C(lines.Contains("Zone regeneration stopped by an error, see the log.") && w.Generated.Contains(home) && !log.Any(l => l.Contains("it had emptied") || l.Contains("could not be finished")),
+      C(lines.Contains("Zone regeneration stopped by an error, see the log.") && w.Generated.Contains(home) && !log.Any(l => SaysPendingFinished(l) || l.Contains("could not be finished")),
         "with no zone waiting, an error before the work finishes nothing and says nothing of it");
 
       // A world that is gone: nothing is finished, and nothing throws.
@@ -445,7 +445,7 @@ internal static partial class Program
         {
         }
       });
-      C(lines.Contains("Zone regeneration stopped by an error, see the log.") && !log.Any(l => l.Contains("it had emptied")) && w.Generated.Contains(home),
+      C(lines.Contains("Zone regeneration stopped by an error, see the log.") && !log.Any(SaysPendingFinished) && w.Generated.Contains(home),
         "in a world that is gone nothing is finished, and the error is told all the same: " + string.Join(" | ", lines.Concat(log.Select(l => l.Length > 100 ? l[..100] : l))));
 
       // Five zones that cannot be finished (the ground's height cannot be asked for): the first three are told with their error, the rest counted.
@@ -475,7 +475,7 @@ internal static partial class Program
       var told = log.Where(l => l.StartsWith("[Error]") && l.Contains("could not be finished:")).ToList();
       C(told.Count == 3 && told.Select(l => System.Text.RegularExpressions.Regex.Match(l, @"zone (\d+),0").Groups[1].Value).SequenceEqual(["0", "1", "2"]) && told.All(l => l.Contains("InvalidOperationException") && l.Contains("no ground at")),
         "five zones cannot be finished: the first three, in order, are told with their error: " + string.Join(" | ", told.Select(l => l.Length > 110 ? l[..110] : l)));
-      C(log.Count(l => l.Contains(ZoneReset.UnfinishedLine(2))) == 1 && !log.Any(l => l.Contains("it had emptied")), "and the other two are counted in one line, and nothing is said to be finished: " + string.Join(" | ", log.Where(l => l.Contains("more zone")).Select(l => l.Length > 140 ? l[..140] : l)));
+      C(log.Count(l => l.Contains(ZoneReset.UnfinishedLine(2))) == 1 && !log.Any(SaysPendingFinished), "and the other two are counted in one line, and nothing is said to be finished: " + string.Join(" | ", log.Where(l => l.Contains("more zone")).Select(l => l.Length > 140 ? l[..140] : l)));
       C(ZoneRegen.MemoryFor(w.Zones).Pending.SetEquals(waiting) && waiting.All(w.Generated.Contains), "(they wait as they were, for the next request to carry them)");
       // Three or fewer: no count line.
       ZDOExtraData.Reset();

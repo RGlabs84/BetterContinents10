@@ -10,7 +10,7 @@ amount2/export.cfg/006
 amount2/export.cfg/007	## Loads every map in this export folder by its standard name, and no map from anywhere else.
 amount2/export.cfg/008	Directory = <work>/BetterContinents/Golden/export-2026-10-04-12-00-00
 amount2/export.cfg/009	
-amount2/export.cfg/010	## Empty: the new world uses the current settings format (the V3 height formula this export is encoded for).
+amount2/export.cfg/010	## Empty: while yours is empty too, the new world is made in the newest settings version, or in 11 when this export's maps span other than its World Size and Edge Size give (a resized 0.9.x world's export); both use the V3 height formula this export is encoded for. The preset bc_import makes from this export never reads your Override version; a number there makes a world made From Config that version, and every world is saved in it while it is set.
 amount2/export.cfg/011	Override version = 
 amount2/export.cfg/012	
 amount2/export.cfg/013	[01 BetterContinents.Global]
@@ -177,7 +177,7 @@ amount1-exact-edgeoff/export.cfg/006
 amount1-exact-edgeoff/export.cfg/007	## Loads every map in this export folder by its standard name, and no map from anywhere else.
 amount1-exact-edgeoff/export.cfg/008	Directory = <work>/BetterContinents/Golden/export-2026-10-04-12-00-00
 amount1-exact-edgeoff/export.cfg/009	
-amount1-exact-edgeoff/export.cfg/010	## Empty: the new world uses the current settings format (the V3 height formula this export is encoded for).
+amount1-exact-edgeoff/export.cfg/010	## Empty: while yours is empty too, the new world is made in the newest settings version, or in 11 when this export's maps span other than its World Size and Edge Size give (a resized 0.9.x world's export); both use the V3 height formula this export is encoded for. The preset bc_import makes from this export never reads your Override version; a number there makes a world made From Config that version, and every world is saved in it while it is set.
 amount1-exact-edgeoff/export.cfg/011	Override version = 
 amount1-exact-edgeoff/export.cfg/012	
 amount1-exact-edgeoff/export.cfg/013	[01 BetterContinents.Global]

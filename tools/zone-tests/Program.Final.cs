@@ -1105,7 +1105,7 @@ internal static partial class Program
       C(!w.Generated.Contains(home) && w.LiveIn(home).Count == 0 && !w.Zones.m_locationInstances[home].m_placed && !w.Loaded.Contains(home),
         "the zone it had emptied is finished: the rest of it was emptied first, and it is no longer generated, its location is to be placed again and its loaded copy is gone");
       C(w.Generated.Contains(beside) && w.LiveIn(beside).Count == 5, "the zone it had not reached is as it was");
-      C(log.Any(l => l.Contains("Zone regeneration stopped:")) && log.Any(l => l.Contains(ZoneReset.PendingLine(1))), "the log says what was finished and how to reset the rest: " + string.Join(" | ", log.Where(l => l.Contains("1 zone it had emptied"))));
+      C(log.Any(l => l.Contains("Zone regeneration stopped:")) && log.Any(l => l.Contains(ZoneReset.PendingLine(1))), "the log says what was finished and how to reset the rest: " + string.Join(" | ", log.Where(SaysPendingFinished)));
       C(GetStatic<ZoneRegen.Job?>(typeof(ZoneRegen), "job") == null, "(the run is over)");
 
       // An error before there is any work: nothing waits, nothing is claimed, nothing throws.
@@ -1127,7 +1127,7 @@ internal static partial class Program
         while (guard++ < 1000 && run.MoveNext())
           w.Flush();
       });
-      C(lines.Contains("Zone regeneration stopped by an error, see the log.") && w.Generated.Contains(home) && !log.Any(l => l.Contains("it had emptied")) && !log.Any(l => l.Contains("could not be finished")),
+      C(lines.Contains("Zone regeneration stopped by an error, see the log.") && w.Generated.Contains(home) && !log.Any(SaysPendingFinished) && !log.Any(l => l.Contains("could not be finished")),
         "an error before the work began: the console says so, the world is as it was, and the log claims no zone finished");
     }
     finally
@@ -1137,8 +1137,10 @@ internal static partial class Program
       World.Close();
     }
     var text = ZoneReset.PendingLine(1) + " | " + ZoneReset.PendingLine(3);
-    C(ZoneReset.PendingLine(1).StartsWith("Zone regeneration: 1 zone it had emptied was finished, so it generates again") && ZoneReset.PendingLine(3).StartsWith("Zone regeneration: 3 zones it had emptied were finished, so they generate again")
-      && text.Contains("'bc regen' resets them."), "the line in the singular and the plural: " + text);
+    C(ZoneReset.PendingLine(1) == "Zone regeneration: 1 zone left waiting was finished, so it generates again with the new settings when somebody comes near. The zones it had not reached are as they were: 'bc regen' resets them."
+      && ZoneReset.PendingLine(3) == "Zone regeneration: 3 zones left waiting were finished, so they generate again with the new settings when somebody comes near. The zones it had not reached are as they were: 'bc regen' resets them.",
+      "the line in the singular and the plural, in words that fit the zones of an earlier run as well as the run's own: " + text);
+    C(!text.Contains("it had emptied") && SaysPendingFinished(ZoneReset.PendingLine(1)) && SaysPendingFinished(ZoneReset.PendingLine(3)), "(the checks that an error finished nothing look for these words, and the line has them)");
     string[] banned = ["Upgrade World", "Expand World", "replace", "obsolete", "no longer need"];
     C(banned.All(x => !text.Contains(x, StringComparison.OrdinalIgnoreCase)) && !text.Contains("1.0") && !text.Contains("0.9"), "and it names no other mod and no version of the game");
   }

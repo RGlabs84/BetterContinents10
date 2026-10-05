@@ -104,9 +104,10 @@ public partial class BetterContinents
     // ImageMapBiome.FollowNames); its biome precision goes up to 31 (FinerBiomePrecision); and its location map's pins
     // land exactly on their pixels, with the start position placed before them (ExactLocationPins,
     // StartBeforeLocationPins). Made with Compact Maps (experimental), it saves and sends its maps in compressed tiles
-    // (DataKey.TiledMap, MapTiles.cs) instead of the pictures' bytes. A world keeps its version: one read as 12 is saved as
-    // 12, any older one as 11, as always. Better Continents 0.9 reads a version 12 world as a version 11 one, and one with
-    // compact maps as vanilla (it stops at their tiles) without saving over its settings.
+    // (DataKey.TiledMap, MapTiles.cs) instead of the pictures' bytes. A world keeps its version unless Override version holds
+    // a number: one read as 12 is saved as 12, any older one as 11, as always; with a number there, that number is the
+    // version every world is saved in and sent in (Serialize). Better Continents 0.9 reads a version 12 world as a version 11
+    // one, and one with compact maps as vanilla (it stops at their tiles) without saving over its settings.
     public const int MaxVersion = 12;
     internal const int KeyedVersion = 11;
     internal const int UnifiedVersion = 12;

@@ -131,6 +131,7 @@ internal static partial class Program
         BC.ConfigDebugResetCommand.Value = command;
       SetStatic(typeof(ZNet), "m_isServer", true);
       SetStatic(typeof(ZoneRegen), "job", null);
+      SetStatic(typeof(ZoneRegen), "stoppedWork", null);
       SetStatic(typeof(ZoneRegen), "flushOwed", false);
       GetStatic<HashSet<Vector2s>>(typeof(ZoneRegen), "placedDuringRun").Clear();
       SetStatic(typeof(ClutterSystem), "m_instance", null);

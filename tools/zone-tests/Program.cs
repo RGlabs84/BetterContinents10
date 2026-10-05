@@ -11,7 +11,8 @@
 // mutation run of the production code found the others let through: the calls that need Unity (stood in for through the seams of
 // ZoneRegen and GameUtils), requests, stops and errors, a world that closes in every phase, and the corners of the work.
 // Program.Review.cs has what the last review asked for: strays after their group, a save's turns taken once, strays the game
-// generated, the drain flushed zone by zone, and an error before the work.
+// generated, the drain flushed zone by zone, and an error before the work. Program.Polish.cs has what the polish round asked for: a save
+// between a second request and the work of the run that took its place, and the counts when the game generates a stray before its turn.
 
 using System;
 using System.Collections.Generic;
@@ -122,6 +123,7 @@ internal static partial class Program
       FixesTests();
       HardenTests();
       ReviewTests();
+      PolishTests();
     }
     finally
     {
@@ -143,6 +145,9 @@ internal static partial class Program
   private static ZDOID Id(uint n) => new(1000L, n);
   private static ZoneReset.Obj O(uint n, Kind kind = Kind.None, int prefab = 100) => new(Id(n), prefab, kind);
   private static string Show(IEnumerable<Vector2s> zones) => string.Join(" ", zones.Select(z => $"{z.x},{z.y}"));
+
+  // Whether a log line says that zones left waiting were finished (ZoneReset.PendingLine): what an error that finished nothing must not say.
+  private static bool SaysPendingFinished(string line) => line.Contains("left waiting was finished") || line.Contains("left waiting were finished");
 
   // Every zone of the square of the given radius around a centre.
   private static List<Vector2s> Square(int radius, int cx = 0, int cy = 0)

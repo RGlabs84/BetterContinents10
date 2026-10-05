@@ -14,8 +14,9 @@ namespace BetterContinents;
 // rebuilt: the zones must generate against the new grid), "bc regen" starts it on demand, and a Debug Reset Command that is
 // not empty runs that console command instead of it.
 //
-// It runs where the world is: single player, the host, or a dedicated server. A client has none of the world's objects and
-// never generates a zone (ZoneSystem.PokeLocalZone: SpawnMode.Client), and the "bc" command does not run there.
+// It runs in single player or on the host: the "bc" commands that start it are valid only on the machine that runs the world, so a
+// client cannot run them (isNetwork false and onlyServer, DebugUtils.cs:43-44; ConsoleCommand.IsValid, Terminal.cs:243-258). A client
+// has none of the world's objects and never generates a zone (ZoneSystem.PokeLocalZone: SpawnMode.Client).
 //
 // The order: (1) one pass over every object of the world looks for what protects a zone (ZoneReset.Rules), (2) ZoneReset.MakePlan
 // decides which zones are reset, nearest the players first, (3) ZoneReset.Work resets them. Each step is split over frames
@@ -29,7 +30,9 @@ namespace BetterContinents;
 // that is reset, so a group that has lost a zone has one waiting), the destroy queue sent after each of those zones and the ground mended
 // (BeforeSave); ZoneSystem.PrepareSave, last, has the zones that are emptied and not finished left out of the copy of m_generatedZones
 // that is written, with their locations written as not placed (HidePendingFromSave). The world itself keeps them until the run finishes
-// them. Both patches do nothing when no run has left anything.
+// them. Both patches do nothing when no run has left anything. A second request drops the work of the run it stops, and the run that
+// takes its place has none until its scan and its plan are over, which take frames; the zones the stopped run left waiting are left out
+// of the file in that time all the same, so a save then has the stopped run's work do all of that (stoppedWork).
 //
 // It works with the vegetation twin guard (VegetationTwins): a reset queues a zone's objects for destruction, the clients are told
 // within the frame, and a zone that generates again before that is not held back by the objects that are leaving (the guard's
@@ -87,6 +90,10 @@ internal static class ZoneRegen
 
   private static Job? job;
 
+  // The work of the run that a second request stopped, kept until the run that took its place has made its own (after its scan and its
+  // plan) or ends: a save before that still has the groups of the zones left waiting given their turns (BeforeSave).
+  private static ZoneReset.Work? stoppedWork;
+
   // The calls into Unity's engine that the offline tests (tools/zone-tests) stand in for, each a field that holds what the game does:
   // the coroutines are Unity's own scheduler's, a frame's time comes from the system clock.
   internal static Func<IEnumerator, Coroutine> StartRoutine = routine => BetterContinents.instance.StartCoroutine(routine);
@@ -116,7 +123,7 @@ internal static class ZoneRegen
   }
 
   /// <summary>Starts the regeneration, or starts it over when one is running. Says what it does, and why not, to
-  /// <paramref name="output"/> (default: the console, the log, and the admin a server runs it for).</summary>
+  /// <paramref name="output"/> (default: the console and the log; a server does not run the "bc" commands for an admin).</summary>
   internal static void Request(Action<string>? output = null)
   {
     output ??= ConsoleTools.Output(Console.instance);
@@ -171,6 +178,9 @@ internal static class ZoneRegen
       job = null;
       placedDuringRun.Clear();
     }
+    // The work stays for a save that comes before the next run has made its own. (A run stopped before it made one leaves the earlier
+    // run's, which is the one that knows what the zones left waiting are waiting for.)
+    stoppedWork = running.Work ?? stoppedWork;
     BetterContinents.Log($"Zone regeneration: {why}.");
   }
 
@@ -263,6 +273,9 @@ internal static class ZoneRegen
       {
         job = null;
         placedDuringRun.Clear();
+        // The run is over, ended or failed, and nothing is left for a save to finish (a run that is stopped does not come here: Stop keeps
+        // its work).
+        stoppedWork = null;
       }
     }
   }
@@ -297,9 +310,18 @@ internal static class ZoneRegen
     mine.Output(ZoneReset.StartLine(plan));
     // Making the plan of a big world takes a while: the first resets wait for the next frame.
     yield return null;
+    // A save in that frame has the stopped run's work give the groups of the zones left waiting their turns (BeforeSave), and a zone it
+    // empties then may wait in its turn: one the plan does not carry would be dropped by the new work and left empty and generated. Plan again.
+    if (world.Alive && remembered.Pending.Any(zone => !plan.Carried.Contains(zone) && zones.m_generatedZones.Contains(zone)))
+    {
+      plan = ZoneReset.MakePlan(zones.m_generatedZones, protectors, focus.Distinct().ToList(), PlacedLocations(zones), remembered.Pending);
+      mine.Progress.Total = plan.Reset.Count;
+    }
 
     var work = new ZoneReset.Work(world, plan, budget, mine.Progress, remembered);
     mine.Work = work;
+    // The new work carries the zones left waiting (the plan has them as carried), so a save has it do what the stopped one did.
+    stoppedWork = null;
     var steps = work.Steps();
     int tens = 0;
     while (steps.MoveNext())
@@ -379,7 +401,7 @@ internal static class ZoneRegen
       return;
     try
     {
-      if (running?.Work is { } work)
+      if ((running?.Work ?? WorkOfStoppedRun()) is { } work)
         work.BeforeSave();
       else
         SendQueued();
@@ -388,6 +410,18 @@ internal static class ZoneRegen
     {
       BetterContinents.LogError($"Zone regeneration: the world could not be made ready to save: {e}");
     }
+  }
+
+  // The run that a second request started has no work yet (its scan and its plan take frames), and HidePendingFromSave leaves out the zones
+  // the stopped run left waiting all the same: their location groups are given their turns by that run's work, until the new one has its own.
+  // Only for the world those zones are in, and only while some are remembered as waiting. (The world terms are a second guard: the work
+  // itself does nothing in a world that is gone, Work.BeforeSave.)
+  private static ZoneReset.Work? WorkOfStoppedRun()
+  {
+    var zones = ZoneSystem.instance;
+    if (stoppedWork == null || Gone(zones) || !ReferenceEquals(memoryOwner?.Target, zones) || memory.Pending.Count == 0)
+      return null;
+    return stoppedWork;
   }
 
   /// <summary>ZDOMan.SendDestroyed, which ZDOMan.Update runs every frame: the destroy queue goes to every machine, this one

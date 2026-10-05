@@ -2083,7 +2083,13 @@ public static class WorldExport
 
       Key(SettingsSchema.Enabled, "true", "Better Continents on for the new world.");
       Key(SettingsSchema.Directory, ConfigDir, "Loads every map in this export folder by its standard name, and no map from anywhere else.");
-      Key(SettingsSchema.OverrideVersion, "", "Empty: the new world uses the current settings format (the V3 height formula this export is encoded for).");
+      // The version is WorldImport.ExportVersion's (11 or the newest); only a world made From Config reads Override version for it
+      // (NewWorldVersion, not the preset or bc_import), and Serialize saves every world in that number while it holds one. Versions 11
+      // and 12 both read the heights by GetBaseHeightV3 (Patcher.PatchGetBaseHeight), the formula the heightmap is encoded for.
+      Key(SettingsSchema.OverrideVersion, "",
+        $"Empty: while yours is empty too, the new world is made in the newest settings version, or in {BetterContinentsSettings.KeyedVersion} when this export's maps span other than its World Size and "
+        + "Edge Size give (a resized 0.9.x world's export); both use the V3 height formula this export is encoded for. The preset bc_import makes from this export never reads "
+        + "your Override version; a number there makes a world made From Config that version, and every world is saved in it while it is set.");
 
       Key(SettingsSchema.WorldSize, F(WorldSizeSetting), "The loaded world's playable radius.");
       Key(SettingsSchema.EdgeSize, F(EdgeSizeSetting), "The loaded world's edge width.");

@@ -84,8 +84,10 @@ namespace BetterContinents;
 //     case that cannot be undone (below).
 //   - A second request stops the first: the zone being emptied is finished off first. The zones emptied but not finished are
 //     remembered for this world (Memory) and the next run resets them again whatever protects them by then, since they are empty
-//     and would stay bare. A run that an error stops finishes them itself (Work.FinishPending): the zones beside them will not be
-//     reached by anything, and generated and bare they would stay so for the session.
+//     and would stay bare. A save that comes before the next run has made its work (its scan and its plan take frames) has the first
+//     run's work take the turns of their groups (ZoneRegen.BeforeSave), as any save does. A run that an error stops finishes them
+//     itself (Work.FinishPending): the zones beside them will not be reached by anything, and generated and bare they would stay so
+//     for the session.
 //   - Who is near is looked at again at the start of every frame (IZoneWorld.LiveProtectors): the plan's picture of the world is
 //     minutes old when a zone's turn comes. That is the players connected, each with the square their game keeps, and the zones where
 //     the player at this machine has placed something since the run began (Piece.SetCreator). A zone that has not begun, and is in
@@ -106,8 +108,9 @@ namespace BetterContinents;
 //   - A tree grown from a sapling has no creator (Plant.Grow): it is the world's, and goes with its zone unless something protects it.
 //   - A protector that appears beside a zone that is already cleared cannot save it; nor can a zone of a location group that was
 //     cleared before another zone of the group was left alone be filled again.
-//   - A location whose home the game generates while a run goes on (an earlier run had reset it) is not in that run's plan: the parts
-//     it puts down in zones whose turns are still to come are cleared with them, and the next 'bc regen' sets that right.
+//   - A location whose home the game generates while a run goes on (one an earlier run reset, or one nobody had generated): its parts
+//     in zones whose turns are over stay and those in zones still to come are cleared, so it ends half placed or, when the home is a
+//     stray, twice; the next 'bc regen' sets it right.
 //   - Zones beyond about 16.35 km out share one sector bucket (ZoneSystem.SectorToIndex), so looking at them is slower.
 //   - ZDOMan.m_deadZDOs grows with each destroyed object, as with any destroy.
 internal static class ZoneReset
@@ -1228,9 +1231,10 @@ internal static class ZoneReset
     return text;
   }
 
-  /// <summary>What the log says after an error stopped the run and the zones it had emptied were finished (see Work.FinishPending).</summary>
+  /// <summary>What the log says after an error stopped the run and the zones left waiting (its own, or those of an earlier run it carried)
+  /// were finished (see Work.FinishPending).</summary>
   internal static string PendingLine(int finished) =>
-    $"Zone regeneration: {Count(finished, "zone", "zones")} it had emptied {(finished == 1 ? "was" : "were")} finished, so {(finished == 1 ? "it generates" : "they generate")} again with the new settings when somebody comes near. "
+    $"Zone regeneration: {Count(finished, "zone", "zones")} left waiting {(finished == 1 ? "was" : "were")} finished, so {(finished == 1 ? "it generates" : "they generate")} again with the new settings when somebody comes near. "
     + "The zones it had not reached are as they were: 'bc regen' resets them.";
 
   /// <summary>What the log says of the zones that could not be finished beyond the few it told one by one (see ZoneRegen.FinishPending).</summary>

@@ -24,10 +24,11 @@ namespace BetterContinents;
 // The game's only guard is IsBlocked: a ray straight down that drops a copy landing on another object's collider, only for
 // entries with m_blockCheck, and blind to a zone's earlier objects while they are only data (a ghost zone).
 //
-// The guard, in every Better Continents world: a placement is skipped when the same prefab already stands within Radius,
-// either an object that was in the zone before the pass or one that another entry placed in this pass. An entry never
-// blocks its own placements, so vanilla densities and groups stay as they are. bc_twins finds and removes the twins a
-// world already has.
+// The guard, in every Better Continents world: a vegetation entry's placement is skipped within Radius (1 m) of an object of the same kind (the same
+// prefab) that already stands in its zone, or that another entry placed in the same pass. An entry never blocks its own placements,
+// so a prefab with a single entry keeps its vanilla density and groups except beside an object of it that stands there already, and
+// a prefab with several entries also loses the copies of its later entries that would land within a metre of an earlier one's.
+// bc_twins finds and removes the twins a world already has.
 internal static class VegetationTwins
 {
   // Horizontal metres.
