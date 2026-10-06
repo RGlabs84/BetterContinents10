@@ -1,6 +1,6 @@
-// Added by Wubarrk on 2026-10-04 for the unifying refactor (0.10.0).
+// Added by Wubarrk on 2026-10-04 for the unifying refactor (0.10.0), and modified on 2026-10-06 for the Forest Scale default (0.10.2).
 //
-// The Debug Reset Command setting and its migration, the "bc regen" command and what it is wired to, and the game's own code
+// The Debug Reset Command setting and its migration, the Forest Scale default and its migration, the "bc regen" command and what it is wired to, and the game's own code
 // that the regeneration depends on, read from the installed game's IL: who sets a creator, how a destroyed object reaches
 // the clients, what a generated zone is, the terrain compiler's data format.
 
@@ -27,7 +27,7 @@ internal static partial class Program
   private static int cfgCount;
 
   // A BetterContinents.cfg as the file the player has, bound and migrated as the game does at start.
-  private static (string Command, int Version, float ExportAmount, List<string> Log, string FileText) Start(string? text, string? name = null)
+  private static (string Command, int Version, float ExportAmount, float ForestScale, List<string> Log, string FileText) Start(string? text, string? name = null)
   {
     var path = Path.Combine(Work, name ?? $"cfg{++cfgCount}.cfg");
     if (text != null)
@@ -39,7 +39,7 @@ internal static partial class Program
       SettingsSchema.Migrate();
     });
     file.Save();
-    return (BC.ConfigDebugResetCommand.Value, BC.ConfigFileVersion.Value, BC.ConfigExportHeightmapAmount.Value, log, File.ReadAllText(path));
+    return (BC.ConfigDebugResetCommand.Value, BC.ConfigFileVersion.Value, BC.ConfigExportHeightmapAmount.Value, BC.ConfigForestScale.Value, log, File.ReadAllText(path));
   }
 
   private static List<string> Mine(List<string> log) => log.Where(l => l.Contains("Debug Reset Command")).ToList();
@@ -55,54 +55,119 @@ internal static partial class Program
     string[] banned = ["replace", "obsolete", "no longer need", "needs no other", "Upgrade World", "Expand World"];
     C(banned.All(w => !def.Description.Contains(w, StringComparison.OrdinalIgnoreCase)), "its description names no other mod and replaces none");
     C(def.Description.Contains("worked on") && def.Description.Contains("kept whole"), "its description names ground work, and says a location is kept whole");
-    C(SettingsSchema.CurrentConfigVersion == 2, "the config version is 2");
+    C(SettingsSchema.CurrentConfigVersion == 3, "the config version is 3");
 
     // A file written by Better Continents 0.9: the old default is emptied once, with a line that says how to go back.
     var old = Start("[00 BetterContinents.Debug]\nDebug Reset Command = zones_reset start\n");
-    C(old.Command == "" && old.Version == 2, "0.9's default 'zones_reset start' becomes empty, and the file is at version 2");
+    C(old.Command == "" && old.Version == 3, "0.9's default 'zones_reset start' becomes empty, and the file is at version 3");
     var line = Mine(old.Log);
     C(line.Count == 1 && line[0].Contains("was \"zones_reset start\"") && line[0].Contains("now empty") && line[0].Contains("Write \"zones_reset start\" there again"),
       "one log line, in the style of the export amount's, with the way back: " + (line.Count > 0 ? line[0] : "(none)"));
-    C(old.FileText.Contains("Debug Reset Command =") && !old.FileText.Contains("Debug Reset Command = zones_reset start") && old.FileText.Contains("Config Version = 2"),
+    C(old.FileText.Contains("Debug Reset Command =") && !old.FileText.Contains("Debug Reset Command = zones_reset start") && old.FileText.Contains("Config Version = 3"),
       "the file on disk holds the new value and version");
 
-    // A new file: nothing to migrate, nothing logged, version 2.
+    // A new file: nothing to migrate, nothing logged, version 3.
     var fresh = Start(null);
-    C(fresh.Command == "" && fresh.Version == 2 && Mine(fresh.Log).Count == 0, "a new file starts empty at version 2, silently");
+    C(fresh.Command == "" && fresh.Version == 3 && Mine(fresh.Log).Count == 0, "a new file starts empty at version 3, silently");
 
     // A command somebody wrote stays, whatever it is.
     foreach (var command in new[] { "zones_reset start safezones=3", "zones_reset", "zones_reset  start", "Zones_Reset Start", "zones_reset start force", "zones_reset start " + "x" })
     {
       var custom = Start($"[00 BetterContinents.Debug]\nDebug Reset Command = {command}\n");
-      C(custom.Command == command && custom.Version == 2 && Mine(custom.Log).Count == 0, $"'{command}' is somebody's own and stays");
+      C(custom.Command == command && custom.Version == 3 && Mine(custom.Log).Count == 0, $"'{command}' is somebody's own and stays");
     }
 
     // The old default written again after the migration is a choice.
     var again = Start("[07 BetterContinents.Misc]\nConfig Version = 2\n\n[00 BetterContinents.Debug]\nDebug Reset Command = zones_reset start\n");
-    C(again.Command == "zones_reset start" && again.Version == 2 && Mine(again.Log).Count == 0, "at version 2 'zones_reset start' is a choice: left alone");
+    C(again.Command == "zones_reset start" && again.Version == 3 && again.Log.Count == 0, "at version 2 'zones_reset start' is a choice: left alone (and the forest step finds nothing to do)");
 
     // Version 1 (after the export amount's step): only the new step runs.
     var one = Start("[07 BetterContinents.Misc]\nConfig Version = 1\n\n[09 BetterContinents.Export]\nDefault Heightmap Amount = 2\n\n[00 BetterContinents.Debug]\nDebug Reset Command = zones_reset start\n");
-    C(one.Command == "" && one.Version == 2 && one.ExportAmount == 2f && one.Log.Count == 1 && Mine(one.Log).Count == 1, "at version 1 only the new step runs: the export amount of 2 is kept");
+    C(one.Command == "" && one.Version == 3 && one.ExportAmount == 2f && one.Log.Count == 1 && Mine(one.Log).Count == 1, "at version 1 only the later steps run: the export amount of 2 is kept");
 
     // Version 0 with both: both steps, in order.
     var both = Start("[09 BetterContinents.Export]\nDefault Heightmap Amount = 2\n\n[00 BetterContinents.Debug]\nDebug Reset Command = zones_reset start\n");
-    C(both.Command == "" && both.Version == 2 && both.ExportAmount == 1f && both.Log.Count == 2 && both.Log[0].Contains("Default Heightmap Amount") && both.Log[1].Contains("Debug Reset Command"),
+    C(both.Command == "" && both.Version == 3 && both.ExportAmount == 1f && both.Log.Count == 2 && both.Log[0].Contains("Default Heightmap Amount") && both.Log[1].Contains("Debug Reset Command"),
       "a 0.9 file with both old defaults gets both steps, the amount's first");
 
     // A file written by a newer Better Continents keeps its version: none of it is done again, and the version is not lowered.
-    var newer = Start("[07 BetterContinents.Misc]\nConfig Version = 3\n\n[00 BetterContinents.Debug]\nDebug Reset Command = zones_reset start\n\n[09 BetterContinents.Export]\nDefault Heightmap Amount = 2\n");
-    C(newer.Version == 3 && newer.Command == "zones_reset start" && newer.ExportAmount == 2f && newer.Log.Count == 0 && newer.FileText.Contains("Config Version = 3"), "a file at version 3 is left as it is, and stays at version 3");
+    var newer = Start("[07 BetterContinents.Misc]\nConfig Version = 4\n\n[00 BetterContinents.Debug]\nDebug Reset Command = zones_reset start\n\n[09 BetterContinents.Export]\nDefault Heightmap Amount = 2\n\n[04 BetterContinents.Forest]\nForest Scale = 1\n");
+    C(newer.Version == 4 && newer.Command == "zones_reset start" && newer.ExportAmount == 2f && newer.ForestScale == 1f && newer.Log.Count == 0 && newer.FileText.Contains("Config Version = 4"), "a file at version 4 is left as it is, and stays at version 4");
 
     // A second start of a file that has been migrated changes nothing.
     var path = Path.Combine(Work, "twice.cfg");
     File.WriteAllText(path, "[00 BetterContinents.Debug]\nDebug Reset Command = zones_reset start\n");
     var first = Start(null, "twice.cfg");
     var second = Start(null, "twice.cfg");
-    C(first.Command == "" && Mine(first.Log).Count == 1 && second.Command == "" && second.Version == 2 && second.Log.Count == 0, "a second start of a migrated file logs nothing and changes nothing");
+    C(first.Command == "" && Mine(first.Log).Count == 1 && second.Command == "" && second.Version == 3 && second.Log.Count == 0, "a second start of a migrated file logs nothing and changes nothing");
+
+    ForestScaleTests();
 
     // The state the wiring tests below need: the default.
     Start(null);
+  }
+
+  private static List<string> Forest(List<string> log) => log.Where(l => l.Contains("Forest Scale")).ToList();
+
+  // Forest Scale: 0.5 is the game's own size of forest and clearing patches. 0.7.20 to 0.10.1 shipped 1 (about five times
+  // that size) and every file they wrote holds it, so step 3 makes a 1 into 0.5, once.
+  private static void ForestScaleTests()
+  {
+    Section("Forest Scale: its default and the one-time migration");
+    var def = SettingsSchema.ForestScale;
+    C(def.Section == "04 BetterContinents.Forest" && def.Key == "Forest Scale", "the setting keeps its section and key");
+    C(def.Default == 0.5f && def.Scope == SettingScope.World, "its default is 0.5, and only a new world reads it");
+    C(def.Range is AcceptableValueRange<float> { MinValue: 0f, MaxValue: 10f }, "its range stays 0 to 10, so a value somebody chose keeps its meaning");
+    C(def.Description.Contains("0.5 (the default) is the game's own size") && def.Description.Contains("about five times larger") && def.Description.Contains("Keep it within 0 to 1"),
+      "its description says what 0.5, 0 and 1 give, and where it stops working");
+    string[] banned = ["replace", "obsolete", "no longer need", "needs no other", "Upgrade World", "Expand World"];
+    C(banned.All(w => !def.Description.Contains(w, StringComparison.OrdinalIgnoreCase)), "its description names no other mod and replaces none");
+
+    // The curve the setter runs the value through: 0.5 is the game's own scale, 1 a fifth of it (patches five times
+    // larger), 0 three times it; near 1.15 it reaches zero.
+    float Internal(float value) => new BC.BetterContinentsSettings { ForestScaleFactor = value }.ForestScale;
+    C(Mathf.Abs(Internal(0.5f) - 1f) < 1e-5f, $"0.5 is the game's own scale: {Internal(0.5f)}");
+    C(Mathf.Abs(Internal(1f) - 0.2f) < 1e-5f, $"1 is a fifth of it, patches five times larger: {Internal(1f)}");
+    C(Mathf.Abs(Internal(0f) - 3f) < 1e-5f, $"0 is three times it, patches a third of the size: {Internal(0f)}");
+    C(Internal(1.1f) > 0f && Internal(1.2f) < 0f, $"the scale reaches zero between 1.1 and 1.2: {Internal(1.1f)}, {Internal(1.2f)}");
+    C(new BC.BetterContinentsSettings().ForestScale == 1f, "a world's settings start at the game's own scale (a world file without the key reads as that)");
+
+    // A file written by 0.7.20 to 0.10.1 (Config Version missing): its 1 becomes 0.5 once, with a line that says how to go back.
+    var old = Start("[04 BetterContinents.Forest]\nForest Scale = 1\n");
+    C(old.ForestScale == 0.5f && old.Version == 3, "the old default 1 becomes 0.5, and the file is at version 3");
+    var line = Forest(old.Log);
+    C(old.Log.Count == 1 && line.Count == 1 && line[0].Contains("Forest Scale was 1") && line[0].Contains("now 0.5") && line[0].Contains("Set it back to 1")
+      && line[0].Contains("Worlds already made keep their forests"), "one log line, in the style of the others, with the way back: " + (line.Count > 0 ? line[0] : "(none)"));
+    C(banned.All(w => line.All(l => !l.Contains(w, StringComparison.OrdinalIgnoreCase))), "the line names no other mod and replaces none");
+    C(old.FileText.Contains("Forest Scale = 0.5") && old.FileText.Contains("Config Version = 3"), "the file on disk holds 0.5 and version 3");
+
+    // A 0.10.0 or 0.10.1 file is at version 2 and holds the old default too: the step runs.
+    var ten = Start("[07 BetterContinents.Misc]\nConfig Version = 2\n\n[04 BetterContinents.Forest]\nForest Scale = 1\n");
+    C(ten.ForestScale == 0.5f && ten.Version == 3 && ten.Log.Count == 1 && Forest(ten.Log).Count == 1, "a 0.10.0 or 0.10.1 file (version 2) gets the step too");
+
+    // Any other value was chosen and stays, in or out of the useful range.
+    foreach (var value in new[] { "0.5", "0.7", "0", "0.99", "1.0001", "2.5", "10" })
+    {
+      var chosen = Start($"[04 BetterContinents.Forest]\nForest Scale = {value}\n");
+      var expected = float.Parse(value, System.Globalization.CultureInfo.InvariantCulture);
+      C(chosen.ForestScale == expected && chosen.Version == 3 && chosen.Log.Count == 0, $"Forest Scale = {value} is somebody's own and stays");
+    }
+
+    // At version 3 a 1 is a choice; a new file starts at 0.5; a second start changes nothing.
+    var again = Start("[07 BetterContinents.Misc]\nConfig Version = 3\n\n[04 BetterContinents.Forest]\nForest Scale = 1\n");
+    C(again.ForestScale == 1f && again.Version == 3 && again.Log.Count == 0, "at version 3 Forest Scale = 1 is a choice: left alone");
+    var fresh = Start(null);
+    C(fresh.ForestScale == 0.5f && fresh.Version == 3 && fresh.Log.Count == 0 && fresh.FileText.Contains("Forest Scale = 0.5"), "a new file starts at 0.5, silently");
+    var path = Path.Combine(Work, "forest-twice.cfg");
+    File.WriteAllText(path, "[04 BetterContinents.Forest]\nForest Scale = 1\n");
+    var first = Start(null, "forest-twice.cfg");
+    var second = Start(null, "forest-twice.cfg");
+    C(first.ForestScale == 0.5f && Forest(first.Log).Count == 1 && second.ForestScale == 0.5f && second.Log.Count == 0, "a second start of a migrated file logs nothing and changes nothing");
+
+    // A 0.9 file with all three old defaults: the three steps, in order.
+    var all = Start("[09 BetterContinents.Export]\nDefault Heightmap Amount = 2\n\n[00 BetterContinents.Debug]\nDebug Reset Command = zones_reset start\n\n[04 BetterContinents.Forest]\nForest Scale = 1\n");
+    C(all.ExportAmount == 1f && all.Command == "" && all.ForestScale == 0.5f && all.Version == 3 && all.Log.Count == 3 && all.Log[0].Contains("Default Heightmap Amount")
+      && all.Log[1].Contains("Debug Reset Command") && all.Log[2].Contains("Forest Scale"), "a 0.9 file with the three old defaults gets the three steps, in order");
   }
 
   // ------------------------------------------------------------------------------------------------ the command and its wiring

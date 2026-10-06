@@ -1,49 +1,89 @@
 new-file/export-amount	1
-new-file/config-version	2
+new-file/config-version	3
 new-file/debug-reset-command	
+new-file/forest-scale	0.5
 new-file/log/count	0
 0.9.x-file/export-amount	1
-0.9.x-file/config-version	2
+0.9.x-file/config-version	3
 0.9.x-file/debug-reset-command	
+0.9.x-file/forest-scale	0.5
 0.9.x-file/log/001	[Log] [BetterContinents] BetterContinents.cfg: [09 BetterContinents.Export] Default Heightmap Amount was 2 (the default of Better Continents 0.9.0 to 0.9.4) and is now 1, Better Continents' default everywhere. Set it back to 2 to export at the old encoding (-30 m to 370 m).
 0.9.x-file/log/count	1
 0.9.x-file-amount-3/export-amount	3
-0.9.x-file-amount-3/config-version	2
+0.9.x-file-amount-3/config-version	3
 0.9.x-file-amount-3/debug-reset-command	
+0.9.x-file-amount-3/forest-scale	0.5
 0.9.x-file-amount-3/log/count	0
 migrated-to-1/export-amount	2
-migrated-to-1/config-version	2
+migrated-to-1/config-version	3
 migrated-to-1/debug-reset-command	
+migrated-to-1/forest-scale	0.5
 migrated-to-1/log/count	0
 already-migrated/export-amount	2
-already-migrated/config-version	2
+already-migrated/config-version	3
 already-migrated/debug-reset-command	
+already-migrated/forest-scale	0.5
 already-migrated/log/count	0
 0.9.x-file-debug-default/export-amount	1
-0.9.x-file-debug-default/config-version	2
+0.9.x-file-debug-default/config-version	3
 0.9.x-file-debug-default/debug-reset-command	
+0.9.x-file-debug-default/forest-scale	0.5
 0.9.x-file-debug-default/log/001	[Log] [BetterContinents] BetterContinents.cfg: [00 BetterContinents.Debug] Debug Reset Command was "zones_reset start" (the default of Better Continents 0.9) and is now empty: Better Continents regenerates the zones itself. Write "zones_reset start" there again to run that console command instead.
 0.9.x-file-debug-default/log/count	1
 0.9.x-file-debug-custom/export-amount	1
-0.9.x-file-debug-custom/config-version	2
+0.9.x-file-debug-custom/config-version	3
 0.9.x-file-debug-custom/debug-reset-command	zones_reset start safezones=3
+0.9.x-file-debug-custom/forest-scale	0.5
 0.9.x-file-debug-custom/log/count	0
 0.9.x-file-both-defaults/export-amount	1
-0.9.x-file-both-defaults/config-version	2
+0.9.x-file-both-defaults/config-version	3
 0.9.x-file-both-defaults/debug-reset-command	
+0.9.x-file-both-defaults/forest-scale	0.5
 0.9.x-file-both-defaults/log/001	[Log] [BetterContinents] BetterContinents.cfg: [09 BetterContinents.Export] Default Heightmap Amount was 2 (the default of Better Continents 0.9.0 to 0.9.4) and is now 1, Better Continents' default everywhere. Set it back to 2 to export at the old encoding (-30 m to 370 m).
 0.9.x-file-both-defaults/log/002	[Log] [BetterContinents] BetterContinents.cfg: [00 BetterContinents.Debug] Debug Reset Command was "zones_reset start" (the default of Better Continents 0.9) and is now empty: Better Continents regenerates the zones itself. Write "zones_reset start" there again to run that console command instead.
 0.9.x-file-both-defaults/log/count	2
 migrated-to-1-debug-default/export-amount	2
-migrated-to-1-debug-default/config-version	2
+migrated-to-1-debug-default/config-version	3
 migrated-to-1-debug-default/debug-reset-command	
+migrated-to-1-debug-default/forest-scale	0.5
 migrated-to-1-debug-default/log/001	[Log] [BetterContinents] BetterContinents.cfg: [00 BetterContinents.Debug] Debug Reset Command was "zones_reset start" (the default of Better Continents 0.9) and is now empty: Better Continents regenerates the zones itself. Write "zones_reset start" there again to run that console command instead.
 migrated-to-1-debug-default/log/count	1
 already-migrated-debug-default/export-amount	1
-already-migrated-debug-default/config-version	2
+already-migrated-debug-default/config-version	3
 already-migrated-debug-default/debug-reset-command	zones_reset start
+already-migrated-debug-default/forest-scale	0.5
 already-migrated-debug-default/log/count	0
 newer-file/export-amount	2
-newer-file/config-version	3
+newer-file/config-version	4
 newer-file/debug-reset-command	zones_reset start
+newer-file/forest-scale	1
 newer-file/log/count	0
+0.10.x-file-forest-default/export-amount	1
+0.10.x-file-forest-default/config-version	3
+0.10.x-file-forest-default/debug-reset-command	
+0.10.x-file-forest-default/forest-scale	0.5
+0.10.x-file-forest-default/log/001	[Log] [BetterContinents] BetterContinents.cfg: [04 BetterContinents.Forest] Forest Scale was 1 (the default of Better Continents 0.7.20 to 0.10.1: forest and clearing patches about five times the game's size) and is now 0.5, the game's own size. Set it back to 1 for the larger patches. Worlds already made keep their forests.
+0.10.x-file-forest-default/log/count	1
+0.10.x-file-forest-custom/export-amount	1
+0.10.x-file-forest-custom/config-version	3
+0.10.x-file-forest-custom/debug-reset-command	
+0.10.x-file-forest-custom/forest-scale	0.7
+0.10.x-file-forest-custom/log/count	0
+0.10.x-file-forest-above-1/export-amount	1
+0.10.x-file-forest-above-1/config-version	3
+0.10.x-file-forest-above-1/debug-reset-command	
+0.10.x-file-forest-above-1/forest-scale	2.5
+0.10.x-file-forest-above-1/log/count	0
+0.9.x-file-all-defaults/export-amount	1
+0.9.x-file-all-defaults/config-version	3
+0.9.x-file-all-defaults/debug-reset-command	
+0.9.x-file-all-defaults/forest-scale	0.5
+0.9.x-file-all-defaults/log/001	[Log] [BetterContinents] BetterContinents.cfg: [09 BetterContinents.Export] Default Heightmap Amount was 2 (the default of Better Continents 0.9.0 to 0.9.4) and is now 1, Better Continents' default everywhere. Set it back to 2 to export at the old encoding (-30 m to 370 m).
+0.9.x-file-all-defaults/log/002	[Log] [BetterContinents] BetterContinents.cfg: [00 BetterContinents.Debug] Debug Reset Command was "zones_reset start" (the default of Better Continents 0.9) and is now empty: Better Continents regenerates the zones itself. Write "zones_reset start" there again to run that console command instead.
+0.9.x-file-all-defaults/log/003	[Log] [BetterContinents] BetterContinents.cfg: [04 BetterContinents.Forest] Forest Scale was 1 (the default of Better Continents 0.7.20 to 0.10.1: forest and clearing patches about five times the game's size) and is now 0.5, the game's own size. Set it back to 1 for the larger patches. Worlds already made keep their forests.
+0.9.x-file-all-defaults/log/count	3
+already-migrated-forest-default/export-amount	1
+already-migrated-forest-default/config-version	3
+already-migrated-forest-default/debug-reset-command	
+already-migrated-forest-default/forest-scale	1
+already-migrated-forest-default/log/count	0

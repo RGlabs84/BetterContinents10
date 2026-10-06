@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-10-04 for the unifying refactor (0.10.0).
+// Added by Wubarrk on 2026-10-04 for the unifying refactor (0.10.0), and modified on 2026-10-06 for the Forest Scale default (0.10.2).
 
 using System;
 using System.Collections.Generic;
@@ -176,7 +176,9 @@ internal static class SettingsSchema
   public static readonly SettingDef<string> TerrainmapFile = S("Terrainmap file", "Path to a terrain map: a square image of the ground colour, named by its legend (terrainmap.txt, 'Ground: colour' lines). Not used when Directory is set: its terrainmap.png is used.", SettingScope.World, "", e => ConfigTerrainFile = e);
 
   // ---- 04 Forest ------------------------------------------------------------------------------------------------------
-  public static readonly SettingDef<float> ForestScale = new("Forest Scale", "Scales forested/cleared area size", SettingScope.World, 1f, e => ConfigForestScale = e)
+  // The setter runs the value through FeatureScaleCurve (BetterContinentsSettings), on which 0.5 is the game's own scale.
+  // The range stays 0 to 10, as since 0.7.20, so a value somebody chose keeps its meaning.
+  public static readonly SettingDef<float> ForestScale = new("Forest Scale", "Size of the game's own forest and clearing patches (a forestmap is not scaled). 0.5 (the default) is the game's own size, 0 about a third of it, 1 about five times larger. Keep it within 0 to 1: near 1.15 the game's own forest is the same everywhere, and above that the patches shrink again.", SettingScope.World, 0.5f, e => ConfigForestScale = e)
   { Range = R(0f, 10f), Get = s => s.ForestScaleFactor, Set = (s, v) => s.ForestScaleFactor = v, ConsoleGroup = "fo", ConsoleName = "sc", ConsoleLabel = "Forest Scale" };
   public static readonly SettingDef<float> ForestAmount = new("Forest Amount", "Adjusts how much forest there is, relative to clearings", SettingScope.World, 0.5f, e => ConfigForestAmount = e)
   { Range = R(0f, 1f), Get = s => s.ForestAmount, Set = (s, v) => s.ForestAmount = v, ConsoleGroup = "fo", ConsoleName = "am", ConsoleLabel = "Forest Amount" };
@@ -293,7 +295,7 @@ internal static class SettingsSchema
 
   // ---- one-time changes to a player's file ----------------------------------------------------------------------------
 
-  public const int CurrentConfigVersion = 2;
+  public const int CurrentConfigVersion = 3;
 
   /// <summary>Awake, after <see cref="Bind"/> and before anything reads the values: the changes a file written by an older
   /// Better Continents needs, each made once (Config Version records how far a file has come).</summary>
@@ -318,6 +320,15 @@ internal static class SettingsSchema
       DebugResetCommand.Entry.Value = "";
       Log("BetterContinents.cfg: [00 BetterContinents.Debug] Debug Reset Command was \"zones_reset start\" (the default of Better Continents 0.9) and is now empty: "
           + "Better Continents regenerates the zones itself. Write \"zones_reset start\" there again to run that console command instead.");
+    }
+    // 3, the forest: Forest Scale is 0.5 by default, the game's own size of forest and clearing patches. 0.7.20 to 0.10.1
+    // shipped 1, which the curve makes about five times that size, and every file they wrote holds it; a 1 chosen on
+    // purpose cannot be told apart. Only a new world reads it: a world keeps the scale it was made with.
+    if (version < 3 && ForestScale.Entry.Value == 1f)
+    {
+      ForestScale.Entry.Value = 0.5f;
+      Log("BetterContinents.cfg: [04 BetterContinents.Forest] Forest Scale was 1 (the default of Better Continents 0.7.20 to 0.10.1: forest and clearing patches "
+          + "about five times the game's size) and is now 0.5, the game's own size. Set it back to 1 for the larger patches. Worlds already made keep their forests.");
     }
     ConfigVersion.Entry.Value = CurrentConfigVersion;
   }

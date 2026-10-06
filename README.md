@@ -6,7 +6,7 @@
 [![Multiplayer Compatible](https://img.shields.io/badge/Multiplayer-Server_Synced-blue.svg)]()
 [![Framework](https://img.shields.io/badge/Requires-BepInEx-red.svg)]()
 [![Compatibility](https://img.shields.io/badge/Target-Valheim_1.0-brightgreen.svg)]()
-[![Version](https://img.shields.io/badge/Version-0.10.0-lightgrey.svg)]()
+[![Version](https://img.shields.io/badge/Version-0.10.2-lightgrey.svg)]()
 
 > *"The Allfather did not carve the Tenth Realm in a single stroke. With hammer and chisel, the jagged peaks were raised, deep fjords torn open, and ancient oceans poured into the abyss. Take up the chisel, Viking, and shape the continents to your will."*
 
@@ -290,7 +290,7 @@ Better Continents uses standard image files (PNG recommended) placed in your wor
 * 📏 **Resolution:** 2048×2048 or 4096×4096 square images provide excellent fidelity for the full Valheim world disc. A map covers the whole world: 2 × (`World Size` + `Edge Size`) across, which is 21,000 m on a vanilla-sized world and on every version 11 world.
 * ⚪ **Heightmaps:** Grayscale 8-bit or 16-bit PNG (16-bit gives smooth slopes). Pure black (`#000000`) is maximum ocean depth; pure white (`#FFFFFF`) is the highest mountain summit, at the height `Heightmap Amount` sets.
 * 🎨 **Biome Maps:** RGB PNG where distinct color codes correspond to each biome type.
-* 🌳 **Forest Maps:** Grayscale PNG where white denotes maximum tree density and black denotes open clearings.
+* 🌳 **Forest Maps:** Grayscale PNG where white denotes maximum tree density and black denotes open clearings, with the default `Forestmap Multiply` 1 and `Forestmap Add` 1. With `Forestmap Multiply` 0, black leaves the game's own forest and the map only adds trees. `Forest Scale` sets the size of the game's own forest and clearing patches: 0.5, the default, is the game's own size.
 
 <a id="sharing-maps-with-players"></a>
 ### 📡 Sharing Maps With Players

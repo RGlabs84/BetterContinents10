@@ -51,7 +51,7 @@ all-defaults/getbiome-prefix	n=8020 min=0 max=512 sha=258116ca7cb93c9abfdb690d
 all-defaults/isashlands	n=16040 min=0 max=1 sha=fa112cd722ed3b193b0507a9
 all-defaults/isdeepnorth	n=16040 min=-1 max=1 sha=08ab360808886048fe1b6c90
 all-defaults/ashlands-gradient	n=4010 min=-1E-05 max=9.99999 sha=efe9b385bf0bd854feaea91b
-all-defaults/forest-factor	n=12030 min=-2100 max=2100 sha=b402aeb1d84c6939d6411c60
+all-defaults/forest-factor	n=12030 min=-10499.999 max=10499.999 sha=ad91d7ec4932586c088265c3
 all-defaults/precision	0
 all-defaults/override-all	True
 all-defaults/altbiome-map	classes=#000000 [none] | #6A8CA0 [Wolf Mountain] | #3C5A28 [Dark Meadows + Lantern] | #A05A3C [!Drake Mountain] | #101010 [none] | point [Wolf Mountain] map=len=9216 sha=710881f77dc2b12720276c69
@@ -81,7 +81,7 @@ heightonly/getbiome-prefix	n=8020 min=1 max=2 sha=4b91b98a3662c926f503b199
 heightonly/isashlands	n=16040 min=0 max=1 sha=6c2b4abae9de0cfc037071f7
 heightonly/isdeepnorth	n=16040 min=-1 max=1 sha=ce25cc9acce7422ac350c37e
 heightonly/ashlands-gradient	n=4010 min=-1E-05 max=-1E-05 sha=5f926809bfe151a0bcec709a
-heightonly/forest-factor	n=12030 min=-2100 max=2100 sha=f902cc92f3107b59c0d6bf89
+heightonly/forest-factor	n=12030 min=-10499.999 max=10499.999 sha=fafdc5f1acb832f1477d612f
 heightonly/precision	0
 heightonly/override-all	True
 heightonly/altbiome-map	none
@@ -111,7 +111,7 @@ alpha/getbiome-prefix	n=8020 min=1 max=2 sha=4b91b98a3662c926f503b199
 alpha/isashlands	n=16040 min=0 max=1 sha=6c2b4abae9de0cfc037071f7
 alpha/isdeepnorth	n=16040 min=-1 max=1 sha=ce25cc9acce7422ac350c37e
 alpha/ashlands-gradient	n=4010 min=-1E-05 max=-1E-05 sha=5f926809bfe151a0bcec709a
-alpha/forest-factor	n=12030 min=-2100 max=2100 sha=f902cc92f3107b59c0d6bf89
+alpha/forest-factor	n=12030 min=-10499.999 max=10499.999 sha=fafdc5f1acb832f1477d612f
 alpha/precision	0
 alpha/override-all	False
 alpha/altbiome-map	none
@@ -141,7 +141,7 @@ files/getbiome-prefix	n=8020 min=0 max=512 sha=258116ca7cb93c9abfdb690d
 files/isashlands	n=16040 min=0 max=1 sha=225b2440231a50a5247ca207
 files/isdeepnorth	n=16040 min=-1 max=1 sha=08ab360808886048fe1b6c90
 files/ashlands-gradient	n=4010 min=-1E-05 max=-1E-05 sha=5f926809bfe151a0bcec709a
-files/forest-factor	n=12030 min=-2100 max=2100 sha=ffdc10afe319fe8eedde4ab4
+files/forest-factor	n=12030 min=-10499.999 max=10499.999 sha=4de063b186a81ed0c52e4fd7
 files/precision	0
 files/override-all	True
 files/altbiome-map	none
@@ -201,7 +201,7 @@ legacy-spawnmap/getbiome-prefix	n=8020 min=1 max=2 sha=4b91b98a3662c926f503b199
 legacy-spawnmap/isashlands	n=16040 min=0 max=1 sha=6c2b4abae9de0cfc037071f7
 legacy-spawnmap/isdeepnorth	n=16040 min=-1 max=1 sha=ce25cc9acce7422ac350c37e
 legacy-spawnmap/ashlands-gradient	n=4010 min=-1E-05 max=-1E-05 sha=5f926809bfe151a0bcec709a
-legacy-spawnmap/forest-factor	n=12030 min=-2100 max=2100 sha=f902cc92f3107b59c0d6bf89
+legacy-spawnmap/forest-factor	n=12030 min=-10499.999 max=10499.999 sha=fafdc5f1acb832f1477d612f
 legacy-spawnmap/precision	0
 legacy-spawnmap/override-all	False
 legacy-spawnmap/altbiome-map	none
@@ -231,7 +231,7 @@ legacy-flat/getbiome-prefix	n=8020 min=0 max=512 sha=258116ca7cb93c9abfdb690d
 legacy-flat/isashlands	n=16040 min=0 max=1 sha=fa112cd722ed3b193b0507a9
 legacy-flat/isdeepnorth	n=16040 min=-1 max=1 sha=08ab360808886048fe1b6c90
 legacy-flat/ashlands-gradient	n=4010 min=-1E-05 max=9.99999 sha=efe9b385bf0bd854feaea91b
-legacy-flat/forest-factor	n=12030 min=-2100 max=2100 sha=b402aeb1d84c6939d6411c60
+legacy-flat/forest-factor	n=12030 min=-10499.999 max=10499.999 sha=ad91d7ec4932586c088265c3
 legacy-flat/precision	0
 legacy-flat/override-all	False
 legacy-flat/altbiome-map	classes=#000000 [none] | #6A8CA0 [Wolf Mountain] | #3C5A28 [Dark Meadows + Lantern] | #A05A3C [!Drake Mountain] | #101010 [none] | point [Wolf Mountain] map=len=9216 sha=710881f77dc2b12720276c69

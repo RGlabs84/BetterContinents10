@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-10-04 for the unifying refactor (0.10.0).
+// Added by Wubarrk on 2026-10-04 for the unifying refactor (0.10.0), and modified on 2026-10-06 for the Forest Scale default (0.10.2).
 
 using System;
 using System.Collections.Generic;
@@ -568,8 +568,10 @@ internal static class Sections
   static void Migration()
   {
     const string S = "migration";
-    // Step 1 is the export's Default Heightmap Amount, step 2 the Debug Reset Command (zone regeneration); Config Version records the last made.
+    // Step 1 is the export's Default Heightmap Amount, step 2 the Debug Reset Command (zone regeneration), step 3 Forest Scale;
+    // Config Version records the last made.
     const string Debug = "[00 BetterContinents.Debug]\nDebug Reset Command = ";
+    const string Forest = "[04 BetterContinents.Forest]\nForest Scale = ";
     var cases = new (string Name, string? File)[]
     {
       ("new-file", null),
@@ -582,7 +584,12 @@ internal static class Sections
       ("0.9.x-file-both-defaults", Debug + "zones_reset start\n\n[09 BetterContinents.Export]\nDefault Heightmap Amount = 2\n"),
       ("migrated-to-1-debug-default", "[07 BetterContinents.Misc]\nConfig Version = 1\n\n" + Debug + "zones_reset start\n\n[09 BetterContinents.Export]\nDefault Heightmap Amount = 2\n"),
       ("already-migrated-debug-default", "[07 BetterContinents.Misc]\nConfig Version = 2\n\n" + Debug + "zones_reset start\n"),
-      ("newer-file", "[07 BetterContinents.Misc]\nConfig Version = 3\n\n" + Debug + "zones_reset start\n\n[09 BetterContinents.Export]\nDefault Heightmap Amount = 2\n"),
+      ("newer-file", "[07 BetterContinents.Misc]\nConfig Version = 4\n\n" + Debug + "zones_reset start\n\n[09 BetterContinents.Export]\nDefault Heightmap Amount = 2\n\n" + Forest + "1\n"),
+      ("0.10.x-file-forest-default", "[07 BetterContinents.Misc]\nConfig Version = 2\n\n" + Forest + "1\n"),
+      ("0.10.x-file-forest-custom", "[07 BetterContinents.Misc]\nConfig Version = 2\n\n" + Forest + "0.7\n"),
+      ("0.10.x-file-forest-above-1", "[07 BetterContinents.Misc]\nConfig Version = 2\n\n" + Forest + "2.5\n"),
+      ("0.9.x-file-all-defaults", Debug + "zones_reset start\n\n" + Forest + "1\n\n[09 BetterContinents.Export]\nDefault Heightmap Amount = 2\n"),
+      ("already-migrated-forest-default", "[07 BetterContinents.Misc]\nConfig Version = 3\n\n" + Forest + "1\n"),
     };
     foreach (var (name, text) in cases)
     {
@@ -599,6 +606,7 @@ internal static class Sections
       Golden.Add(S, $"{name}/export-amount", F(BC.ConfigExportHeightmapAmount.Value));
       Golden.Add(S, $"{name}/config-version", BC.ConfigFileVersion.Value.ToString());
       Golden.Add(S, $"{name}/debug-reset-command", BC.ConfigDebugResetCommand.Value);
+      Golden.Add(S, $"{name}/forest-scale", F(BC.ConfigForestScale.Value));
       Golden.Lines(S, $"{name}/log", log);
     }
   }

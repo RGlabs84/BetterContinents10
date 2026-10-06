@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Added by Wubarrk on 2026-10-04 for the unifying refactor and the vegetation twin guard (0.10.0).
+# Added by Wubarrk on 2026-10-04 for the unifying refactor and the vegetation twin guard (0.10.0), and modified on 2026-10-06 for the Forest Scale default (0.10.2).
 #
 # Builds the plugin (Release) and runs every offline suite against it, one after another, memory-capped and niced:
 #   golden-tests      the reference recordings (tools/golden-tests/golden): any difference fails
@@ -14,7 +14,7 @@
 #   zone-tests        zone regeneration: what protects a zone (pieces, tombstones, players, worked ground), locations kept whole,
 #                     the plan and the work, saves and stops in the middle, requests and errors (Unity's coroutines stood in for),
 #                     a world that closes in every phase, time-slicing and bandwidth, the ground at a border, the Debug Reset
-#                     Command migration, "bc regen", the game code it relies on, a whole made-up world
+#                     Command and Forest Scale migrations, "bc regen", the game code it relies on, a whole made-up world
 # Usage: tools/run-tests.sh [suite ...]   (default: all). Exit code 1 when the build or any suite fails.
 set -u
 cd "$(dirname "$0")/.."

@@ -1,3 +1,20 @@
+- v0.10.2
+  - Forest Scale is 0.5 by default, the game's own size of forest and clearing patches. Since 0.7.20 the
+    default was 1, which Better Continents turns into patches about five times the game's size, so a new
+    world made from an untouched config had far larger forests and clearings than vanilla. The values
+    mean what they always did: 0 gives patches about a third of the game's size, 0.5 the game's own, 1
+    about five times larger. Keep it within 0 to 1: near 1.15 the game's own forest is the same
+    everywhere, and above that the patches shrink again. Its description in BetterContinents.cfg says so.
+  - A BetterContinents.cfg that holds Forest Scale = 1, as every config written by 0.7.20 to 0.10.1 does
+    unless somebody changed it, is set to 0.5 once, the first time the game starts with this version, and
+    the log says so ([07 BetterContinents.Misc] Config Version becomes 3). A 1 written there again
+    afterwards is kept, and any other value stays as it is.
+  - Only new worlds read Forest Scale. Every existing world and preset keeps the forest it was made with,
+    and a world made from an export folder takes the Forest Scale in the export's export.cfg, as before.
+  - The Better Continents Guide's forest chapter and "Map-making: a skill for AI agents" describe the
+    default, and say what black means in a forestmap: with the default Forestmap Multiply 1 and Add 1,
+    black is a clearing; with Forestmap Multiply 0 and Add 1, black leaves the game's own forest and the
+    map only adds trees.
 - v0.10.1
   - Rebuilt against Valheim 1.0.17 and re-verified: the reference check passes against the 1.0.17
     client and dedicated server, every offline test suite passes, and a world made from image maps on a
