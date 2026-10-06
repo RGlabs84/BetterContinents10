@@ -1,3 +1,11 @@
+- v0.10.1
+  - Rebuilt against Valheim 1.0.17 and re-verified: the reference check passes against the 1.0.17
+    client and dedicated server, every offline test suite passes, and a world made from image maps on a
+    1.0.17 dedicated server comes out the same, height for height and pin for pin, as under 1.0.16.
+    Nothing that Better Continents patches changed in 1.0.17.
+  - The New World screen's Better Continents panel shows the mod's own emblem, the package icon, for
+    "From Config" and for a preset without a picture of its own. It still showed the original 2021
+    pictures, a gear beside "BC" and "BC" over a map.
 - v0.10.0
   - Every existing world and preset keeps its terrain, biomes and locations exactly as in 0.9.4, and a
     world is saved byte for byte as before. What else changes for them is listed under "For every

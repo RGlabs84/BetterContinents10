@@ -105,6 +105,8 @@
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="assets\BCAssets\AssetBundles\StandaloneWindows\bcassets" />
+    <!-- The mod's emblem (the package icon), shown in the New World screen's Better Continents panel (Presets.Emblem). -->
+    <EmbeddedResource Include="icon.png" LogicalName="BetterContinents.icon.png" />
     <EmbeddedResource Include="assets\BCAssets\Presets\Continents.BetterContinents" />
     <EmbeddedResource Include="assets\BCAssets\Presets\Continents.png" />
     <EmbeddedResource Include="assets\BCAssets\Presets\Pangaea.BetterContinents" />

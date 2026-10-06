@@ -1,4 +1,4 @@
-﻿// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and alt-biome planting (0.8.1), and on 2026-09-24 for world export and import (0.9.0), and on 2026-10-04 for the unifying refactor (0.10.0).
+﻿// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and alt-biome planting (0.8.1), and on 2026-09-24 for world export and import (0.9.0), and on 2026-10-04 for the unifying refactor (0.10.0), and on 2026-10-06 for the New World panel's emblem (0.10.1).
 
 using System;
 using System.Collections.Generic;
@@ -69,6 +69,37 @@ public class Presets
   private Texture2D settingsIcon;
 #nullable enable
   private Texture2D? loadedIcon;
+
+  // icon.png, embedded as BetterContinents.icon.png (BetterContinents.csproj), read once. The main menu comes back after
+  // every logout and builds this panel again, so the texture is kept rather than made again each time.
+  private static Texture2D? emblem;
+  private static Texture2D? Emblem()
+  {
+    if (emblem != null)
+      return emblem;
+    try
+    {
+      using var stream = typeof(Presets).Assembly.GetManifestResourceStream("BetterContinents.icon.png");
+      if (stream == null)
+        return null;
+      using var bytes = new MemoryStream();
+      stream.CopyTo(bytes);
+      var texture = new Texture2D(2, 2) { name = "Better Continents emblem", hideFlags = HideFlags.DontUnloadUnusedAsset };
+      LoadImageCompat(texture, bytes.ToArray());
+      // A picture that did not decode leaves the blank 2 x 2 texture: the bundle's picture then shows instead.
+      if (texture.width <= 2)
+      {
+        Object.Destroy(texture);
+        return null;
+      }
+      return emblem = texture;
+    }
+    catch (Exception e)
+    {
+      BetterContinents.LogError($"Could not load the Better Continents emblem: {e.Message}");
+      return null;
+    }
+  }
   public Presets()
   {
     Active = this;
@@ -128,8 +159,11 @@ public class Presets
       GameUtils.UnpackDirectoryFromResources("BetterContinents.assets.BCAssets.Presets", PresetsDir);
     }
 
-    logoIcon = assetBundle.LoadAsset<Texture2D>("Assets/logo256.png");
-    settingsIcon = assetBundle.LoadAsset<Texture2D>("Assets/settings256.png");
+    // The mod's emblem, the package's icon.png, for "From Config" and for a preset without a picture of its own. The
+    // asset bundle's logo256 and settings256 are the original 2021 pictures, kept only in case the emblem is missing.
+    var picture = Emblem();
+    logoIcon = picture ?? assetBundle.LoadAsset<Texture2D>("Assets/logo256.png");
+    settingsIcon = picture ?? assetBundle.LoadAsset<Texture2D>("Assets/settings256.png");
 
     var prefab = assetBundle.LoadAsset<GameObject>("Assets/BCPresetPrefab.prefab");
 
