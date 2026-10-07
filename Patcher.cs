@@ -29,6 +29,8 @@ public partial class BetterContinents
       toggle.Update(Settings);
     // A world whose heightmap is read at an amount above 5, the most before 0.10.3: the game's rules that hold a height (HighTerrain.cs).
     PatchHighTerrain();
+    // The sectors a world past the game's 16 km gets: its own, out to 65 km (WorldSectors).
+    WorldSectors.Update(HarmonyInstance, Settings, ExpandWorldSizeGeometry);
     // WorldGenerator caches GetBiome/GetBiomeArea results per grid cell for the lifetime of the
     // WorldGenerator instance (only cleared in its constructor). Any biome-affecting patch toggled
     // above (GetBiome, IsAshlands, IsAshlands without a heat map) can leave already-queried cells

@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-10-04 for the unifying refactor (0.10.0).
+// Added by Wubarrk on 2026-10-04 for the unifying refactor (0.10.0), and modified on 2026-10-06 for 16k worlds (0.10.3).
 
 using System;
 using System.Collections;
@@ -111,7 +111,8 @@ namespace BetterContinents;
 //   - A location whose home the game generates while a run goes on (one an earlier run reset, or one nobody had generated): its parts
 //     in zones whose turns are over stay and those in zones still to come are cleared, so it ends half placed or, when the home is a
 //     stray, twice; the next 'bc regen' sets it right.
-//   - Zones beyond about 16.35 km out share one sector bucket (ZoneSystem.SectorToIndex), so looking at them is slower.
+//   - Zones beyond 65.5 km out share one sector bucket, as those beyond 16.4 km do in a world that has no wide sectors
+//     (WorldSectors; ZoneSystem.SectorToIndex), so looking at them is slower.
 //   - ZDOMan.m_deadZDOs grows with each destroyed object, as with any destroy.
 internal static class ZoneReset
 {

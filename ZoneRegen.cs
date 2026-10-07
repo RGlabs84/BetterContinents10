@@ -671,8 +671,9 @@ internal static class ZoneRegen
       return result;
     }
 
-    // The objects whose position is in the zone. A zone's sector list also holds what is beyond the 256 zones the sectors
-    // reach (ZoneSystem.SectorToIndex files all of that under one sector), so each position is looked at.
+    // The objects whose position is in the zone. A zone's sector list also holds what the game files under it for want of a
+    // sector: with the game's own sectors, everything beyond 256 zones out (ZoneSystem.SectorToIndex files all of that
+    // under sector 0, which is also zone (-256, -256)); with WorldSectors', what is beyond 1024 zones. So each position is looked at.
     private List<ZDO> ZdosIn(Vector2s zone)
     {
       var result = new List<ZDO>();

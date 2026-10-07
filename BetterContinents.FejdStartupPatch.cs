@@ -1,4 +1,4 @@
-﻿// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and alt-biome planting (0.8.1).
+﻿// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and alt-biome planting (0.8.1), and on 2026-10-06 for 16k worlds (0.10.3).
 
 using HarmonyLib;
 using TMPro;
@@ -31,6 +31,8 @@ public partial class BetterContinents
             AltBiomeReport.ForgetPins();
             AltBiomeControl.ResetServerAssignment();
             AltBiomeControl.ServerPeer = null;
+            // What the last world's save made of the sectors goes with the world.
+            WorldSectors.SessionStarts();
             DynamicPatch();
         }
         private static readonly Presets presets = new();

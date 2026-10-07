@@ -1,4 +1,4 @@
-﻿// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and alt-biome planting (0.8.1), and on 2026-09-24 for world export and import (0.9.0).
+﻿// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and alt-biome planting (0.8.1), and on 2026-09-24 for world export and import (0.9.0), and on 2026-10-06 for 16k worlds (0.10.3).
 
 using System;
 using System.Collections;
@@ -60,6 +60,7 @@ public partial class BetterContinents
             // settings yet (LiveConfig).
             ClientInfo.Clear();
             LiveConfig.ClearServerValues();
+            WorldSectors.SessionStarts();
             if (server)
             {
                 var settings = ResolveWorldSettingsPath(world);

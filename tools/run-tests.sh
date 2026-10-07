@@ -10,6 +10,8 @@
 #   ewd-tests         Expand World Data biomes (vanilla and EWD processes)
 #   twin-tests        the vegetation twin guard, bc_twins' scan, the PlaceVegetation tracking on the game's IL
 #   size-tests        the world's size: WorldGeometry, SetSize, the edge-of-world patches on the game's IL; the water depth patch
+#   sector-tests      the sectors of a world past the game's 16 km (WorldSectors): the sector, index and chunk map for all 2048 x 2048 zones, the
+#                     transpilers on the game's IL (client and dedicated server), the game's save planning run patched, and when the map is on
 #   tile-tests        the maps' tiles: the codec, every map kind sampling as before, saves in tiles, the cache
 #   zone-tests        zone regeneration: what protects a zone (pieces, tombstones, players, worked ground), locations kept whole,
 #                     the plan and the work, saves and stops in the middle, requests and errors (Unity's coroutines stood in for),
@@ -26,7 +28,7 @@ export DOTNET_ROOT="${DOTNET_ROOT:-$HOME/.dotnet}"
 export DOTNET_GCHeapHardLimit="${DOTNET_GCHeapHardLimit:-0xC0000000}"
 logs="$(mktemp -d "${TMPDIR:-/tmp}/bc-tests-XXXXXX")"
 suites=("$@")
-[ ${#suites[@]} -eq 0 ] && suites=(golden-tests altbiome-harness export-tests import-tests livecfg-tests ewd-tests twin-tests size-tests tile-tests zone-tests high-tests)
+[ ${#suites[@]} -eq 0 ] && suites=(golden-tests altbiome-harness export-tests import-tests livecfg-tests ewd-tests twin-tests size-tests sector-tests tile-tests zone-tests high-tests)
 
 echo "== building the plugin"
 if ! nice -n 10 dotnet build -c Release BetterContinents.csproj > "$logs/build.log" 2>&1; then

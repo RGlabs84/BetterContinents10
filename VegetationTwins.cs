@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-10-04 for the vegetation twin guard (0.10.0), and modified on 2026-10-04 for the unifying refactor (0.10.0).
+// Added by Wubarrk on 2026-10-04 for the vegetation twin guard (0.10.0), and modified on 2026-10-04 for the unifying refactor (0.10.0), and on 2026-10-06 for 16k worlds (0.10.3).
 
 using System;
 using System.Collections;
@@ -105,7 +105,7 @@ internal static class VegetationTwins
     {
       if (leaving != null && leaving.Contains(zdo.m_uid)) continue;
       var p = zdo.GetPosition();
-      // Sector 0 also holds everything beyond 256 zones out.
+      // Sector 0 also holds everything the game has no sector for: beyond 256 zones out, or 1024 with WorldSectors' wide sectors.
       if (ZoneSystem.GetZone(p) != zone) continue;
       pass.AddBefore(zdo.GetPrefab(), p.x, p.z);
     }
