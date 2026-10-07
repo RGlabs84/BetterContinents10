@@ -1,4 +1,4 @@
-// Modified by Wubarrk on 2026-09-22 for alt-biome planting (0.8.1), and on 2026-09-24 for world export and import (0.9.0), and on 2026-10-04 for the unifying refactor (0.10.0), and on 2026-10-06 for 16k worlds (0.10.3).
+// Modified by Wubarrk on 2026-09-22 for alt-biome planting (0.8.1), and on 2026-09-24 for world export and import (0.9.0), and on 2026-10-04 for the unifying refactor (0.10.0), and on 2026-10-06 for 16k worlds (0.10.3), and on 2026-10-07 for baked placements (0.10.4).
 
 using System;
 using System.Collections.Generic;
@@ -95,6 +95,14 @@ public partial class BetterContinents
     // that every world that does not set it saves byte for byte as it did, and a world without the key reads as Auto. Better Continents 0.10.2 and
     // older stop at it ("Unknown feature") and treat the world as vanilla without re-saving its settings.
     HighTerrain = 69,
+    // 0.10.4 (70): the world's baked layer (placements.bcp, format 1: BakedFormat.cs), as one byte array on disk; in the package sent to
+    // players an empty one ("this world has a layer, sent apart": the layer goes to a player in a transfer of its own, so a change of the layer
+    // leaves the package, its id and every cached copy alone). Written only by a world that has a layer, after every other key.
+    Placements = 70,
+    // 0.10.4 (71): a flag: the world's terrain is the game's own (settings.GameTerrain; a world made without Better Continents' maps that
+    // carries a layer). Written before Placements. 72 and up are for the water work (U6): whichever branch merges second takes the next free
+    // number, written explicitly as these are.
+    GameTerrain = 71,
   }
   public partial class BetterContinentsSettings
   {
