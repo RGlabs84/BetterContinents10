@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-09-24 for world export and import (0.9.0).
+// Added by Wubarrk on 2026-09-24 for world export and import (0.9.0), and modified on 2026-10-06 for 16k worlds (0.10.3).
 
 using System;
 using System.IO;
@@ -79,7 +79,7 @@ public static class LiveConfig
   internal static WorldExport.Options ApplyDefaults(WorldExport.Options options)
   {
     if (ConfigExportSize != null)
-      options.Size = ConfigExportSize.Value;
+      options.Size = Math.Min(ConfigExportSize.Value, WorldExport.SizeLimit);
     if (ConfigExportHeightmapAmount != null)
       options.HeightmapAmount = ConfigExportHeightmapAmount.Value;
     if (ConfigExportSeaLevel != null)

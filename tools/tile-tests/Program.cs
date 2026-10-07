@@ -99,6 +99,7 @@ internal static partial class Program
       PngRowsTests();
       PngWriterTests();
       LargeSizes();
+      MaxMapSizeSetting();
       LocationMaps();
       PackageTests();
       Damage();

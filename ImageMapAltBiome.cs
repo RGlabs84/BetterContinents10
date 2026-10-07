@@ -428,7 +428,7 @@ internal class ImageMapAltBiome() : ImageMapBase()
       map.Pins.Add(pin);
     }
     map.Size = pkg.ReadInt();
-    if (map.Size < 0 || map.Size > MaxMapSize)
+    if (map.Size < 0 || map.Size > LargestMapSize)
       throw new InvalidDataException($"alt-biome map declares an impossible size {map.Size}");
     map.Map = DecodeRle(pkg.ReadByteArray(), map.Size * map.Size);
     map.Legend = pkg.ReadString();

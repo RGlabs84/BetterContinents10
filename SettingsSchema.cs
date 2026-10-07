@@ -224,6 +224,8 @@ internal static class SettingsSchema
   { Set = (s, v) => s.CompactMaps = v && s.Version >= BetterContinentsSettings.UnifiedVersion };
   public static readonly SettingDef<int> MapMemory = new("Map Memory", "For a world made with Compact Maps: how many megabytes this machine lets the decoded tiles of its maps take. Past this, the tiles read least recently are dropped, and decoded again when read again. 512 holds every tile of a world's maps up to about 8192 pixels across, so each is decoded once; the tiles of a world of 16384 pixel maps are more than that (a heightmap's are 537 MB decoded), and what players read across the whole world is decoded again when it was dropped; a server short of memory can use less (each player's surroundings take about a megabyte). No effect on any other world, which holds its maps decoded. Applies at once", SettingScope.Live, 512, e => ConfigMapMemory = e)
   { Range = R(64, 65536) };
+  public static readonly SettingDef<int> MaxMapSize = new("Max Map Size", "The largest map, in pixels across, that this machine reads from a picture file: 4096, 8192 or 16384. A bigger picture is refused before it is read, with a line in the log, and the world is made without that map. A world's own maps, saved with it, are never refused. Making a world from 16384 pixel maps takes about 2 GB of memory (such a world is saved compact), so a machine short of memory can stop at 8192 or 4096. Applies the next time a map is read", SettingScope.Live, ImageMapBase.LargestMapSize, e => ConfigMaxMapSize = e)
+  { Range = new AcceptableValueList<int>(4096, 8192, 16384) };
 
   // ---- 08 AltBiomes (read into AltBiomeSettings by AltBiomeSettings.FromConfig) --------------------------------------
   public static readonly SettingDef<string> AltBiomemapFile = S("Altbiomemap File", "Path to an alt-biome map (altbiomemap.png). It plants Valheim 1.0 alt biomes with colours, the way the biome map plants biomes; the legend beside it (altbiomemap.txt, written with a default colour per alt biome when missing) says which colour plants what. Black and transparent pixels are left to the game.", SettingScope.World, "", e => ConfigAltBiomeFile = e);
@@ -252,6 +254,8 @@ internal static class SettingsSchema
   { Range = R(0.01f, MaxHeightmapAmount) };
   public static readonly SettingDef<float> ExportSeaLevel = new("Default Sea Level", "The Sea Level Adjustment an export encodes its heights for, unless bc_export or the window says otherwise", SettingScope.Live, 0.5f, e => ConfigExportSeaLevel = e)
   { Range = R(0f, 1f) };
+  public static readonly SettingDef<int> ExportLargestSize = new("Largest Size", "The largest export, in pixels a side, that this machine makes: the export window offers sizes up to it, bc_export refuses bigger ones, and a larger Default Size is used as this. 4096, 8192 or 16384. A 16384 px export takes a dedicated server about three minutes, and every player joining a world built from it downloads its maps", SettingScope.Live, WorldExport.MaxSize, e => ConfigExportLargestSize = e)
+  { Range = new AcceptableValueList<int>(4096, 8192, 16384) };
 
   /// <summary>BetterContinents.cfg, section by section, in order.</summary>
   public static readonly SettingGroup[] Groups =
@@ -263,10 +267,10 @@ internal static class SettingsSchema
     new("BetterContinents.Forest", ForestScale, ForestAmount, ForestFactorOverrideAllTrees, ForestmapFile, ForestmapMultiply, ForestmapAdd),
     new("BetterContinents.StartPosition", OverrideStartPosition, StartPositionX, StartPositionY),
     new("BetterContinents.Maps", LocationmapFile, SpawnmapFile, VegetationmapFile, PaintmapFile, LavamapFile, MossmapFile, HeatmapFile, HeatmapScale),
-    new("BetterContinents.Misc", NexusId, SelectedPreset, SettingsTransferRate, CompactMaps, MapMemory, ConfigVersion),
+    new("BetterContinents.Misc", NexusId, SelectedPreset, SettingsTransferRate, CompactMaps, MapMemory, ConfigVersion, MaxMapSize),
     // Every value of these two is still read at the same moments as before: AltBiomes when a world is created, Export live.
     new("BetterContinents.AltBiomes", AltBiomemapFile, AltBiomeMode, AltBiomeGrid, AltBiomeSeed, AltBiomeChance, AltBiomeAmount, AltBiomeEdgeScale, AltBiomeDistanceScale, AltBiomeMinThickness, AltBiomeMeanHeight, AltBiomeFixNeighbourCheck, AltBiomeOverrides),
-    new("BetterContinents.Export", ExportHud, ExportAllowed, ExportHudKey, ExportWindowKey, ExportSize, ExportHeightmapAmount, ExportSeaLevel),
+    new("BetterContinents.Export", ExportHud, ExportAllowed, ExportHudKey, ExportWindowKey, ExportSize, ExportHeightmapAmount, ExportSeaLevel, ExportLargestSize),
   ];
 
   public static IEnumerable<SettingDef> All => Groups.SelectMany(g => g.Settings);

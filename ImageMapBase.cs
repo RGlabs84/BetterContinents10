@@ -30,10 +30,11 @@ internal abstract class ImageMapBase()
   // picture is read and kept, and the world saves the picture, as always.
   internal bool Compact;
 
-  // The largest picture a new map reads, in pixels across: 16384 x 16384 is 268 million pixels (537 MB as 16-bit grey), and
-  // holds a world of 32 km at 2 m a pixel. A picture a world was made with before is never refused (it is read from the
-  // world's settings, not from a file).
-  internal const int MaxMapSize = 16384;
+  // The largest map Better Continents reads at all, in pixels across: 16384 x 16384 is 268 million pixels (537 MB as 16-bit
+  // grey), and holds a world of 32 km at 2 m a pixel. The largest picture a new map reads on this machine is Max Map Size, at
+  // most that. A picture a world was made with before is never refused (it is read from the world's settings, not from a file).
+  internal const int LargestMapSize = 16384;
+  internal static int MaxMapSize => BetterContinents.ConfigMaxMapSize is { Value: > 0 } limit ? Math.Min(limit.Value, LargestMapSize) : LargestMapSize;
 
   public virtual bool LoadSourceImage()
   {
@@ -47,7 +48,8 @@ internal abstract class ImageMapBase()
       // The picture's size first, from the file's first bytes: a picture too large is refused before the whole file is read.
       if (PictureSize(FilePath) is { } picture && (picture.Width > MaxMapSize || picture.Height > MaxMapSize))
       {
-        BetterContinents.LogError($"Cannot use texture {FilePath}: it is {picture.Width} x {picture.Height} pixels, and the largest map Better Continents reads is {MaxMapSize} x {MaxMapSize}. " +
+        BetterContinents.LogError($"Cannot use texture {FilePath}: it is {picture.Width} x {picture.Height} pixels, and the largest map Better Continents reads is {MaxMapSize} x {MaxMapSize}" +
+          (MaxMapSize < LargestMapSize ? $" (Max Map Size; it can be raised to {LargestMapSize}). " : ". ") +
           "Scale it down (at 2 m a pixel, 16384 pixels hold a world 32.7 km across).");
         return false;
       }

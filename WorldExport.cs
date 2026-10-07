@@ -197,6 +197,9 @@ public static class WorldExport
 {
   public const int MinSize = 128;
   public const int MaxSize = 16384;
+  /// <summary>The largest export this machine makes: Largest Size ([09 BetterContinents.Export]), at most <see cref="MaxSize"/>;
+  /// MaxSize when the config is not bound (the offline harness).</summary>
+  public static int SizeLimit => BetterContinents.ConfigExportLargestSize is { Value: > 0 } limit ? Math.Min(limit.Value, MaxSize) : MaxSize;
   /// <summary>The most a Heightmap Amount can be (the world's setting and an export's, SettingsSchema.MaxHeightmapAmount): at Sea
   /// Level 0.5 it spans -30 m to 16,170 m, a mountain 16 km tall.</summary>
   public const float MaxHeightmapAmount = SettingsSchema.MaxHeightmapAmount;
@@ -284,8 +287,8 @@ public static class WorldExport
 
     internal string? Validate()
     {
-      if (Size < MinSize || Size > MaxSize)
-        return $"the size must be {MinSize} to {MaxSize} pixels (got {Size})";
+      if (Size < MinSize || Size > SizeLimit)
+        return $"the size must be {MinSize} to {SizeLimit} pixels{(SizeLimit < MaxSize ? " (Largest Size in the config)" : "")} (got {Size})";
       if (!(HeightmapAmount > 0f && HeightmapAmount <= MaxHeightmapAmount))
         return $"the heightmap amount must be above 0 and at most {Inv(MaxHeightmapAmount)}, the config's range (got {Inv(HeightmapAmount)})";
       if (!(SeaLevel >= 0f && SeaLevel <= 1f))

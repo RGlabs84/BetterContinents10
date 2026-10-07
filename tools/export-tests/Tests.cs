@@ -484,6 +484,31 @@ internal static class Tests
     C(WorldExportCommands.TryParse("16385", out var over, out _) && validate.Invoke(over, null) is string sizeError && sizeError.Contains("16384"), "16385 px is refused, and the message names the limit");
     C(WorldExportCommands.TryParse("amount=81.01", out var overAmount, out _) && validate.Invoke(overAmount, null) is string amountError && amountError.Contains("81"), "amount 81.01 is refused, and the message names the limit");
     C(WorldExport.MaxSize == 16384 && WorldExport.MaxHeightmapAmount == 81f && WorldExport.PresetMaxSize == 8192, "the limits: 16384 px, amount 81, the preset made by the export up to 8192 px");
+    // Largest Size ([09 BetterContinents.Export]): this machine's limit, 4096, 8192 or 16384 (the default).
+    var savedLimit = BetterContinents.BetterContinents.ConfigExportLargestSize;
+    var savedSize = BetterContinents.BetterContinents.ConfigExportSize;
+    try
+    {
+      var cfg = new BepInEx.Configuration.ConfigFile(Path.Combine(Path.GetTempPath(), $"bc-export-limit-{Guid.NewGuid():N}.cfg"), false);
+      BetterContinents.BetterContinents.ConfigExportLargestSize = cfg.Bind("09 BetterContinents.Export", "Largest Size", WorldExport.MaxSize,
+        new BepInEx.Configuration.ConfigDescription("test", new BepInEx.Configuration.AcceptableValueList<int>(4096, 8192, 16384)));
+      BetterContinents.BetterContinents.ConfigExportSize = cfg.Bind("09 BetterContinents.Export", "Default Size", 16384,
+        new BepInEx.Configuration.ConfigDescription("test", new BepInEx.Configuration.AcceptableValueRange<int>(WorldExport.MinSize, WorldExport.MaxSize)));
+      C(WorldExport.SizeLimit == 16384 && validate.Invoke(big, null) == null, "Largest Size is 16384 by default, and a 16384 px export is valid");
+      BetterContinents.BetterContinents.ConfigExportLargestSize.Value = 8192;
+      C(WorldExport.SizeLimit == 8192 && validate.Invoke(big, null) is string limited && limited.Contains("8192") && limited.Contains("Largest Size"),
+        "at Largest Size 8192, a 16384 px export is refused, and the message names the setting");
+      C(WorldExportCommands.TryParse("8192", out var at8192, out _) && validate.Invoke(at8192, null) == null, "and an 8192 px export is valid");
+      var liveConfig = typeof(WorldExport).Assembly.GetType("BetterContinents.LiveConfig")!;
+      var defaults = (WorldExport.Options)liveConfig.GetMethod("ApplyDefaults", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Static)!.Invoke(null, [WorldExport.Options.Default()])!;
+      C(defaults.Size == 8192, $"a Default Size of 16384 is used as 8192, the limit ({defaults.Size})");
+    }
+    finally
+    {
+      BetterContinents.BetterContinents.ConfigExportLargestSize = savedLimit;
+      BetterContinents.BetterContinents.ConfigExportSize = savedSize;
+    }
+    C(WorldExport.SizeLimit == WorldExport.MaxSize, "with the config not bound the limit is 16384");
   }
 
   // The export window's estimate and notes (ExportHud.Estimate and Notes, private and pure: no GUI call) for the sizes it offers.

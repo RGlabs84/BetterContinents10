@@ -507,9 +507,13 @@ public static class ExportHud
 
     GUILayout.Label("Encoding", s.Header);
     GUILayout.BeginHorizontal();
+    if (o.Size > WorldExport.SizeLimit)
+      o.Size = WorldExport.SizeLimit;
     GUILayout.Label($"Size: {o.Size} px", s.Text, GUILayout.Width(LabelWidth));
     foreach (var size in Sizes)
     {
+      if (size > WorldExport.SizeLimit)
+        continue;
       if (Radio(o.Size == size, size.ToString(CultureInfo.InvariantCulture)))
         o.Size = size;
     }

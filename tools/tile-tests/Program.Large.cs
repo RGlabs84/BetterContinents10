@@ -35,6 +35,48 @@ internal static partial class Program
     return stream.ToArray();
   }
 
+  // Max Map Size ([07 BetterContinents.Misc]): this machine's limit on the pictures it reads, 4096, 8192 or 16384 (the
+  // default). A world's own maps, read from its settings, are never held to it.
+  private static void MaxMapSizeSetting()
+  {
+    Section("Max Map Size: the largest picture this machine reads (4096, 8192 or 16384), never a world's own maps");
+    var saved = BC.ConfigMaxMapSize;
+    try
+    {
+      var cfg = new BepInEx.Configuration.ConfigFile(Path.Combine(Work, "max-map-size.cfg"), false);
+      BC.ConfigMaxMapSize = cfg.Bind("07 BetterContinents.Misc", "Max Map Size", ImageMapBase.LargestMapSize,
+        new BepInEx.Configuration.ConfigDescription("test", new BepInEx.Configuration.AcceptableValueList<int>(4096, 8192, 16384)));
+      C(ImageMapBase.MaxMapSize == 16384 && ImageMapBase.LargestMapSize == 16384, "16384 by default, the largest Better Continents reads at all");
+      BC.ConfigMaxMapSize.Value = 8192;
+      var over = WriteMap("over-8192.png", HeaderOnlyPng(8193, 8193));
+      var wide = WriteMap("wide-8192.png", HeaderOnlyPng(8193, 16));
+      var at = WriteMap("at-8192.png", HeaderOnlyPng(8192, 8192));
+      foreach (var (name, path) in new[] { ("8193 px square", over), ("8193 x 16", wide) })
+      {
+        lock (LogHandler.Lines) LogHandler.Lines.Clear();
+        var made = new ImageMapBase[] { ImageMapFloat.Create(path, ImageMapFloat.HeightAlpha.None), ImageMapBiome.Create(path), ImageMapSpawn.Create(path) };
+        string[] lines;
+        lock (LogHandler.Lines) lines = LogHandler.Lines.Where(l => l.Contains("largest map")).ToArray();
+        C(ImageMapBase.MaxMapSize == 8192 && made.All(m => m == null) && lines.Length == made.Length && lines[0].Contains("8192 x 8192") && lines[0].Contains("Max Map Size"),
+          $"at 8192, a {name} picture is refused, and the log names the setting (\"{lines.FirstOrDefault()?.Substring(0, Math.Min(150, lines[0].Length))}...\")");
+      }
+      lock (LogHandler.Lines) LogHandler.Lines.Clear();
+      ImageMapFloat.Create(at, ImageMapFloat.HeightAlpha.None);
+      string[] none;
+      lock (LogHandler.Lines) none = LogHandler.Lines.Where(l => l.Contains("largest map")).ToArray();
+      C(none.Length == 0, "an 8192 px picture passes the size check");
+      BC.ConfigMaxMapSize.Value = 4096;
+      var saved4100 = Png(4100, (x, y) => new L16((ushort)((x + y) & 0xFFFF)), SixLabors.ImageSharp.Formats.Png.PngColorType.Grayscale, SixLabors.ImageSharp.Formats.Png.PngBitDepth.Bit16);
+      var fromSettings = ImageMapFloat.Create(saved4100, ImageMapFloat.HeightAlpha.None);
+      C(ImageMapBase.MaxMapSize == 4096 && fromSettings != null && fromSettings.Size == 4100, "at 4096, a world's saved 4100 px picture is read as it always was");
+    }
+    finally
+    {
+      BC.ConfigMaxMapSize = saved;
+    }
+    C(ImageMapBase.MaxMapSize == 16384, "with the config not bound (the offline harness, a client that never read it) the limit is 16384");
+  }
+
   private static void LargeSizes()
   {
     Section("a picture larger than 16384 px is refused from its header, with a message");
