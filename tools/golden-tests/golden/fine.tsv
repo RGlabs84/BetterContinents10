@@ -71,7 +71,7 @@
 8-bit/base-height-v3	n=4010 min=-2 max=2.2089956 sha=fd49f0cd1cf44dca79620264
 8-bit/getbiome-prefix	n=8020 min=1 max=2 sha=4b91b98a3662c926f503b199
 8-bit/isashlands	n=16040 min=0 max=1 sha=6c2b4abae9de0cfc037071f7
-8-bit/isdeepnorth	n=16040 min=-1 max=1 sha=ce25cc9acce7422ac350c37e
+8-bit/isdeepnorth	n=8020 min=0 max=1 sha=2c7a4e48856512a1e42ad6a3
 8-bit/ashlands-gradient	n=4010 min=-1E-05 max=-1E-05 sha=5f926809bfe151a0bcec709a
 8-bit/forest-factor	n=12030 min=-10499.999 max=10499.999 sha=fafdc5f1acb832f1477d612f
 8-bit/precision	0
@@ -152,7 +152,7 @@
 4-bit/base-height-v3	n=4010 min=-2 max=2.2090855 sha=f14d666a359ab78bf75475d3
 4-bit/getbiome-prefix	n=8020 min=1 max=2 sha=4b91b98a3662c926f503b199
 4-bit/isashlands	n=16040 min=0 max=1 sha=6c2b4abae9de0cfc037071f7
-4-bit/isdeepnorth	n=16040 min=-1 max=1 sha=ce25cc9acce7422ac350c37e
+4-bit/isdeepnorth	n=8020 min=0 max=1 sha=2c7a4e48856512a1e42ad6a3
 4-bit/ashlands-gradient	n=4010 min=-1E-05 max=-1E-05 sha=5f926809bfe151a0bcec709a
 4-bit/forest-factor	n=12030 min=-10499.999 max=10499.999 sha=fafdc5f1acb832f1477d612f
 4-bit/precision	0
@@ -234,7 +234,7 @@ blend/locations/Runestone_Meadows
 blend/base-height-v3	n=4010 min=-2 max=2.2089956 sha=fd49f0cd1cf44dca79620264
 blend/getbiome-prefix	n=8020 min=1 max=2 sha=4b91b98a3662c926f503b199
 blend/isashlands	n=16040 min=0 max=1 sha=6c2b4abae9de0cfc037071f7
-blend/isdeepnorth	n=16040 min=-1 max=1 sha=ce25cc9acce7422ac350c37e
+blend/isdeepnorth	n=8020 min=0 max=1 sha=2c7a4e48856512a1e42ad6a3
 blend/ashlands-gradient	n=4010 min=-1E-05 max=-1E-05 sha=5f926809bfe151a0bcec709a
 blend/forest-factor	n=12030 min=-10499.999 max=10499.999 sha=fafdc5f1acb832f1477d612f
 blend/precision	0
@@ -310,7 +310,7 @@ no-file/locations/Runestone_Meadows
 no-file/base-height-v3	n=4010 min=-2 max=2.2090855 sha=eabf0b73ebbbc98a0fc3e43d
 no-file/getbiome-prefix	n=8020 min=1 max=2 sha=4b91b98a3662c926f503b199
 no-file/isashlands	n=16040 min=0 max=1 sha=6c2b4abae9de0cfc037071f7
-no-file/isdeepnorth	n=16040 min=-1 max=1 sha=ce25cc9acce7422ac350c37e
+no-file/isdeepnorth	n=8020 min=0 max=1 sha=2c7a4e48856512a1e42ad6a3
 no-file/ashlands-gradient	n=4010 min=-1E-05 max=-1E-05 sha=5f926809bfe151a0bcec709a
 no-file/forest-factor	n=12030 min=-10499.999 max=10499.999 sha=fafdc5f1acb832f1477d612f
 no-file/precision	0
@@ -388,7 +388,7 @@ compact-off/locations/Runestone_Meadows
 compact-off/base-height-v3	n=4010 min=-2 max=2.2090855 sha=eabf0b73ebbbc98a0fc3e43d
 compact-off/getbiome-prefix	n=8020 min=1 max=2 sha=4b91b98a3662c926f503b199
 compact-off/isashlands	n=16040 min=0 max=1 sha=6c2b4abae9de0cfc037071f7
-compact-off/isdeepnorth	n=16040 min=-1 max=1 sha=ce25cc9acce7422ac350c37e
+compact-off/isdeepnorth	n=8020 min=0 max=1 sha=2c7a4e48856512a1e42ad6a3
 compact-off/ashlands-gradient	n=4010 min=-1E-05 max=-1E-05 sha=5f926809bfe151a0bcec709a
 compact-off/forest-factor	n=12030 min=-10499.999 max=10499.999 sha=fafdc5f1acb832f1477d612f
 compact-off/precision	0
@@ -465,7 +465,7 @@ compact-on/locations/Runestone_Meadows
 compact-on/base-height-v3	n=4010 min=-2 max=2.2090855 sha=eabf0b73ebbbc98a0fc3e43d
 compact-on/getbiome-prefix	n=8020 min=1 max=2 sha=4b91b98a3662c926f503b199
 compact-on/isashlands	n=16040 min=0 max=1 sha=6c2b4abae9de0cfc037071f7
-compact-on/isdeepnorth	n=16040 min=-1 max=1 sha=ce25cc9acce7422ac350c37e
+compact-on/isdeepnorth	n=8020 min=0 max=1 sha=2c7a4e48856512a1e42ad6a3
 compact-on/ashlands-gradient	n=4010 min=-1E-05 max=-1E-05 sha=5f926809bfe151a0bcec709a
 compact-on/forest-factor	n=12030 min=-10499.999 max=10499.999 sha=fafdc5f1acb832f1477d612f
 compact-on/precision	0
@@ -543,7 +543,7 @@ version-11/locations/Runestone_Meadows
 version-11/base-height-v3	n=4010 min=-2 max=2.2090855 sha=eabf0b73ebbbc98a0fc3e43d
 version-11/getbiome-prefix	n=8020 min=1 max=2 sha=4b91b98a3662c926f503b199
 version-11/isashlands	n=16040 min=0 max=1 sha=6c2b4abae9de0cfc037071f7
-version-11/isdeepnorth	n=16040 min=-1 max=1 sha=ce25cc9acce7422ac350c37e
+version-11/isdeepnorth	n=8020 min=0 max=1 sha=2c7a4e48856512a1e42ad6a3
 version-11/ashlands-gradient	n=4010 min=-1E-05 max=-1E-05 sha=5f926809bfe151a0bcec709a
 version-11/forest-factor	n=12030 min=-10499.999 max=10499.999 sha=fafdc5f1acb832f1477d612f
 version-11/precision	0

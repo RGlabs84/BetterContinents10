@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-09-24 for world export and import (0.9.0), and on 2026-09-27 for map mod compatibility (0.9.2), and modified on 2026-10-04 for the unifying refactor (0.10.0).
+// Added by Wubarrk on 2026-09-24 for world export and import (0.9.0), and on 2026-09-27 for map mod compatibility (0.9.2), and modified on 2026-10-04 for the unifying refactor (0.10.0), and on 2026-10-06 for 16k worlds (0.10.3).
 
 // Offline checks of Better Continents 0.9.0's live config (LiveConfig), its RPC package, the export gate and the
 // configured export defaults. Loads the real pre-ILRepack BetterContinents.dll, the game's assemblies and BepInEx.
@@ -381,7 +381,6 @@ internal static class Program
     if (on && s.HasHeatMap && s.HeatMapScale > 0f) r.Add("WorldGenerator.IsAshlands");
     if (on && s.HasBiomeMap && (!s.HasHeatMap || s.HeatMapScale == 0f)) r.Add("WorldGenerator.IsAshlands (no heat map)");
     if (on && s.HasBiomeMap) r.Add("WorldGenerator.IsDeepnorth");
-    if (on && s.HasBiomeMap) r.Add("WorldGenerator.DeepNorthWaveFade");
     if (on && (s.HasPaintMap || s.HasLavaMap)) r.Add("WorldGenerator.GetAshlandsHeight");
     // Every Better Continents world since the twin guard (0.9.4: with a vegetation map only).
     if (on) r.Add("ZoneSystem.PlaceVegetation (vegetation map, twin guard)");

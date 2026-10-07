@@ -508,10 +508,8 @@ internal static class Sections
       add("isdeepnorth", Hash.Floats(grid.SelectMany(p =>
       {
         bool r = false;
-        double fade = -1;
         bool run = BC.WorldGeneratorPatch.IsDeepnorthPrefix(W(p.U), W(p.V), ref r);
-        bool run2 = BC.WorldGeneratorPatch.DeepNorthWaveFadePrefix(W(p.U), W(p.V), ref fade);
-        return new[] { run ? 1f : 0f, r ? 1f : 0f, run2 ? 1f : 0f, (float)fade };
+        return new[] { run ? 1f : 0f, r ? 1f : 0f };
       })));
       add("ashlands-gradient", Hash.Floats(grid.Select(p =>
       {

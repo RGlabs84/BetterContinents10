@@ -1,4 +1,4 @@
-﻿// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0), and on 2026-10-04 for the unifying refactor (0.10.0).
+﻿// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0), and on 2026-10-04 for the unifying refactor (0.10.0), and on 2026-10-06 for 16k worlds (0.10.3).
 
 using System.Collections.Generic;
 using System.Linq;
@@ -385,23 +385,6 @@ public partial class BetterContinents
             if (biome == Heightmap.Biome.None)
                 return true;
             __result = biome == Heightmap.Biome.DeepNorth;
-            return false;
-        }
-
-        // DeepNorthWaveFade is new in 1.0 and flattens the sea inside the Deep North: WaterVolume and Fish
-        // both take waves as (1 - fade), so 0 is a normal sea and 1 is dead calm. Vanilla derives it from the
-        // same hardcoded circle as IsDeepnorth, ramping 0 -> 1 over the 200 m just past the boundary, so on a
-        // world whose Deep North has been moved or resized the calm water stays behind in the old place.
-        // A single biome-map sample keeps this cheap: GetWaterSurface runs per water sample per frame, and
-        // every fish calls it too, so sampling neighbours to rebuild the 200 m ramp would not pay for itself.
-        // The cost of that is a wave-height seam at the Deep North shore rather than a short fade - barely
-        // different from vanilla's own 200 m ramp across a 20 km world, and only when a biome map is in use.
-        public static bool DeepNorthWaveFadePrefix(float wx, float wy, ref double __result)
-        {
-            var biome = Settings.GetBiomeOverride(Normalize(wx), Normalize(wy));
-            if (biome == Heightmap.Biome.None)
-                return true;
-            __result = biome == Heightmap.Biome.DeepNorth ? 1.0 : 0.0;
             return false;
         }
     }

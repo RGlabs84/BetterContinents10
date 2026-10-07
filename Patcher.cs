@@ -36,6 +36,8 @@ public partial class BetterContinents
     // above (GetBiome, IsAshlands, IsAshlands without a heat map) can leave already-queried cells
     // returning their pre-patch answer for the rest of the session unless we clear the caches here.
     ClearWorldGeneratorBiomeCaches();
+    // The water's colours follow the hot sea the patches above make (AshlandsWater).
+    AshlandsWater.Refresh();
     // EnvMan's Deep North weather test reads the biome map at the camera's x and z exactly when IsDeepnorth
     // reads the biome map at all (the IsDeepnorth toggle); every other world keeps vanilla's (x, height) call. A
     // high world asks at x and z too: the game's (x, height) is inside the Deep North's circle once the camera is
@@ -322,11 +324,9 @@ public partial class BetterContinents
     new("WorldGenerator.IsDeepnorth",
       s => s.EnabledForThisWorld && s.HasBiomeMap,
       OnWorldGenerator(nameof(WorldGenerator.IsDeepnorth), null, nameof(WorldGeneratorPatch.IsDeepnorthPrefix), HookKind.Prefix, Priority.VeryHigh)),
-    // Follows IsDeepnorth: the wave fade uses the same hardcoded Deep North circle, so a biome map that moves the biome
-    // has to move the calm water with it, or the sea stays flat over open ocean and choppy in the new Deep North.
-    new("WorldGenerator.DeepNorthWaveFade",
-      s => s.EnabledForThisWorld && s.HasBiomeMap,
-      OnWorldGenerator(nameof(WorldGenerator.DeepNorthWaveFade), null, nameof(WorldGeneratorPatch.DeepNorthWaveFadePrefix), HookKind.Prefix, Priority.VeryHigh)),
+    // Not WorldGenerator.DeepNorthWaveFade (patched from 0.8.0 to 0.10.2): it floats boats and fish on the waves, and the water
+    // shader draws them calm by the game's own circle whatever the biome map says, so the boats must follow that circle too
+    // (AshlandsWater).
     // Mossmap is not needed as it doesn't apply to Ashlands.
     new("WorldGenerator.GetAshlandsHeight",
       s => s.EnabledForThisWorld && (s.HasPaintMap || s.HasLavaMap),

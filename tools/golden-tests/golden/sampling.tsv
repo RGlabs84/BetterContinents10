@@ -19,7 +19,7 @@ all/locations/Runestone_Meadows
 all/base-height-v3	n=4010 min=-0.35000005 max=0.2904891 sha=f8e92c132b69d6292bf4a210
 all/getbiome-prefix	n=8020 min=0 max=512 sha=258116ca7cb93c9abfdb690d
 all/isashlands	n=16040 min=0 max=1 sha=fa112cd722ed3b193b0507a9
-all/isdeepnorth	n=16040 min=-1 max=1 sha=08ab360808886048fe1b6c90
+all/isdeepnorth	n=8020 min=0 max=1 sha=46f9d1c9e46d2a3a960a1448
 all/ashlands-gradient	n=4010 min=-1E-05 max=7.49999 sha=898b5b5ef0e0d70e283e10c1
 all/forest-factor	n=12030 min=-6774.0054 max=6774.0054 sha=4f8388c7bd6ac4c4c061bdaf
 all/precision	3
@@ -49,7 +49,7 @@ all-defaults/locations/Runestone_Meadows
 all-defaults/base-height-v3	n=4010 min=-2 max=0.33522585 sha=796fde1051b898667ba28208
 all-defaults/getbiome-prefix	n=8020 min=0 max=512 sha=258116ca7cb93c9abfdb690d
 all-defaults/isashlands	n=16040 min=0 max=1 sha=fa112cd722ed3b193b0507a9
-all-defaults/isdeepnorth	n=16040 min=-1 max=1 sha=08ab360808886048fe1b6c90
+all-defaults/isdeepnorth	n=8020 min=0 max=1 sha=46f9d1c9e46d2a3a960a1448
 all-defaults/ashlands-gradient	n=4010 min=-1E-05 max=9.99999 sha=efe9b385bf0bd854feaea91b
 all-defaults/forest-factor	n=12030 min=-10499.999 max=10499.999 sha=ad91d7ec4932586c088265c3
 all-defaults/precision	0
@@ -79,7 +79,7 @@ heightonly/locations/Runestone_Meadows
 heightonly/base-height-v3	n=4010 min=-2 max=0.33522585 sha=796fde1051b898667ba28208
 heightonly/getbiome-prefix	n=8020 min=1 max=2 sha=4b91b98a3662c926f503b199
 heightonly/isashlands	n=16040 min=0 max=1 sha=6c2b4abae9de0cfc037071f7
-heightonly/isdeepnorth	n=16040 min=-1 max=1 sha=ce25cc9acce7422ac350c37e
+heightonly/isdeepnorth	n=8020 min=0 max=1 sha=2c7a4e48856512a1e42ad6a3
 heightonly/ashlands-gradient	n=4010 min=-1E-05 max=-1E-05 sha=5f926809bfe151a0bcec709a
 heightonly/forest-factor	n=12030 min=-10499.999 max=10499.999 sha=fafdc5f1acb832f1477d612f
 heightonly/precision	0
@@ -109,7 +109,7 @@ alpha/locations/Runestone_Meadows
 alpha/base-height-v3	n=4010 min=-2 max=0.33522585 sha=796fde1051b898667ba28208
 alpha/getbiome-prefix	n=8020 min=1 max=2 sha=4b91b98a3662c926f503b199
 alpha/isashlands	n=16040 min=0 max=1 sha=6c2b4abae9de0cfc037071f7
-alpha/isdeepnorth	n=16040 min=-1 max=1 sha=ce25cc9acce7422ac350c37e
+alpha/isdeepnorth	n=8020 min=0 max=1 sha=2c7a4e48856512a1e42ad6a3
 alpha/ashlands-gradient	n=4010 min=-1E-05 max=-1E-05 sha=5f926809bfe151a0bcec709a
 alpha/forest-factor	n=12030 min=-10499.999 max=10499.999 sha=fafdc5f1acb832f1477d612f
 alpha/precision	0
@@ -139,7 +139,7 @@ files/locations/Runestone_Meadows
 files/base-height-v3	n=4010 min=-2 max=0.8190597 sha=f71175d49992fb1858adbb8e
 files/getbiome-prefix	n=8020 min=0 max=512 sha=258116ca7cb93c9abfdb690d
 files/isashlands	n=16040 min=0 max=1 sha=225b2440231a50a5247ca207
-files/isdeepnorth	n=16040 min=-1 max=1 sha=08ab360808886048fe1b6c90
+files/isdeepnorth	n=8020 min=0 max=1 sha=46f9d1c9e46d2a3a960a1448
 files/ashlands-gradient	n=4010 min=-1E-05 max=-1E-05 sha=5f926809bfe151a0bcec709a
 files/forest-factor	n=12030 min=-10499.999 max=10499.999 sha=4de063b186a81ed0c52e4fd7
 files/precision	0
@@ -169,7 +169,7 @@ scalars/locations/Runestone_Meadows
 scalars/base-height-v3	n=4010 min=0.38 max=0.65 sha=6fe53c30d5f25d1ee9f59200
 scalars/getbiome-prefix	n=8020 min=1 max=2 sha=4b91b98a3662c926f503b199
 scalars/isashlands	n=16040 min=0 max=1 sha=6c2b4abae9de0cfc037071f7
-scalars/isdeepnorth	n=16040 min=-1 max=1 sha=ce25cc9acce7422ac350c37e
+scalars/isdeepnorth	n=8020 min=0 max=1 sha=2c7a4e48856512a1e42ad6a3
 scalars/ashlands-gradient	n=4010 min=-1E-05 max=-1E-05 sha=5f926809bfe151a0bcec709a
 scalars/forest-factor	n=12030 min=-14368.876 max=14368.876 sha=3ad1098d72c7be7a7b8bcf85
 scalars/precision	5
@@ -199,7 +199,7 @@ legacy-spawnmap/locations/Runestone_Meadows
 legacy-spawnmap/base-height-v3	n=4010 min=-2 max=-0.15 sha=a4e3e2980beb7e81fe7371da
 legacy-spawnmap/getbiome-prefix	n=8020 min=1 max=2 sha=4b91b98a3662c926f503b199
 legacy-spawnmap/isashlands	n=16040 min=0 max=1 sha=6c2b4abae9de0cfc037071f7
-legacy-spawnmap/isdeepnorth	n=16040 min=-1 max=1 sha=ce25cc9acce7422ac350c37e
+legacy-spawnmap/isdeepnorth	n=8020 min=0 max=1 sha=2c7a4e48856512a1e42ad6a3
 legacy-spawnmap/ashlands-gradient	n=4010 min=-1E-05 max=-1E-05 sha=5f926809bfe151a0bcec709a
 legacy-spawnmap/forest-factor	n=12030 min=-10499.999 max=10499.999 sha=fafdc5f1acb832f1477d612f
 legacy-spawnmap/precision	0
@@ -229,7 +229,7 @@ legacy-flat/locations/Runestone_Meadows
 legacy-flat/base-height-v3	n=4010 min=-2 max=0.33522585 sha=796fde1051b898667ba28208
 legacy-flat/getbiome-prefix	n=8020 min=0 max=512 sha=258116ca7cb93c9abfdb690d
 legacy-flat/isashlands	n=16040 min=0 max=1 sha=fa112cd722ed3b193b0507a9
-legacy-flat/isdeepnorth	n=16040 min=-1 max=1 sha=08ab360808886048fe1b6c90
+legacy-flat/isdeepnorth	n=8020 min=0 max=1 sha=46f9d1c9e46d2a3a960a1448
 legacy-flat/ashlands-gradient	n=4010 min=-1E-05 max=9.99999 sha=efe9b385bf0bd854feaea91b
 legacy-flat/forest-factor	n=12030 min=-10499.999 max=10499.999 sha=ad91d7ec4932586c088265c3
 legacy-flat/precision	0

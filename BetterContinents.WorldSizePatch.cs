@@ -169,7 +169,8 @@ public class WorldSizeHelper
     new Part(() => AccessTools.EnumeratorMoveNext(AccessTools.Method(typeof(ZoneSystem), nameof(ZoneSystem.GenerateLocationsTimeSliced),
       [typeof(ZoneSystem.ZoneLocation), typeof(System.Diagnostics.Stopwatch), typeof(ZPackage)])), transpiler: nameof(GenerateLocationsTranspiler)),
     // The game's own biomes, where no biome map decides: its bands (the Swamp's limit included), its Ashlands ring in the
-    // south and Deep North ring in the north, with their gaps, and the calm sea of the Deep North.
+    // south and Deep North ring in the north, with their gaps. Not the calm sea of the Deep North (DeepNorthWaveFade, moved
+    // from 0.10.0 to 0.10.2): the water shader draws it by the game's own circle, and the boats float on what is drawn.
     new Part(() => AccessTools.Method(typeof(WorldGenerator), nameof(WorldGenerator.GetBiome), [typeof(float), typeof(float), typeof(float), typeof(bool)]),
       transpiler: nameof(GetBiomeTranspiler)),
     new Part(() => AccessTools.Method(typeof(WorldGenerator), nameof(WorldGenerator.IsAshlands), [typeof(float), typeof(float)]),
@@ -182,8 +183,6 @@ public class WorldSizeHelper
     new Part(() => AccessTools.Method(typeof(WorldGenerator), nameof(WorldGenerator.IsDeepnorth), [typeof(float), typeof(float)]),
       transpiler: nameof(IsDeepnorthTranspiler)),
     new Part(() => AccessTools.Method(typeof(WorldGenerator), nameof(WorldGenerator.CreateDeepNorthGap), [typeof(float), typeof(float)]),
-      transpiler: nameof(DeepNorthTranspiler)),
-    new Part(() => AccessTools.Method(typeof(WorldGenerator), nameof(WorldGenerator.DeepNorthWaveFade), [typeof(float), typeof(float)]),
       transpiler: nameof(DeepNorthTranspiler)),
     // The lakes the rivers run between, and the streams' sources: searched for within World Size.
     new Part(() => AccessTools.Method(typeof(WorldGenerator), nameof(WorldGenerator.FindLakes)), transpiler: nameof(FindLakesTranspiler)),
@@ -399,7 +398,7 @@ public class WorldSizeHelper
   private static IEnumerable<CodeInstruction> IsDeepnorthTranspiler(IEnumerable<CodeInstruction> instructions) =>
     new Constants(instructions).Replace(4000d, Scaled(4000d)).Replace(12000d, Scaled(12000d)).Codes;
 
-  // CreateDeepNorthGap and DeepNorthWaveFade write the centre as a float.
+  // CreateDeepNorthGap writes the centre as a float.
   private static IEnumerable<CodeInstruction> DeepNorthTranspiler(IEnumerable<CodeInstruction> instructions) =>
     new Constants(instructions).Replace(4000f, Scaled(4000f)).Replace(12000d, Scaled(12000d)).Codes;
 

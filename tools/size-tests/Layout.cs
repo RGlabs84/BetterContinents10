@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-10-04 for the unifying refactor (0.10.0).
+// Added by Wubarrk on 2026-10-04 for the unifying refactor (0.10.0), and modified on 2026-10-06 for 16k worlds (0.10.3).
 //
 // The layout (WorldSizeHelper.Layout): which worlds are laid out to their own size, the alt-biome grid a size has, every
 // layout transpiler on the installed game's IL, the pure ones patched through Harmony and run, the minimap's scale,
@@ -171,8 +171,6 @@ internal static partial class Program
       "ldc.r8 4000 -> ldc.r8 8000", "ldc.r8 12000 -> ldc.r8 24000");
     Expect("WorldGenerator.CreateDeepNorthGap: the same ring", "DeepNorthTranspiler", "WorldGenerator.CreateDeepNorthGap",
       "ldc.r4 4000 -> ldc.r4 8000", "ldc.r8 12000 -> ldc.r8 24000");
-    Expect("WorldGenerator.DeepNorthWaveFade: the same ring", "DeepNorthTranspiler", "WorldGenerator.DeepNorthWaveFade",
-      "ldc.r4 4000 -> ldc.r4 8000", "ldc.r8 12000 -> ldc.r8 24000");
     Expect("WorldGenerator.FindLakes: lakes looked for within 20000 m", "FindLakesTranspiler", "WorldGenerator.FindLakes",
       "ldc.r4 -10000 -> ldc.r4 -20000", "ldc.r4 -10000 -> ldc.r4 -20000", "ldc.r4 10000 -> ldc.r4 20000", "ldc.r4 10000 -> ldc.r4 20000", "ldc.r4 10000 -> ldc.r4 20000");
     Expect("WorldGenerator.FindStreamStartPoint: streams' sources within 20000 m either way", "FindStreamStartPointTranspiler", "WorldGenerator.FindStreamStartPoint",
@@ -216,13 +214,23 @@ internal static partial class Program
       new WorldSizeHelper.Part(() => Target(typeof(AltBiomeWorldData), "MapSpaceToWorldSpace", [typeof(float)]), transpiler: "GridToWorldTranspiler"),
       new WorldSizeHelper.Part(() => Target(typeof(AltBiomeWorldData), "WorldSpaceToMapSpace", [typeof(float)]), transpiler: "WorldToGridTranspiler"),
       new WorldSizeHelper.Part(() => Target(typeof(WorldGenerator), "IsAshlands", XY), transpiler: "AshlandsTranspiler"),
-      new WorldSizeHelper.Part(() => Target(typeof(WorldGenerator), "IsDeepnorth", XY), transpiler: "IsDeepnorthTranspiler"),
-      new WorldSizeHelper.Part(() => Target(typeof(WorldGenerator), "DeepNorthWaveFade", XY), transpiler: "DeepNorthTranspiler"));
+      new WorldSizeHelper.Part(() => Target(typeof(WorldGenerator), "GetAshlandsOceanGradient", XY), transpiler: "AshlandsTranspiler"),
+      new WorldSizeHelper.Part(() => Target(typeof(WorldGenerator), "IsDeepnorth", XY), transpiler: "IsDeepnorthTranspiler"));
     int mark = CapturingLogHandler.Lines.Count;
     try
     {
       Check(AltBiomeWorldData.MapSpaceToWorldSpace(0f) == -12282f && WorldGenerator.IsDeepnorth(0f, 9000f) && WorldGenerator.IsAshlands(0f, -9000f),
         "unpatched: vanilla's grid starts at -12282 m, the Deep North at 8000 m north, the Ashlands at 8000 m south");
+      // The water's colours (AshlandsWater): its copy of the game's ring is the game's gradient, so the water is left alone.
+      int ringPoints = 0, ringSame = 0, ringDiffer = 0;
+      for (float x = -30000f; x <= 30000f; x += 1234.5f)
+      for (float z = -30000f; z <= 30000f; z += 987.25f)
+      {
+        ringPoints++;
+        if (Math.Abs(AshlandsWater.GameRing(x, z) - WorldGenerator.GetAshlandsOceanGradient(x, z)) < 1e-4) ringSame++;
+        if (AshlandsWater.Differs(x, z, out _)) ringDiffer++;
+      }
+      Check(ringSame == ringPoints && ringDiffer == 0, $"the water's copy of the game's Ashlands ring is the game's ({ringSame}/{ringPoints} points, {ringDiffer} differ)");
 
       var size = new WorldGeometry(20000f, 500f);
       WorldSizeHelper.Layout.Assume(size);
@@ -239,8 +247,20 @@ internal static partial class Program
         "the Deep North starts 16000 m north (vanilla's 8000 m, x2)");
       Check(!WorldGenerator.IsAshlands(0f, -15000f) && WorldGenerator.IsAshlands(0f, -17000f),
         "the Ashlands start 16000 m south (vanilla's 8000 m, x2)");
-      Check(Math.Abs(WorldGenerator.DeepNorthWaveFade(0f, 16100f) - 0.5) < 1e-3,
-        $"the Deep North's calm sea fades in from its new ring ({WorldGenerator.DeepNorthWaveFade(0f, 16100f)} at 16100 m)");
+      // The shader still draws the game's ring: between 8000 and 16000 m south the water is red where the sea is cold, so
+      // AshlandsWater sets its colours; past 16000 m both say hot, and inside 8000 m both say cold.
+      bool between = AshlandsWater.Differs(0f, -12000f, out bool hotBetween);
+      bool beyond = AshlandsWater.Differs(0f, -17000f, out bool hotBeyond);
+      bool inside = AshlandsWater.Differs(0f, -5000f, out bool hotInside);
+      Check(between && !hotBetween && !beyond && hotBeyond && !inside && !hotInside,
+        $"the water: the game's ring and the world's hot sea differ only between them (12000 m south {between}/{hotBetween}, 17000 m {beyond}/{hotBeyond}, 5000 m {inside}/{hotInside})");
+      // 0.10.3: the calm sea of the Deep North stays where the game has it. The water shader draws the waves calm by the game's
+      // own circle, and boats and fish float on DeepNorthWaveFade, so it must not move (AshlandsWater).
+      var parts = ((WorldSizeHelper.Part[])typeof(WorldSizeHelper.Group).GetField("parts", BindingFlags.NonPublic | BindingFlags.Instance)!
+        .GetValue(WorldSizeHelper.Layout)!).Select(p => p.ToString()).ToList();
+      Check(parts.Contains("WorldGenerator.IsDeepnorth") && !parts.Contains("WorldGenerator.DeepNorthWaveFade")
+            && Math.Abs(WorldGenerator.DeepNorthWaveFade(0f, 8100f) - 0.5) < 1e-3,
+        $"the layout moves the Deep North but not its calm sea, which fades in from the game's ring ({WorldGenerator.DeepNorthWaveFade(0f, 8100f)} at 8100 m)");
       Check(!CapturingLogHandler.Lines.Skip(mark).Any(l => l.Contains("could not")), "no part failed to patch");
 
       Check(group.Update(harmony, WorldGeometry.Vanilla) && !group.Patched && AltBiomeWorldData.MapSpaceToWorldSpace(0f) == -12282f
