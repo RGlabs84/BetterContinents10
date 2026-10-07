@@ -462,7 +462,8 @@ internal static class BakedClient
     drawDirty = false;
     var list = new List<BuiltZone>();
     foreach (var s in Slots.Values)
-      if (s.InDraw && s.Current != null && s.Current.Drawn > 0)
+      // a zone that waits for its hand-over keeps its old drawing, even where its records are gone (9.7)
+      if ((s.InDraw || s.Next != null) && s.Current != null && s.Current.Drawn > 0)
         list.Add(s.Current);
     ring = list.ToArray();
     ringVersion++;
@@ -504,7 +505,9 @@ internal static class BakedClient
     {
       if (s.Job != null || s.Disposed || (s.FailedAt != 0 && s.FailedAt == layer!.Revision))
         continue;
-      bool wants = s.InDraw || s.WantsColliders(now);
+      // a zone that has lost its records is built too (an empty zone, at no cost): its old drawing and colliders then go through the hand-over
+      bool vanished = s.Dirty && s.Current != null && !(layer!.TryGetZoneRow(s.Key, out var row) && row.Placements > 0);
+      bool wants = s.InDraw || s.WantsColliders(now) || vanished;
       if (!wants || !(s.Dirty || (s.Current == null && s.Next == null)))
         continue;
       bool collider = s.WantsColliders(now);
@@ -786,6 +789,9 @@ internal static class BakedClient
     Scratch.Clear();
     foreach (var s in Slots.Values)
     {
+      // a zone that is being built or handed over keeps what it has until that is done
+      if (s.Job != null || s.Next != null)
+        continue;
       bool wantsColliders = s.WantsColliders(now);
       if (!wantsColliders && s.LeftCollider >= 0f && now - s.LeftCollider >= Linger && s.Objects != null && !(s.Objects.Props?.SatOn() ?? false))
       {
