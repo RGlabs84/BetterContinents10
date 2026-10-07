@@ -135,7 +135,7 @@ internal static class BakedClient
   {
     if (layer == null)
     {
-      say("Baked placements: this world has no layer.");
+      say(BakedLayerStore.Current == null ? "Baked placements: this world has no layer." : "Baked placements: this machine draws nothing (it has no screen, or no world is up yet).");
       return;
     }
     int drawn = 0, withColliders = 0, waiting = 0;
@@ -301,9 +301,6 @@ internal static class BakedClient
   private static bool Active() =>
     BakedLayerStore.Current != null && ZNetScene.instance != null && ZoneSystem.instance != null && ZNet.instance != null && !ZNet.instance.IsDedicated()
     && SystemInfo.graphicsDeviceType != GraphicsDeviceType.Null;
-
-  /// <summary>Whether the manager has taken in the layer of the world it is in.</summary>
-  internal static bool Running => layer != null && scene != null;
 
   // LateUpdate of the host
   internal static void Frame()

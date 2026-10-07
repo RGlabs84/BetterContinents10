@@ -386,7 +386,7 @@ internal static class BakedKinds
       }
       k.Piece = piece;
       k.Prefab = prefab;
-      k.Name = name;
+      k.Name = e.Tint.Length > 0 ? $"{name} ({e.Tint})" : name;
       k.Anchor = i < e.Anchors.Length ? e.Anchors[i] : Vector3.zero;
       found = true;
     }
