@@ -530,12 +530,22 @@ internal sealed class LayerEdit
     }
   }
 
-  // A number the journal on disk has used for an operation that never reached a layer: the next one is at least this, and none is reused.
-  public void EnsureNextOperation(int atLeast)
+  // Makes n the next operation's number: a number the journal on disk has taken (a new operation, or one rolled forward after a
+  // crash). Numbers below n are skipped and never reused. Afterwards NextOperationNumber == n. A counter already past n refuses:
+  // when the registry holds operation n it was applied and there is nothing to roll; otherwise n can no longer be used.
+  public void EnsureNextOperation(int n)
   {
-    if (atLeast > nextOperation)
-      nextOperation = atLeast;
+    if (n < 1 || n > ushort.MaxValue)
+      throw new ArgumentOutOfRangeException(nameof(n), n, "operation numbers run from 1 to 65,535");
+    if (n < nextOperation)
+      throw new InvalidOperationException(HasOperation(n)
+        ? $"operation {n} is already in the layer (the next is {nextOperation})"
+        : $"operation number {n} is already passed (the next is {nextOperation})");
+    nextOperation = n;
   }
+
+  // Whether the registry being edited holds operation n.
+  public bool HasOperation(int n) => operations.Exists(o => o.Number == n);
 
   // The palette index of an entry: an equal entry's, or a new one appended after the last (indices never move). Throws past 65,535.
   public int PaletteIndexFor(PaletteEntry entry)

@@ -174,8 +174,12 @@ internal static partial class Tests
     C(edit.NextOperationNumber == 2, "and the counter moves");
     edit.EnsureNextOperation(5);
     C(edit.NextOperationNumber == 5, "a number the journal used is skipped");
-    edit.EnsureNextOperation(3);
-    C(edit.NextOperationNumber == 5, "the counter never goes back");
+    edit.EnsureNextOperation(5);
+    C(edit.NextOperationNumber == 5, "asking for the next number again changes nothing");
+    C(ThrowsInvalid(() => edit.EnsureNextOperation(3)) && edit.NextOperationNumber == 5, "a passed number refuses and the counter never goes back");
+    C(edit.HasOperation(1) && !edit.HasOperation(3), "operation 1 is in the registry and 3 is not");
+    C(ThrowsInvalid(() => edit.EnsureNextOperation(1)), "a number already in the registry refuses (it was applied)");
+    C(ThrowsOther(() => edit.EnsureNextOperation(0)) && ThrowsOther(() => edit.EnsureNextOperation(65536)), "numbers outside 1-65,535 refuse");
     edit.AddOperation(SampleOperation(5, OperationKind.BakeBox, 1));
     edit.AddRecords([ZoneRecord.CreateYaw(0, 1, 40, 1, 0, source: 1, valueSet: 1), ZoneRecord.CreateYaw(0, 2, 40, 1, 0, source: 5, valueSet: 0)]);
     var layer = edit.Build().Layer;
