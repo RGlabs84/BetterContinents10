@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-09-24 for world export and import (0.9.0), and on 2026-09-27 for map mod compatibility (0.9.2), and modified on 2026-10-04 for the unifying refactor (0.10.0), and on 2026-10-06 for 16k worlds (0.10.3).
+// Added by Wubarrk on 2026-09-24 for world export and import (0.9.0), and on 2026-09-27 for map mod compatibility (0.9.2), and modified on 2026-10-04 for the unifying refactor (0.10.0), and on 2026-10-06 for 16k worlds (0.10.3), and on 2026-10-07 for baked placements (0.10.4).
 
 // Offline checks of Better Continents 0.9.0's live config (LiveConfig), its RPC package, the export gate and the
 // configured export defaults. Loads the real pre-ILRepack BetterContinents.dll, the game's assemblies and BepInEx.
@@ -284,10 +284,13 @@ internal static class Program
   static void SectionNumbers()
   {
     Section("config section numbering");
-    // ConfigHelpers numbers groups in declaration order; the Export group must come tenth (09), after AltBiomes (08).
+    // ConfigHelpers numbers groups in declaration order; the Export group must come tenth (09), after AltBiomes (08), and the baked
+    // placements group eleventh (10): sections only ever go last.
     // Every setting is declared in SettingsSchema (since the unifying refactor), group by group in file order.
     var groups = SettingsSchema.Groups.Select(g => g.Name).ToList();
-    C(groups.Count == 10 && groups[8] == "BetterContinents.AltBiomes" && groups[9] == "BetterContinents.Export", $"Awake declares 10 groups, Export last: {string.Join(", ", groups.Select((g, i) => $"{i:00} {g}"))}");
+    C(groups.Count == 11 && groups[8] == "BetterContinents.AltBiomes" && groups[9] == "BetterContinents.Export" && groups[10] == "BetterContinents.BakedPlacements",
+      $"Awake declares 11 groups, baked placements last: {string.Join(", ", groups.Select((g, i) => $"{i:00} {g}"))}");
+    C(SettingsSchema.BakedDrawDistance.Section == "10 BetterContinents.BakedPlacements", $"the baked placements settings are in section '{SettingsSchema.BakedDrawDistance.Section}'");
     var path = Path.Combine(Path.GetTempPath(), "bc-sections-" + Environment.ProcessId + ".cfg");
     try
     {

@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-10-04 for the unifying refactor (0.10.0), and modified on 2026-10-06 for the Forest Scale default (0.10.2), and on 2026-10-06 for 16k worlds (0.10.3).
+// Added by Wubarrk on 2026-10-04 for the unifying refactor (0.10.0), and modified on 2026-10-06 for the Forest Scale default (0.10.2), and on 2026-10-06 for 16k worlds (0.10.3), and on 2026-10-07 for baked placements (0.10.4).
 
 using System;
 using System.Collections.Generic;
@@ -266,6 +266,21 @@ internal static class SettingsSchema
   public static readonly SettingDef<int> ExportLargestSize = new("Largest Size", "The largest export, in pixels a side, that this machine makes: the export window offers sizes up to it, bc_export refuses bigger ones, and a larger Default Size is used as this. 4096, 8192 or 16384. A 16384 px export takes a dedicated server about three minutes, and every player joining a world built from it downloads its maps", SettingScope.Live, WorldExport.MaxSize, e => ConfigExportLargestSize = e)
   { Range = new AcceptableValueList<int>(4096, 8192, 16384) };
 
+  // ---- 10 BakedPlacements (every setting here is read while the game runs; the client's drawing of a world's baked layer, 9.4, 11.2) ------------
+  public static readonly SettingDef<int> BakedDrawDistance = new("Draw Distance", "How many zones (64 m each) around the camera baked buildings are drawn: 4 is a block of 9 x 9 zones, which is what a town's buildings reach. Applies at once", SettingScope.Live, 4, e => BakedSettings.DrawDistance = e)
+  { Range = R(1, 8) };
+  public static readonly SettingDef<float> BakedDrawScale = new("Draw Scale", "How far baked pieces are drawn, as a multiple of where the game culls the same piece (which follows your level of detail setting: about 140 m for a stone wall on High). 1 is the game's own; more shows more of a town from afar, at the cost of frame rate. Applies at once", SettingScope.Live, 1.5f, e => BakedSettings.DrawScale = e)
+  { Range = R(0.5f, 4f) };
+  public static readonly SettingDef<float> BakedDetailScale = new("Detail Scale", "How far baked pieces keep their full detail, as a multiple of where the game switches the same piece to its simpler model (about 30 m for a stone wall on High). Applies at once", SettingScope.Live, 1f, e => BakedSettings.DetailScale = e)
+  { Range = R(0.5f, 4f) };
+  public static readonly SettingDef<BakedShadows> BakedShadowMode = new("Shadows", "Which baked pieces cast shadows. Near: the pieces in full detail cast them and the simpler models farther out do not. All: both cast, as the game's own pieces do. Off: none cast. Every baked piece receives shadows. Applies at once", SettingScope.Live, BakedShadows.All, e => BakedSettings.Shadows = e);
+  public static readonly SettingDef<float> BakedLightDistance = new("Light Distance", "How far from you (metres) a baked world's wall torches, braziers, fire pits and candles burn: within it each is a real lit copy of its piece, farther out it is not shown. 0 turns them off. Applies at once", SettingScope.Live, 90f, e => BakedSettings.LightDistance = e)
+  { Range = R(0f, 200f) };
+  public static readonly SettingDef<float> BakedSeatDistance = new("Seat Distance", "How far from you (metres) a baked world's chairs, benches, stools and thrones are real, so that you can sit on them: within it each has its seat made, a few per frame; farther out it is only drawn. 0 turns the seats off. Applies at once", SettingScope.Live, 12f, e => BakedSettings.SeatDistance = e)
+  { Range = R(0f, 40f) };
+  public static readonly SettingDef<string> BakedTints = S("Tints", "Override the colours that a baked layer tints its pieces with: name=r,g,b pairs separated by semicolons, by the tint's name in the layer (a town's clay walls may be plaster, brick, sandstone and marble), for example \"plaster=1.65,1.58,1.48; brick=1.25,0.72,0.56\". Each colour multiplies the clay's grey texture (1 keeps it). Empty: the layer's own colours. Applies at once", SettingScope.Live, "", e => BakedSettings.Tints = e);
+  public static readonly SettingDef<bool> BakedDiagnostics = S("Diagnostics", "Writes, once for each kind of baked piece, the materials it is drawn with (shader, texture, colour) to the log", SettingScope.Live, false, e => BakedSettings.Diagnostics = e);
+
   /// <summary>BetterContinents.cfg, section by section, in order.</summary>
   public static readonly SettingGroup[] Groups =
   [
@@ -280,6 +295,8 @@ internal static class SettingsSchema
     // Every value of these two is still read at the same moments as before: AltBiomes when a world is created, Export live.
     new("BetterContinents.AltBiomes", AltBiomemapFile, AltBiomeMode, AltBiomeGrid, AltBiomeSeed, AltBiomeChance, AltBiomeAmount, AltBiomeEdgeScale, AltBiomeDistanceScale, AltBiomeMinThickness, AltBiomeMeanHeight, AltBiomeFixNeighbourCheck, AltBiomeOverrides),
     new("BetterContinents.Export", ExportHud, ExportAllowed, ExportHudKey, ExportWindowKey, ExportSize, ExportHeightmapAmount, ExportSeaLevel, ExportLargestSize),
+    // The client's drawing of baked placements, all read live. The water work (U6) adds its own section after this one.
+    new("BetterContinents.BakedPlacements", BakedDrawDistance, BakedDrawScale, BakedDetailScale, BakedShadowMode, BakedLightDistance, BakedSeatDistance, BakedTints, BakedDiagnostics),
   ];
 
   public static IEnumerable<SettingDef> All => Groups.SelectMany(g => g.Settings);
