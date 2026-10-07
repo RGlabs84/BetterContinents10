@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-09-24 for world export and import (0.9.0), and modified on 2026-10-06 for 16k worlds (0.10.3).
+// Added by Wubarrk on 2026-09-24 for world export and import (0.9.0), and modified on 2026-10-06 for 16k worlds (0.10.3), and on 2026-10-07 for baked placements (0.10.4).
 
 // 0.9.0: a shareable form of the world cache (BetterContinents.ZNetPatch.WorldCache). Joining a Better Continents
 // world streams its settings package to every new client once per world revision (11.8 MB for a 2048 px world);
@@ -6,6 +6,8 @@
 // download. The player- and admin-facing walkthrough is chapter 9 of the Export & Import guide and the README's
 // "Sharing Maps With Players"; "bc_cache ..." (registered in DebugUtils.Export.cs) is the console front end for
 // Export/ImportPath/ListEntries below.
+// 0.10.4: the file holds the settings package only. A world with baked placements sends them apart, once, when a player joins
+// (BakedTransfer), and the player's game keeps them for next time, so a player who used a file downloads them once.
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -130,7 +132,7 @@ public static class WorldCacheShare
     try
     {
       var dir = Path.Combine(Utils.GetSaveDataPath(FileHelpers.FileSource.Local), "BetterContinents", SafeFileName(worldName));
-      return WriteExportFiles(bytes, worldName, seedName, dir);
+      return WriteExportFiles(bytes, worldName, seedName, dir, BC.Settings.HasLayer || BC.Settings.LayerSentApart);
     }
     catch (Exception e)
     {
@@ -142,7 +144,7 @@ public static class WorldCacheShare
   // The file-writing half of an export, independent of ZNet/WorldGenerator so the offline tests can call it
   // directly. Writes "<world name sanitised>-<id>.bcworld" (the raw bytes, byte-identical to cache/<id>.bc) plus
   // a "<same>.txt" sidecar, into outputDir (created if missing).
-  internal static ExportResult WriteExportFiles(byte[] bytes, string worldName, string seedName, string outputDir)
+  internal static ExportResult WriteExportFiles(byte[] bytes, string worldName, string seedName, string outputDir, bool hasLayer = false)
   {
     var id = WorldCache.PackageID(bytes, bytes.Length);
     var baseName = $"{SafeFileName(worldName)}-{id}";
@@ -150,11 +152,11 @@ public static class WorldCacheShare
     var filePath = Path.Combine(outputDir, baseName + Extension);
     var sidecarPath = Path.Combine(outputDir, baseName + ".txt");
     File.WriteAllBytes(filePath, bytes);
-    File.WriteAllText(sidecarPath, Sidecar(worldName, seedName, id, bytes.LongLength));
+    File.WriteAllText(sidecarPath, Sidecar(worldName, seedName, id, bytes.LongLength, hasLayer));
     return new ExportResult(filePath, sidecarPath, id, bytes.LongLength);
   }
 
-  private static string Sidecar(string worldName, string seedName, string id, long size) => string.Join("\n", new[]
+  private static string Sidecar(string worldName, string seedName, string id, long size, bool hasLayer) => string.Join("\n", new[]
   {
     $"Better Continents world cache: {worldName}",
     $"Seed: {seedName}",
@@ -164,7 +166,9 @@ public static class WorldCacheShare
     $"Date: {DateTime.Now:yyyy-MM-dd HH:mm:ss}",
     "",
     $"Player: before you join \"{worldName}\", drop this file into BepInEx/config/BetterContinents/seed/ (it imports automatically) or run 'bc_cache import <path to this file>' once - either way, you skip the settings download.",
-  }) + "\n";
+  }.Concat(hasLayer
+    ? new[] { "This world also has baked placements, which are not in this file: the world sends them once when you join, and your game keeps them for next time." }
+    : Array.Empty<string>())) + "\n";
 
   // Mirrors WorldExport.cs's own SafeFileName (private there): replace characters a file name cannot hold.
   // Kept as a small local copy rather than exposing that one, to keep this file's footprint self-contained.

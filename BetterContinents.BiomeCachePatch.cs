@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-09-22 for alt-biome planting (0.8.1), and on 2026-09-25 for version-agnostic wording (0.9.1).
+// Added by Wubarrk on 2026-09-22 for alt-biome planting (0.8.1), and on 2026-09-25 for version-agnostic wording (0.9.1), and on 2026-10-07 for baked placements (0.10.4).
 
 using System;
 using System.IO;
@@ -146,13 +146,13 @@ public partial class BetterContinents
         var path = AltBiomeWorldData.GetFilePath(world);
         if (!File.Exists(path))
         {
-          if (Settings.EnabledForThisWorld)
+          if (Settings.ShapesWorld)
             Log($"Alt biomes: no biome data cache for '{world.m_name}' yet; generating the grid.");
           return true;
         }
-        if (!Settings.EnabledForThisWorld)
+        if (!Settings.ShapesWorld)
         {
-          // A world without Better Continents behaves exactly as vanilla - unless the grid in the cache was built by
+          // A world without Better Continents (or one that keeps the game's own terrain) behaves exactly as vanilla - unless the grid in the cache was built by
           // Better Continents for another world of the same name, which vanilla would happily reuse.
           return BiomeCacheFingerprint.HasTrailer(path)
             ? Reject(world, ref __result, $"Alt biomes: the biome data cache {path} was built for a Better Continents world and this world does not use Better Continents; rebuilding it.")
@@ -193,7 +193,7 @@ public partial class BetterContinents
     [HarmonyPostfix, HarmonyPatch(nameof(AltBiomeWorldData.SaveCache))]
     private static void SaveCachePostfix(AltBiomeWorldData __instance)
     {
-      if (!Settings.EnabledForThisWorld || !FileHelpers.LocalStorageSupportedAndAllowed)
+      if (!Settings.ShapesWorld || !FileHelpers.LocalStorageSupportedAndAllowed)
         return;
       var world = __instance.m_world;
       if (world == null)

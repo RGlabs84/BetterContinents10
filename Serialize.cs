@@ -251,12 +251,27 @@ public partial class BetterContinents
         return;
       }
       var version = formatVersion ?? (int.TryParse(ConfigOverrideVersion.Value, out var v) ? v : SavedVersion);
+      // The layer is a key of the keyed format, and a world that takes the game's terrain is made in the newest one: neither is written in a
+      // legacy layout, whatever Override version says (a layer there would be lost).
+      if (GameTerrain)
+        version = Math.Max(version, UnifiedVersion);
+      else if (version < KeyedVersion && (Layer != null || LayerSentApart || LayerBytesAsRead != null))
+        version = KeyedVersion;
       // Room for as many bytes as the last package of this kind took, so the stream does not grow by doubling.
       PackageBytes.Reserve(pkg, network ? sentLength : savedLength);
       pkg.Write(version);
       if (version < 11)
       {
         SerializeLegacy(pkg, version, network);
+        return;
+      }
+      // A world that takes the game's own terrain keeps no map and no setting (they mean nothing): its version, the sectors it uses, and its layer.
+      if (GameTerrain)
+      {
+        if (WideSectors)
+          pkg.Write((int)DataKey.WideSectors);
+        WriteLayerKeys(pkg, network, includeAltBiomes);
+        Finished(pkg, network);
         return;
       }
       // A compact map of a version 12 world is saved and sent in its tiles; every other map as the picture's bytes (the
@@ -669,11 +684,68 @@ public partial class BetterContinents
           }
         }
       }
+      WriteLayerKeys(pkg, network, includeAltBiomes);
+      Finished(pkg, network);
+    }
+
+    private void Finished(ZPackage pkg, bool network)
+    {
       pkg.Flush();
       if (network)
         sentLength = pkg.m_stream.Length;
       else
         savedLength = pkg.m_stream.Length;
+    }
+
+    // The keys of 0.10.4, after every other: that the terrain is the game's own, and the baked layer. A world with neither saves byte for
+    // byte as before. On disk the layer is one byte array; in the package sent to players an empty one, which says "this world has a layer, sent
+    // apart" (BakedTransfer sends it on its own, so a change of the layer leaves the package, its id and every cached copy alone). A layer
+    // that could not be read is saved back as it was. The biome cache's fingerprint (includeAltBiomes false) leaves them out: neither
+    // changes the biome grid it holds.
+    private void WriteLayerKeys(ZPackage pkg, bool network, bool includeAltBiomes)
+    {
+      if (!includeAltBiomes)
+        return;
+      if (GameTerrain)
+        pkg.Write((int)DataKey.GameTerrain);
+      if (network ? Layer != null || LayerSentApart : Layer != null || LayerBytesAsRead != null)
+      {
+        pkg.Write((int)DataKey.Placements);
+        if (network)
+          pkg.Write(0);
+        else if (Layer is { } layer)
+        {
+          PackageBytes.Guard(pkg, "the baked layer", layer.Length);
+          PackageBytes.WriteBlock(pkg, w => w.Write(layer.Bytes, 0, layer.Length));
+        }
+        else
+          pkg.Write(LayerBytesAsRead!);
+      }
+    }
+
+    // The layer's bytes as the settings hold them. An empty array is a package sent to players: the layer comes apart. A layer that cannot
+    // be read (made by a newer Better Continents, or damaged) is kept as it is, so that no save destroys it, and the world load stops
+    // (LayerError), as it does for an alt-biome map that cannot be read.
+    private void ReadLayer(byte[] bytes)
+    {
+      if (bytes.Length == 0)
+      {
+        LayerSentApart = true;
+        return;
+      }
+      try
+      {
+        Layer = BakedLayer.Read(bytes, bytes.Length);
+        LayerBytesAsRead = null;
+        LayerError = null;
+      }
+      catch (BakedFormatException e)
+      {
+        LayerError = $"the baked layer in the world's settings cannot be read ({e.Message})";
+        LogError($"Failed to read the baked layer ({e.Message}). It is kept unchanged in the world's settings.");
+        Layer = null;
+        LayerBytesAsRead = bytes;
+      }
     }
 
     // How long the last package of each kind was (Serialize): the room it starts with.
@@ -1015,6 +1087,12 @@ public partial class BetterContinents
             path = pkg.ReadString();
             if (AltBiomeMap != null)
               AltBiomeMap.FilePath = path;
+            break;
+          case DataKey.GameTerrain:
+            GameTerrain = true;
+            break;
+          case DataKey.Placements:
+            ReadLayer(pkg.ReadByteArray());
             break;
           case DataKey.TiledMap:
             var mapKey = (DataKey)pkg.ReadInt();

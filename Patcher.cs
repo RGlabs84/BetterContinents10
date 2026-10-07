@@ -225,7 +225,7 @@ public partial class BetterContinents
   // Heightmap.GetBiomeColor(float, float) has one prefix for both features that use it, the terrain map and biome
   // precision (GetBiomeColorPatch picks per vertex), so neither can unpatch the other. A new world's
   // (PrecisionKeepsTerritories) comes after Expand World Data's and keeps its territory colours.
-  private static bool WantsBiomeColor(BetterContinentsSettings s) => s.EnabledForThisWorld && (s.HasTerrainMap || EffectiveBiomePrecision(s) > 0);
+  private static bool WantsBiomeColor(BetterContinentsSettings s) => s.ShapesWorld && (s.HasTerrainMap || EffectiveBiomePrecision(s) > 0);
   private static readonly Toggle BiomeColor = new("Heightmap.GetBiomeColor",
     s => WantsBiomeColor(s) && !s.PrecisionKeepsTerritories,
     new Hook(() => AccessTools.Method(typeof(Heightmap), nameof(Heightmap.GetBiomeColor), [typeof(float), typeof(float)]),
@@ -254,50 +254,50 @@ public partial class BetterContinents
   private static readonly Toggle[] TogglesBeforeWorldSize =
   [
     new("WorldGenerator.GetBiomeHeight with rough",
-      s => s.EnabledForThisWorld && !s.HeightBeforeBiomeRules && !Paints(s) && !s.ShouldHeightMapOverrideAll && s.HasRoughMap,
+      s => s.ShapesWorld && !s.HeightBeforeBiomeRules && !Paints(s) && !s.ShouldHeightMapOverrideAll && s.HasRoughMap,
       OnWorldGenerator(nameof(WorldGenerator.GetBiomeHeight), null, nameof(WorldGeneratorPatch.GetBiomeHeightWithRough), HookKind.Postfix)),
     new("WorldGenerator.GetBiomeHeight with rough and paint",
-      s => s.EnabledForThisWorld && !s.HeightBeforeBiomeRules && Paints(s) && !s.ShouldHeightMapOverrideAll && s.HasRoughMap,
+      s => s.ShapesWorld && !s.HeightBeforeBiomeRules && Paints(s) && !s.ShouldHeightMapOverrideAll && s.HasRoughMap,
       OnWorldGenerator(nameof(WorldGenerator.GetBiomeHeight), null, nameof(WorldGeneratorPatch.GetBiomeHeightWithRoughPaint), HookKind.Postfix)),
     new("WorldGenerator.GetBiomeHeight with height",
-      s => s.EnabledForThisWorld && !s.HeightBeforeBiomeRules && !Paints(s) && s.ShouldHeightMapOverrideAll,
+      s => s.ShapesWorld && !s.HeightBeforeBiomeRules && !Paints(s) && s.ShouldHeightMapOverrideAll,
       OnWorldGenerator(nameof(WorldGenerator.GetBiomeHeight), null, nameof(WorldGeneratorPatch.GetBiomeHeightWithHeight), HookKind.Postfix)),
     new("WorldGenerator.GetBiomeHeight with height and paint",
-      s => s.EnabledForThisWorld && !s.HeightBeforeBiomeRules && Paints(s) && s.ShouldHeightMapOverrideAll,
+      s => s.ShapesWorld && !s.HeightBeforeBiomeRules && Paints(s) && s.ShouldHeightMapOverrideAll,
       OnWorldGenerator(nameof(WorldGenerator.GetBiomeHeight), null, nameof(WorldGeneratorPatch.GetBiomeHeightWithHeightPaint), HookKind.Postfix)),
     new("WorldGenerator.GetBiomeHeight with rough, before Expand World Data",
-      s => s.EnabledForThisWorld && s.HeightBeforeBiomeRules && !s.ShouldHeightMapOverrideAll && s.HasRoughMap,
+      s => s.ShapesWorld && s.HeightBeforeBiomeRules && !s.ShouldHeightMapOverrideAll && s.HasRoughMap,
       OnWorldGenerator(nameof(WorldGenerator.GetBiomeHeight), null, nameof(WorldGeneratorPatch.GetBiomeHeightBeforeEwdWithRough), HookKind.Postfix,
         before: [EWD.GUID])),
     new("WorldGenerator.GetBiomeHeight with height, before Expand World Data",
-      s => s.EnabledForThisWorld && s.HeightBeforeBiomeRules && s.ShouldHeightMapOverrideAll,
+      s => s.ShapesWorld && s.HeightBeforeBiomeRules && s.ShouldHeightMapOverrideAll,
       OnWorldGenerator(nameof(WorldGenerator.GetBiomeHeight), null, nameof(WorldGeneratorPatch.GetBiomeHeightBeforeEwdWithHeight), HookKind.Postfix,
         before: [EWD.GUID])),
     new("WorldGenerator.GetBiomeHeight with paint",
-      s => s.EnabledForThisWorld && !s.HeightBeforeBiomeRules && Paints(s),
+      s => s.ShapesWorld && !s.HeightBeforeBiomeRules && Paints(s),
       OnWorldGenerator(nameof(WorldGenerator.GetBiomeHeight), null, nameof(WorldGeneratorPatch.GetBiomeHeightWithPaint), HookKind.Postfix)),
     new("WorldGenerator.GetBiomeHeight with paint, after Expand World Data",
-      s => s.EnabledForThisWorld && s.HeightBeforeBiomeRules && Paints(s),
+      s => s.ShapesWorld && s.HeightBeforeBiomeRules && Paints(s),
       OnWorldGenerator(nameof(WorldGenerator.GetBiomeHeight), null, nameof(WorldGeneratorPatch.GetBiomeHeightAfterEwdWithPaint), HookKind.Postfix,
         after: [EWD.GUID])),
     // After Expand World Data's prefix, which answers from its own world yaml and skips the original: every prefix runs
     // and the last to set the result wins, so the biome map overrides it wherever it has a biome, and a None pixel
     // leaves its answer.
     new("WorldGenerator.GetBiome",
-      s => s.EnabledForThisWorld && s.HasBiomeMap,
+      s => s.ShapesWorld && s.HasBiomeMap,
       OnWorldGenerator(nameof(WorldGenerator.GetBiome), [typeof(float), typeof(float), typeof(float), typeof(bool)],
         nameof(WorldGeneratorPatch.GetBiomePrefix), HookKind.Prefix, after: [EWD.GUID])),
     new("WorldGenerator.AddRivers",
-      s => s.EnabledForThisWorld && !s.RiversEnabled,
+      s => s.ShapesWorld && !s.RiversEnabled,
       OnWorldGenerator(nameof(WorldGenerator.AddRivers), null, nameof(WorldGeneratorPatch.AddRiversPrefix), HookKind.Prefix)),
     new("WorldGenerator.GetForestFactor prefix",
-      s => s.EnabledForThisWorld && s.ForestScale != 1f,
+      s => s.ShapesWorld && s.ForestScale != 1f,
       OnWorldGenerator(nameof(WorldGenerator.GetForestFactor), null, nameof(WorldGeneratorPatch.GetForestFactorPrefix), HookKind.Prefix)),
     new("WorldGenerator.GetForestFactor postfix",
-      s => s.EnabledForThisWorld && (s.HasForestMap || s.ForestAmountOffset != 0f),
+      s => s.ShapesWorld && (s.HasForestMap || s.ForestAmountOffset != 0f),
       OnWorldGenerator(nameof(WorldGenerator.GetForestFactor), null, nameof(WorldGeneratorPatch.GetForestFactorPostfix), HookKind.Postfix)),
     new("WorldGenerator.GetAshlandsOceanGradient prefix",
-      s => s.EnabledForThisWorld && s.HasHeatMap && s.HeatMapScale > 0f,
+      s => s.ShapesWorld && s.HasHeatMap && s.HeatMapScale > 0f,
       OnWorldGenerator(nameof(WorldGenerator.GetAshlandsOceanGradient), [typeof(float), typeof(float)],
         nameof(WorldGeneratorPatch.GetAshlandsOceanGradientPrefix), HookKind.Prefix)),
   ];
@@ -306,18 +306,18 @@ public partial class BetterContinents
   [
     // Hardcoded gaps don't work well when the whole world layout is changed (WorldGeneratorPatch.DisableGap).
     new("WorldGenerator.CreateAshlandsGap",
-      s => s.EnabledForThisWorld && !s.AshlandsGapEnabled,
+      s => s.ShapesWorld && !s.AshlandsGapEnabled,
       OnWorldGenerator(nameof(WorldGenerator.CreateAshlandsGap), null, nameof(WorldGeneratorPatch.DisableGap), HookKind.Prefix)),
     new("WorldGenerator.CreateDeepNorthGap",
-      s => s.EnabledForThisWorld && !s.DeepNorthGapEnabled,
+      s => s.ShapesWorld && !s.DeepNorthGapEnabled,
       OnWorldGenerator(nameof(WorldGenerator.CreateDeepNorthGap), null, nameof(WorldGeneratorPatch.DisableGap), HookKind.Prefix)),
     // After Expand World Data's prefix (its world yaml), as GetBiome: a priority does not stop a later prefix from
     // setting the result again.
     new("WorldGenerator.IsAshlands",
-      s => s.EnabledForThisWorld && s.HasHeatMap && s.HeatMapScale > 0f,
+      s => s.ShapesWorld && s.HasHeatMap && s.HeatMapScale > 0f,
       OnWorldGenerator(nameof(WorldGenerator.IsAshlands), null, nameof(WorldGeneratorPatch.IsAshlandsPrefix), HookKind.Prefix, Priority.VeryHigh, [EWD.GUID])),
     new("WorldGenerator.IsAshlands (no heat map)",
-      s => s.EnabledForThisWorld && s.HasBiomeMap && (!s.HasHeatMap || s.HeatMapScale == 0f),
+      s => s.ShapesWorld && s.HasBiomeMap && (!s.HasHeatMap || s.HeatMapScale == 0f),
       OnWorldGenerator(nameof(WorldGenerator.IsAshlands), null, nameof(WorldGeneratorPatch.IsAshlandsFallbackPrefix), HookKind.Prefix, Priority.VeryHigh, [EWD.GUID])),
     // Valheim 1.0 made Deep North a real biome with its own terrain, weather and snow behaviour, but vanilla still
     // decides where it IS from a hardcoded geographic test (WorldGenerator.IsDeepnorth). That test feeds EnvMan's
@@ -326,19 +326,19 @@ public partial class BetterContinents
     // North terrain that still has the wrong weather and paints the wrong ground when cultivated. This mirrors the
     // IsAshlands fallback; there is no heat-map condition because heat is Ashlands-only.
     new("WorldGenerator.IsDeepnorth",
-      s => s.EnabledForThisWorld && s.HasBiomeMap,
+      s => s.ShapesWorld && s.HasBiomeMap,
       OnWorldGenerator(nameof(WorldGenerator.IsDeepnorth), null, nameof(WorldGeneratorPatch.IsDeepnorthPrefix), HookKind.Prefix, Priority.VeryHigh)),
     // Not WorldGenerator.DeepNorthWaveFade (patched from 0.8.0 to 0.10.2): it floats boats and fish on the waves, and the water
     // shader draws them calm by the game's own circle whatever the biome map says, so the boats must follow that circle too
     // (AshlandsWater).
     // Mossmap is not needed as it doesn't apply to Ashlands.
     new("WorldGenerator.GetAshlandsHeight",
-      s => s.EnabledForThisWorld && (s.HasPaintMap || s.HasLavaMap),
+      s => s.ShapesWorld && (s.HasPaintMap || s.HasLavaMap),
       OnWorldGenerator(nameof(WorldGenerator.GetAshlandsHeight), null, nameof(WorldGeneratorPatch.GetAshlandsHeight), HookKind.Postfix)),
     // Every Better Continents world: the vegetation map and the twin guard (VegetationTwins) share these patches, so a
     // failure (another mod's rewrite of PlaceVegetation) must not stop the patches after this one.
     new("ZoneSystem.PlaceVegetation (vegetation map, twin guard)",
-      s => s.EnabledForThisWorld,
+      s => s.ShapesWorld,
       new Hook(() => AccessTools.Method(typeof(ZoneSystem), nameof(ZoneSystem.PlaceVegetation)), "ZoneSystem.PlaceVegetation",
         typeof(ZoneSystemPatch), nameof(ZoneSystemPatch.PlaceVegetationPrefix), HookKind.Prefix),
       new Hook(() => AccessTools.Method(typeof(ZoneSystem), nameof(ZoneSystem.PlaceVegetation)), "ZoneSystem.PlaceVegetation",
@@ -349,7 +349,7 @@ public partial class BetterContinents
         typeof(ZoneSystemPatch), nameof(ZoneSystemPatch.InsideClearAreaPostfix), HookKind.Postfix))
     { FailureMessage = "Could not patch ZoneSystem.PlaceVegetation, so the vegetation map and the twin guard are off: " },
     new("SpawnSystem.UpdateSpawnList",
-      s => s.EnabledForThisWorld && s.HasSpawnMap,
+      s => s.ShapesWorld && s.HasSpawnMap,
       new Hook(() => AccessTools.Method(typeof(SpawnSystem), nameof(SpawnSystem.UpdateSpawnList)), "SpawnSystem.UpdateSpawnList",
         typeof(SpawnSystemPatch), nameof(SpawnSystemPatch.UpdateSpawnListEnable), HookKind.Prefix),
       new Hook(() => AccessTools.Method(typeof(SpawnSystem), nameof(SpawnSystem.UpdateSpawnList)), "SpawnSystem.UpdateSpawnList",
@@ -362,12 +362,12 @@ public partial class BetterContinents
   [
     // The vegetation mask: on for every world with a layer.
     new("ZoneSystem.InsideClearArea, baked vegetation mask",
-      s => s.HasLayer,
+      s => s.EnabledForThisWorld && s.HasLayer,
       new Hook(() => AccessTools.Method(typeof(ZoneSystem), "InsideClearArea"), "ZoneSystem.InsideClearArea",
         typeof(BakedVegetation), nameof(BakedVegetation.InsideClearAreaPostfix), HookKind.Postfix)),
     // The 1 m ground: only while the layer has ground; the lowest priority, after Expand World Data's postfix and Better Continents' own.
     new("WorldGenerator.GetBiomeHeight, baked ground",
-      s => s.Layer is { Ground.Any: true },
+      s => s.EnabledForThisWorld && s.Layer is { Ground.Any: true },
       new Hook(() => AccessTools.Method(typeof(WorldGenerator), nameof(WorldGenerator.GetBiomeHeight)), "WorldGenerator.GetBiomeHeight",
         typeof(BakedGround), nameof(BakedGround.GetBiomeHeightPostfix), HookKind.Postfix, Priority.Last, after: [EWD.GUID])),
   ];
@@ -467,7 +467,8 @@ public partial class BetterContinents
   private static void PatchGetBaseHeight()
   {
     var patchVersion = 0;
-    if (Settings.EnabledForThisWorld)
+    // A world that keeps the game's own terrain has the game's own base height (none of Better Continents' formulas).
+    if (Settings.ShapesWorld)
     {
       switch (Settings.Version)
       {
@@ -556,7 +557,8 @@ public partial class BetterContinents
 
   private static void PatchWorldSize()
   {
-    if (!Settings.EnabledForThisWorld)
+    // A world that keeps the game's own terrain keeps the game's own sizes.
+    if (!Settings.ShapesWorld)
       WorldSizeHelper.PatchEdgeChecks(HarmonyInstance, 10000f, 500f);
     else if (Settings.DisableMapEdgeDropoff)
       // Easiest to just apply very large values to disable the feature.
@@ -564,7 +566,7 @@ public partial class BetterContinents
     else
       WorldSizeHelper.PatchEdgeChecks(HarmonyInstance, Settings.WorldSize, Settings.EdgeSize);
 
-    if (!Settings.EnabledForThisWorld)
+    if (!Settings.ShapesWorld)
       WorldSizeHelper.PatchWorldSize(HarmonyInstance, 10000f, 500f);
     else
       WorldSizeHelper.PatchWorldSize(HarmonyInstance, Settings.WorldSize, Settings.EdgeSize);
