@@ -1,4 +1,4 @@
-﻿// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and alt-biome planting (0.8.1), and on 2026-10-04 for the unifying refactor (0.10.0).
+﻿// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and alt-biome planting (0.8.1), and on 2026-10-04 for the unifying refactor (0.10.0), and on 2026-10-06 for 16k worlds (0.10.3).
 
 using System;
 using System.Collections;
@@ -399,32 +399,24 @@ public static class GameUtils
         }
     }
 
+    // Removes the pins ShowOnMap put on the map: those of the locations matching the filter, or of every location when
+    // there is none. Other pins (the player's own, shared ones) stay; before 0.10.3, no filter removed every pin.
     public static void HideOnMap(params string[] list)
     {
         var pins = Minimap.instance.m_pins;
-        if (list == null || list.Length == 0)
+        var locationInstances = ZoneSystem.instance.m_locationInstances;
+        foreach (var lg in locationInstances.Values.GroupBy(l => l.m_location.m_prefabName))
         {
-            foreach (var pin in pins.ToList())
+            if (list == null || list.Length == 0 || list.Any(f => lg.Key.ToLower().StartsWith(f.ToLower())))
             {
-                Minimap.instance.RemovePin(pin);
-            }
-        }
-        else
-        {
-            var locationInstances = ZoneSystem.instance.m_locationInstances;
-            foreach (var lg in locationInstances.Values.GroupBy(l => l.m_location.m_prefabName))
-            {
-                if (list.Any(f => lg.Key.ToLower().StartsWith(f.ToLower())))
+                BetterContinents.Log($"Hiding {lg.Count()} {lg.Key} locations from the map");
+                int idx = 0;
+                foreach (var li in lg)
                 {
-                    BetterContinents.Log($"Hiding {lg.Count()} {lg.Key} locations from the map");
-                    int idx = 0;
-                    foreach (var li in lg)
-                    {
-                        var name = $"{li.m_location.m_prefabName} {idx++}";
-                        var pin = pins.FirstOrDefault(p => p.m_name == name && p.m_pos == li.m_position);
-                        if (pin != null)
-                            Minimap.instance.RemovePin(pin);
-                    }
+                    var name = $"{li.m_location.m_prefabName} {idx++}";
+                    var pin = pins.FirstOrDefault(p => p.m_name == name && p.m_pos == li.m_position);
+                    if (pin != null)
+                        Minimap.instance.RemovePin(pin);
                 }
             }
         }

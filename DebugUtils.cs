@@ -117,7 +117,7 @@ public partial class DebugUtils
                     .Select(f => f.Trim())
                     .ToArray());
             });
-            bc.AddCommand("hide", "Hide locations", "Removes pins matching optional filter from the map", args =>
+            bc.AddCommand("hide", "Hide locations", "Removes the pins 'bc show' and 'bc bosses' put on the map, those matching the optional filter or, with none, all of them; your own pins stay", args =>
             {
                 GameUtils.HideOnMap((args ?? "")
                     .Split([' '], StringSplitOptions.RemoveEmptyEntries)
@@ -130,10 +130,6 @@ public partial class DebugUtils
                     GameUtils.DisableMinimapClouds();
                 else
                     GameUtils.EnableMinimapClouds();
-                GameUtils.HideOnMap((args ?? "")
-                    .Split([' '], StringSplitOptions.RemoveEmptyEntries)
-                    .Select(f => f.Trim())
-                    .ToArray());
             });
             bc.AddValue("mapds", "Minimap downscaling", "Sets minimap downscaling factor (for faster updates)",
                 defaultValue: 2,
@@ -166,11 +162,13 @@ public partial class DebugUtils
                     Console.instance.Print($"Map screenshot saved to {path}, size {size} x {size}");
                 });
             bc.AddCommand("savepreset", "Save preset",
-                "Saves current world settings as a preset, including a thumbnail, pass preset name as argument",
+                "Saves current world settings as a preset, including a thumbnail, pass preset name as argument (the world's name if none)",
                 arg =>
                 {
-                    arg ??= WorldGenerator.instance.m_world.m_name;
+                    // The console passes "" when no name is given, not null.
+                    arg = string.IsNullOrWhiteSpace(arg) ? WorldGenerator.instance.m_world.m_name : arg.Trim();
                     Presets.Save(BetterContinents.Settings, arg);
+                    Console.instance.Print($"Preset {arg} saved");
                 });
 
             AddAltBiomeCommands(bc);
@@ -384,8 +382,8 @@ public partial class DebugUtils
                     getter: () => settings.UseOpacity);
                 group.AddValue("op", "Opacity", "Opacity",
                     defaultValue: 1, minValue: 0, maxValue: 1,
-                    getter: () => settings.Threshold,
-                    setter: SetHeightmapValue<float>(value => settings.Threshold = value));
+                    getter: () => settings.Opacity,
+                    setter: SetHeightmapValue<float>(value => settings.Opacity = value));
 
                 group.AddValue("blm", "Blend Mode", "How to apply this layer to the previous one",
                     defaultValue: BlendOperations.BlendModeType.Overlay,
@@ -703,11 +701,14 @@ public partial class DebugUtils
             }),
             getter: () => kind.Get(BetterContinents.Settings));
 
+    // DynamicPatch, as for a value: the first layer of a world with no heightmap, or a heightmap reloaded, changes which
+    // GetBaseHeight patch the world needs (Patcher.PatchGetBaseHeight).
     private static Action<string> HeightmapCommand(Action<string> command) =>
         value =>
         {
             command(value);
             WorldGeneratorPatch.ApplyNoiseSettings();
+            DynamicPatch();
             noisePreviewTextures = null;
             maskPreviewTextures = null;
             GameUtils.Reset();
