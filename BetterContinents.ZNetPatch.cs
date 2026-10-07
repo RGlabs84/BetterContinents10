@@ -152,10 +152,12 @@ public partial class BetterContinents
         private static int SettingsReceiveBufferBytesReceived;
         private static int SettingsReceiveHash;
 
-        private static int GetHashCode<T>(T[] array) where T : struct => array == null ? 0 : GetHashCode(array, array.Length);
+        // The hash the server sends with a settings package and its packets and the client works out over what it received (internal: the
+        // offline tests, tools/tile-tests, hold it to the hash 0.10.2 made).
+        internal static int GetHashCode<T>(T[] array) where T : struct => array == null ? 0 : GetHashCode(array, array.Length);
 
         // The same over the first `length` elements (a package's buffer is longer than the package).
-        private static int GetHashCode<T>(T[] array, int length) where T : struct
+        internal static int GetHashCode<T>(T[] array, int length) where T : struct
         {
             unchecked
             {
@@ -171,6 +173,10 @@ public partial class BetterContinents
                 return hash;
             }
         }
+
+        // How much of the download is here, in percent: in a long, as a package of a 16384 px world (over 50 MB) has more than 21,474,836 bytes,
+        // which times 100 passes an int.
+        internal static int Percent(int received, int total) => (int)(received * 100L / Math.Max(total, 1));
 
         private static string ServerVersion = "";
 
@@ -374,7 +380,7 @@ public partial class BetterContinents
                     SettingsReceiveBufferBytesReceived = 0;
                     Log($"Receiving settings from server ({SettingsReceiveBuffer.Length} bytes)");
 
-                    UI.Add("ConfigDownload", () => UI.ProgressBar((int)(SettingsReceiveBufferBytesReceived * 100L / Math.Max(SettingsReceiveBuffer.Length, 1)), $"Better Continents: downloading world settings from server ..."));
+                    UI.Add("ConfigDownload", () => UI.ProgressBar(Percent(SettingsReceiveBufferBytesReceived, SettingsReceiveBuffer.Length), $"Better Continents: downloading world settings from server ..."));
                 });
 
                 peer.m_rpc.Register("BetterContinentsConfigPacket", (ZRpc rpc, int offset, int packetHash, ZPackage packet) =>

@@ -163,6 +163,13 @@ internal static partial class Program
 
     var heights = (ImageMapFloat)Field("HeightMap").GetValue(back)!;
     C(heights.SourceData.Length == 0 && heights.SourceBytes().Length > 0, "a map read from tiles holds no picture, and writes one when asked");
+    // A compact map made from a file lets go of the file's bytes (168 MB for a 16384 px heightmap, held until the world is saved, for every map);
+    // a decoded one keeps them, the world saves them as they are.
+    var keeps = WriteMap("keeps-bytes.png", Png(N, (x, y) => new L16(Height(x, y, 3)), PngColorType.Grayscale, PngBitDepth.Bit16));
+    var compactMade = ImageMapFloat.Create(keeps, ImageMapFloat.HeightAlpha.None, compact: true);
+    var decodedMade = ImageMapFloat.Create(keeps, ImageMapFloat.HeightAlpha.None, compact: false);
+    C(compactMade != null && compactMade.SourceData.Length == 0 && compactMade.SourceBytes().Length > 0 && decodedMade != null && decodedMade.SourceData.SequenceEqual(File.ReadAllBytes(keeps)),
+      "a map made from a file: compact holds no file bytes (and writes the picture when asked), decoded holds the file's bytes");
     // The rebuilt picture holds the map's own values, rows from the north as a file has them.
     using (var image = ISImage.Load<L16>(ISConfiguration.Default, heights.SourceBytes()))
     {

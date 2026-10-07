@@ -17,10 +17,10 @@ namespace ImportTest;
 // what a config file and an export.cfg make of each value, and what is written back.
 internal static partial class Program
 {
-  static void Strip(string folder, string file, int width)
+  static void Strip(string folder, string file, int width, int height = 1)
   {
-    // A real picture one row high: past the size that counts (its width), and no map (it is not square), so nothing big is made.
-    using var image = new Image<L16>(width, 1);
+    // A real picture one row high (or one column wide): past the size that counts (its larger side), and no map (it is not square), so nothing big is made.
+    using var image = new Image<L16>(width, height);
     image.Save(Path.Combine(folder, file), new PngEncoder { ColorType = PngColorType.Grayscale, BitDepth = PngBitDepth.Bit16, ChunkFilter = PngChunkFilter.ExcludeAll });
   }
 
@@ -62,6 +62,13 @@ internal static partial class Program
         large.Dump(info.Add);
         C(info.Any(l => l.StartsWith("Compact Maps: the maps are held and saved as compressed tiles")) == over, $"{mode}: bc info {(over ? "says" : "does not say")} the maps are compact");
       }
+      // The larger side of a picture counts, its height too: one 8193 high and 1 wide.
+      BC.ConfigCompactMaps.Value = CompactMapsMode.Auto;
+      File.Delete(Path.Combine(big, "forestmap.png"));
+      Strip(big, "forestmap.png", 1, 8193);
+      C(BC.BetterContinentsSettings.Create().CompactMaps, "Auto: a picture 8193 high and 1 wide makes a world compact, as one 8193 wide does");
+      Strip(big, "forestmap.png", 1, 8192);
+      C(!BC.BetterContinentsSettings.Create().CompactMaps, "and one 8192 high does not");
       // The biome map counts, the location and alt-biome maps do not; Override version 11 makes no world compact; the threshold is one number.
       BC.ConfigCompactMaps.Value = CompactMapsMode.Auto;
       File.Delete(Path.Combine(big, "forestmap.png"));
@@ -82,6 +89,93 @@ internal static partial class Program
     {
       BC.ConfigCompactMaps.Value = CompactMapsMode.Auto;
       BC.ConfigOverrideVersion.Value = "";
+      BC.ConfigMapSourceDir.Value = "";
+    }
+  }
+
+  // ---- a map file that cannot be opened ----------------------------------------------------------------------------------------
+
+  // A map file that is there but cannot be opened (held by another program, or not allowed): a new world is made without that map, as 0.10.2 made
+  // it, and the log says the picture could not be loaded; CompactForLargeMaps, which looks at every map file's size first, does not fail it.
+  static void CompactUnreadable()
+  {
+    Section("Compact Maps: a map file that exists but cannot be opened is skipped, as any map that cannot be read is, and no exception ends the world's making");
+    var folder = Path.Combine(root, "UnreadableMaps", "maps");
+    Directory.CreateDirectory(folder);
+    foreach (var file in Directory.GetFiles(folder))
+      File.Delete(file);
+    BC.ConfigMapSourceDir.Value = folder;
+    var path = Path.Combine(folder, "forestmap.png");
+    void Attempt(string why, CompactMapsMode mode)
+    {
+      BC.ConfigCompactMaps.Value = mode;
+      lock (LogHandler.Lines) LogHandler.Lines.Clear();
+      BC.BetterContinentsSettings? world = null;
+      string? thrown = null;
+      try
+      {
+        world = BC.BetterContinentsSettings.Create();
+      }
+      catch (Exception e)
+      {
+        thrown = $"{e.GetType().Name}: {e.Message}";
+      }
+      C(thrown == null && world is { CompactMaps: false, Version: 12 }, $"{mode}, the file {why}: a world is made, not compact" + (thrown == null ? "" : $" (it threw {thrown})"));
+      C(thrown == null && Count("Cannot load image") == 1 && LogHandler.Has("forestmap.png"), $"{mode}, the file {why}: the log says the picture could not be loaded");
+    }
+    try
+    {
+      Strip(folder, "forestmap.png", 8193);
+      // Held by another program: opening it fails (a sharing violation on Windows, a lock .NET takes on Linux).
+      using (var held = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.None))
+      {
+        bool blocked;
+        try
+        {
+          using var probe = File.OpenRead(path);
+          blocked = false;
+        }
+        catch (IOException)
+        {
+          blocked = true;
+        }
+        C(blocked, "the file cannot be opened while the test holds it (what is being tested)");
+        Attempt("is held by another program", CompactMapsMode.Auto);
+        Attempt("is held by another program", CompactMapsMode.Off);
+      }
+      // Not allowed (a user who can read any file, root, has nothing to try).
+      if (!OperatingSystem.IsWindows())
+      {
+        File.SetUnixFileMode(path, UnixFileMode.None);
+        try
+        {
+          bool denied;
+          try
+          {
+            using var probe = File.OpenRead(path);
+            denied = false;
+          }
+          catch (UnauthorizedAccessException)
+          {
+            denied = true;
+          }
+          if (denied)
+            Attempt("is not allowed to be read", CompactMapsMode.Auto);
+          else
+            System.Console.WriteLine("  (this user can read a file with no permissions: that case is not tried)");
+        }
+        finally
+        {
+          File.SetUnixFileMode(path, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+        }
+      }
+      // Readable again: it counts again.
+      BC.ConfigCompactMaps.Value = CompactMapsMode.Auto;
+      C(BC.BetterContinentsSettings.Create().CompactMaps, "and the same file, readable again, makes the world compact again (8193 px across)");
+    }
+    finally
+    {
+      BC.ConfigCompactMaps.Value = CompactMapsMode.Auto;
       BC.ConfigMapSourceDir.Value = "";
     }
   }

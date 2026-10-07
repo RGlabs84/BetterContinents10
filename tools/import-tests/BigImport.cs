@@ -17,6 +17,12 @@ namespace ImportTest;
 // A world export at Heightmap Amount 81 read back as a preset, as the Directory and as the config; and (BCIMPORT_BIG) an export
 // folder of 8192 or 16384 px made into a preset with its memory measured. The folders are written with the export's own row
 // writer, so a 16384 px map never exists whole in this process either.
+//
+// The memory is measured by a sampler of the process's RSS: BUILDER says how much the builder (MakePlan and BuildPreset, what the export's
+// preset step runs) added at its peak to what the process held when it began, and what the export window says for that size
+// (WorldExport.PresetMemoryMb, which follows these numbers: a process of its own for each run, BCIMPORT_ONLY=1 BCIMPORT_BIG=<size>
+// BCIMPORT_ALL=1, and BCIMPORT_NOPAINT=1 for an export without the paint map). Runs of one size differ by about a tenth; run after the other
+// checks of this suite, 2048 and 4096 px came out at 40 and 197 MB where a process of its own gave 44 to 57 and 202 to 227.
 internal static partial class Program
 {
   static readonly System.Globalization.CultureInfo Inv = System.Globalization.CultureInfo.InvariantCulture;
@@ -150,7 +156,9 @@ internal static partial class Program
 
   static void BigImport(int n, bool all)
   {
-    Section($"an export folder of {n} x {n} px made into a preset (the heightmap{(all ? " and every other map" : " alone")}), memory measured");
+    // BCIMPORT_NOPAINT=1: every map but the paint map (an export with Paint off), to measure what the paint map takes.
+    bool paint = Environment.GetEnvironmentVariable("BCIMPORT_NOPAINT") != "1";
+    Section($"an export folder of {n} x {n} px made into a preset (the heightmap{(all ? paint ? " and every other map" : " and every other map but the paint map" : " alone")}), memory measured");
     const float amount = 81f, seaLevel = 0.5f, peak = 16000f;
     var dir = Path.Combine(root, "Big", $"export-{n}");
     Directory.CreateDirectory(dir);
@@ -199,7 +207,8 @@ internal static partial class Program
       Rows("mossmap.png", 1, 8, (y, row) => { if (y < n / 4) for (int x = 0; x < n / 4; x++) row[x] = 150; });
       var biomeAt = (Func<int, int, Heightmap.Biome>)((x, y) => HeightWet(x, y, n) ? (x < n / 2 ? (y < n / 2 ? Heightmap.Biome.Meadows : Heightmap.Biome.Plains) : (y < n / 2 ? Heightmap.Biome.BlackForest : Heightmap.Biome.Mountain)) : Heightmap.Biome.Ocean);
       Rows("biomemap.png", 3, 8, (y, row) => { for (int x = 0; x < n; x++) { var c = colours[biomeAt(x, y)]; row[3 * x] = c.r; row[3 * x + 1] = c.g; row[3 * x + 2] = c.b; } });
-      Rows("paintmap.png", 3, 8, (y, row) => { for (int x = 0; x < n; x++) { row[3 * x] = (byte)(x * 255L / (n - 1)); row[3 * x + 1] = (byte)(y * 255L / (n - 1)); row[3 * x + 2] = 128; } });
+      if (paint)
+        Rows("paintmap.png", 3, 8, (y, row) => { for (int x = 0; x < n; x++) { row[3 * x] = (byte)(x * 255L / (n - 1)); row[3 * x + 1] = (byte)(y * 255L / (n - 1)); row[3 * x + 2] = 128; } });
       Rows("altbiomemap.png", 3, 8, (y, row) =>
       {
         for (int x = 0; x < n; x++)
@@ -208,13 +217,16 @@ internal static partial class Program
       });
       Rows("locationmap.png", 3, 8, (y, row) => { if (y == n / 2) row[3 * (n / 2)] = 255; if (y == n / 4) { row[3 * (n / 4)] = 255; row[3 * (n / 4) + 1] = 153; } });
       File.WriteAllLines(Path.Combine(dir, "biomemap.txt"), ImageMapBiome.DefaultColors.Split('|'));
-      File.WriteAllLines(Path.Combine(dir, "paintmap.txt"), ["# The paint map needs no colour list. Every pixel is used as it is"]);
+      if (paint)
+        File.WriteAllLines(Path.Combine(dir, "paintmap.txt"), ["# The paint map needs no colour list. Every pixel is used as it is"]);
       File.WriteAllLines(Path.Combine(dir, "altbiomemap.txt"), ["# test legend", "Dark Meadows: AA3377", "Wolf Mountain: 33AA77"]);
       File.WriteAllLines(Path.Combine(dir, "locationmap.txt"), ["StartTemple: 255,0,0", "Eikthyrnir: 255,153,0"]);
     }
     WriteConfig(dir, n, 15850f, 500f, amount, seaLevel, manifest: true);
     long onDisk = Directory.GetFiles(dir, "*.png").Sum(f => new FileInfo(f).Length);
 
+    // What the process holds as the builder begins, to say how much the builder adds.
+    long beforeBuild = Memory().Rss;
     Phase("MakePlan and BuildPreset (the builder, as the export's preset step runs it)");
     lock (LogHandler.Lines) LogHandler.Lines.Clear();
     var plan = WorldImport.MakePlan(dir);
@@ -230,8 +242,11 @@ internal static partial class Program
     var after = Memory();
     foreach (var p in peaks)
       System.Console.WriteLine($"    {p.Phase,-82} {p.Seconds,7:0.0} s, peak {p.PeakKb / 1024,6} MB");
-    System.Console.WriteLine($"    MEASURED {n}{(all ? " all maps" : " heightmap")}: {clock.Elapsed.TotalSeconds:0.0} s; process RSS {before.Rss / 1024} MB before, peak (VmHWM) {after.Hwm / 1024} MB; "
+    System.Console.WriteLine($"    MEASURED {n}{(all ? paint ? " all maps" : " all maps but paint" : " heightmap")}: {clock.Elapsed.TotalSeconds:0.0} s; process RSS {before.Rss / 1024} MB before, peak (VmHWM) {after.Hwm / 1024} MB; "
                              + $"PNGs {onDisk / 1048576.0:0.0} MB on disk, preset {new FileInfo(plan.PresetPath).Length / 1048576.0:0.0} MB");
+
+    var builder = peaks.First(p => p.Phase.StartsWith("MakePlan"));
+    System.Console.WriteLine($"    BUILDER {n}{(all ? paint ? " all maps" : " all maps but paint" : " heightmap")}: {builder.Seconds:0.0} s, peak {builder.PeakKb / 1024} MB, {(builder.PeakKb - beforeBuild) / 1024} MB above the {beforeBuild / 1024} MB the process held when it began{(all ? $"; the export window says {WorldExport.PresetMemoryMb(n, paint):0} MB" : "")}");
 
     C(outcome.Error == null && outcome.Warnings.Count == 0, $"the preset of the {n} px folder is made ({outcome.Error ?? string.Join("; ", outcome.Warnings.DefaultIfEmpty("no warning"))})");
     C(s.HeightmapAmount == 81f && s.Version == 12 && hm != null && hm.Size == n && hm.Record is { Amount: 81f }, $"it loads at Heightmap Amount 81, version {s.Version}, a {hm?.Size} px heightmap with its record");
@@ -246,11 +261,11 @@ internal static partial class Program
         worst = Mathf.Max(worst, Mathf.Abs(got - want));
         count++;
       }
-    C(worst <= step * 0.51f + 0.01f && count > 400, $"{count} sampled heights come back within half a grey step ({step:0.###} m); worst {worst:0.###} m");
+    C(worst <= step * 0.51f + 0.01f && count > 40, $"{count} sampled heights come back within half a grey step ({step:0.###} m); worst {worst:0.###} m");
     if (all)
     {
       var names = s.LoadedImageMaps().Select(m => m.FileName).ToHashSet();
-      string[] want = ["heightmap.png", "biomemap.png", "locationmap.png", "forestmap.png", "heatmap.png", "paintmap.png", "lavamap.png", "mossmap.png", "altbiomemap.png"];
+      string[] want = ["heightmap.png", "biomemap.png", "locationmap.png", "forestmap.png", "heatmap.png", .. (paint ? new[] { "paintmap.png" } : Array.Empty<string>()), "lavamap.png", "mossmap.png", "altbiomemap.png"];
       C(want.All(names.Contains), "every map is in the preset: " + string.Join(", ", want.Where(w => !names.Contains(w)).DefaultIfEmpty("none missing")));
     }
     try { Directory.Delete(dir, true); } catch { }

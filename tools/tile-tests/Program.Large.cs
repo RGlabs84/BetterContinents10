@@ -51,7 +51,8 @@ internal static partial class Program
       var over = WriteMap("over-8192.png", HeaderOnlyPng(8193, 8193));
       var wide = WriteMap("wide-8192.png", HeaderOnlyPng(8193, 16));
       var at = WriteMap("at-8192.png", HeaderOnlyPng(8192, 8192));
-      foreach (var (name, path) in new[] { ("8193 px square", over), ("8193 x 16", wide) })
+      var tall = WriteMap("tall-8192.png", HeaderOnlyPng(16, 8193));
+      foreach (var (name, path) in new[] { ("8193 px square", over), ("8193 x 16", wide), ("16 x 8193", tall) })
       {
         lock (LogHandler.Lines) LogHandler.Lines.Clear();
         var made = new ImageMapBase[] { ImageMapFloat.Create(path, ImageMapFloat.HeightAlpha.None), ImageMapBiome.Create(path), ImageMapSpawn.Create(path) };
@@ -69,6 +70,17 @@ internal static partial class Program
       var saved4100 = Png(4100, (x, y) => new L16((ushort)((x + y) & 0xFFFF)), SixLabors.ImageSharp.Formats.Png.PngColorType.Grayscale, SixLabors.ImageSharp.Formats.Png.PngBitDepth.Bit16);
       var fromSettings = ImageMapFloat.Create(saved4100, ImageMapFloat.HeightAlpha.None);
       C(ImageMapBase.MaxMapSize == 4096 && fromSettings != null && fromSettings.Size == 4100, "at 4096, a world's saved 4100 px picture is read as it always was");
+      // Its alt-biome map is held to the format's own 16384, not to this machine's setting; a new picture of that size is refused.
+      var savedAlt = new ImageMapAltBiome { Size = 4100, Map = new byte[4100 * 4100] }.ToBlock();
+      ImageMapAltBiome altBack = null;
+      try { altBack = ImageMapAltBiome.FromBlock(savedAlt); }
+      catch (InvalidDataException) { }
+      C(altBack is { Size: 4100 }, "at 4096, a world's saved 4100 px alt-biome map is read as it always was");
+      lock (LogHandler.Lines) LogHandler.Lines.Clear();
+      var newAlt = ImageMapAltBiome.Create(WriteMap("altbiomemap.png", HeaderOnlyPng(4100, 4100)));
+      string[] altRefused;
+      lock (LogHandler.Lines) altRefused = LogHandler.Lines.Where(l => l.Contains("largest map")).ToArray();
+      C(newAlt == null && altRefused.Length == 1 && altRefused[0].Contains("4096"), "while a new 4100 px alt-biome picture is refused at 4096");
     }
     finally
     {
@@ -82,6 +94,7 @@ internal static partial class Program
     Section("a picture larger than 16384 px is refused from its header, with a message");
     var big = WriteMap("too-big.png", HeaderOnlyPng(16385, 16385));
     var wide = WriteMap("too-wide.png", HeaderOnlyPng(20000, 8));
+    var tall = WriteMap("too-tall.png", HeaderOnlyPng(8, 20000));
     var full = WriteMap("full.png", HeaderOnlyPng(16384, 16384));
     C(ImageMapBase.PictureSize(big) == (16385, 16385) && ImageMapBase.PictureSize(full) == (16384, 16384) && ImageMapBase.MaxMapSize == 16384,
       "the size is read from the first 24 bytes of the file; 16384 is the largest");
@@ -92,7 +105,22 @@ internal static partial class Program
     File.WriteAllText(text, "this is no picture at all, only text that is long enough to be read as a header");
     C(ImageMapBase.PictureSize(jpeg) == (40, 30) && ImageMapBase.PictureSize(text) == null,
       "a JPEG's size comes from ImageSharp's reading of its start, and a file that is no picture has none");
-    foreach (var (name, path) in new[] { ("a 16385 px square", big), ("20000 x 8", wide) })
+    // A file that cannot be opened (held by another program) or is not there has no size either, and is no exception: a new world's Compact Maps
+    // check asks every map file that exists.
+    var held = WriteMap("held.png", HeaderOnlyPng(8193, 8193));
+    using (new FileStream(held, FileMode.Open, FileAccess.Read, FileShare.None))
+    {
+      bool blocked;
+      try { using var probe = File.OpenRead(held); blocked = false; }
+      catch (IOException) { blocked = true; }
+      (int Width, int Height)? heldSize = (1, 1);
+      string raised = null;
+      try { heldSize = ImageMapBase.PictureSize(held); }
+      catch (Exception e) { raised = e.GetType().Name; }
+      C(blocked && raised == null && heldSize == null, "a file that cannot be opened has no size, and raises nothing" + (raised == null ? "" : $" (it raised {raised})"));
+    }
+    C(ImageMapBase.PictureSize(held) == (8193, 8193) && ImageMapBase.PictureSize(Path.Combine(Work, "no-such-picture.png")) == null, "the same file readable again has its size; one that is not there has none");
+    foreach (var (name, path) in new[] { ("a 16385 px square", big), ("20000 x 8", wide), ("8 x 20000", tall) })
     {
       lock (LogHandler.Lines) LogHandler.Lines.Clear();
       var made = new ImageMapBase[]
@@ -208,6 +236,30 @@ internal static partial class Program
       }
       C(same && map.RemainingAreas.Count > 0, $"{size} px: every pin of every colour, in the order they were found, as the whole array found them" + (same ? "" : $" ({why})"));
     }
+
+    // Pins of one pixel, on the first pixel of a tile column (x = 0, 128, 256, ...) among others: the scan steps over a tile with nothing in it by
+    // its width, and must not step over the first pixel of the next.
+    {
+      const int size = 520;
+      var pins = new (int x, int y)[] { (0, 3), (128, 3), (256, 3), (384, 3), (512, 3), (128, 200), (256, 450), (0, 519), (517, 519), (129, 300) };
+      var red = new Rgba32(255, 0, 0, 255);
+      var black = new Rgba32(0, 0, 0, 255);
+      var png = Png(size, (x, y) => pins.Any(p => p.x == x && p.y == size - 1 - y) ? red : black, SixLabors.ImageSharp.Formats.Png.PngColorType.RgbWithAlpha, SixLabors.ImageSharp.Formats.Png.PngBitDepth.Bit8);
+      var pinMap = ImageMapLocation.Create(WriteMap("pins520.png", png, "Pin0: 255,0,0|Backdrop: 0,0,0,255"), exactPins: true);
+      var want = pins.OrderBy(p => p.y).ThenBy(p => p.x).Select(p => new Vector2(p.x / (float)(size - 1), p.y / (float)(size - 1))).ToList();
+      var found = pinMap?.GetAllSpawns("Pin0").ToList() ?? [];
+      C(found.SequenceEqual(want), $"{want.Count} one-pixel pins, five of them on the first pixel of a tile column: {found.Count} found, in the order the scan finds them");
+    }
+  }
+
+  // The bytes of a package that holds an int and then these bytes as they are (a block's length, and a block).
+  private static byte[] PackageOf(int first, params byte[] rest)
+  {
+    var pkg = new ZPackage();
+    pkg.Write(first);
+    foreach (var b in rest)
+      pkg.Write(b);
+    return pkg.GetArray();
   }
 
   private static void PackageTests()
@@ -226,6 +278,23 @@ internal static partial class Program
       "its SHA-512 is GenerateHash's");
     C(BC.ZNetPatch.WorldCache.PackageID(pkg) == BC.ZNetPatch.WorldCache.PackageID(pkg.GetArray(), length)
       && BC.ZNetPatch.WorldCache.PackageID(pkg).Length == 32, "and so is the cache's id, from the package or from its bytes");
+    // The join: the server hashes the first `length` bytes of the package's buffer (longer than the package: a hash of the whole buffer would
+    // never be the one the client works out over the bytes it received) and sends it; the client hashes what it received. 0.10.2's hash, so
+    // that a client and a server of two versions agree.
+    int OldHash(byte[] bytes) { unchecked { int hash = 17; foreach (var b in bytes) hash = hash * 31 + b.GetHashCode(); return hash; } }
+    var received = pkg.GetArray();
+    var prefixOnly = new byte[length + 1000];
+    Array.Copy(received, prefixOnly, length);
+    new System.Random(11).NextBytes(prefixOnly.AsSpan(length));
+    C(buffer.Length > length && BC.ZNetPatch.GetHashCode(buffer, length) == BC.ZNetPatch.GetHashCode(received)
+      && BC.ZNetPatch.GetHashCode(prefixOnly, length) == OldHash(received) && BC.ZNetPatch.GetHashCode(received) == OldHash(received),
+      "the join's hash: the first `length` bytes of the package's buffer hash as the bytes the client receives, as 0.10.2 hashed them, whatever follows them in the buffer");
+    C(BC.ZNetPatch.GetHashCode(new byte[0]) == 17 && BC.ZNetPatch.GetHashCode<byte>(null!) == 0 && BC.ZNetPatch.GetHashCode(received, 0) == 17 && BC.ZNetPatch.GetHashCode(received, 1) == OldHash(received[..1]),
+      "and the hash of nothing is 17, of no array 0");
+    // The download bar: bytes received * 100 / the total, in a long (a 16384 px world is over 50 MB, and 21,474,837 bytes * 100 passes an int).
+    C(BC.ZNetPatch.Percent(21_474_837, 52_606_940) == 40 && BC.ZNetPatch.Percent(52_606_940, 52_606_940) == 100 && BC.ZNetPatch.Percent(1_500_000_000, 1_500_000_000) == 100
+      && BC.ZNetPatch.Percent(0, 52_606_940) == 0 && BC.ZNetPatch.Percent(50, 100) == 50 && BC.ZNetPatch.Percent(0, 0) == 0,
+      "the download's progress: 21,474,837 of 52,606,940 bytes is 40 %, the whole package 100 %, and no total yet 0 %");
     using (var stream = new MemoryStream(pkg.GetArray()))
     {
       var back = PackageBytes.Read(stream, length);
@@ -236,6 +305,16 @@ internal static partial class Program
     bool negative = false;
     try { PackageBytes.Read(new MemoryStream(new byte[10]), -1); } catch (InvalidDataException) { negative = true; }
     C(refused && negative, "a package longer than its stream, or of a negative length, is refused");
+    // A block in a package (a map's tiles) that claims more bytes than the package has, or a negative number, is refused before anything is read of it.
+    var blockOk = PackageBytes.ReadBlock(new ZPackage(PackageOf(4, 1, 2, 3, 4)));
+    int blocksRefused = 0;
+    foreach (int claim in new[] { 5, 100, -1, int.MaxValue })
+    {
+      try { PackageBytes.ReadBlock(new ZPackage(PackageOf(claim, 1, 2, 3, 4))); }
+      catch (EndOfStreamException) { blocksRefused++; }
+      catch (Exception) { }
+    }
+    C(blockOk.Length == 4 && blocksRefused == 4, $"a block that ends beyond its package is refused ({blocksRefused} of 4), one that fits is read ({blockOk.Length} bytes)");
 
     // The cache writes and reads the bytes it was given.
     var dir = Path.Combine(Work, "cache");
@@ -258,6 +337,26 @@ internal static partial class Program
       C(message != null && message.Contains("come to") && message.Contains("Compact Maps") && message.Contains("map") && !message.Contains(" 0 MB"), $"settings past the limit are refused with a message ({message})");
       PackageBytes.Limit = normal + 10;
       C(Save(world, false, 12).Length == normal, "and settings just inside it are saved");
+
+      // The limit counts what is about to be written too: with 100 bytes to spare, 100 more fit and 101 do not.
+      var spare = new ZPackage();
+      spare.Write(new byte[1000]);
+      PackageBytes.Buffer(spare, out int have);
+      PackageBytes.Limit = have + 100;
+      bool Refuses(long upcoming)
+      {
+        try { PackageBytes.Guard(spare, "the map", upcoming); return false; }
+        catch (WorldTooLargeException) { return true; }
+      }
+      C(!Refuses(0) && !Refuses(100) && Refuses(101) && Refuses(1_000_000), "the bytes about to be written are counted: 100 more fit, 101 do not");
+      // A compact world's tiles are checked as each block is written (its size is known only then).
+      var compactWorld = World(120, alpha: false, compact: true);
+      PackageBytes.Limit = limit;
+      int compactNormal = Save(compactWorld, false, 12).Length;
+      PackageBytes.Limit = compactNormal / 3;
+      string tiledMessage = null;
+      try { Save(compactWorld, false, 12); } catch (WorldTooLargeException e) { tiledMessage = e.Message; }
+      C(tiledMessage != null && tiledMessage.Contains("map"), $"a compact world's settings past the limit are refused too ({tiledMessage})");
     }
     finally
     {

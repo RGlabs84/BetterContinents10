@@ -4,14 +4,16 @@
 // points, points on the 128 m grid FindLakes makes (many of them equally near), duplicates, clusters, points that are no number,
 // and the lake points of a made-up sea map, every one compared bit for bit with a copy of the game's code (assembly_valheim
 // 1.0.17, client and dedicated server: the same); that a long list of the size a 32 km world finds is merged in seconds; that the
-// prefix is bound to the game's method (patched through Harmony here, which refuses a prefix whose parameters do not match); and
-// that a short list is left to the game.
+// prefix is bound to the game's method (patched through Harmony here, which refuses a prefix whose parameters do not match); that
+// a short list is left to the game; and that the prefix belongs to the groups the mod ships as it should (the layout group, patched
+// for real, and no other), so a world that is not laid out to its own size keeps the game's code.
 
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using BetterContinents;
 using HarmonyLib;
 using UnityEngine;
@@ -23,6 +25,7 @@ internal static partial class Program
     LakeMergeEqualTests();
     LakeMergeSpeedTests();
     LakeMergeBindingTests();
+    LakeMergeScopeTests();
   }
 
   // ------------------------------------------------------------------------------------------------ the game's own code
@@ -149,6 +152,15 @@ internal static partial class Program
       Run("duplicates, clusters and no-number points", odd, range);
     Run("a first point that is no number", [new Vector2(float.NaN, float.NaN), new Vector2(1f, 1f), new Vector2(2f, 2f)], 800f);
 
+    // Two points just inside the range (796 m for 800 m) in every direction and at every place across the cells' borders (a cell is 808 m: a
+    // pair 796 m apart is in neighbouring cells, and in cells two apart if the cells are narrower than the range).
+    foreach (double angle in new[] { 0.0, 30.0, 45.0, 60.0, 90.0, 135.0 })
+      for (float x = 0f; x < 1700f; x += 0.7f)
+      {
+        float dx = (float)(796.0 * Math.Cos(angle * Math.PI / 180.0)), dy = (float)(796.0 * Math.Sin(angle * Math.PI / 180.0));
+        Run($"a pair 796 m apart at {angle} degrees from x = {x}", [new Vector2(x, x * 0.37f), new Vector2(x + dx, x * 0.37f + dy)], 800f);
+      }
+
     // A range the game's search cannot use as it is: left to the game's own code (null).
     foreach (float bad in new[] { 0f, -1f, float.NaN, 99999f, float.PositiveInfinity })
       Check(LakeMerge.Merge([new Vector2(0f, 0f), new Vector2(1f, 1f)], bad) == null, $"a range of {bad}: not ours to answer");
@@ -227,5 +239,78 @@ internal static partial class Program
     Check((bool)prefix.Invoke(null, fewArguments) && fewArguments[2] == null && few.Count == 50, "a short list: the game's own code runs, the list untouched");
     var badArguments = new object[] { new List<Vector2>(many), float.NaN, null };
     Check((bool)prefix.Invoke(null, badArguments) && badArguments[2] == null, "a range that is no number: the game's own code runs");
+  }
+
+  // ------------------------------------------------------------------------------------------------ which worlds get it
+  // The prefix is a part of the layout group (WorldSizeHelper.Layout): on for a world made since 0.10 whose own size is not vanilla's, while
+  // Expand World Size is not installed. The two other groups are on for every world of any other size than vanilla's, one made before 0.10
+  // among them, which keeps the game's own code. These look at the groups the mod ships, not at a group built here.
+  private static int mergeCalls;
+  private static void CountMerges() => mergeCalls++;
+
+  private static void LakeMergeScopeTests()
+  {
+    var method = (MethodInfo)Target(typeof(WorldGenerator), "MergePoints");
+    var partsField = typeof(WorldSizeHelper.Group).GetField("parts", BindingFlags.NonPublic | BindingFlags.Instance)!;
+    List<string> Names(WorldSizeHelper.Group group) => ((WorldSizeHelper.Part[])partsField.GetValue(group)!).Select(p => p.ToString()).ToList();
+    Check(Names(WorldSizeHelper.Layout).Count(n => n == "WorldGenerator.MergePoints") == 1, "the layout group has a part on WorldGenerator.MergePoints");
+    Check(!Names(WorldSizeHelper.EdgeChecks).Contains("WorldGenerator.MergePoints") && !Names(WorldSizeHelper.WorldSize).Contains("WorldGenerator.MergePoints"),
+      "and neither the edge checks (every size but vanilla's) nor the Ashlands' limit have one");
+
+    // The layout group, as shipped, patched for the size of a 32 km world on a real Harmony: the game's own MergePoints, called as the game
+    // calls it, goes through the prefix for a long list (LakeMerge.Merge is called), and runs its own code for a short one (it is not).
+    var harmony = new Harmony("size-tests.lakes-scope");
+    var instance = RuntimeHelpers.GetUninitializedObject(typeof(WorldGenerator));
+    List<Vector2> Call(List<Vector2> points) => (List<Vector2>)method.Invoke(instance, [points, 800f])!;
+    var random = new System.Random(31);
+    var many = new List<Vector2>();
+    // 5000 points, whatever FastAbove is (the game's own code takes a fraction of a second for them; it would take minutes for 200,000).
+    for (int i = 0; i < 5000; i++)
+      many.Add(new Vector2((float)random.NextDouble() * 4000f, (float)random.NextDouble() * 4000f));
+    var few = many.Take(200).ToList();
+    var expectedMany = GameMergePoints(new List<Vector2>(many), 800f);
+    var expectedFew = GameMergePoints(new List<Vector2>(few), 800f);
+    int mark = CapturingLogHandler.Lines.Count;
+    try
+    {
+      harmony.Patch(AccessTools.Method(typeof(LakeMerge), "Merge"), prefix: new HarmonyMethod(typeof(Program).GetMethod(nameof(CountMerges), BindingFlags.NonPublic | BindingFlags.Static)));
+      mergeCalls = 0;
+      var unpatched = Call(new List<Vector2>(many));
+      Check(mergeCalls == 0 && SameLakes(expectedMany, unpatched), "vanilla's size (the layout group off): a long list goes through the game's own code");
+      var size = new WorldGeometry(32264f, 500f);
+      Check(WorldSizeHelper.Layout.Update(harmony, size) && WorldSizeHelper.Layout.Patched && Harmony.GetPatchInfo(method) is { } info && info.Prefixes.Count(p => p.owner == harmony.Id) == 1,
+        "World Size 32264: the shipped layout group puts the prefix on the game's MergePoints");
+      mergeCalls = 0;
+      var longList = new List<Vector2>(many);
+      var viaPrefix = Call(longList);
+      Check(mergeCalls == 1 && SameLakes(expectedMany, viaPrefix) && longList.Count == 0, "a long list is answered by LakeMerge, with the game's lakes");
+      mergeCalls = 0;
+      var shortList = new List<Vector2>(few);
+      var viaGame = Call(shortList);
+      Check(mergeCalls == 0 && SameLakes(expectedFew, viaGame) && shortList.Count == 0, "a short list is the game's own code, with the game's lakes");
+      Check(!CapturingLogHandler.Lines.Skip(mark).Any(l => l.Contains("MergePoints")), "no part on MergePoints failed to patch");
+      Check(WorldSizeHelper.Layout.Update(harmony, WorldGeometry.Vanilla) && !WorldSizeHelper.Layout.Patched, "vanilla's size again: the layout group is off");
+      mergeCalls = 0;
+      Call(new List<Vector2>(many));
+      Check(mergeCalls == 0 && (Harmony.GetPatchInfo(method)?.Prefixes.Count(p => p.owner == harmony.Id) ?? 0) == 0, "and the game's own code runs for a long list again");
+    }
+    catch (Exception e)
+    {
+      Check(false, $"the layout group patched for real: {e.GetType().Name}: {e.Message}");
+    }
+    finally
+    {
+      WorldSizeHelper.Layout.Update(harmony, WorldGeometry.Vanilla);
+      harmony.UnpatchAll(harmony.Id);
+      WorldSizeHelper.Layout.Assume(WorldGeometry.Vanilla);
+    }
+
+    // The prefix answers a list of 5000 points whatever the threshold's own value is (the speed test above asks for FastAbove + 500).
+    var prefix = typeof(WorldSizeHelper).GetMethod("MergePointsPrefix", BindingFlags.NonPublic | BindingFlags.Static)!;
+    var five = new List<Vector2>();
+    for (int i = 0; i < 5000; i++)
+      five.Add(new Vector2((float)random.NextDouble() * 6000f, (float)random.NextDouble() * 6000f));
+    var arguments = new object[] { five, 800f, null };
+    Check(!(bool)prefix.Invoke(null, arguments)! && arguments[2] is List<Vector2> { Count: > 0 }, "5000 points: LakeMerge answers, the game's code is skipped (the threshold is no higher than that)");
   }
 }

@@ -550,19 +550,46 @@ internal static class Tests
     Section("the export window's estimate and notes");
     var hud = typeof(ExportHud);
     string Call(string name, WorldExport.Options o) => (string)hud.GetMethod(name, BindingFlags.NonPublic | BindingFlags.Static)!.Invoke(null, [o])!;
-    WorldExport.Options At(int size, bool preset = true) { var o = WorldExport.Options.Default(); o.Size = size; o.Preset = preset; return o; }
+    WorldExport.Options At(int size, bool preset = true, bool paint = true) { var o = WorldExport.Options.Default(); o.Size = size; o.Preset = preset; o.Paint = paint; return o; }
     int MemoryMb(string estimate) => int.Parse(System.Text.RegularExpressions.Regex.Match(estimate, @"About (\d+) MB of memory while it runs").Groups[1].Value);
     var e4 = Call("Estimate", At(4096)); var e8 = Call("Estimate", At(8192)); var e16 = Call("Estimate", At(16384));
     C(e16.StartsWith("16384 x 16384 px = 268.4 million pixels a map"), $"16384 px: {e16.Substring(0, 60)}");
     C(MemoryMb(e4) == MemoryMb(e8) && MemoryMb(e8) == MemoryMb(e16) && MemoryMb(e16) <= 150,
       $"the memory it says holds no matter the size, as the maps are written band by band ({MemoryMb(e4)}, {MemoryMb(e8)}, {MemoryMb(e16)} MB)");
-    C(e8.Contains("MB while the preset is made") && e16.Contains("and no preset") && !e16.Contains("while the preset is made"), "the preset's memory is said up to 8192 px, and at 16384 px that there is none");
+    C(e8.Contains("819 MB while the preset is made") && Call("Estimate", At(8192, paint: false)).Contains("691 MB while the preset is made") && e16.Contains("and no preset") && !e16.Contains("while the preset is made"),
+      "the preset's memory is said up to 8192 px (819 MB, 691 without the paint map), and at 16384 px that there is none");
     C(e16.Contains("a quarter of an hour") && e8.Contains("several minutes"), "and the time");
     var n8 = Call("Notes", At(8192)); var n16 = Call("Notes", At(16384)); var n16off = Call("Notes", At(16384, preset: false));
-    C(n8.Contains("needs about 1.7 GB") && n8.Contains("bc_import") && !n8.Contains("is not made"), $"8192 px: the preset's memory ({n8.Split('\n')[1]})");
-    C(n16.Contains("The New World preset is not made at 16384 px") && n16.Contains("about 6.8 GB") && n16.Contains("bc_import") && n16.Contains("over 100 MB"),
-      $"16384 px: the preset is left to bc_import, and the maps are a download for every player");
+    C(n8.Contains("needs about 0.8 GB") && n8.Contains("bc_import") && !n8.Contains("is not made"), $"8192 px: the preset's memory ({n8.Split('\n')[1]})");
+    C(n16.Contains("The New World preset is not made at 16384 px") && n16.Contains("it takes about 1.4 GB more memory to make, many times what the export itself uses") && !n16.Contains("decodes every map")
+      && n16.Contains("bc_import") && n16.Contains("the main menu, where no world is loaded") && n16.Contains("over 100 MB"),
+      $"16384 px: the preset is left to bc_import, which makes it in the main menu, and the maps are a download for every player ({n16.Split('\n')[1]})");
     C(!n16off.Contains("preset"), "16384 px with the preset switched off: nothing about it");
+
+    // The preset's memory is what the builder was measured to add to its process (tools/import-tests: BCIMPORT_ONLY=1 BCIMPORT_BIG=<size> BCIMPORT_ALL=1, and BCIMPORT_NOPAINT=1,
+    // a process of its own for each run): up to 8192 px a world holds its maps as pictures, above it as tiles, a line each in the pixels. The figures are what the runs gave
+    // (the means of two to four of each size, or the one run), and the runs of one size differ by about a tenth.
+    double Mb(int size, bool paint = true) => WorldExport.PresetMemoryMb(size, paint);
+    var measured = new (int Size, bool Paint, double Mb)[]
+    {
+      (2048, true, 50), (3072, true, 113), (4096, true, 220), (5120, true, 315), (6144, true, 425), (7168, true, 684), (8192, true, 820),
+      (2048, false, 45), (4096, false, 180), (6144, false, 380), (8192, false, 690),
+      (8193, true, 445), (10240, true, 609), (12288, true, 812), (14336, true, 1120), (16384, true, 1415), (16384, false, 1387),
+    };
+    var off = measured.Where(m => System.Math.Abs(Mb(m.Size, m.Paint) / m.Mb - 1) >= 0.10).ToList();
+    C(off.Count == 0, $"the preset's memory is within a tenth of what was measured at {measured.Length} sizes and options, 2048 to 16384 px"
+      + (off.Count == 0 ? $" ({Mb(2048):0}, {Mb(4096):0}, {Mb(8192):0} MB as pictures; {Mb(8193):0}, {Mb(12288):0}, {Mb(16384):0} as tiles)" : $": not at {string.Join(", ", off.Select(m => $"{m.Size}{(m.Paint ? "" : " without paint")} ({Mb(m.Size, m.Paint):0} for {m.Mb})"))}"));
+    bool grows = true, paintCosts = true;
+    for (int size = 128; size < 16384; size += 128)
+    {
+      if (size != 8192)
+        grows &= Mb(size) <= Mb(size + 128) && Mb(size, false) <= Mb(size + 128, false);
+      paintCosts &= Mb(size, false) <= Mb(size);
+    }
+    C(grows && paintCosts && Mb(128) == 20 && Mb(128, false) == 20 && Mb(1024) == 20 && Mb(2048, false) > 20,
+      "it never falls as the size grows (but over 8192 px), an export with the paint map needs no less than one without (as pictures: as tiles it takes none of it into account), and none needs less than 20 MB");
+    C(Mb(8193) < Mb(8192) && Mb(8193) > 400 && Mb(16384, true) == Mb(16384, false) && Mb(8192) < 1000 && Mb(16384) < 2000,
+      "a world over 8192 px across is compact and its preset takes less than the 8192 px one's; the 1,775 and 7,009 MB the old formula said for 8192 and 16384 px are gone");
 
     // Fine heights in the window: the precision line under the fields, the note when they are asked for where they add nothing, the estimate.
     string FineLine(WorldExport.Options o) => (string)hud.GetMethod("FineInfo", BindingFlags.NonPublic | BindingFlags.Static)!.Invoke(null, [o])!;

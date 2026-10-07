@@ -318,7 +318,8 @@ internal static class EndToEnd
     Program.C(WorldExport.Phase == "Cancelled" && !WorldExport.IsRunning, $"cancel ends in 'Cancelled' ({WorldExport.Phase})");
     Program.C(!Directory.Exists(dir2), "a cancelled export leaves no folder behind");
 
-    // Past WorldExport.PresetMaxSize the export leaves the preset to bc_import (the builder decodes every map), and says so without calling it a failure.
+    // Past WorldExport.PresetMaxSize the export leaves the preset to bc_import (the builder takes many times the memory the export does), and says so
+    // without calling it a failure.
     var big = WorldExport.Options.Default();
     big.Size = 16384;
     big.Preset = true;
@@ -328,7 +329,8 @@ internal static class EndToEnd
     string? skipped = (string?)jobTypeBig.GetField("PresetSkipped", BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(jobBig);
     bool tooBig = (bool)jobTypeBig.GetField("PresetTooBig", BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(jobBig)!;
     var summaryBig = (List<string>)jobTypeBig.GetMethod("Summary", BindingFlags.NonPublic | BindingFlags.Instance)!.Invoke(jobBig, null)!;
-    Program.C(tooBig && skipped != null && skipped.Contains("16384 px") && skipped.Contains("about 6.8 GB") && skipped.Contains("bc_import makes it") && !summaryBig.Any(l => l.StartsWith("WARNING"))
+    Program.C(tooBig && skipped != null && skipped.Contains("16384 px") && skipped.Contains("about 1.4 GB more memory to make, many times what the export itself uses")
+      && skipped.Contains("bc_import makes it in the main menu, where no world is loaded") && !skipped.Contains("decodes every map") && !summaryBig.Any(l => l.StartsWith("WARNING"))
       && summaryBig.Any(l => l.StartsWith("no New World preset at this size")), $"at 16384 px the preset is left to bc_import, as a note and not a warning ({skipped})");
     var atLimit = WorldExport.Options.Default();
     atLimit.Size = WorldExport.PresetMaxSize;

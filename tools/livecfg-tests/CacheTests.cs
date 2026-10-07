@@ -1,9 +1,10 @@
-// Added by Wubarrk on 2026-09-24 for world export and import (0.9.0).
+// Added by Wubarrk on 2026-09-24 for world export and import (0.9.0), and modified on 2026-10-06 for 16k worlds (0.10.3).
 
 // Offline checks of Better Continents 0.9.0's shareable world cache (WorldCacheShare, and the accessors it uses on
 // BetterContinents.ZNetPatch.WorldCache): a .bcworld imports into the real on-disk cache under its recomputed id
 // with byte-identical content, a corrupt/short file is refused without throwing, the plugin-tree seed scan imports
-// once and reports "already present" the second time, and export writes both files. Loads the real pre-ILRepack
+// once and reports "already present" the second time, a file is refused for its size only past the package limit
+// (1.5 GB, not the 512 MB of before), and export writes both files. Loads the real pre-ILRepack
 // BetterContinents.dll, the game's assemblies and BepInEx (see Program.cs, which this shares its process with).
 using System;
 using System.IO;
@@ -45,6 +46,7 @@ internal static class CacheTests
     {
       ImportRoundTrip(work);
       CorruptFileRefused(work);
+      SizeLimit(work);
       SeedScan(work);
       ExportWritesBothFiles(work);
     }
@@ -138,6 +140,36 @@ internal static class CacheTests
     C(e2 == null && r2.Count == 1 && !r2[0].Imported && r2[0].Error != null, $"an out-of-range version header is refused, not thrown ({r2.FirstOrDefault()?.Error})");
 
     C(!Directory.Exists(WorldCache.WorldCachePath) || Directory.GetFiles(WorldCache.WorldCachePath).Length == 0, "neither refused file reached the cache directory");
+  }
+
+  // A .bcworld may be as large as a settings package can be (PackageBytes.MaxLength, 1.5 GB: a world of 16384 px maps made compact is a few tens
+  // of megabytes to a few hundred, and one of several noisy 16-bit maps passed the 512 MB it was limited to before). The files here are sparse: they
+  // hold only zeros, so nothing is written to the disk, and are refused for what they are (no package) once the size passes, never read whole.
+  static void SizeLimit(string work)
+  {
+    Section("import: a file is refused for its size only past the package limit (1.5 GB), not at 512 MB");
+    WorldCache.WorldCachePath = Path.Combine(work, "cache-size");
+    string Refusal(long length)
+    {
+      var path = Path.Combine(work, $"size-{length}" + WorldCacheShare.Extension);
+      using (var file = new FileStream(path, FileMode.Create))
+        file.SetLength(length);
+      try
+      {
+        var outcomes = WorldCacheShare.ImportPath(path, out var error);
+        return error ?? (outcomes.Count == 1 ? outcomes[0].Error ?? "imported" : $"{outcomes.Count} outcomes");
+      }
+      finally
+      {
+        File.Delete(path);
+      }
+    }
+    var over512 = Refusal(600_000_000L);
+    C(over512.Contains("bad header") && !over512.Contains("too large"), $"600 MB (over the 512 MB it was limited to) is not refused for its size, but for being no package ({over512})");
+    var atLimit = Refusal(PackageBytes.MaxLength);
+    C(atLimit.Contains("bad header") && !atLimit.Contains("too large"), $"a file of exactly the limit ({PackageBytes.MaxLength:N0} bytes) is not either ({atLimit})");
+    var pastLimit = Refusal(PackageBytes.MaxLength + 1L);
+    C(pastLimit.Contains("too large"), $"one byte more is refused for its size ({pastLimit})");
   }
 
   static void SeedScan(string work)

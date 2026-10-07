@@ -9,12 +9,17 @@
 #   livecfg-tests     live config, transfer rate, world cache, minimap
 #   ewd-tests         Expand World Data biomes (vanilla and EWD processes)
 #   twin-tests        the vegetation twin guard, bc_twins' scan, the PlaceVegetation tracking on the game's IL
-#   size-tests        the world's size: WorldGeometry, SetSize, the edge-of-world patches on the game's IL; the water depth patch
+#   size-tests        the world's size: WorldGeometry, SetSize, the edge-of-world patches on the game's IL; the water depth patch; the lakes'
+#                     merge (LakeMerge against the game's code) and the layout group that carries it, patched for real
 #   sector-tests      the sectors of a world past the game's 16 km (WorldSectors): the sector, index and chunk map for all 2048 x 2048 zones, the
 #                     transpilers on the game's IL (client and dedicated server), the game's save planning run patched, when the map is on (the
 #                     Wide Sectors setting, the world's marker, the save's chunks), the conversion of a save made with the game's sectors, and what
 #                     happens when the patches cannot be installed
-#   tile-tests        the maps' tiles: the codec, every map kind sampling as before, saves in tiles, the cache
+#   tile-tests        the maps' tiles: the codec, every map kind sampling as before, saves in tiles, the cache; the PNG reader and writer
+#                     (PngRows against ImageSharp on every kind of picture, odd ones included; PngWriter's zlib stream), how a map's picture
+#                     comes (by rows, whole, or whole again when the stream ends early), the 16,384 px limits, the settings package and the
+#                     client's join (hash, progress), the location map's pins. "big" (by hand: dotnet bin/Release/net8.0/AltBiomeHarness.dll big)
+#                     makes every kind of map at 16,384 px
 #   zone-tests        zone regeneration: what protects a zone (pieces, tombstones, players, worked ground), locations kept whole,
 #                     the plan and the work, saves and stops in the middle, requests and errors (Unity's coroutines stood in for),
 #                     a world that closes in every phase, time-slicing and bandwidth, the ground at a border, the Debug Reset

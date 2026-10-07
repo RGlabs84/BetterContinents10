@@ -378,7 +378,7 @@ public static class ExportHud
       list.Add($"{o.Size} px: every player joining a world built from these maps downloads them{(o.Size >= 16384 ? " (over 100 MB at this size, and more for noisy maps)" : "")}.");
     if (o.Size > 4096 && o.Preset)
       list.Add(o.Size > WorldExport.PresetMaxSize
-        ? $"The New World preset is not made at {o.Size} px: building it decodes every map and would need about {PresetMemory(o) / 1024.0:0.#} GB. Run bc_import on the folder (the Import tab, or in the main menu) when the memory is there."
+        ? $"The New World preset is not made at {o.Size} px: it takes about {PresetMemory(o) / 1024.0:0.#} GB more memory to make, many times what the export itself uses. Run bc_import on the folder (the Import tab, or in the main menu, where no world is loaded)."
         : $"The New World preset needs about {PresetMemory(o) / 1024.0:0.#} GB while it is made; switch it off here and run bc_import in the main menu if memory is short.");
     if (o.AltBiomes && o.Size < 2048)
       list.Add("Below 2048 px the alt-biome map is only approximate.");

@@ -55,7 +55,8 @@ internal sealed class PngRowsException(string message) : Exception(message)
 // tiles and a few rows, where ImageSharp holds the whole decoded image (1 GB for four 8-bit channels) beside them. Only
 // the cases where the pixels it gives are exactly the ones ImageSharp gives (tests in tools/tile-tests compare every one,
 // pixel for pixel) are read here; anything else (other formats, Adam7 interlacing, colour keys, 16-bit colour, bit depths
-// below 8 but for a palette's, damaged chunks, ...) is TryOpen's null, and the picture goes to ImageSharp as before.
+// below 8 but for a palette's, damaged chunks, image data that another chunk interrupts, ...) is TryOpen's null, and the
+// picture goes to ImageSharp as before.
 //
 // The rows come from the stream in file order, the north first. A map's rows are the file's the other way round, so the
 // tiles are asked for from the top of the map down (ReadRows); a request for earlier rows starts the stream again.
@@ -117,7 +118,7 @@ internal sealed class PngRows<TPixel> : MapPicture<TPixel> where TPixel : unmana
     if (file.Length < 8 + 25 + 12 || !file.AsSpan(0, 8).SequenceEqual(Signature))
       return null;
     int width = 0, height = 0, depth = 0, colorType = -1, at = 8;
-    bool header = false, end = false;
+    bool header = false, end = false, dataEnded = false;
     byte[]? plte = null, trns = null;
     var idat = new List<(int At, int Length)>();
     var text = new List<PngTextData>();
@@ -129,6 +130,10 @@ internal sealed class PngRows<TPixel> : MapPicture<TPixel> where TPixel : unmana
       if (next > file.Length)
         return null;
       int data = at + 8, size = (int)length;
+      // The image data is the IDAT chunks that follow one another. ImageSharp reads that run and no other, so a picture with another chunk
+      // between two of them (an ancillary one, as PNG has it) is left to it: it makes of such a file what it always did.
+      if (type != Idat && idat.Count > 0)
+        dataEnded = true;
       switch (type)
       {
         case Ihdr:
@@ -155,7 +160,7 @@ internal sealed class PngRows<TPixel> : MapPicture<TPixel> where TPixel : unmana
           break;
         case Idat:
           // Checked here, as ImageSharp does, so a damaged file is found before a pixel of it is used (and left to ImageSharp).
-          if (!header || !CrcMatches(file, at, size))
+          if (!header || dataEnded || !CrcMatches(file, at, size))
             return null;
           idat.Add((data, size));
           break;
@@ -196,8 +201,12 @@ internal sealed class PngRows<TPixel> : MapPicture<TPixel> where TPixel : unmana
       if (depth is not (1 or 2 or 4 or 8) || typeof(TPixel) != typeof(Rgba32) || (trns != null && trns.Length > plte!.Length / 3) || plte!.Length / 3 > 1 << depth)
         return null;
       colours = new Rgba32[1 << depth];
-      for (int i = 0; i < plte!.Length / 3; i++)
+      int entries = plte!.Length / 3;
+      for (int i = 0; i < entries; i++)
         colours[i] = new Rgba32(plte[3 * i], plte[3 * i + 1], plte[3 * i + 2], trns != null && i < trns.Length ? trns[i] : (byte)255);
+      // An index past the palette's last colour is that colour (its alpha too), as ImageSharp has it.
+      for (int i = entries; i < colours.Length; i++)
+        colours[i] = colours[entries - 1];
       paletteBits = depth;
       convert = null;
     }

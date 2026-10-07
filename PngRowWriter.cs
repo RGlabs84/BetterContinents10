@@ -3,6 +3,7 @@
 using System;
 using System.IO;
 using System.IO.Compression;
+using System.Runtime.CompilerServices;
 
 namespace BetterContinents;
 
@@ -365,17 +366,10 @@ internal sealed class PngRowWriter : IDisposable
     return ~c;
   }
 
-  /// <summary>CRC-32 of a whole file (what zlib.crc32 gives for its bytes), read a megabyte at a time.</summary>
-  internal static uint FileCrc32(string path)
-  {
-    using var input = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, 1 << 20);
-    var buffer = new byte[1 << 20];
-    uint crc = 0;
-    int read;
-    while ((read = input.Read(buffer, 0, buffer.Length)) > 0)
-      crc = Crc32(crc, buffer, 0, read);
-    return crc;
-  }
+  /// <summary>CRC-32 of a whole file (what zlib.crc32 gives for its bytes), read a megabyte at a time (FineHeights.FileCrc, which this
+  /// calls). Not inlined: a test slows this step down to cancel an export in the middle of it (tools/export-tests/FineTest.cs).</summary>
+  [MethodImpl(MethodImplOptions.NoInlining)]
+  internal static uint FileCrc32(string path) => FineHeights.FileCrc(path);
 
   /// <summary>Adler-32 (the zlib one) of a byte range, continued from <paramref name="adler"/> (1 to start).</summary>
   internal static uint Adler32(uint adler, byte[] data, int offset, int count)

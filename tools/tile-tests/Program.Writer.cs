@@ -1,12 +1,13 @@
 // Added by Wubarrk on 2026-10-06 for 16k worlds (0.10.3).
 //
 // PngWriter (a map written back out as a PNG from its tiles, a row at a time): every colour type and depth reads back, in
-// ImageSharp and in PngRows, as the bytes it was given; and every map format written out from tiles gives the pixels of the
-// picture it was made from.
+// ImageSharp and in PngRows, as the bytes it was given; its zlib stream is a valid one, Adler-32 included (which neither of
+// those checks); and every map format written out from tiles gives the pixels of the picture it was made from.
 
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.IO.Compression;
 using System.Linq;
 using BetterContinents;
 using SixLabors.ImageSharp;
@@ -85,6 +86,84 @@ internal static partial class Program
     var flatPng = PngWriter.Write(1000, 1000, 6, 8, (y, raw) => { for (int i = 0; i < raw.Length; i++) raw[i] = (byte)(i % 4 == 3 ? 255 : 17); });
     var noisePng = PngWriter.Write(1000, 1000, 6, 8, (y, raw) => new System.Random(y).NextBytes(raw));
     C(flatPng.Length < 20000 && noisePng.Length > 50 * flatPng.Length, $"a flat picture is {flatPng.Length:N0} bytes, noise {noisePng.Length:N0}");
+
+    // Each row is filtered with the one of None, Sub and Up that leaves the smallest bytes: a smooth gradient is far smaller than ImageSharp's own with no filter at all.
+    using (var gradient = Picture(512, 512, 1, (r, x, y) => new L16((ushort)(x * 97 + y * 3))))
+    {
+      var unfiltered = Encode(gradient, PngColorType.Grayscale, PngBitDepth.Bit16, PngFilterMethod.None);
+      var filtered = PngWriter.Write(512, 512, 0, 16, (y, raw) =>
+      {
+        for (int x = 0; x < 512; x++)
+        {
+          raw[2 * x] = (byte)((x * 97 + y * 3) >> 8);
+          raw[2 * x + 1] = (byte)(x * 97 + y * 3);
+        }
+      });
+      C(filtered.Length < unfiltered.Length / 4, $"a smooth gradient is {filtered.Length:N0} bytes (the rows filtered), against {unfiltered.Length:N0} for ImageSharp's with no filter");
+    }
+
+    // The zlib stream is valid, to its last four bytes: the runtime's own zlib checks the Adler-32 there, ImageSharp and PngRows do not.
+    bool ZlibReads(byte[] png, long expected, out string why)
+    {
+      try
+      {
+        using var inflate = new ZLibStream(new MemoryStream(OddIdatData(png)), CompressionMode.Decompress);
+        var buffer = new byte[1 << 16];
+        long total = 0;
+        int n;
+        while ((n = inflate.Read(buffer, 0, buffer.Length)) > 0)
+          total += n;
+        why = total == expected ? "" : $"{total} bytes, not {expected}";
+        return total == expected;
+      }
+      catch (Exception e)
+      {
+        why = e.GetType().Name + ": " + e.Message;
+        return false;
+      }
+    }
+    using (var control = new Image<L8>(40, 40))
+    {
+      var controlPng = Encode(control, PngColorType.Grayscale, PngBitDepth.Bit8);
+      C(ZlibReads(controlPng, 40 * 41, out var controlWhy), $"the check itself: ImageSharp's own PNG passes it ({controlWhy})");
+      // The same picture with the last byte of its last IDAT (the Adler-32's) changed: the check refuses it.
+      int lastEnd = 0;
+      for (int at = 8; at + 12 <= controlPng.Length;)
+      {
+        int length = controlPng[at] << 24 | controlPng[at + 1] << 16 | controlPng[at + 2] << 8 | controlPng[at + 3];
+        if (controlPng[at + 4] == 'I' && controlPng[at + 5] == 'D' && controlPng[at + 6] == 'A' && controlPng[at + 7] == 'T')
+          lastEnd = at + 8 + length;
+        at += 12 + length;
+      }
+      controlPng[lastEnd - 1] ^= 0x55;
+      C(!ZlibReads(controlPng, 40 * 41, out _), "and refuses a stream whose Adler-32 is wrong");
+    }
+    int zlibRan = 0, zlibBad = 0;
+    string zlibFirst = null;
+    // Rows from 1 to 36,000 bytes (the Adler-32's sums are reduced every 5552 bytes), noise and a pattern, every colour type and both depths.
+    foreach (var (zWidth, zHeight, zType, zDepth) in new[] { (1, 1, 0, 8), (300, 70, 0, 16), (2049, 5, 6, 16), (5000, 3, 0, 8), (1500, 40, 2, 16), (9000, 2, 6, 8), (64, 300, 4, 16) })
+    {
+      int zChannels = zType switch { 0 => 1, 2 => 3, 4 => 2, _ => 4 };
+      int zBpp = zChannels * zDepth / 8, zRowBytes = zWidth * zBpp;
+      foreach (int pattern in new[] { 0, 1 })
+      {
+        var zPng = PngWriter.Write(zWidth, zHeight, zType, zDepth, (y, raw) =>
+        {
+          if (pattern == 0)
+            new System.Random(y * 7 + zWidth).NextBytes(raw);
+          else
+            for (int i = 0; i < raw.Length; i++)
+              raw[i] = (byte)(i / zBpp * 3 + y);
+        });
+        zlibRan++;
+        if (!ZlibReads(zPng, (long)zHeight * (zRowBytes + 1), out var zWhy))
+        {
+          zlibBad++;
+          zlibFirst ??= $"{zWidth} x {zHeight}, colour type {zType}, {zDepth} bits, pattern {pattern}: {zWhy}";
+        }
+      }
+    }
+    C(zlibBad == 0, $"{zlibRan} PngWriter pictures (rows of 1 to 36,000 bytes, noise and a pattern, every colour type, 8 and 16 bits) inflate to exactly their rows, Adler-32 included" + (zlibFirst == null ? "" : $"; {zlibBad} do not, first {zlibFirst}"));
 
     Section("PngWriter: every map format written out from its tiles gives the pixels it was made from");
     const int N = 150;

@@ -88,6 +88,13 @@ internal static partial class Program
     try
     {
       Bind();
+      // BCIMPORT_ONLY=1 with BCIMPORT_BIG=<size>: that measurement alone, without the checks before it (a quick way to measure a size).
+      if (Environment.GetEnvironmentVariable("BCIMPORT_ONLY") == "1" && int.TryParse(Environment.GetEnvironmentVariable("BCIMPORT_BIG"), out var only) && only > 0)
+      {
+        BigImport(only, Environment.GetEnvironmentVariable("BCIMPORT_ALL") == "1");
+        System.Console.WriteLine($"{checks} checks, {failures} failures");
+        return failures == 0 ? 0 : 1;
+      }
       Parsing();
       Names();
       var folder = Path.Combine(root, "Test World", "export-2026-09-24-12-00-00");
@@ -107,11 +114,12 @@ internal static partial class Program
       Amount81();
       LargeMaps();
       CompactModes();
+      CompactUnreadable();
       CompactValues();
       FineImport();
       FineWithEachValue();
       // Past the usual sizes: BCIMPORT_BIG=<size> makes an export folder of that size into a preset (the heightmap alone, or with
-      // every map when BCIMPORT_ALL=1), with its memory measured.
+      // every map when BCIMPORT_ALL=1, but the paint map when BCIMPORT_NOPAINT=1), with its memory measured.
       if (int.TryParse(Environment.GetEnvironmentVariable("BCIMPORT_BIG"), out var big) && big > 0)
         BigImport(big, Environment.GetEnvironmentVariable("BCIMPORT_ALL") == "1");
       // BCIMPORT_FOLDER=<an export folder>: its heightmap read back (a real 16384 px export from a dedicated server).

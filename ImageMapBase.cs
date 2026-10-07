@@ -70,29 +70,32 @@ internal abstract class ImageMapBase()
   }
 
   // A picture's width and height from its header, without reading the rest of the file: a PNG's own IHDR (always the first
-  // chunk) or, for any other kind of file, what ImageSharp makes of its start; null when neither says.
+  // chunk) or, for any other kind of file, what ImageSharp makes of its start; null when neither says, or when the file cannot be
+  // opened or read.
   internal static (int Width, int Height)? PictureSize(string path)
   {
-    using var stream = File.OpenRead(path);
-    var header = new byte[24];
-    int read = 0, n;
-    while (read < header.Length && (n = stream.Read(header, read, header.Length - read)) > 0)
-      read += n;
-    if (read == header.Length && header[0] == 137 && header[1] == 80 && header[2] == 78 && header[3] == 71 && header[12] == 'I' && header[13] == 'H' && header[14] == 'D' && header[15] == 'R')
-    {
-      long width = (uint)(header[16] << 24 | header[17] << 16 | header[18] << 8 | header[19]);
-      long height = (uint)(header[20] << 24 | header[21] << 16 | header[22] << 8 | header[23]);
-      return (width > int.MaxValue ? int.MaxValue : (int)width, height > int.MaxValue ? int.MaxValue : (int)height);
-    }
     try
     {
+      using var stream = File.OpenRead(path);
+      var header = new byte[24];
+      int read = 0, n;
+      while (read < header.Length && (n = stream.Read(header, read, header.Length - read)) > 0)
+        read += n;
+      if (read == header.Length && header[0] == 137 && header[1] == 80 && header[2] == 78 && header[3] == 71 && header[12] == 'I' && header[13] == 'H' && header[14] == 'D' && header[15] == 'R')
+      {
+        long width = (uint)(header[16] << 24 | header[17] << 16 | header[18] << 8 | header[19]);
+        long height = (uint)(header[20] << 24 | header[21] << 16 | header[22] << 8 | header[23]);
+        return (width > int.MaxValue ? int.MaxValue : (int)width, height > int.MaxValue ? int.MaxValue : (int)height);
+      }
       stream.Position = 0;
       var info = Image.Identify(Configuration.Default, stream);
       return info == null ? null : (info.Width, info.Height);
     }
     catch (Exception)
     {
-      // A format ImageSharp does not know, or a damaged start: the picture is read (and refused) the usual way.
+      // A file that cannot be opened or read (not allowed, held by another program, gone since it was found), a format ImageSharp does not
+      // know, or a damaged start: there is no size to go by, and the picture is read (and refused) the usual way, which says what is wrong
+      // (LoadSourceImage: "Cannot load image"; a new world's Compact Maps check skips the map).
       return null;
     }
   }

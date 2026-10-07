@@ -118,11 +118,8 @@ public static class WorldExportMath
   /// <summary>Metres in one grey step of heightmap.png: 200 * amount / 65535 (1.5 cm at amount 5, a quarter of a metre at 81).</summary>
   public static double GreyStepMetres(float amount) => HeightScale * (double)amount / 65535.0;
 
-  /// <summary>A length in metres the way the notes and the log say it: 1.25 m, 24.7 cm, 1.5 cm, 0.97 mm.</summary>
-  public static string LengthText(double metres) =>
-    metres >= 1.0 ? string.Format(CultureInfo.InvariantCulture, "{0:0.##} m", metres)
-    : metres >= 0.01 ? string.Format(CultureInfo.InvariantCulture, "{0:0.#} cm", metres * 100.0)
-    : string.Format(CultureInfo.InvariantCulture, "{0:0.##} mm", metres * 1000.0);
+  /// <summary>A length in metres the way the notes and the log say it: 1.25 m, 24.7 cm, 1.5 cm, 0.97 mm (FineHeights.Length, which this calls).</summary>
+  public static string LengthText(double metres) => FineHeights.Length(metres);
 
   /// <summary>What fine=auto goes by: a fine file is made where one grey step is more than 1.5 cm (Heightmap Amount above about 4.92).</summary>
   public const double FineAutoStepMetres = 0.015;
@@ -157,22 +154,13 @@ public static class WorldExportMath
   public static int FineUnits(double x) => (int)Math.Round(x * 256.0);
 
   /// <summary>How many bits the fine bytes use, from the OR of all of them: 8 less the trailing zero bits, 0 when every byte is 0
-  /// (the number a reader works out for itself).</summary>
-  public static int FineBitsUsed(int orOfBytes)
-  {
-    orOfBytes &= 255;
-    if (orOfBytes == 0)
-      return 0;
-    int zeros = 0;
-    while (((orOfBytes >> zeros) & 1) == 0)
-      zeros++;
-    return 8 - zeros;
-  }
+  /// (the number a reader works out for itself: FineHeights.BitsUsed, which this calls).</summary>
+  public static int FineBitsUsed(int orOfBytes) => FineHeights.BitsUsed(orOfBytes & 255);
 
   /// <summary>The text of the fine file's record, a PNG text chunk with the keyword BetterContinents: the format, the bits the
-  /// bytes use (for people), and the CRC-32 of the heightmap.png file the fine file was made for, 8 hex digits in upper case.</summary>
-  public static string FineRecordText(int bits, uint heightmapCrc) =>
-    string.Format(CultureInfo.InvariantCulture, "Fine Format = 1; Fine Bits = {0}; Heightmap CRC-32 = {1:X8}", bits, heightmapCrc);
+  /// bytes use (for people), and the CRC-32 of the heightmap.png file the fine file was made for, 8 hex digits in upper case
+  /// (FineHeights.RecordText, which this calls).</summary>
+  public static string FineRecordText(int bits, uint heightmapCrc) => FineHeights.RecordText(bits, heightmapCrc);
 
   /// <summary>8-bit channel for value v: round(clamp01(v) * 255). The game keeps its terrain mask in 8 bits
   /// (Heightmap.m_paintMask is an RGBA32 texture), so lava, moss and paint lose nothing at this depth.</summary>
@@ -267,15 +255,33 @@ public static class WorldExport
   /// <summary>The most a Heightmap Amount can be (the world's setting and an export's, SettingsSchema.MaxHeightmapAmount): at Sea
   /// Level 0.5 it spans -30 m to 16,170 m, a mountain 16 km tall.</summary>
   public const float MaxHeightmapAmount = SettingsSchema.MaxHeightmapAmount;
-  /// <summary>The largest export that makes its New World preset itself. The preset builder decodes the maps (about 26 bytes a
-  /// pixel at its peak: 1.5 GB at 8192 px, and 2 GB for the heightmap alone at 16384), so past this size the export leaves it to
-  /// bc_import, which the player runs where the memory is.</summary>
+  /// <summary>The largest export that makes its New World preset itself. The preset takes about 0.8 GB more memory to make at 8192 px and
+  /// 1.4 GB at 16384 (<see cref="PresetMemoryMb"/>), many times what the export itself uses (about 100 MB at any size), so past this
+  /// size the export leaves it to bc_import, which the player runs in the main menu, where no world is loaded.</summary>
   public const int PresetMaxSize = 8192;
 
-  /// <summary>About how many MB the preset builder holds at its peak for an export of this size: the heightmap and biome map
-  /// stay decoded while the others decode one at a time, some 26 bytes a pixel (440 MB at 4096 px, 1.5 GB at 8192 px with nine
-  /// maps, measured offline), 20 without the paint map.</summary>
-  public static double PresetMemoryMb(int size, bool paint) => (double)size * size / 1e6 * (paint ? 26 : 20) + 30;
+  // What bc_import's preset builder was measured to add to the memory of its process at its peak (PresetMemoryMb), for an export of every map. Up to
+  // BetterContinentsSettings.CompactAbove (8192) px across a world holds its maps as decoded pictures, about 12 bytes a pixel (10 without the paint
+  // map). A world with a map over that is made compact (Compact Maps, Auto) and holds them as compressed tiles: far less at 8193 px than the pictures
+  // at 8192 (445 MB, 820), and growing more slowly, about 5 bytes a pixel on top of 107 MB; the paint map adds nothing that shows to them.
+  private const double PresetPicturesMbPerMegapixel = 12.2, PresetPicturesWithoutPaintMbPerMegapixel = 10.3;
+  private const double PresetTilesMbPerMegapixel = 4.87, PresetTilesBaseMb = 107;
+  private const double PresetFloorMb = 20;
+
+  /// <summary>About how many MB bc_import's preset builder adds to the memory of its process, at its peak, for an export of this size, with
+  /// Compact Maps on Auto as it is by default. Measured offline in a process of its own for each run (tools/import-tests: BCIMPORT_ONLY=1
+  /// BCIMPORT_BIG=size BCIMPORT_ALL=1, and BCIMPORT_NOPAINT=1 for an export without the paint map), several runs of each size from 1024 to 16384 px:
+  /// up to 8192 px across 50 MB at 2048 px, 220 at 4096, 425 at 6144 and 820 at 8192 (690 without the paint map); over it 445 MB at 8193 px, 810 at
+  /// 12288 and 1,415 at 16384. Runs of one size differ by about a tenth, and this comes within a tenth of the figure for every size measured.
+  /// Never under 20 MB.</summary>
+  public static double PresetMemoryMb(int size, bool paint)
+  {
+    double megapixels = (double)size * size / 1e6;
+    double mb = size > BetterContinentsSettings.CompactAbove
+      ? PresetTilesBaseMb + PresetTilesMbPerMegapixel * megapixels
+      : (paint ? PresetPicturesMbPerMegapixel : PresetPicturesWithoutPaintMbPerMegapixel) * megapixels;
+    return Math.Max(PresetFloorMb, mb);
+  }
   public const string Format = "bc-export/1";
 
   /// <summary>Whether heightmap-fine.png is made beside heightmap.png: more bits of height for every pixel, below the 16 of the
@@ -2414,8 +2420,8 @@ public static class WorldExport
 
     // bc_import's builder, on this folder and these settings lines (export.cfg is written after it, and says how it went).
     // A preset that cannot be made never fails the export: every map is written by now.
-    // Whether the export builds the preset itself: asked for, and not so big that the builder's memory (every map decoded) is more
-    // than an export should take (WorldExport.PresetMaxSize).
+    // Whether the export builds the preset itself: asked for, and not so big that the builder's memory is many times more than an export
+    // should take (WorldExport.PresetMaxSize).
     private bool MakesPreset => O.Preset && Size <= PresetMaxSize;
 
     private IEnumerable PresetPass(List<string> config)
@@ -2426,7 +2432,7 @@ public static class WorldExport
           ? OnDedicatedServer()
             ? "a dedicated server has no New World screen: copy the folder to a game and run bc_import there"
             : "switched off for this export"
-          : $"at {Size} px the preset builder decodes every map and needs about {PresetMemoryMb(Size, O.Paint) / 1024:0.#} GB, more than an export takes by itself: bc_import makes it where the memory is";
+          : $"at {Size} px the preset takes about {PresetMemoryMb(Size, O.Paint) / 1024:0.#} GB more memory to make, many times what the export itself uses, so bc_import makes it in the main menu, where no world is loaded";
         PresetTooBig = O.Preset;
         yield break;
       }

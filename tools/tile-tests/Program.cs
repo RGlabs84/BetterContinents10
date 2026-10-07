@@ -97,6 +97,11 @@ internal static partial class Program
     {
       Codec();
       PngRowsTests();
+      PngRowsPaletteIndices();
+      PngRowsInterruptedData();
+      PngRowsColourKey();
+      PngRowsChunkChecksums();
+      MapsAreReadByRows();
       PngWriterTests();
       LargeSizes();
       MaxMapSizeSetting();
@@ -537,6 +542,28 @@ internal static partial class Program
         C(m.Compact == compact && differ == 0 && m.Biomes.SequenceEqual(old) && m.Serialize().SequenceEqual(old.Select(BiomeRegistry.ToByte)),
           $"{size} px picture, {Mode(compact)}: every sample, every pixel and the saved bytes as before ({differ} differ)");
       }
+    }
+    // A map of thousands of different colours (the nearest-colour cache's 4096 slots collide): every pixel is the biome of its nearest legend colour.
+    {
+      const int noiseSize = 160;
+      var noiseRandom = new System.Random(99);
+      var noise = new Rgba32[noiseSize * noiseSize];
+      for (int i = 0; i < noise.Length; i++)
+        noise[i] = new Rgba32((byte)noiseRandom.Next(256), (byte)noiseRandom.Next(256), (byte)noiseRandom.Next(256), 255);
+      var noiseLegend = "Meadows: 00FF00|BlackForest: 007F00|Swamp: 7F7F00|Mountain: FFFFFF|Plains: FFFF00|Ocean: 0000FF|Mistlands: 7F7F7F";
+      var noiseMap = ImageMapBiome.Create(Png(noiseSize, (x, y) => noise[y * noiseSize + x], PngColorType.Rgb, PngBitDepth.Bit8), noiseLegend, "noise.png");
+      var nearest = noiseMap.LegendColors.Select(kv => (Biome: kv.Key, Color: kv.Value)).Concat(noiseMap.UnresolvedLegend.Select(u => (Biome: Heightmap.Biome.None, u.Color))).ToList();
+      var noiseBiomes = noiseMap.Biomes;
+      int noiseWrong = 0;
+      for (int row = 0; row < noiseSize; row++)
+        for (int x = 0; x < noiseSize; x++)
+        {
+          var p = noise[(noiseSize - 1 - row) * noiseSize + x];
+          var c = new Color32(p.R, p.G, p.B, p.A);
+          if (noiseBiomes[row * noiseSize + x] != nearest.OrderBy(d => Distance(c, d.Color)).First().Biome)
+            noiseWrong++;
+        }
+      C(noiseWrong == 0, $"{noiseSize * noiseSize:N0} pixels of {noise.Select(p => (p.R, p.G, p.B)).Distinct().Count():N0} different colours: {noiseWrong} differ from the nearest legend colour's biome");
     }
     // A saved map: bytes that are no biome read as None and are saved back as 0; bytes past the square are kept.
     var saved = new byte[50 * 50 + 7];
