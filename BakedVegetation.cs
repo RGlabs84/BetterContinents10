@@ -64,6 +64,16 @@ internal static class BakedVegetation
 
     public bool Any => All || Bits != null;
 
+    /// <summary>The mask of these bits: none when no bit is set.</summary>
+    public static ZoneMask Of(byte[]? bits)
+    {
+      if (bits != null)
+        foreach (var b in bits)
+          if (b != 0)
+            return new ZoneMask(false, bits);
+      return None;
+    }
+
     /// <summary>Whether the cell holding the zone-local point (metres from the south-west corner) is covered.</summary>
     public bool Covers(double localX, double localZ)
     {
@@ -87,25 +97,17 @@ internal static class BakedVegetation
       if (old.Bits == null)
         return this;
       var grown = new byte[BakedFormat.MaskBytes];
-      bool any = false;
       for (int i = 0; i < grown.Length; i++)
-      {
         grown[i] = (byte)(Bits![i] & ~old.Bits[i]);
-        any |= grown[i] != 0;
-      }
-      return any ? new ZoneMask(false, grown) : None;
+      return Of(grown);
     }
 
     private static ZoneMask Complement(byte[] bits)
     {
       var rest = new byte[BakedFormat.MaskBytes];
-      bool any = false;
       for (int i = 0; i < rest.Length; i++)
-      {
         rest[i] = (byte)~bits[i];
-        any |= rest[i] != 0;
-      }
-      return any ? new ZoneMask(false, rest) : None;
+      return Of(rest);
     }
   }
 
@@ -116,7 +118,7 @@ internal static class BakedVegetation
       return ZoneMask.None;
     if (row.NoVegetation)
       return ZoneMask.Everywhere;
-    return row.ClearMask == null ? ZoneMask.None : new ZoneMask(false, row.ClearMask);
+    return ZoneMask.Of(row.ClearMask);
   }
 
   /// <summary>The file's mask joined with the cells within 4 m of the footprints of the in-game records around: what the zone grows no
@@ -158,7 +160,7 @@ internal static class BakedVegetation
     if (file.Bits != null)
       for (int i = 0; i < bits.Length; i++)
         bits[i] |= file.Bits[i];
-    return new ZoneMask(false, bits);
+    return ZoneMask.Of(bits);
   }
 
   /// <summary>Where an in-game record stands and how far its pieces reach: a circle in the world.</summary>

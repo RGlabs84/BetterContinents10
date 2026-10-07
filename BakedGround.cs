@@ -73,12 +73,16 @@ internal static class BakedGround
   // ---- the ground changes in a running world (build spec 8.3) ------------------------------------------------------------------------
 
   // The calls this makes into the game, as fields for the offline tests to stand in for.
-  internal static Func<IEnumerable<Heightmap>> LoadedTerrain = () => Heightmap.s_heightmaps.ToList();
+  // The zone terrain that is loaded, each with the zone it covers (the distant terrain is not in the list: PokeDistant has it).
+  internal static Func<IEnumerable<(ZoneKey Zone, Heightmap Terrain)>> LoadedTerrain = () =>
+    Heightmap.s_heightmaps.Where(hm => hm != null && !hm.IsDistantLod).Select(hm => (ZoneKey.OfPoint(hm.transform.position), hm)).ToList();
   internal static Action<Heightmap> PokeTerrain = hm =>
   {
     hm.m_buildData = null;
     hm.Poke(1);
   };
+  internal static Action PokeDistant = () => GameUtils.PokeDistantTerrain(Heightmap.Instances, hm => PokeTerrain(hm));
+  internal static Action ClearBuilds = GameUtils.ClearReadyBuilds;
   internal static Action<Vector3, float> ResetGrass = (centre, radius) => ClutterSystem.instance?.ResetGrass(centre, radius);
   internal static Action DeleteMinimapCache = () =>
   {
@@ -171,16 +175,16 @@ internal static class BakedGround
   private static void PokeLoaded(HashSet<ZoneKey> zones)
   {
     int poked = 0;
-    foreach (var hm in LoadedTerrain())
+    foreach (var (zone, terrain) in LoadedTerrain())
     {
-      if (hm == null || hm.IsDistantLod || !zones.Contains(ZoneKey.OfPoint(hm.transform.position)))
+      if (!zones.Contains(zone))
         continue;
-      PokeTerrain(hm);
+      PokeTerrain(terrain);
       poked++;
     }
     if (poked > 0)
-      GameUtils.PokeDistantTerrain(Heightmap.Instances, hm => PokeTerrain(hm));
-    GameUtils.ClearReadyBuilds();
+      PokeDistant();
+    ClearBuilds();
     var host = BetterContinents.instance;
     if (host)
       host.StartCoroutine(AfterTheFrame(zones));
@@ -189,7 +193,7 @@ internal static class BakedGround
   private static IEnumerator AfterTheFrame(HashSet<ZoneKey> zones)
   {
     yield return null;
-    GameUtils.ClearReadyBuilds();
+    ClearBuilds();
     foreach (var zone in zones)
       ResetGrass(zone.Centre, 46f);
   }

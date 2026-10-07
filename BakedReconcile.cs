@@ -264,6 +264,7 @@ internal static class BakedReconcile
   // The calls this makes into the game, as fields for the offline tests to stand in for.
   internal static Func<ZoneKey, bool> IsGenerated = zone => ZoneSystem.instance != null && ZoneSystem.instance.m_generatedZones.Contains(zone.ToVector2s());
   internal static Func<ZDOMan?> Objects = () => ZDOMan.instance;
+  internal static Func<ZDO, Quaternion> RotationOf = zdo => zdo.GetRotation();
   internal static Func<HashSet<int>> VegetationPrefabs = () =>
     ZoneSystem.instance == null ? [] : ZoneSystem.instance.m_vegetation.Where(v => v.m_prefab != null).Select(v => v.m_prefab.name.GetStableHashCode()).ToHashSet();
 
@@ -353,7 +354,7 @@ internal static class BakedReconcile
       return;
     var position = zdo.GetPosition();
     input.Pieces.Add(new WorldPiece(zdo.m_uid, zdo.GetInt(BakedKeys.Src, 0), unchecked((uint)id), ZoneKey.OfPoint(position), zdo.GetPrefab(), position,
-      zdo.GetRotation(), HoldsItems(zdo), zdo.GetInt(BakedKeys.Rev, -1)));
+      RotationOf(zdo), HoldsItems(zdo), zdo.GetInt(BakedKeys.Rev, -1)));
   }
 
   // ---- the execution ---------------------------------------------------------------------------------------------------------------------

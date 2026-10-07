@@ -110,7 +110,7 @@ internal static class BakedServer
         var record = data.Record(k);
         if (!record.HasId || standing.Contains(BakedFormat.LiveKey(record.SourceNumber, record.Id)))
           continue;
-        if (SeedPiece(context, data.Palette[k], palette, record, ghost, spawned))
+        if (MakePiece(context, data.Palette[k], palette, record, ghost, spawned))
           made++;
         else
           failed++;
@@ -145,12 +145,12 @@ internal static class BakedServer
 
   /// <summary>What seeding learns once about a palette entry in a zone's pass: the prefab it makes, where its anchor is, whether the prefab
   /// takes a scale.</summary>
-  internal sealed class Resolved(GameObject prefab, Candidate candidate, ZNetView view)
+  internal sealed class Resolved(GameObject prefab, Candidate candidate, bool syncsScale)
   {
     public readonly GameObject Prefab = prefab;
     public readonly Candidate Candidate = candidate;
-    public readonly ZNetView View = view;
-    public bool SyncsScale => View.m_syncInitialScale;
+    /// <summary>The prefab's ZNetView syncs a scale (m_syncInitialScale): the record's scale is made, not 1.</summary>
+    public readonly bool SyncsScale = syncsScale;
   }
 
   internal sealed class Context(BakedLayer layer)
@@ -177,7 +177,7 @@ internal static class BakedServer
         SayOnce(palette.Name, "nview", $"Baked pieces: {candidate.Name} has no ZNetView, so a Live record of it cannot be seeded.");
         continue;
       }
-      found = new Resolved(prefab, candidate, view);
+      found = new Resolved(prefab, candidate, view.m_syncInitialScale);
       break;
     }
     if (found == null)
@@ -218,6 +218,9 @@ internal static class BakedServer
     return new Placement(Pivot(record.Position, rotation, scale, resolved.Candidate.Anchor), rotation, scale, scaled);
   }
 
+  /// <summary>Makes one piece (SeedPiece; a field, for the offline tests, which have no prefabs to make).</summary>
+  internal static Func<Context, int, PaletteEntry, ZoneRecord, bool, List<GameObject>?, bool> MakePiece = SeedPiece;
+
   /// <summary>Makes one piece. True when it stands finished. A failure is logged, the piece (if any was made) taken out, and false returned.</summary>
   internal static bool SeedPiece(Context context, int index, PaletteEntry palette, ZoneRecord record, bool ghost, List<GameObject>? spawned)
   {
@@ -246,7 +249,8 @@ internal static class BakedServer
           collider.enabled = true;
         }
       }
-      WriteKeys(context.Layer, palette, record, zdo, resolved.Prefab);
+      WriteKeys(context.Layer, palette, record, zdo);
+      WriteLook(palette, record, zdo, resolved.Prefab);
       if (palette.Protected)
         BakedProtect.Apply(go);
       BakedApi.RaiseLiveSeeded(zdo, go, record.SourceNumber, record.Id);
@@ -269,7 +273,7 @@ internal static class BakedServer
   }
 
   // Every key a seeded piece has, in the order the build spec lists them.
-  private static void WriteKeys(BakedLayer layer, PaletteEntry palette, ZoneRecord record, ZDO zdo, GameObject prefab)
+  internal static void WriteKeys(BakedLayer layer, PaletteEntry palette, ZoneRecord record, ZDO zdo)
   {
     foreach (var tag in palette.Tags)
       WriteTag(zdo, tag);
@@ -278,7 +282,6 @@ internal static class BakedServer
     zdo.Set(BakedKeys.Rev, unchecked((int)layer.Revision));
     if (palette.Protected)
       zdo.Set(BakedKeys.Protect, true);
-    WriteLook(palette, record, zdo, prefab);
     if (record.HasSource && layer.Registry.TryGet(record.SourceNumber, out var operation) && operation.IsBake && record.ValueSet < operation.ValueSets.Length)
       foreach (var value in operation.ValueSets[record.ValueSet].Values)
         WriteValue(zdo, value);
