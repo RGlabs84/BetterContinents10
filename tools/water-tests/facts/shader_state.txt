@@ -1,0 +1,201 @@
+# Added by Wubarrk on 2026-10-07 for BC's own water (0.10.4): output of shader_state.py against Valheim 1.0.17's SoftRef bundle eb7a4308 (Custom/Water).
+=== Custom/Water (path_id -1220688799747046602), fallback 'Diffuse', custom editor ''
+--- properties
+  _ColorTop                    Color    flags 0 default [1.0, 1.0, 1.0, 1.0] tex '' attrs [] desc 'Color top'
+  _ColorBottom                 Color    flags 0 default [1.0, 1.0, 1.0, 1.0] tex '' attrs [] desc 'Color bottom deep'
+  _ColorBottomShallow          Color    flags 0 default [1.0, 1.0, 1.0, 1.0] tex '' attrs [] desc 'Color bottom shallow'
+  _Glossiness                  Range    flags 0 default [0.5, 0.0, 1.0, 0.0] tex '' attrs [] desc 'Smoothness'
+  _Metallic                    Range    flags 0 default [0.0, 0.0, 1.0, 0.0] tex '' attrs [] desc 'Metallic'
+  _FoamTex                     Texture  flags 0 default [0.0, 0.0, 0.0, 0.0] tex 'white' attrs [] desc 'Foam'
+  _FoamHighTex                 Texture  flags 0 default [0.0, 0.0, 0.0, 0.0] tex 'white' attrs [] desc 'Foam high'
+  _RandomFoamTex               Texture  flags 0 default [0.0, 0.0, 0.0, 0.0] tex 'white' attrs [] desc 'Random Foam'
+  _Normal                      Texture  flags 0 default [0.0, 0.0, 0.0, 0.0] tex 'bump' attrs [] desc 'Normalmap'
+  _NormalFine                  Texture  flags 0 default [0.0, 0.0, 0.0, 0.0] tex 'bump' attrs [] desc 'NormalFine'
+  _NormalPower                 Range    flags 0 default [1.0, 0.0, 5.0, 0.0] tex '' attrs [] desc 'NormalPower'
+  _NormalScale                 Float    flags 0 default [1.0, 0.0, 0.0, 0.0] tex '' attrs [] desc 'NormalScale'
+  _WaveVel                     Float    flags 0 default [1.0, 0.0, 0.0, 0.0] tex '' attrs [] desc 'WaveVel'
+  _DepthFade                   Float    flags 0 default [1.0, 0.0, 0.0, 0.0] tex '' attrs [] desc 'DepthFade'
+  _ShoreFade                   Float    flags 0 default [1.0, 0.0, 0.0, 0.0] tex '' attrs [] desc 'ShoreFade'
+  _FoamDepth                   Float    flags 0 default [0.05, 0.0, 0.0, 0.0] tex '' attrs [] desc 'FoamDepth'
+  _FoamColor                   Color    flags 0 default [1.0, 1.0, 1.0, 1.0] tex '' attrs [] desc 'FoamColor'
+  _RefractionScale             Float    flags 0 default [1.0, 0.0, 0.0, 0.0] tex '' attrs [] desc 'Refraction Scale'
+  _RefractionMax               Float    flags 0 default [0.01, 0.0, 0.0, 0.0] tex '' attrs [] desc 'Refraction Max'
+  _SurfaceColor                Color    flags 0 default [1.0, 1.0, 1.0, 1.0] tex '' attrs [] desc 'SurfaceColor'
+  _Tess                        Range    flags 0 default [4.0, 1.0, 32.0, 0.0] tex '' attrs [] desc 'Tessellation'
+  _IsLod                       Float    flags 0 default [0.0, 0.0, 0.0, 0.0] tex '' attrs ['MaterialToggle'] desc 'Is lod'
+  _VisibleMaxDistance          Float    flags 0 default [0.0, 0.0, 0.0, 0.0] tex '' attrs [] desc 'Lod distance'
+  _WaterEdge                   Float    flags 0 default [9100.0, 0.0, 0.0, 0.0] tex '' attrs [] desc 'World water edge'
+  _CurlTex                     Texture  flags 0 default [0.0, 0.0, 0.0, 0.0] tex 'white{}' attrs ['Header(Ashlands Settings)', 'Space(10)'] desc 'Curl Noise'
+  _BubbleTexture               Texture  flags 0 default [0.0, 0.0, 0.0, 0.0] tex 'white' attrs [] desc 'Bubble Texture'
+  _AshlandsDistance            Float    flags 0 default [12000.0, 0.0, 0.0, 0.0] tex '' attrs [] desc 'Distance'
+  _AshlandsYOffset             Float    flags 0 default [4000.0, 0.0, 0.0, 0.0] tex '' attrs [] desc 'Y Offset'
+  _AshlandsSurfaceColor        Color    flags 0 default [1.0, 1.0, 1.0, 1.0] tex '' attrs [] desc 'Surface Color'
+  _AshlandsFoamColor           Color    flags 0 default [1.0, 1.0, 1.0, 1.0] tex '' attrs [] desc 'Foam Color'
+  _AshlandsColorTop            Color    flags 0 default [1.0, 1.0, 1.0, 1.0] tex '' attrs [] desc 'Color top'
+  _AshlandsColorBottom         Color    flags 0 default [1.0, 1.0, 1.0, 1.0] tex '' attrs [] desc 'Color bottom deep'
+  _AshlandsColorBottomShallow  Color    flags 0 default [1.0, 1.0, 1.0, 1.0] tex '' attrs [] desc 'Color bottom shallow'
+--- keywords ['STEREO_INSTANCING_ON', 'UNITY_SINGLE_PASS_STEREO', 'STEREO_MULTIVIEW_ON', 'STEREO_CUBEMAP_RENDER_ON', 'TESSELATION_ON', 'DIRECTIONAL', 'LIGHTPROBE_SH', 'SHADOWS_SCREEN', 'LIGHTMAP_SHADOW_MIXING', 'VERTEXLIGHT_ON', 'POINT', 'SPOT', 'POINT_COOKIE', 'DIRECTIONAL_COOKIE', 'UNITY_HDR_ON', 'FOG_LINEAR', 'FOG_EXP', 'FOG_EXP2', 'INSTANCING_ON', 'SHADOWS_SHADOWMASK', 'DYNAMICLIGHTMAP_ON', 'LIGHTMAP_ON', 'DIRLIGHTMAP_COMBINED', 'SHADOWS_DEPTH', 'SHADOWS_CUBE', 'EDITOR_VISUALIZATION']
+--- SubShader 0: LOD 250, tags {'QUEUE': 'Transparent-100', 'RenderType': 'Transparent'}
+  Pass 0: type Grab, name '', useName '', grab texture '_BackgroundTex', tags {}, LOD 0
+  Pass 1: type Normal, name 'FORWARD', useName '', grab texture '', tags {'LIGHTMODE': 'FORWARDBASE', 'QUEUE': 'Transparent-100', 'RenderType': 'Transparent', 'SHADOWSUPPORT': 'true'}, LOD 250
+     ZTest LEqual ; ZWrite 1; Cull Back ; ZClip 1
+     Blend src SrcAlpha dst OneMinusSrcAlpha; alpha src SrcAlpha dst OneMinusSrcAlpha; op Add / Add; ColorMask 0; separate False; AlphaToMask 0
+     Offset 0, 10; Stencil ref 2 read 255 write 255
+       stencilOp: pass Keep fail Keep zfail Keep comp NotEqual
+       stencilOpFront: pass Keep fail Keep zfail Keep comp Always
+       stencilOpBack: pass Keep fail Keep zfail Keep comp Always
+     Fog mode -1, lighting False
+     platforms None
+       progVertex: 0 sub-programs, player sub-programs 32
+         platform block 3: 32 programs; types [7, 25]; keyword sets [('DIRECTIONAL',), ('DIRECTIONAL', 'LIGHTPROBE_SH'), ('DIRECTIONAL', 'LIGHTPROBE_SH', 'SHADOWS_SCREEN'), ('DIRECTIONAL', 'LIGHTPROBE_SH', 'SHADOWS_SCREEN', 'TESSELATION_ON'), ('DIRECTIONAL', 'LIGHTPROBE_SH', 'SHADOWS_SCREEN', 'TESSELATION_ON', 'VERTEXLIGHT_ON'), ('DIRECTIONAL', 'LIGHTPROBE_SH', 'SHADOWS_SCREEN', 'VERTEXLIGHT_ON'), ('DIRECTIONAL', 'LIGHTPROBE_SH', 'TESSELATION_ON'), ('DIRECTIONAL', 'LIGHTPROBE_SH', 'TESSELATION_ON', 'VERTEXLIGHT_ON'), ('DIRECTIONAL', 'LIGHTPROBE_SH', 'VERTEXLIGHT_ON'), ('DIRECTIONAL', 'SHADOWS_SCREEN'), ('DIRECTIONAL', 'SHADOWS_SCREEN', 'TESSELATION_ON'), ('DIRECTIONAL', 'SHADOWS_SCREEN', 'TESSELATION_ON', 'VERTEXLIGHT_ON'), ('DIRECTIONAL', 'SHADOWS_SCREEN', 'VERTEXLIGHT_ON'), ('DIRECTIONAL', 'TESSELATION_ON'), ('DIRECTIONAL', 'TESSELATION_ON', 'VERTEXLIGHT_ON'), ('DIRECTIONAL', 'VERTEXLIGHT_ON')]
+       progFragment: 0 sub-programs, player sub-programs 0
+       progHull: 0 sub-programs, player sub-programs 0
+       progDomain: 0 sub-programs, player sub-programs 0
+       progGeometry: 0 sub-programs, player sub-programs 0
+     name indices: []
+  Pass 2: type Normal, name 'FORWARD', useName '', grab texture '', tags {'LIGHTMODE': 'FORWARDADD', 'QUEUE': 'Transparent-100', 'RenderType': 'Transparent'}, LOD 250
+     ZTest LEqual ; ZWrite 0; Cull Back ; ZClip 1
+     Blend src One dst One; alpha src One dst One; op Add / Add; ColorMask 0; separate False; AlphaToMask 0
+     Offset 0, 10; Stencil ref 2 read 255 write 255
+       stencilOp: pass Keep fail Keep zfail Keep comp NotEqual
+       stencilOpFront: pass Keep fail Keep zfail Keep comp Always
+       stencilOpBack: pass Keep fail Keep zfail Keep comp Always
+     Fog mode -1, lighting False
+     platforms None
+       progVertex: 0 sub-programs, player sub-programs 20
+         platform block 3: 20 programs; types [7, 25]; keyword sets [('DIRECTIONAL',), ('DIRECTIONAL', 'TESSELATION_ON'), ('DIRECTIONAL_COOKIE',), ('DIRECTIONAL_COOKIE', 'TESSELATION_ON'), ('POINT',), ('POINT', 'TESSELATION_ON'), ('POINT_COOKIE',), ('POINT_COOKIE', 'TESSELATION_ON'), ('SPOT',), ('SPOT', 'TESSELATION_ON')]
+       progFragment: 0 sub-programs, player sub-programs 0
+       progHull: 0 sub-programs, player sub-programs 0
+       progDomain: 0 sub-programs, player sub-programs 0
+       progGeometry: 0 sub-programs, player sub-programs 0
+     name indices: []
+  Pass 3: type Normal, name 'DEFERRED', useName '', grab texture '', tags {'LIGHTMODE': 'DEFERRED', 'QUEUE': 'Transparent-100', 'RenderType': 'Transparent'}, LOD 250
+     ZTest LEqual ; ZWrite 1; Cull Back ; ZClip 1
+     Blend src SrcAlpha dst OneMinusSrcAlpha; alpha src SrcAlpha dst OneMinusSrcAlpha; op Add / Add; ColorMask 0; separate False; AlphaToMask 0
+     Offset 0, 10; Stencil ref 2 read 255 write 255
+       stencilOp: pass Keep fail Keep zfail Keep comp NotEqual
+       stencilOpFront: pass Keep fail Keep zfail Keep comp Always
+       stencilOpBack: pass Keep fail Keep zfail Keep comp Always
+     Fog mode -1, lighting False
+     platforms None
+       progVertex: 0 sub-programs, player sub-programs 16
+         platform block 3: 16 programs; types [7, 25]; keyword sets [(), ('LIGHTPROBE_SH',), ('LIGHTPROBE_SH', 'TESSELATION_ON'), ('LIGHTPROBE_SH', 'TESSELATION_ON', 'UNITY_HDR_ON'), ('LIGHTPROBE_SH', 'UNITY_HDR_ON'), ('TESSELATION_ON',), ('TESSELATION_ON', 'UNITY_HDR_ON'), ('UNITY_HDR_ON',)]
+       progFragment: 0 sub-programs, player sub-programs 0
+       progHull: 0 sub-programs, player sub-programs 0
+       progDomain: 0 sub-programs, player sub-programs 0
+       progGeometry: 0 sub-programs, player sub-programs 0
+     name indices: []
+  Pass 4: type Normal, name 'FORWARD', useName '', grab texture '', tags {'LIGHTMODE': 'FORWARDBASE', 'QUEUE': 'Transparent-100', 'RenderType': 'Transparent'}, LOD 250
+     ZTest LEqual ; ZWrite 0; Cull Back ; ZClip 1
+     Blend src SrcAlpha dst OneMinusSrcAlpha; alpha src SrcAlpha dst OneMinusSrcAlpha; op Add / Add; ColorMask 14; separate False; AlphaToMask 0
+     Offset 0, 10; Stencil ref 2 read 255 write 255
+       stencilOp: pass Keep fail Keep zfail Keep comp NotEqual
+       stencilOpFront: pass Keep fail Keep zfail Keep comp Always
+       stencilOpBack: pass Keep fail Keep zfail Keep comp Always
+     Fog mode -1, lighting False
+     platforms None
+       progVertex: 0 sub-programs, player sub-programs 12
+         platform block 3: 12 programs; types [7, 25]; keyword sets [('DIRECTIONAL',), ('DIRECTIONAL', 'LIGHTPROBE_SH'), ('DIRECTIONAL', 'LIGHTPROBE_SH', 'TESSELATION_ON'), ('DIRECTIONAL', 'LIGHTPROBE_SH', 'TESSELATION_ON', 'VERTEXLIGHT_ON'), ('DIRECTIONAL', 'LIGHTPROBE_SH', 'VERTEXLIGHT_ON'), ('DIRECTIONAL', 'TESSELATION_ON')]
+       progFragment: 0 sub-programs, player sub-programs 0
+       progHull: 0 sub-programs, player sub-programs 0
+       progDomain: 0 sub-programs, player sub-programs 0
+       progGeometry: 0 sub-programs, player sub-programs 0
+     name indices: []
+  Pass 5: type Normal, name 'FORWARD', useName '', grab texture '', tags {'LIGHTMODE': 'FORWARDADD', 'QUEUE': 'Transparent-100', 'RenderType': 'Transparent'}, LOD 250
+     ZTest LEqual ; ZWrite 0; Cull Back ; ZClip 1
+     Blend src SrcAlpha dst One; alpha src SrcAlpha dst One; op Add / Add; ColorMask 14; separate False; AlphaToMask 0
+     Offset 0, 10; Stencil ref 2 read 255 write 255
+       stencilOp: pass Keep fail Keep zfail Keep comp NotEqual
+       stencilOpFront: pass Keep fail Keep zfail Keep comp Always
+       stencilOpBack: pass Keep fail Keep zfail Keep comp Always
+     Fog mode -1, lighting False
+     platforms None
+       progVertex: 0 sub-programs, player sub-programs 20
+         platform block 3: 20 programs; types [7, 25]; keyword sets [('DIRECTIONAL',), ('DIRECTIONAL', 'TESSELATION_ON'), ('DIRECTIONAL_COOKIE',), ('DIRECTIONAL_COOKIE', 'TESSELATION_ON'), ('POINT',), ('POINT', 'TESSELATION_ON'), ('POINT_COOKIE',), ('POINT_COOKIE', 'TESSELATION_ON'), ('SPOT',), ('SPOT', 'TESSELATION_ON')]
+       progFragment: 0 sub-programs, player sub-programs 0
+       progHull: 0 sub-programs, player sub-programs 0
+       progDomain: 0 sub-programs, player sub-programs 0
+       progGeometry: 0 sub-programs, player sub-programs 0
+     name indices: []
+--- SubShader 1: LOD 200, tags {'QUEUE': 'Transparent-100', 'RenderType': 'Transparent'}
+  Pass 0: type Grab, name '', useName '', grab texture '_BackgroundTex', tags {}, LOD 0
+  Pass 1: type Normal, name 'FORWARD', useName '', grab texture '', tags {'LIGHTMODE': 'FORWARDBASE', 'QUEUE': 'Transparent-100', 'RenderType': 'Transparent', 'SHADOWSUPPORT': 'true'}, LOD 200
+     ZTest LEqual ; ZWrite 1; Cull Back ; ZClip 1
+     Blend src SrcAlpha dst OneMinusSrcAlpha; alpha src SrcAlpha dst OneMinusSrcAlpha; op Add / Add; ColorMask 0; separate False; AlphaToMask 0
+     Offset 0, 10; Stencil ref 2 read 255 write 255
+       stencilOp: pass Keep fail Keep zfail Keep comp NotEqual
+       stencilOpFront: pass Keep fail Keep zfail Keep comp Always
+       stencilOpBack: pass Keep fail Keep zfail Keep comp Always
+     Fog mode -1, lighting False
+     platforms None
+       progVertex: 0 sub-programs, player sub-programs 32
+         platform block 3: 32 programs; types [6, 25]; keyword sets [('DIRECTIONAL',), ('DIRECTIONAL', 'LIGHTPROBE_SH'), ('DIRECTIONAL', 'LIGHTPROBE_SH', 'SHADOWS_SCREEN'), ('DIRECTIONAL', 'LIGHTPROBE_SH', 'SHADOWS_SCREEN', 'TESSELATION_ON'), ('DIRECTIONAL', 'LIGHTPROBE_SH', 'SHADOWS_SCREEN', 'TESSELATION_ON', 'VERTEXLIGHT_ON'), ('DIRECTIONAL', 'LIGHTPROBE_SH', 'SHADOWS_SCREEN', 'VERTEXLIGHT_ON'), ('DIRECTIONAL', 'LIGHTPROBE_SH', 'TESSELATION_ON'), ('DIRECTIONAL', 'LIGHTPROBE_SH', 'TESSELATION_ON', 'VERTEXLIGHT_ON'), ('DIRECTIONAL', 'LIGHTPROBE_SH', 'VERTEXLIGHT_ON'), ('DIRECTIONAL', 'SHADOWS_SCREEN'), ('DIRECTIONAL', 'SHADOWS_SCREEN', 'TESSELATION_ON'), ('DIRECTIONAL', 'SHADOWS_SCREEN', 'TESSELATION_ON', 'VERTEXLIGHT_ON'), ('DIRECTIONAL', 'SHADOWS_SCREEN', 'VERTEXLIGHT_ON'), ('DIRECTIONAL', 'TESSELATION_ON'), ('DIRECTIONAL', 'TESSELATION_ON', 'VERTEXLIGHT_ON'), ('DIRECTIONAL', 'VERTEXLIGHT_ON')]
+       progFragment: 0 sub-programs, player sub-programs 0
+       progHull: 0 sub-programs, player sub-programs 0
+       progDomain: 0 sub-programs, player sub-programs 0
+       progGeometry: 0 sub-programs, player sub-programs 0
+     name indices: []
+  Pass 2: type Normal, name 'FORWARD', useName '', grab texture '', tags {'LIGHTMODE': 'FORWARDADD', 'QUEUE': 'Transparent-100', 'RenderType': 'Transparent'}, LOD 200
+     ZTest LEqual ; ZWrite 0; Cull Back ; ZClip 1
+     Blend src One dst One; alpha src One dst One; op Add / Add; ColorMask 0; separate False; AlphaToMask 0
+     Offset 0, 10; Stencil ref 2 read 255 write 255
+       stencilOp: pass Keep fail Keep zfail Keep comp NotEqual
+       stencilOpFront: pass Keep fail Keep zfail Keep comp Always
+       stencilOpBack: pass Keep fail Keep zfail Keep comp Always
+     Fog mode -1, lighting False
+     platforms None
+       progVertex: 0 sub-programs, player sub-programs 20
+         platform block 3: 20 programs; types [6, 25]; keyword sets [('DIRECTIONAL',), ('DIRECTIONAL', 'TESSELATION_ON'), ('DIRECTIONAL_COOKIE',), ('DIRECTIONAL_COOKIE', 'TESSELATION_ON'), ('POINT',), ('POINT', 'TESSELATION_ON'), ('POINT_COOKIE',), ('POINT_COOKIE', 'TESSELATION_ON'), ('SPOT',), ('SPOT', 'TESSELATION_ON')]
+       progFragment: 0 sub-programs, player sub-programs 0
+       progHull: 0 sub-programs, player sub-programs 0
+       progDomain: 0 sub-programs, player sub-programs 0
+       progGeometry: 0 sub-programs, player sub-programs 0
+     name indices: []
+  Pass 3: type Normal, name 'DEFERRED', useName '', grab texture '', tags {'LIGHTMODE': 'DEFERRED', 'QUEUE': 'Transparent-100', 'RenderType': 'Transparent'}, LOD 200
+     ZTest LEqual ; ZWrite 1; Cull Back ; ZClip 1
+     Blend src SrcAlpha dst OneMinusSrcAlpha; alpha src SrcAlpha dst OneMinusSrcAlpha; op Add / Add; ColorMask 0; separate False; AlphaToMask 0
+     Offset 0, 10; Stencil ref 2 read 255 write 255
+       stencilOp: pass Keep fail Keep zfail Keep comp NotEqual
+       stencilOpFront: pass Keep fail Keep zfail Keep comp Always
+       stencilOpBack: pass Keep fail Keep zfail Keep comp Always
+     Fog mode -1, lighting False
+     platforms None
+       progVertex: 0 sub-programs, player sub-programs 16
+         platform block 3: 16 programs; types [6, 25]; keyword sets [(), ('LIGHTPROBE_SH',), ('LIGHTPROBE_SH', 'TESSELATION_ON'), ('LIGHTPROBE_SH', 'TESSELATION_ON', 'UNITY_HDR_ON'), ('LIGHTPROBE_SH', 'UNITY_HDR_ON'), ('TESSELATION_ON',), ('TESSELATION_ON', 'UNITY_HDR_ON'), ('UNITY_HDR_ON',)]
+       progFragment: 0 sub-programs, player sub-programs 0
+       progHull: 0 sub-programs, player sub-programs 0
+       progDomain: 0 sub-programs, player sub-programs 0
+       progGeometry: 0 sub-programs, player sub-programs 0
+     name indices: []
+  Pass 4: type Normal, name 'FORWARD', useName '', grab texture '', tags {'LIGHTMODE': 'FORWARDBASE', 'QUEUE': 'Transparent-100', 'RenderType': 'Transparent'}, LOD 200
+     ZTest LEqual ; ZWrite 0; Cull Back ; ZClip 1
+     Blend src SrcAlpha dst OneMinusSrcAlpha; alpha src SrcAlpha dst OneMinusSrcAlpha; op Add / Add; ColorMask 14; separate False; AlphaToMask 0
+     Offset 0, 10; Stencil ref 2 read 255 write 255
+       stencilOp: pass Keep fail Keep zfail Keep comp NotEqual
+       stencilOpFront: pass Keep fail Keep zfail Keep comp Always
+       stencilOpBack: pass Keep fail Keep zfail Keep comp Always
+     Fog mode -1, lighting False
+     platforms None
+       progVertex: 0 sub-programs, player sub-programs 12
+         platform block 3: 12 programs; types [6, 25]; keyword sets [('DIRECTIONAL',), ('DIRECTIONAL', 'LIGHTPROBE_SH'), ('DIRECTIONAL', 'LIGHTPROBE_SH', 'TESSELATION_ON'), ('DIRECTIONAL', 'LIGHTPROBE_SH', 'TESSELATION_ON', 'VERTEXLIGHT_ON'), ('DIRECTIONAL', 'LIGHTPROBE_SH', 'VERTEXLIGHT_ON'), ('DIRECTIONAL', 'TESSELATION_ON')]
+       progFragment: 0 sub-programs, player sub-programs 0
+       progHull: 0 sub-programs, player sub-programs 0
+       progDomain: 0 sub-programs, player sub-programs 0
+       progGeometry: 0 sub-programs, player sub-programs 0
+     name indices: []
+  Pass 5: type Normal, name 'FORWARD', useName '', grab texture '', tags {'LIGHTMODE': 'FORWARDADD', 'QUEUE': 'Transparent-100', 'RenderType': 'Transparent'}, LOD 200
+     ZTest LEqual ; ZWrite 0; Cull Back ; ZClip 1
+     Blend src SrcAlpha dst One; alpha src SrcAlpha dst One; op Add / Add; ColorMask 14; separate False; AlphaToMask 0
+     Offset 0, 10; Stencil ref 2 read 255 write 255
+       stencilOp: pass Keep fail Keep zfail Keep comp NotEqual
+       stencilOpFront: pass Keep fail Keep zfail Keep comp Always
+       stencilOpBack: pass Keep fail Keep zfail Keep comp Always
+     Fog mode -1, lighting False
+     platforms None
+       progVertex: 0 sub-programs, player sub-programs 20
+         platform block 3: 20 programs; types [6, 25]; keyword sets [('DIRECTIONAL',), ('DIRECTIONAL', 'TESSELATION_ON'), ('DIRECTIONAL_COOKIE',), ('DIRECTIONAL_COOKIE', 'TESSELATION_ON'), ('POINT',), ('POINT', 'TESSELATION_ON'), ('POINT_COOKIE',), ('POINT_COOKIE', 'TESSELATION_ON'), ('SPOT',), ('SPOT', 'TESSELATION_ON')]
+       progFragment: 0 sub-programs, player sub-programs 0
+       progHull: 0 sub-programs, player sub-programs 0
+       progDomain: 0 sub-programs, player sub-programs 0
+       progGeometry: 0 sub-programs, player sub-programs 0
+     name indices: []
