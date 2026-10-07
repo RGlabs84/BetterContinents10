@@ -57,6 +57,8 @@ internal sealed class AdoptedPiece
   public PieceCopy Place { get; set; } = new();
   // Its id within the operation, which is also the Live record's.
   public uint Id { get; set; }
+  // The bake that owns the Live record: this operation's number for a bake; the record's own source for a piece an unbake releases.
+  public int Source { get; set; }
 }
 
 // Everything an operation needs to be undone, or finished after a stop.
@@ -205,6 +207,7 @@ internal static class BakeJournalFile
     {
       WritePiece(w, a.Place);
       w.Write(a.Id);
+      w.Write(a.Source);
     }
     w.Flush();
     var bytes = stream.ToArray();
@@ -291,7 +294,7 @@ internal static class BakeJournalFile
         data.Created.Add(ReadPiece(r));
       int adopted = Count(r);
       for (int i = 0; i < adopted; i++)
-        data.Adopted.Add(new AdoptedPiece { Place = ReadPiece(r), Id = r.ReadUInt32() });
+        data.Adopted.Add(new AdoptedPiece { Place = ReadPiece(r), Id = r.ReadUInt32(), Source = r.ReadInt32() });
       if (r.BaseStream.Position != r.BaseStream.Length)
         throw new BakeJournalException("the journal has bytes left over after its last section");
       return data;

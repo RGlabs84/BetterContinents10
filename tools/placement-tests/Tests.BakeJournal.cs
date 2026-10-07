@@ -73,7 +73,7 @@ internal static partial class Tests
     data.Records.Add(BakeCapture.MakeRecord(tilted, BakeFacts("tilted", true), BakedRole.Static, data.Number, 0, pool));
     // A town piece.
     var door = BakePiece(11, 5f, 5f, "wood_door");
-    data.Adopted.Add(new AdoptedPiece { Place = door, Id = 1 });
+    data.Adopted.Add(new AdoptedPiece { Place = door, Id = 1, Source = data.Number });
     data.Records.Add(BakeCapture.MakeRecord(door, BakeFacts("wood_door"), BakedRole.Live, data.Number, 1, pool));
     // Records of other sources, as an unbake would take them out: a compiler's, and one of bake 3 with a set of its own.
     var other = BakeCapture.MakeRecord(BakePiece(12, 9f, 9f, "darkwood_roof"), BakeFacts("darkwood_roof"), BakedRole.Static, 3, 0, new BakeValueSetPool());
@@ -135,8 +135,8 @@ internal static partial class Tests
       return "the number of adopted pieces";
     for (int i = 0; i < a.Adopted.Count; i++)
     {
-      if (a.Adopted[i].Id != b.Adopted[i].Id)
-        return $"adopted piece {i}'s id";
+      if (a.Adopted[i].Id != b.Adopted[i].Id || a.Adopted[i].Source != b.Adopted[i].Source)
+        return $"adopted piece {i}'s id or source";
       d = Pieces([a.Adopted[i].Place], [b.Adopted[i].Place], "adopted place");
       if (d.Length > 0) return d;
     }
