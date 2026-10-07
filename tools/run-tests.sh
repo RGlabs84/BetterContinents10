@@ -17,8 +17,9 @@
 #                     the plan and the work, saves and stops in the middle, requests and errors (Unity's coroutines stood in for),
 #                     a world that closes in every phase, time-slicing and bandwidth, the ground at a border, the Debug Reset
 #                     Command and Forest Scale migrations, "bc regen", the game code it relies on, a whole made-up world
-#   high-tests        terrain up to 16 km: when a world is a high world, heights at Heightmap Amount 81, what is inside a dungeon, the
-#                     patches of the game's height rules on the client's and the dedicated server's IL, an inventory of the game's numbers
+#   high-tests        terrain up to 16 km: when a world is a high world (the High Terrain setting: Auto, On, Off), heights at Heightmap Amount 81,
+#                     what is inside a dungeon, the patches of the game's height rules on the client's and the dedicated server's IL, an
+#                     inventory of the game's numbers, what a world saves of the setting, DynamicPatch's patches on and off on the game's methods
 # Usage: tools/run-tests.sh [suite ...]   (default: all). Exit code 1 when the build or any suite fails.
 set -u
 cd "$(dirname "$0")/.."

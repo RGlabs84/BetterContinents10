@@ -49,7 +49,8 @@ internal static partial class Program
     var none = new BC.BetterContinentsSettings();
     Check(HighTerrain.MaxMetres(none) == 0f && !HighTerrain.Wanted(none), "the main menu's settings (Better Continents off, no heightmap): not a high world");
     var noMap = new BC.BetterContinentsSettings { EnabledForThisWorld = true, Version = 12, HeightmapAmount = 81f };
-    Check(HighTerrain.MaxMetres(noMap) == 0f && !HighTerrain.Wanted(noMap), "Heightmap Amount 81 with no heightmap: the amount multiplies nothing, not a high world");
+    Check(HighTerrain.MaxMetres(noMap) > 1900f && HighTerrain.MaxMetres(noMap) < 1920f && !HighTerrain.Wanted(noMap),
+      "Heightmap Amount 81 with no heightmap: the amount multiplies nothing, the land is the game's own (Bound.cs, Modes.cs), and it is not a high world (Auto)");
     Check(!HighTerrain.Wanted(HighWorld(81f, enabled: false)), "Better Continents off for the world: not a high world, whatever the amount");
 
     // A world is high above Heightmap Amount 5, the most before 0.10.3. The top it cannot pass is 200 m * (amount - 0.15) with Heightmap Override All
@@ -87,7 +88,8 @@ internal static partial class Program
     HighTerrain.Update(HighWorld(81f));
     Check(CapturingLogHandler.Lines.Skip(mark).Count(l => l.Contains("High terrain")) == 1, "the same world again: nothing said again");
     HighTerrain.Update(new BC.BetterContinentsSettings());
-    Check(!HighTerrain.Active && HighTerrain.Top == 0f && CapturingLogHandler.Lines.Skip(mark).Any(l => l.Contains("is not read above Heightmap Amount 5")), "the menu again: inactive, and says the rules are left alone");
+    Check(!HighTerrain.Active && HighTerrain.Top == 0f && CapturingLogHandler.Lines.Skip(mark).Any(l => l.Contains("High terrain: off (no high world is loaded): the game's own height rules apply")),
+      "the menu again: inactive, and says the game's own rules apply again");
     int count = CapturingLogHandler.Lines.Count;
     HighTerrain.Update(new BC.BetterContinentsSettings());
     Check(CapturingLogHandler.Lines.Count == count, "inactive again: nothing logged (every world load passes here)");

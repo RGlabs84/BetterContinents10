@@ -17,8 +17,9 @@ public partial class BetterContinents
   internal static bool DeepNorthWeatherUsesZ(BetterContinentsSettings settings) =>
     settings.EnabledForThisWorld && (settings.HasBiomeMap || HighTerrain.Wanted(settings));
 
-  // DynamicPatch's step: the state the patched game code reads, then each group on or off. One that fails is logged and the
-  // others go on: the world loads either way, as vanilla's heights would.
+  // DynamicPatch's first step: the state the patched game code reads, then each group on or off. One that fails is logged and the
+  // others go on: the world loads either way, as vanilla's heights would. It comes first, and nothing in it depends on another
+  // step, so that a step that throws later cannot leave the patches of a high world on for the next world.
   internal static void PatchHighTerrain()
   {
     HighTerrain.Update(Settings);
@@ -55,18 +56,18 @@ public partial class BetterContinents
       }
     }, description, typeof(HighTerrainPatches), patch, kind);
 
-  // The patches of the game's height rules (HighTerrain.cs), on while the loaded world's heightmap is read at an amount above 5
-  // (HighTerrain.Wanted) and off for every other world, which keeps the game's own code. Switched by DynamicPatch with the
-  // others. Each group is a Toggle of its own, so that one the installed game (or another mod) does not allow is logged and
-  // leaves the rest.
+  // The patches of the game's height rules (HighTerrain.cs), on while the loaded world wants them (HighTerrain.Wanted: its High
+  // Terrain setting, by default a heightmap read at an amount above 5) and off for every other world, which keeps the game's own
+  // code. Switched by DynamicPatch with the others. Each group is a Toggle of its own, so that one the installed game (or another
+  // mod) does not allow is logged and leaves the rest.
   private static readonly Toggle[] HighTerrainToggles =
   [
     // Character.InInterior is "higher than 3000 m" (Character.cs:4372): standing on a mountain above that is being in a
     // dungeon, which switches off the terrain's render group (RenderGroupSystem.cs:60, Heightmap.c_RenderGroup), the weather,
     // building and the random events. The three ways of asking, patched for every caller (a mod's), and each of the game's
-    // twelve methods that ask, rewritten to call HighTerrain.Interior: Mono builds the 12-14 byte InInterior methods into the
-    // methods that call them, so a patch of them is not seen by a caller that was compiled before it (measured on the
-    // dedicated server).
+    // twelve methods that ask (thirteen calls: Teleport.Interact asks twice), rewritten to call HighTerrain.Interior: Mono builds
+    // the 12-14 byte InInterior methods into the methods that call them, so a patch of them is not seen by a caller that was
+    // compiled before it (measured on the dedicated server).
     new("High terrain: Character.InInterior and the methods that call it", HighTerrain.Wanted,
       OnGame(typeof(Character), nameof(Character.InInterior), [typeof(Vector3)], nameof(HighTerrainPatches.InteriorOfPoint), HookKind.Prefix),
       OnGame(typeof(Character), nameof(Character.InInterior), [typeof(Transform)], nameof(HighTerrainPatches.InteriorOfTransform), HookKind.Prefix),

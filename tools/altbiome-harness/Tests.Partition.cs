@@ -1,9 +1,11 @@
-// Added by Wubarrk on 2026-09-22 for alt-biome planting (0.8.1).
+// Added by Wubarrk on 2026-09-22 for alt-biome planting (0.8.1), and modified on 2026-10-06 for 16k worlds (0.10.3).
 
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection;
+using SixLabors.ImageSharp.Formats.Png;
 using SixLabors.ImageSharp.PixelFormats;
 using UnityEngine;
 using BC = BetterContinents.BetterContinents;
@@ -188,6 +190,24 @@ internal static partial class Tests
     Use(NewSettings());
   }
 
+  // A world whose white heightmap is read at an amount (High Terrain's top is 200 m * (amount - 0.15) with Heightmap Override All on, the default).
+  private static BC.BetterContinentsSettings WorldWithHeightmap(float amount)
+  {
+    // (Not "using SixLabors.ImageSharp": its Size would clash with this harness's.)
+    using var image = new SixLabors.ImageSharp.Image<L16>(4, 4);
+    for (int y = 0; y < 4; y++)
+      for (int x = 0; x < 4; x++)
+        image[x, y] = new L16(65535);
+    using var stream = new MemoryStream();
+    SixLabors.ImageSharp.ImageExtensions.SaveAsPng(image, stream, new PngEncoder { BitDepth = PngBitDepth.Bit16, ColorType = PngColorType.Grayscale });
+    var settings = NewSettings();
+    settings.Version = 12;
+    settings.HeightmapAmount = amount;
+    typeof(BC.BetterContinentsSettings).GetField("HeightMap", BindingFlags.NonPublic | BindingFlags.Instance)!
+      .SetValue(settings, BetterContinents.ImageMapFloat.Create(stream.ToArray(), BetterContinents.ImageMapFloat.HeightAlpha.None));
+    return settings;
+  }
+
   // ------------------------------------------------------------------------------------------------ BeginRun / EndRun
   private static void ControlRunTests(AltBiomeWorldData a, List<AltBiome> alts)
   {
@@ -218,6 +238,33 @@ internal static partial class Tests
     var run2 = Control.BeginRun(a);
     Check(run2.Changed.Count == 0, "default settings override nothing (vanilla-identical placement)");
     Control.EndRun(a, run2);
+
+    // A world whose land reaches over 9000 m (a heightmap read at Heightmap Amount 81: High Terrain's top is 16170 m): an alt biome's 10000 m limit on a sector's mean
+    // height is lifted over it (HighTerrain.MaxAverageHeight, which ApplyOverrides asks), the lower limits stay, and EndRun puts the game's own back. A world of
+    // vanilla heights asks the same and changes nothing.
+    var limits = alts.ToDictionary(x => x, x => x.m_maxAvgHeight);
+    try
+    {
+      var tall = WorldWithHeightmap(81f);
+      BetterContinents.HighTerrain.Update(tall);
+      Use(tall);
+      var run3 = Control.BeginRun(a);
+      Check(alts.Any(x => limits[x] >= 10000f) && alts.All(x => x.m_maxAvgHeight == (limits[x] >= 10000f ? 17170f : limits[x])) && run3.Changed.Count == alts.Count(x => limits[x] >= 10000f),
+        $"a world of land to 16170 m: every alt biome's 10000 m limit becomes 17170 m, the lower ones stay ({alts.Count(x => x.m_maxAvgHeight == 17170f)} of {alts.Count} lifted)");
+      Control.EndRun(a, run3);
+      Check(alts.All(x => x.m_maxAvgHeight == limits[x]), "EndRun restores the game's own limits");
+      var low = WorldWithHeightmap(2f);
+      BetterContinents.HighTerrain.Update(low);
+      Use(low);
+      var run4 = Control.BeginRun(a);
+      Check(run4.Changed.Count == 0 && alts.All(x => x.m_maxAvgHeight == limits[x]), "a world of land to 370 m changes no alt biome's limit");
+      Control.EndRun(a, run4);
+    }
+    finally
+    {
+      BetterContinents.HighTerrain.Update(NewSettings());
+      Use(NewSettings());
+    }
 
     Use(new BC.AltBiomeSettings { UseFixedSeed = true, Seed = 777 });
     Check(Control.PlacementSeed(null!) == 777, "fixed placement seed");

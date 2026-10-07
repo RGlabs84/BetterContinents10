@@ -3,13 +3,15 @@
 // How far above Better Continents' heightmap the game's own terrain can reach: HighTerrain.MaxMetres, the top the ground rays start over and the
 // altitude limits are lifted to. Three kinds of check:
 //   - the numbers it gives for the settings that matter (the old and new Heightmap Amount limits, 81, VALtima's 10.8 with Heightmap Override All on and off);
-//   - the game's own height formulas of Valheim 1.0.17 (WorldGenerator.GetMeadowsHeight, GetPlainsHeight, GetForestHeight, GetMistlandsHeight,
+//   - the game's own height formulas (WorldGenerator.GetMeadowsHeight, GetPlainsHeight, GetForestHeight, GetMistlandsHeight,
 //     GetSnowMountainHeight, GetDeepNorthHeight, GetMarshHeight, GetOceanHeight), transcribed with the noise taken to the extremes of what the game's
 //     Perlin function gives (-0.14 .. 1.14 measured), over every base height from -0.15 to 81 units: none passes the bound;
-//   - the game's Mountain and Mistlands formulas as they are in both game builds (Cecil): a game update that changes their constants fails it,
-//     which is the point: the bound stands on them.
+//   - the game's own base height (WorldGenerator.GetBaseHeight, what a world without a heightmap has), transcribed and run over the same noise extremes:
+//     the top of a world without a heightmap is the Mountain formula over its largest;
+//   - the game's Mountain, Mistlands and base height formulas as they are in both game builds (Cecil): a game update that changes their constants fails
+//     it, which is the point: the bound stands on them.
 // What the bound does not hold is the Mountain biome's own slope term (+ 2 * Perlin * the base height's change over 2 m in x and y, about 4 m per
-// unit of slope): a heightmap's steepness, within the 1,000 m the rays start over it (RayMargin), slopes up to 250; measured on the rig (tools/high-tests/rig).
+// unit of slope, 4.55 at the noise's largest): a heightmap's steepness, within the 1,000 m the rays start over it (RayMargin), slopes up to about 220; measured on the rig (tools/high-tests/rig).
 
 using System;
 using System.Collections.Generic;
@@ -59,6 +61,16 @@ internal static partial class Program
     if (over > 0f)
       h -= over * ((1f - mask) * 0.75f);
     return h + q[4] * 0.01f + q[5] * 0.003f;
+  }
+
+  // WorldGenerator.GetBaseHeight (not the menu's), before its ocean channels, the mountain-free centre and the world's edge, which only lower it: three
+  // products of two noises, each added to the height so far times a factor, and 0.07 off. q: the six noises.
+  private static float GameBase(float[] q)
+  {
+    float n = q[0] * q[1];
+    n += q[2] * q[3] * n * 0.9f;
+    n += q[4] * q[5] * 0.5f * n;
+    return n - 0.07f;
   }
 
   private static float BlackForest(float b, float[] q) => b + FieldNoise(q[0], q[1], q[2], q[3]) * 0.1f + q[4] * 0.01f + q[5] * 0.003f;
@@ -115,16 +127,25 @@ internal static partial class Program
     Check(Math.Abs(Metres(81f, true, blend: 0.5f) - 200f * (40.5f - 0.15f)) < 0.01f && Math.Abs(Metres(81f, true, add: 1f) - 200f * (82f - 0.15f)) < 0.5f && Math.Abs(Metres(81f, true, sea: 1f) - 200f * (82f - 0.15f)) < 0.5f
           && Math.Abs(Metres(81f, true, add: -1f) - Metres(81f, true)) < 0.01f && Math.Abs(Metres(81f, true, sea: -1f) - Metres(81f, true)) < 0.01f,
       "Blend 0.5 halves what the amount adds (8070 m), Add 1 and a Sea Level Adjustment of +1 add a unit (16370 m), a negative Add or sea shift lowers the land and counts for nothing");
-    Check(Metres(float.NaN, true) == 0f && Metres(0f, true) == 0f && HighTerrain.MaxMetres(HighWorld(81f, enabled: false)) == 0f
-          && HighTerrain.MaxMetres(new BC.BetterContinentsSettings { EnabledForThisWorld = true, Version = 12, HeightmapAmount = 81f }) == 0f,
-      "an amount that is not a number or 0 (Override All on), Better Continents off, and no heightmap at all: no land to speak of, 0 m (not the sea's -30 m)");
+    Check(Metres(float.NaN, true) == 0f && Metres(0f, true) == 0f && HighTerrain.MaxMetres(HighWorld(81f, enabled: false)) == 0f,
+      "an amount that is not a number or 0 (Override All on), and Better Continents off: no land to speak of, 0 m (not the sea's -30 m)");
+
+    // The game's own base height: what a world without a heightmap has, and what shows through a heightmap's transparent pixels.
+    float mostBase = float.MinValue;
+    foreach (var q in NoiseCombinations(6))
+      mostBase = Math.Max(mostBase, GameBase(q));
+    Check(Math.Abs(mostBase - HighTerrain.GameBaseMax) < 1e-4f && mostBase > 4.7f && mostBase < 4.8f,
+      $"the game's own base height reaches {mostBase:0.####} units with every noise at its extreme, and GameBaseMax is {HighTerrain.GameBaseMax:0.####}");
+    float ownUnits = HighTerrain.MaxMetres(new BC.BetterContinentsSettings { EnabledForThisWorld = true, Version = 12 }) / 200f;
+    Check(Math.Abs(ownUnits - Metres(HighTerrain.GameBaseMax + 0.15f, false) / 200f) < 1e-3f && ownUnits * 200f > 1800f && ownUnits * 200f < 2000f,
+      $"a world without a heightmap: the Mountain biome's bound over the game's own base height, {ownUnits * 200f:0} m");
 
     // The game's formulas under the bound, for every base height from just under the sea to the top of Amount 81, and every noise.
     var biomes = new (string name, int noises, Func<float, float[], float> height)[]
     {
       ("Meadows and Plains", 6, MeadowsOrPlains), ("BlackForest", 6, BlackForest), ("Mistlands", 6, Mistlands), ("Mountain", 6, Mountain), ("DeepNorth", 6, DeepNorth),
     };
-    var bases = new[] { -0.15f, 0f, 0.15f, 0.3f, 0.4f, 0.6f, 1f, 1.3f, 2f, 5f, 10.65f, 20f, 40f, 80.85f };
+    var bases = new[] { -0.15f, 0f, 0.15f, 0.3f, 0.4f, 0.6f, 1f, 1.3f, 2f, HighTerrain.GameBaseMax, 5f, 10.65f, 20f, 40f, 80.85f };
     foreach (var b in bases)
     {
       float amount = b + 0.15f;
@@ -137,6 +158,8 @@ internal static partial class Program
         foreach (var q in NoiseCombinations(noises))
           most = Math.Max(most, height(b, q));
         Check(most <= off + 1e-4f, $"base height {b}: the game's {name} formula reaches at most {most:0.###} units, the bound with Override All off is {off:0.###}");
+        if (b <= HighTerrain.GameBaseMax)
+          Check(most <= ownUnits + 1e-4f, $"base height {b}: the game's {name} formula is under the bound of a world without a heightmap too ({ownUnits:0.###} units)");
       }
       // Swamp (0.137 + 0.03 * a product of two noises + the small ones) and Ocean (the base height) do not depend on more than that.
       Check(Math.Max(b, 0.137f + 0.03f * 1.15f * 1.15f + 0.01f * 1.15f + 0.003f * 1.15f) <= off + 1e-4f, $"base height {b}: Swamp and Ocean are under the bound too");
@@ -184,6 +207,12 @@ internal static partial class Program
         $"{dll}: GetMistlandsHeight has 0.4, 1.5 (the power), 400 (the terrace, twice) and 7: got 1.5 x{Count(mistlands, 1.5)}, 400 x{Count(mistlands, 400.0)}, 7 x{Count(mistlands, 7.0)}");
       Check(FindMethod("GetHeightMultiplier").Body.Instructions.Any(i => i.OpCode.Code == Code.Ldc_R4 && i.Operand is float f && f == 200f),
         $"{dll}: the game's height multiplier is 200 m a unit");
+      // GetBaseHeight: the three products of two noises added in turn (x 0.9 and x 0.5 are the factors, 0.07 comes off), in the menu's terrain and the world's, and the
+      // world's two noises of the ocean channels: 14 calls of the noise in all.
+      var baseHeight = FindMethod("GetBaseHeight").Body.Instructions.ToArray();
+      int noises = baseHeight.Count(i => i.OpCode.Code is Code.Call or Code.Callvirt && i.Operand is MethodReference { Name: "PerlinNoise" });
+      Check(Count(baseHeight, 0.9) == 2 && Count(baseHeight, 0.07) == 2 && noises == 14,
+        $"{dll}: GetBaseHeight is the three products of noises the bound stands on (0.9 x2, 0.07 x2, 14 noise calls over its two paths): got 0.9 x{Count(baseHeight, 0.9)}, 0.07 x{Count(baseHeight, 0.07)}, {noises} noise calls");
     }
   }
 }

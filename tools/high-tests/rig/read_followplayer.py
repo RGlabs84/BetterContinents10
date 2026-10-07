@@ -1,16 +1,17 @@
-#!/home/rohan/upy/bin/python
+#!/usr/bin/env python3
 # Added by Wubarrk on 2026-10-06 for 16k worlds (0.10.3).
 #
 # Lists every FollowPlayer component (FollowPlayer.cs: an object that follows the camera or the player, optionally keeping its own height with
 # m_lockYPos, or capping the height it follows to with m_maxYPos) in the game's asset bundle(s), with the object's name: the sky, clouds,
 # rain and the ocean are such objects, and what they do at 16 km depends on these numbers.
 # Usage (run under ~/valheim-testbed/heavy.sh, about 1 GB for d59cfac): read_followplayer.py [bundle ...]   (default: the client's d59cfac)
+import os
 import sys
-sys.path.insert(0, "/home/rohan/WubarrkCODING/libs-Tools/UNITY-ASSET-TOOLS")
+sys.path.insert(0, os.path.expanduser("~/WubarrkCODING/libs-Tools/UNITY-ASSET-TOOLS"))
 import UnityPy
 from valheim_paths import pid
 
-paths = sys.argv[1:] or ["/home/rohan/.local/share/Steam/steamapps/common/Valheim/valheim_Data/StreamingAssets/SoftRef/Bundles/d59cfac"]
+paths = sys.argv[1:] or [os.path.expanduser("~/.local/share/Steam/steamapps/common/Valheim/valheim_Data/StreamingAssets/SoftRef/Bundles/d59cfac")]
 for path in paths:
     print("####", path)
     env = UnityPy.load(path)

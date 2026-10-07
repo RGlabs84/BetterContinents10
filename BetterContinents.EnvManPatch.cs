@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-09-22 for alt-biome planting (0.8.1), and on 2026-09-25 for version-agnostic wording (0.9.1).
+// Added by Wubarrk on 2026-09-22 for alt-biome planting (0.8.1), and on 2026-09-25 for version-agnostic wording (0.9.1), and modified on 2026-10-06 for 16k worlds (0.10.3).
 
 using System.Collections.Generic;
 using System.Reflection;
@@ -27,9 +27,12 @@ public partial class BetterContinents
   // everywhere else, so every other world behaves exactly as vanilla, bug included.
   public static class DeepNorthWeather
   {
-    // Set by DynamicPatch: a Better Continents world with a biome map.
+    // Set by DynamicPatch: a Better Continents world with a biome map, or with high terrain.
     public static bool UseZ;
-    public static int RewrittenCalls;
+    // How many IsDeepnorth calls each of the two methods has rewritten as of its last transpile. Harmony runs a method's transpilers again on every
+    // change to its patches (the high-terrain patches, the world size's wind patch), so these are set, not added to, and said once for each count.
+    internal static int UpdateEnvironmentCalls, GetBiomeCalls;
+    public static int RewrittenCalls => UpdateEnvironmentCalls + GetBiomeCalls;
 
     public static bool IsDeepnorth(float x, float y, float z) => WorldGenerator.IsDeepnorth(x, UseZ ? z : y);
 
@@ -80,9 +83,9 @@ public partial class BetterContinents
     private static IEnumerable<CodeInstruction> UpdateEnvironmentTranspiler(IEnumerable<CodeInstruction> instructions)
     {
       var code = DeepNorthWeather.Rewrite(instructions, "EnvMan.UpdateEnvironment", out var n);
-      DeepNorthWeather.RewrittenCalls += n;
-      if (n > 0)
+      if (n > 0 && n != DeepNorthWeather.UpdateEnvironmentCalls)
         Log($"Deep North weather: EnvMan.UpdateEnvironment now asks IsDeepnorth with the camera's z on worlds with a biome map ({n} call).");
+      DeepNorthWeather.UpdateEnvironmentCalls = n;
       return code;
     }
 
@@ -91,9 +94,9 @@ public partial class BetterContinents
     private static IEnumerable<CodeInstruction> GetBiomeTranspiler(IEnumerable<CodeInstruction> instructions)
     {
       var code = DeepNorthWeather.Rewrite(instructions, "EnvMan.GetBiome", out var n);
-      DeepNorthWeather.RewrittenCalls += n;
-      if (n > 0)
+      if (n > 0 && n != DeepNorthWeather.GetBiomeCalls)
         Log($"Deep North weather: EnvMan.GetBiome now asks IsDeepnorth with the camera's z on worlds with a biome map ({n} call).");
+      DeepNorthWeather.GetBiomeCalls = n;
       return code;
     }
   }

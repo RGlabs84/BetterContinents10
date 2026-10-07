@@ -2270,6 +2270,9 @@ public static class WorldExport
         Key(SettingsSchema.HeightmapOverrideAll, "true", "Every biome takes its height from the heightmap.");
         Key(SettingsSchema.HeightmapAlpha, "false", "heightmap.png is plain 16-bit grey.");
       }
+      // Only when the loaded world chose one: Auto is every world's own, and the new world follows the config's.
+      if (Settings.EnabledForThisWorld && Settings.HighTerrainMode != HighTerrainMode.Auto)
+        Key(SettingsSchema.HighTerrain, Settings.HighTerrainMode.ToString(), "As the loaded world: which worlds get Better Continents' patches of the game's height rules (Auto: those whose heightmap is read at an amount above 5).");
 
       var precision = EffectiveBiomePrecision(Settings);
       Key(SettingsSchema.BiomePrecision, precision.ToString(CultureInfo.InvariantCulture), precision > 0

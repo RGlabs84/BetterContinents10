@@ -1,0 +1,15 @@
+name	x	z	ground	biome	ray_ground	ray_ok	ray_h	data_y	data_biome	data_normal_y	data_hmap	blocked	interior_ground	interior_dungeon	interior_3500	tile_y	grass_ok	grass_y
+base_origin	0	0	4000.039	Mountain	4000.039	True	4000.039	4000.039	Mountain	1	True	False	True	True	True	2500	False	0
+base_far	-1000	-1000	1200.048	Mountain	1200.048	True	1200.048	1200.048	Mountain	1	True	False	False	True	True	2500	False	0
+dome_mid	-2000	1500	647.957	Mountain	647.957	True	647.957	647.957	Mountain	0.973	True	False	False	True	True	2500	False	0
+dome_steep	-1000	1500	1200.048	Mountain	1200.048	True	1200.048	1200.048	Mountain	1	True	False	False	True	True	2500	False	0
+ramp1	6150	0	629.9	Mountain	629.9	True	629.9	629.9	Mountain	0.401	True	False	False	True	True	2500	False	0
+plateau1_1200	5550	0	1200.048	Mountain	1200.048	True	1200.048	1200.048	Mountain	1	True	False	False	True	True	2500	False	0
+ramp2	5000	0	2599.948	Mountain	2599.948	True	2599.948	2599.948	Mountain	0.141	True	False	False	True	True	2500	False	0
+plateau2_4000	4500	0	4000.039	Mountain	4000.039	True	4000.039	4000.039	Mountain	1	True	False	True	True	True	2500	False	0
+plateau3_8000	3600	0	7999.92	Mountain	0	False	0	0	None	1	False	False	True	True	True	2500	False	0
+plateau4_15000	2900	0	15000.02	Mountain	0	False	0	0	None	1	False	False	True	True	True	2500	False	0
+summit_16100	2300	0	16100.04	Mountain	0	False	0	0	None	1	False	False	True	True	True	2500	False	0
+land_west	-5000	0	60.906	BlackForest	60.906	True	60.906	60.906	BlackForest	0.954	True	False	False	True	True	2500	True	60.906
+land_south	-3000	-3000	59.979	Plains	59.979	True	59.979	59.979	Plains	1	True	False	False	True	True	2500	True	59.979
+land_north	0	6000	59.979	BlackForest	59.979	True	59.979	59.979	BlackForest	1	True	False	False	True	True	2500	True	59.979

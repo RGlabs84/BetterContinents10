@@ -5,6 +5,28 @@ using UnityEngine;
 
 namespace BetterContinents;
 
+/// <summary>High Terrain ([02 BetterContinents.Heightmap]): which worlds get the patches of the game's height rules (HighTerrain.Wanted). A
+/// world saves it only when it is not Auto (DataKey.HighTerrain): a world without the key is Auto.</summary>
+public enum HighTerrainMode
+{
+  /// <summary>The default: a world whose heightmap is read at a Heightmap Amount above 5 (the most any earlier version allowed) gets them, every
+  /// other world keeps the game's own rules.</summary>
+  Auto = 0,
+  /// <summary>Every Better Continents world gets them, whatever its heights.</summary>
+  On = 1,
+  /// <summary>No world gets them: the game's own height rules, whatever the amount.</summary>
+  Off = 2,
+}
+
+/// <summary>The modes as a world's settings or a config hold them: a number that is none of the modes (one a newer version wrote, or a 7 typed in
+/// a config) is Auto.</summary>
+internal static class HighTerrainModes
+{
+  internal static HighTerrainMode Of(int value) => Enum.IsDefined(typeof(HighTerrainMode), value) ? (HighTerrainMode)value : HighTerrainMode.Auto;
+
+  internal static HighTerrainMode Known(HighTerrainMode mode) => Of((int)mode);
+}
+
 // Terrain up to 16 km above the sea.
 //
 // Heightmap Amount reaches 81 (-30 m to 16,170 m with Sea Level Adjustment 0.5), but Valheim 1.0 was written for terrain that
@@ -13,12 +35,13 @@ namespace BetterContinents;
 // own, patched in BetterContinents.HighTerrainPatch.cs (the toggles) and HighTerrainPatches (the IL and prefixes); the numbers
 // and rules they stand on are here.
 //
-// All of it is switched on by one decision (Wanted): the loaded world is a Better Continents world whose heightmap is read at an
-// amount above 5, the most any version before 0.10.3 allowed. The patches are applied while that holds and removed when it stops,
-// so a world of vanilla heights runs the game's own code, unchanged, and so does every world an older version could make, whatever
-// its other settings: the game's rules were as they are in those, and stay. The line is drawn at the amount, not at the 3000 m of
-// the best known rule: a world of Amount 6, the first that is high, reaches 1,400 m at most, already past the game's grass (500 m),
-// AI tiles (400 m of ground) and altitude limits of plants (1000 m).
+// All of it is switched on by one decision (Wanted), which the world's High Terrain setting (HighTerrainMode) makes: Auto, the default,
+// wants it for a Better Continents world whose heightmap is read at an amount above 5, the most any version before 0.10.3 allowed; On for
+// every Better Continents world; Off for none. The patches are applied while that holds and removed when it stops, so a world that does not
+// want them runs the game's own code, unchanged, and so does every world an older version could make, whatever its other settings, under
+// Auto: the game's rules were as they are in those, and stay. The line is drawn at the amount, not at the 3000 m of the best known rule:
+// a world of Amount 6, the first that is high, reaches 1,400 m at most, already past the game's grass (500 m), AI tiles (400 m of ground)
+// and altitude limits of plants (1000 m).
 public static class HighTerrain
 {
   // What Character.InInterior calls inside a dungeon (Character.cs:4372): higher than this. A dungeon is built 5000 m above its
@@ -32,8 +55,8 @@ public static class HighTerrain
   // mountain is a few metres above theirs. 3000 m is between the two with room on both sides, and the same number as the game's.
   public const float InteriorAboveGround = 3000f;
 
-  // The most Heightmap Amount any version before 0.10.3 allowed (its range was 0 to 5): a world read at more is new, and is a high
-  // world. Above 5 its land can reach 1,200 m and more, past what the game's grass (500 m), AI tiles (400 m of ground) and altitude
+  // The most Heightmap Amount any version before 0.10.3 allowed (its range was 0 to 5): a world read at more is new, and under Auto is a
+  // high world. Above 5 its land can reach 1,200 m and more, past what the game's grass (500 m), AI tiles (400 m of ground) and altitude
   // limits (1000 m) were made for; from about 13 it passes 2500 m, under the game's own 3000 m rule, and at 81 it reaches 16,170 m (32,300 m
   // with Heightmap Override All off: see MaxMetres).
   public const float OldMaxAmount = 5f;
@@ -55,9 +78,10 @@ public static class HighTerrain
   //         most. MountainNoise is the formula's maximum with every noise at PerlinMax. Next is Mistlands (GetMistlandsHeight: b + 0.4 * n^1.5 and
   //         small terms, MistlandsRise); Meadows, Plains, BlackForest, DeepNorth, Swamp and Ocean are under that (tools/high-tests/Bound.cs runs all of
   //         them, transcribed, over every noise extreme).
-  // Not in the bound: the Mountain biome's tilt term (r a noise, tilt the change of b over 2 m in x plus in z): a heightmap's own steepness, 4 m per
-  // unit of slope (+164 m on the 35-slope cliffs of the rig's ziggurat, 0 on a plateau), inside the RayMargin for any ground that can be walked (slopes up to 250); Expand
-  // World Data's own height rules; a rough map (it only mixes the two heights); and the 8 m at most a player's terrain tools add.
+  // Not in the bound: the Mountain biome's tilt term (2 * r * tilt, r a noise and tilt the change of b over 2 m in x plus in z): a heightmap's own
+  // steepness, 4 m per unit of slope for r = 1 and 4.55 m at the largest r measured (1.1384): +164 m on the 35-slope cliffs of the rig's ziggurat
+  // (4.7 m per unit), 0 on a plateau. RayMargin covers it for slopes (|dx| + |dy|, metres per metre) up to about 220; Expand World Data's own
+  // height rules; a rough map (it only mixes the two heights); and the 8 m at most a player's terrain tools add.
   private const float MetresPerUnit = 200f;
   private const float BaseOffset = 0.15f;
   private const float MountainStart = 0.4f;
@@ -67,10 +91,28 @@ public static class HighTerrain
   // u * v + w * x * u * v * 0.5 with every noise at PerlinMax.
   private static float FieldNoiseMax => PerlinMax * PerlinMax * (1f + 0.5f * PerlinMax * PerlinMax);
 
+  // The game's own base height (WorldGenerator.GetBaseHeight, which a heightmap replaces) at its largest, in units of 200 m: three products of Perlin
+  // noises added in turn, n = P1 * P2; n += P3 * P4 * n * 0.9; n += P5 * P6 * n * 0.5; minus 0.07. With every noise at PerlinMax that is 4.74 (948 m,
+  // which the Mountain biome doubles); the ocean channels, the mountain-free centre and the world's edge only lower it, and the noises never are all at
+  // their largest together: the highest mountain of the game's own terrain is under 370 m (Heightmap Amount 2 keeps them all). This is the base height
+  // of a world without a heightmap, and of the transparent part of one with Heightmap Alpha. tools/high-tests/Bound.cs runs the game's formula over every
+  // noise extreme, and reads it in both game builds.
+  internal static readonly float GameBaseMax = GameBase(PerlinMax);
+
+  private static float GameBase(float noise)
+  {
+    float pp = noise * noise;
+    float n = pp;
+    n += pp * n * 0.9f;
+    n += pp * 0.5f * n;
+    return n - 0.07f;
+  }
+
   // How far above MaxMetres the game's absolute ground rays start (a ray that starts under the ground finds none): what MaxMetres leaves out, which is
-  // the Mountain biome's tilt term of a world with Heightmap Override All off (4 m per unit of slope of the heightmap, 164 m measured on the rig's cliffs,
-  // about 350 m at the steepest pixel of VALtima's map) and the 8 m a player's terrain tools add. 1,000 m is that for slopes up to 250, and the ray is
-  // longer by as much as it starts higher, so it costs nothing.
+  // the Mountain biome's tilt term of a world with Heightmap Override All off (up to 4.55 m per unit of slope of the heightmap: 164 m measured on the
+  // rig's cliffs of slope 35, 350 to 430 m at the steepest pixel of VALtima's map, by central and by forward differences: rig/results/valtima_crop.txt) and the
+  // 8 m a player's terrain tools add. 1,000 m is that for slopes (|dx| + |dy|) up to about 220, and the ray is longer by as much as it starts higher, so a higher
+  // start costs nothing.
   public const float RayMargin = 1000f;
 
   // The upper limit of an altitude rule that means "no limit": the default of the game's altitude fields, in metres over the
@@ -109,43 +151,100 @@ public static class HighTerrain
   // whatever picture it holds, and nothing is read from the image), and not what makes a world a high one (Wanted): see above for what it stands on.
   //   Override All on:   200 m * b
   //   Override All off:  200 m * max(2b - 0.4 + MountainNoise, b + MistlandsRise)
-  // b = Amount * Blend + max(0, Add) - 0.15 + max(0, Sea Level shift); a world without a heightmap has the game's own heights, or Better Continents'
-  // noise alone, and is 0.
+  // b = Amount * Blend + max(0, Add) - 0.15 + max(0, Sea Level shift). Where the game's own base height shows instead of the heightmap's (a world
+  // without a heightmap, which High Terrain On also patches, and the transparent part of a heightmap with Heightmap Alpha) b is at most GameBaseMax
+  // (plus the sea shift), over the same formulas. 0 when Better Continents is off.
   internal static float MaxMetres(BetterContinents.BetterContinentsSettings s)
   {
-    if (!s.EnabledForThisWorld || !s.HasHeightMap)
+    if (!s.EnabledForThisWorld)
       return 0f;
-    float amount = Sane(s.HeightmapAmount), blend = Mathf.Clamp01(Sane(s.HeightmapBlend)), add = Sane(s.HeightmapAdd), sea = Sane(s.SeaLevelAdjustment);
-    float b = amount * blend + Mathf.Max(0f, add) - BaseOffset + Mathf.Max(0f, sea);
-    float units = s.HeightmapOverrideAll ? b : Mathf.Max(2f * b - MountainStart + MountainNoise, b + MistlandsRise);
+    float sea = Mathf.Max(0f, Sane(s.SeaLevelAdjustment));
+    bool overrides = s.HasHeightMap && s.HeightmapOverrideAll;
+    float units = 0f;
+    if (s.HasHeightMap)
+    {
+      float amount = Sane(s.HeightmapAmount), blend = Mathf.Clamp01(Sane(s.HeightmapBlend)), add = Sane(s.HeightmapAdd);
+      units = Units(amount * blend + Mathf.Max(0f, add) - BaseOffset + sea, overrides);
+    }
+    if (!s.HasHeightMap || s.BlendsHeightmapAlpha)
+      units = Mathf.Max(units, Units(GameBaseMax + sea, overrides));
     return Mathf.Max(0f, units) * MetresPerUnit;
   }
 
+  // The most the terrain is over a base height b, in units of 200 m.
+  private static float Units(float b, bool overrides) => overrides ? b : Mathf.Max(2f * b - MountainStart + MountainNoise, b + MistlandsRise);
+
   private static float Sane(float v) => float.IsNaN(v) || float.IsInfinity(v) ? 0f : Mathf.Clamp(v, -1000f, 1000f);
 
-  // Whether the patches are wanted for these settings: a heightmap read at an amount above the old most.
+  // Whether the patches are wanted for these settings: Better Continents is on for the world and its High Terrain setting says so. Auto says so
+  // for a heightmap read at an amount above the old most (HighByAmount), On for every world, Off for none.
   internal static bool Wanted(BetterContinents.BetterContinentsSettings s) =>
-    s.EnabledForThisWorld && s.HasHeightMap && s.HeightmapAmount > OldMaxAmount;
+    s.EnabledForThisWorld && (s.HighTerrainMode switch
+    {
+      HighTerrainMode.On => true,
+      HighTerrainMode.Off => false,
+      _ => HighByAmount(s),
+    });
+
+  // What Auto goes by: a heightmap read at an amount above the old most.
+  internal static bool HighByAmount(BetterContinents.BetterContinentsSettings s) => s.HasHeightMap && s.HeightmapAmount > OldMaxAmount;
+
+  // What Update said last (null: nothing worth saying), so that a world load that changes nothing says nothing.
+  private static string? said;
 
   // Called by DynamicPatch with the settings of the world being loaded (or the menu's), before the toggles are switched.
   internal static void Update(BetterContinents.BetterContinentsSettings s)
   {
     bool on = Wanted(s);
     float reach = on ? MaxMetres(s) : 0f;
-    if (on == active && reach == top)
-      return;
-    top = reach;
-    lastTerrain = null;
-    rayTop = on ? reach + RayMargin : 0f;
-    altitudeCap = on ? reach : 0f;
     bool was = active;
-    active = on;
-    if (on)
-      BetterContinents.Log($"High terrain: this world's heightmap is read at Heightmap Amount {s.HeightmapAmount:0.##}, above the {OldMaxAmount:0} that older versions allowed, so its land can reach {reach:0} m: "
-          + $"Better Continents patches the game's rules that hold a height (what is inside a dungeon, where the ground is looked for from {rayTop:0} m, altitude limits of {NoLimitAltitude:0} m and more, the grass, the AI's tiles)");
+    if (on != active || reach != top)
+    {
+      top = reach;
+      lastTerrain = null;
+      rayTop = on ? reach + RayMargin : 0f;
+      altitudeCap = on ? reach : 0f;
+      active = on;
+    }
+    // On says so; Off says what it costs a world whose heightmap Auto would have patched for; every other world that is not patched says nothing.
+    var note = on ? OnNote(s, reach) : s.EnabledForThisWorld && s.HighTerrainMode == HighTerrainMode.Off && HighByAmount(s) ? OffNote(s) : null;
+    if (note != null)
+    {
+      if (note != said)
+        BetterContinents.Log(note);
+    }
     else if (was)
-      BetterContinents.Log($"High terrain: this world's heightmap is not read above Heightmap Amount {OldMaxAmount:0}: the game's own height rules are left alone");
+      BetterContinents.Log("High terrain: off (no high world is loaded): the game's own height rules apply");
+    said = note;
   }
+
+  // A change of the mode in a world that is running (bc h ht, LiveChange.Rules): the patches follow it at once (DynamicPatch), and the zones are generated
+  // again, so that what they place follows the rules. The noise and the minimap are as they were, and so is the loaded terrain, unless the alt biomes are
+  // made again: an alt biome's limit of 10000 m on a sector's mean height is lifted with the patches (MaxAverageHeight), which only matters to a world whose
+  // land passes 9,000 m, and then the placement and the terrain's alt-biome corners are redone as every alt-biome change does. Only the world on this machine
+  // changes (single player, or the host): a player who joins takes the mode from the settings the server sends.
+  internal static void ModeChanged()
+  {
+    float limit = MaxAverageHeight(NoLimitAverageHeight);
+    BetterContinents.DynamicPatch();
+    if (MaxAverageHeight(NoLimitAverageHeight) != limit)
+      BetterContinents.AltBiomeControl.RequestRebuild(BetterContinents.AltBiomeControl.RebuildLevel.Assignment, "High Terrain changed", GameUtils.ResetZones);
+    else
+      GameUtils.RegenerateZones();
+  }
+
+  private static string OnNote(BetterContinents.BetterContinentsSettings s, float reach)
+  {
+    var what = $"Better Continents patches the game's rules that hold a height (what is inside a dungeon, where the ground is looked for from {reach + RayMargin:0} m, "
+      + $"altitude limits of {NoLimitAltitude:0} m and more, the grass, the AI's tiles)";
+    return s.HighTerrainMode == HighTerrainMode.On
+      ? $"High terrain: High Terrain is On for this world, so its land can reach {reach:0} m at most: {what}"
+      : $"High terrain: this world's heightmap is read at Heightmap Amount {s.HeightmapAmount:0.##}, above the {OldMaxAmount:0} that older versions allowed, so its land can reach {reach:0} m: {what}";
+  }
+
+  private static string OffNote(BetterContinents.BetterContinentsSettings s) =>
+    $"High terrain: High Terrain is Off for this world, whose heightmap is read at Heightmap Amount {s.HeightmapAmount:0.##} (its land can reach {MaxMetres(s):0} m): the game's own height rules stand, "
+    + "so there is no grass above 500 m, no plants, creatures or locations above about 1,000 m, anything above 3,000 m counts as inside a dungeon, and no ground is found above 6,000 m";
 
   // ---- what the patched game code calls ---------------------------------------------------------------------------------
 
@@ -256,7 +355,9 @@ public static class HighTerrain
   public static int MaxElevation(int elevation) => active && elevation == NoLimitElevation ? int.MaxValue : elevation;
 
   // An alt biome's upper limit of the mean height of a sector (AltBiome.m_maxAvgHeight, 10000 m unless it says otherwise).
-  public static float MaxAverageHeight(float cap) => active && cap >= 10000f && cap < top + RayMargin ? top + RayMargin : cap;
+  public const float NoLimitAverageHeight = 10000f;
+
+  public static float MaxAverageHeight(float cap) => active && cap >= NoLimitAverageHeight && cap < top + RayMargin ? top + RayMargin : cap;
 
   // Where the AI's navigation tile of a tile id is centred in height. Valheim's tiles are 6000 m high and centred on 2500 m
   // (-500 m to 5500 m): the ground, and the dungeon 5000 m above it (and a dungeon's rooms reach a little higher), are inside

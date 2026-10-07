@@ -1,9 +1,11 @@
 <!-- Added by Wubarrk on 2026-10-06 for 16k worlds (0.10.3). -->
-<!-- Offline checks of the high-terrain patches (HighTerrain.cs, BetterContinents.HighTerrainPatch.cs): when a world is a high world,
-     the height of the land at Heightmap Amount 81, the rule for what is inside a dungeon, the helpers the patched game code calls,
-     and every transpiler on the IL of both the client's and the dedicated server's game assemblies, with an inventory of the game's
-     methods that hold the numbers they replace (a game update that adds one fails it). Build BetterContinents.csproj (Release)
-     first: this references its pre-ILRepack DLL in obj/. Run from this folder with "dotnet run -c Release". -->
+<!-- Offline checks of the high-terrain patches (HighTerrain.cs, BetterContinents.HighTerrainPatch.cs): when a world is a high world (the
+     High Terrain setting: Auto, On, Off), the height of the land at Heightmap Amount 81, the rule for what is inside a dungeon, the helpers
+     the patched game code calls, every transpiler on the IL of both the client's and the dedicated server's game assemblies, with an
+     inventory of the game's methods that hold the numbers they replace (a game update that adds one fails it), what a world saves of the
+     setting, and DynamicPatch run for real on the game's methods .NET can compile here. Build BetterContinents.csproj (Release)
+     first: this references its pre-ILRepack DLL in obj/. Run from this folder with "dotnet run -c Release". The sources of rig/ are not
+     part of it. -->
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
@@ -19,6 +21,9 @@
     <BcDll>$(MSBuildThisFileDirectory)../../obj/Release/net4.8/BetterContinents.dll</BcDll>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Remove="rig/**" />
+  </ItemGroup>
+  <ItemGroup>
     <!-- BetterContinents.dll is built against BepInEx's HarmonyX 0Harmony, which cannot initialise on .NET 8;
          Lib.Harmony has the same assembly name and the API surface Better Continents touches here. -->
     <PackageReference Include="Lib.Harmony" Version="2.3.6" />
@@ -27,7 +32,8 @@
     <PackageReference Include="Mono.Cecil" Version="0.11.6" />
   </ItemGroup>
   <ItemGroup>
-    <Reference Include="BetterContinents"><HintPath>$(BcDll)</HintPath></Reference>
+    <!-- Not copied: Entry.Main (Rewrite.cs) loads a copy of it with its Harmony.Patch calls made fit for Lib.Harmony before anything uses it. -->
+    <Reference Include="BetterContinents"><HintPath>$(BcDll)</HintPath><Private>false</Private></Reference>
     <Reference Include="assembly_valheim"><HintPath>$(LibsTools)1.0/client/assembly_valheim.dll</HintPath></Reference>
     <Reference Include="assembly_utils"><HintPath>$(LibsTools)1.0/client/assembly_utils.dll</HintPath></Reference>
     <Reference Include="UnityEngine"><HintPath>$(LibsTools)1.0/client/UnityEngine.dll</HintPath></Reference>

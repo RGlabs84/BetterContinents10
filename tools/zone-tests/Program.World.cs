@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-10-04 for the unifying refactor (0.10.0).
+// Added by Wubarrk on 2026-10-04 for the unifying refactor (0.10.0), and modified on 2026-10-06 for 16k worlds (0.10.3).
 //
 // A whole regeneration of a made-up world, built from the game's own classes (ZDO, ZDOMan, ZNet, ZoneSystem, ZNetScene and
 // ZNetPeer, made without their Unity parts): the scan for what protects, the plan, the work on the real ZDOs, and the
@@ -65,6 +65,27 @@ internal static partial class Program
     C(ZoneRegen.KindOf(deep, local) == (Kind.Player | Kind.Interior), "a player above 3000 m is in a dungeon");
     var low = NewZdo("Player", 4, y: 3000f, user: 700L);
     C(ZoneRegen.KindOf(low, local) == Kind.Player, "exactly 3000 m is not above it");
+    // A world of high terrain (High Terrain On here, which needs no heightmap, and whose land cannot pass 1,908 m): a player's own ground decides, as it does for the game's
+    // Character.InInterior (HighTerrain.Interior). Where the game says "inside a dungeon" over 3000 m, a player 4000 m up over ground at 3900 m stands on a mountain, and one
+    // 5100 m up, over the highest ground there is and 3000 m more, is in a dungeon whatever is below him.
+    try
+    {
+      HighTerrain.Update(new BC.BetterContinentsSettings { EnabledForThisWorld = true, HighTerrainMode = HighTerrainMode.On });
+      var mountain = NewZdo("Player", 6, y: 4000f, user: 700L);
+      HighTerrain.GroundSource = _ => 3900f;
+      C(ZoneRegen.KindOf(mountain, local) == Kind.Player, "a high world: a player 4000 m up over a ground of 3900 m is not in a dungeon (the game's own rule says he is)");
+      HighTerrain.GroundSource = _ => 30f;
+      C(ZoneRegen.KindOf(mountain, local) == (Kind.Player | Kind.Interior), "a high world: a player 4000 m up over a ground of 30 m (where a dungeon's entrance is) is in a dungeon");
+      C(ZoneRegen.KindOf(deep, local) == (Kind.Player | Kind.Interior), "a high world: and one 5100 m up is too");
+      HighTerrain.GroundSource = _ => 3999f;
+      C(ZoneRegen.KindOf(low, local) == Kind.Player, "a high world: exactly 3000 m is still not above it");
+    }
+    finally
+    {
+      HighTerrain.GroundSource = null;
+      HighTerrain.Update(new BC.BetterContinentsSettings());
+    }
+    C(ZoneRegen.KindOf(deep, local) == (Kind.Player | Kind.Interior), "back in a world that is not high: a player above 3000 m is in a dungeon again");
     C(ZoneRegen.KindOf(Tame(Creator(NewZdo("piece_x", 7), 9L)), local) == (Kind.Piece | Kind.Tamed), "kinds combine");
     C(ZoneRegen.KindOf(Creator(NewZdo("Player", 5, user: 700L), 9L), local) == (Kind.Player | Kind.Piece), "a creator on a player is both");
   }

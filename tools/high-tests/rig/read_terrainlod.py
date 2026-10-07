@@ -1,4 +1,4 @@
-#!/home/rohan/upy/bin/python
+#!/usr/bin/env python3
 # Added by Wubarrk on 2026-10-06 for 16k worlds (0.10.3).
 #
 # Reads TerrainLod's serialized values (how far and how finely the game draws distant terrain) out of the game's own asset bundle,
@@ -7,11 +7,11 @@
 # m_updateStepDistance 256); the prefab may override them, so this prints what the prefab holds.
 # Usage (run under ~/valheim-testbed/heavy.sh, about 1 GB): read_terrainlod.py [bundle ...]   (default: client's and server's d59cfac)
 import os, sys
-sys.path.insert(0, "/home/rohan/WubarrkCODING/libs-Tools/UNITY-ASSET-TOOLS")
+sys.path.insert(0, os.path.expanduser("~/WubarrkCODING/libs-Tools/UNITY-ASSET-TOOLS"))
 import UnityPy
 from valheim_paths import pid
 
-STEAM = "/home/rohan/.local/share/Steam/steamapps/common/"
+STEAM = os.path.expanduser("~/.local/share/Steam/steamapps/common/")
 BUNDLES = sys.argv[1:] or [
     STEAM + "Valheim/valheim_Data/StreamingAssets/SoftRef/Bundles/d59cfac",
     STEAM + "Valheim dedicated server/valheim_server_Data/StreamingAssets/SoftRef/Bundles/d59cfac",

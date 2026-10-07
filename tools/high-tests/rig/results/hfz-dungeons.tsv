@@ -1,0 +1,8 @@
+location	zone_x	zone_z	entrance_y	ground_at_zone_centre	zdos	above_ground_3000	min_over_ground	max_over_ground	interior_true	interior_false	entrance_interior
+MountainCave02	33	-2	16100.04	16100.04	319	268	4973.75	5003.85	268	51	False
+MountainCave02	30	7	15000.02	15000.02	193	149	4984.928	5003.689	149	44	False
+MountainCave02	22	-4	15000.02	15000.02	402	354	4956.75	5003.85	354	48	False
+MountainCave02	11	9	7999.92	7999.92	554	499	4941.131	5003.85	499	55	False
+MountainCave02	57	-11	7999.92	7999.92	340	294	4973.75	5003.85	294	46	False
+MountainCave02	33	-20	7999.92	7999.92	278	240	4993.75	5003.85	240	38	False
+MountainCave02	90	-32	271.908	271.908	322	281	4913.079	5060.473	281	41	False

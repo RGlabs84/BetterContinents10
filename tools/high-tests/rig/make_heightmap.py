@@ -1,7 +1,7 @@
-#!/home/rohan/upy/bin/python
+#!/usr/bin/env python3
 # Added by Wubarrk on 2026-10-06 for 16k worlds (0.10.3).
 #
-# The synthetic heightmap of the high-terrain rig test (tools/high-tests/README in the report): a 16-bit grey PNG, north up, for a
+# The synthetic heightmap of the high-terrain rig test (tools/high-tests/rig/README.txt): a 16-bit grey PNG, north up, for a
 # world of World Size 8000 + Edge Size 500 (17,000 m across) read at Heightmap Amount 81 and Sea Level Adjustment 0.5, so that
 #   metres = (pixel / 65535 * 81 - 0.15) * 200        and        pixel = (metres / 200 + 0.15) / 81 * 65535.
 # A stepped mountain (a ziggurat) centred at (2200, 0) with flat plateaus at 1200, 4000, 8000, 15000 and 16100 m joined by cliffs, a

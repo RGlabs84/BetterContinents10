@@ -1,0 +1,9 @@
+mode I;16 size (16383, 16383)
+pixels (16383, 16383) uint16 min 0 max 61573
+tallest pixel: row 7466, column 3911, value 0.93954; at Amount 10.8: terrain 1999.4 m (above the sea 1969.4 m); b = 9.9971 units
+tallest pixel in the full world (about 65532 m across): x -17121, z 2900 (beyond 16,350 m from the centre: True)
+crop 4096 px from row 5418, column 1863: the tallest pixel is at row 2048, column 2048, which is x 2, z -2 in a world of World Size 7692 + Edge Size 500
+crop: max value 0.93954 min 0.00000, terrain -30.0 .. 1999.4 m
+crop slopes (m per m): |dx| mean 0.44 p99 3.9 max 63.1; |dy| mean 0.44 p99 4.1 max 63.4; |dx| + |dy| mean 0.88 p99 7.1 max 93.5
+the Mountain biome's tilt term at the steepest pixel: up to 426 m (4.55 m per unit); the rays' margin is 1000 m, which covers |dx| + |dy| up to about 220
+crop: ground slope (rise over run of the heightmap's own pixels): mean 0.679, p99 5.361, max 54.819; (|dx| + |dy|) max 77.187

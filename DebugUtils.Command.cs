@@ -1,4 +1,4 @@
-﻿// Modified by Wubarrk on 2026-10-04 for the unifying refactor (0.10.0).
+﻿// Modified by Wubarrk on 2026-10-04 for the unifying refactor (0.10.0), and on 2026-10-06 for 16k worlds (0.10.3).
 
 using System;
 using System.Collections;
@@ -169,8 +169,7 @@ public partial class DebugUtils
                     {
                         if (hasArgs)
                         {
-                            var parser = StringToTypeConverters[valueType];
-                            setValue(parser(text.Substring(cmd.Length).Trim()));
+                            setValue(Parse(valueType, text.Substring(cmd.Length).Trim()));
                         }
                         else if (getValue == null)
                         {
@@ -189,6 +188,19 @@ public partial class DebugUtils
             }
 
             return true;
+        }
+
+        // The text typed after a value's name as a value of its type: the plain types by StringToTypeConverters, an enum by the name of one of its
+        // values, in any case. Only a name: Enum.Parse alone would also take a number ("1") and a list of names ("Auto, On", read as flags).
+        private static object Parse(Type type, string text)
+        {
+            if (!type.IsEnum)
+                return StringToTypeConverters[type](text);
+            var names = Enum.GetNames(type);
+            var name = names.FirstOrDefault(n => string.Equals(n, text, StringComparison.OrdinalIgnoreCase));
+            if (name == null)
+                throw new ArgumentException($"{text} is not one of {string.Join(", ", names)}");
+            return Enum.Parse(type, name);
         }
 
         public List<Command> GetSubcommands()

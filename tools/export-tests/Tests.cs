@@ -655,6 +655,36 @@ internal static class Tests
     C(cfP.Bind("03 BetterContinents.Biomemap", "Biome precision", -1).Value == 3 && cfgP.Count(l => l.StartsWith("Biome precision")) == 1, "a world with Biome precision 3 exports Biome precision = 3 (the later line wins)");
     C(Call(precise, "ReadmeLines").Count(l => l.Contains("Biome precision (3)")) == 1, "README.txt names the exported Biome precision");
 
+    // High Terrain is copied from the world it was exported from when that world chose one (Auto is every world's own, and writes nothing): the new world is in that mode, and
+    // the later line wins over the player's own config, as for every setting.
+    C(!cfg.Any(l => l.StartsWith("High Terrain")) && !cfgP.Any(l => l.StartsWith("High Terrain")), "a world in Auto exports no High Terrain line (the new world follows the config)");
+    foreach (var mode in new[] { HighTerrainMode.Off, HighTerrainMode.On })
+    {
+      var chosen = Make(heights: true, locations: true, full: true, edge: true, forestExact: false);
+      jobType.GetField("Settings", BindingFlags.NonPublic | BindingFlags.Instance)!.SetValue(chosen, new BC.BetterContinentsSettings { EnabledForThisWorld = true, HighTerrainMode = mode });
+      var cfgH = Call(chosen, "ConfigLines");
+      var fileH = Path.Combine(work, $"BetterContinents-highterrain-{mode}.cfg");
+      var other = mode == HighTerrainMode.Off ? "On" : "Off";
+      File.WriteAllLines(fileH, new[] { "[02 BetterContinents.Heightmap]", $"High Terrain = {other}" }.Concat(cfgH));
+      var cfH = new BepInEx.Configuration.ConfigFile(fileH, false);
+      C(cfgH.Count(l => l.StartsWith("High Terrain")) == 1 && cfgH.Contains($"High Terrain = {mode}") && cf2Section(cfgH, "High Terrain") == "02 BetterContinents.Heightmap"
+        && cfH.Bind("02 BetterContinents.Heightmap", "High Terrain", HighTerrainMode.Auto).Value == mode,
+        $"a world in High Terrain {mode} exports 'High Terrain = {mode}' in the Heightmap section, and it wins over a config that says {other}");
+    }
+    // The section a line of export.cfg is in.
+    static string cf2Section(List<string> lines, string key)
+    {
+      string section = "";
+      foreach (var line in lines)
+      {
+        if (line.StartsWith("[") && line.EndsWith("]"))
+          section = line.Substring(1, line.Length - 2);
+        else if (line.StartsWith(key + " ="))
+          return section;
+      }
+      return "";
+    }
+
     var client = Make(heights: true, locations: true, full: false, edge: false, forestExact: true);
     var cfg2 = Call(client, "ConfigLines");
     C(cfg2.Contains("Skip Default Locations = false") && cfg2.Contains("Map Edge Drop-off = false") && cfg2.Contains("Forestmap Multiply = 1"), "a client export keeps default locations, and the edge / forest options follow");

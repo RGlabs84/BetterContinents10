@@ -48,6 +48,9 @@ public partial class BetterContinents
     public bool MountainsAllowedAtCenter;
     public bool ForestFactorOverrideAllTrees;
     public bool HeightmapOverrideAll = true;
+    // High Terrain (SettingsSchema.HighTerrain): which worlds get the patches of the game's height rules (HighTerrain.Wanted). Auto unless the
+    // world says otherwise; saved only when it is not Auto (DataKey.HighTerrain), and a world without the key is Auto.
+    public HighTerrainMode HighTerrainMode = HighTerrainMode.Auto;
     public float HeightmapMask;
     public float HeatMapScale = 10f;
     public float WorldSize = 10000f;
@@ -418,7 +421,7 @@ public partial class BetterContinents
           else if (HeightMap.FineNote != null)
             output(HeightMap.FineNote);
           output($"Heightmap amount {HeightmapAmount}, blend {HeightmapBlend}, add {HeightmapAdd}, mask {HeightmapMask}");
-          if (HighTerrain.Wanted(this))
+          if (HighTerrainMode == HighTerrainMode.Auto && HighTerrain.Wanted(this))
             output($"High terrain: the land can reach {HighTerrain.MaxMetres(this):0} m, so the game's rules that hold a height are patched (what is inside a dungeon, the ground and the grass, altitude limits, the AI's tiles)");
           if (HeightMap.Record is { } record)
             output($"Heightmap made by a world export for Heightmap Amount {record.Amount}, Sea Level Adjustment {record.SeaLevel}");
@@ -432,6 +435,11 @@ public partial class BetterContinents
           }
         }
         else output($"Heightmap disabled");
+        // Auto is said above, where the heightmap is; On and Off are the world's own choice, with or without one.
+        if (HighTerrainMode == HighTerrainMode.On)
+          output($"High Terrain On: the game's rules that hold a height are patched for this world, whatever its heights (what is inside a dungeon, the ground and the grass, altitude limits, the AI's tiles); its land cannot pass {HighTerrain.MaxMetres(this):0} m");
+        else if (HighTerrainMode == HighTerrainMode.Off)
+          output("High Terrain Off: the game's own height rules stand, whatever Heightmap Amount is (no grass above 500 m, no plants, creatures or locations above about 1,000 m, inside a dungeon above 3,000 m, no ground found above 6,000 m)");
 
         if (Version < 7)
         {

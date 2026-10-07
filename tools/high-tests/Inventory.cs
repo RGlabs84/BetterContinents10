@@ -107,7 +107,7 @@ internal static partial class Program
       void Expect(string what, SortedSet<string> got, params string[] expected) =>
         Check(got.SetEquals(expected), $"{dll}: {what}\n    expected: {string.Join(", ", expected.OrderBy(s => s))}\n    got:      {string.Join(", ", got)}");
 
-      Expect("the methods that call Character.InInterior are the three overloads and the twelve methods that are patched",
+      Expect("the methods that call Character.InInterior are the three overloads and the twelve methods (thirteen calls: Teleport.Interact asks twice) that are patched",
         Sites(module, (c, i) => CallsOf(c[i], "Character", "InInterior")),
         ["Character::InInterior", ..InteriorCallers.Select(c => $"{c.type}::{c.method}")]);
       Expect("the 3000 m test of a point's height (ldfld y; ldc.r4 3000; compare) is in InInterior and the two of the random events",

@@ -1,4 +1,4 @@
-#!/home/rohan/upy/bin/python
+#!/usr/bin/env python3
 # Added by Wubarrk on 2026-10-06 for 16k worlds (0.10.3).
 #
 # The world height range each sky object that keeps its own height covers (FollowPlayer.m_lockYPos: Clouds, CloudCylinder, Distant_fog_planes,
@@ -8,8 +8,9 @@
 # is given does not hold the file the mesh is in) and lists the particle emitters' shape boxes too. Rotations are not applied (it says when a node has one).
 # Usage (run under ~/valheim-testbed/heavy.sh, about 3 GB because of the main bundle): read_sky_ranges.py [prefab bundle [mesh bundle]]
 #   defaults: the client's d59cfac and c4210710.
+import os
 import sys
-sys.path.insert(0, "/home/rohan/WubarrkCODING/libs-Tools/UNITY-ASSET-TOOLS")
+sys.path.insert(0, os.path.expanduser("~/WubarrkCODING/libs-Tools/UNITY-ASSET-TOOLS"))
 import UnityPy
 from valheim_paths import pid, sibling_bundle
 

@@ -52,6 +52,7 @@ public partial class BetterContinents : BaseUnityPlugin
     public static ConfigEntry<float> ConfigHeightmapMask;
     public static ConfigEntry<bool> ConfigHeightmapOverrideAll;
     public static ConfigEntry<bool> ConfigHeightmapAlpha;
+    public static ConfigEntry<HighTerrainMode> ConfigHighTerrain;
 
     public static ConfigEntry<int> ConfigBiomePrecision;
     public static ConfigEntry<string> ConfigBiomeFile;

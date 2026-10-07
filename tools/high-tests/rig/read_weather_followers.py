@@ -1,15 +1,16 @@
-#!/home/rohan/upy/bin/python
+#!/usr/bin/env python3
 # Added by Wubarrk on 2026-10-06 for 16k worlds (0.10.3).
 #
 # For every environment of EnvMan (the game's weather), lists its particle systems (EnvSetup.m_psystems) and the FollowPlayer ancestor each one
 # hangs under, with that ancestor's m_lockYPos and m_maxYPos (FollowPlayer.cs): the follower decides where the effect is when the player is high.
 # Usage (run under ~/valheim-testbed/heavy.sh, about 1 GB): read_weather_followers.py [bundle]    (default: the client's d59cfac)
+import os
 import sys
-sys.path.insert(0, "/home/rohan/WubarrkCODING/libs-Tools/UNITY-ASSET-TOOLS")
+sys.path.insert(0, os.path.expanduser("~/WubarrkCODING/libs-Tools/UNITY-ASSET-TOOLS"))
 import UnityPy
 from valheim_paths import pid
 
-path = sys.argv[1] if len(sys.argv) > 1 else "/home/rohan/.local/share/Steam/steamapps/common/Valheim/valheim_Data/StreamingAssets/SoftRef/Bundles/d59cfac"
+path = sys.argv[1] if len(sys.argv) > 1 else os.path.expanduser("~/.local/share/Steam/steamapps/common/Valheim/valheim_Data/StreamingAssets/SoftRef/Bundles/d59cfac")
 env = UnityPy.load(path)
 objs = {o.path_id: o for o in env.objects}
 

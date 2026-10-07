@@ -87,6 +87,10 @@ public partial class BetterContinents
     // (MapTiles.cs), followed by the map's own key (HeightMap, BiomeMap, ...) and its block. Better Continents 0.9 stops at
     // it ("Unknown feature") and treats the world as vanilla without re-saving its settings.
     TiledMap,
+    // 0.10.3 (69; 68 is left for the key of the wide sectors): High Terrain, the mode as an int (HighTerrainMode), written only when it is not Auto, so
+    // that every world that does not set it saves byte for byte as it did, and a world without the key reads as Auto. Better Continents 0.10.2 and
+    // older stop at it ("Unknown feature") and treat the world as vanilla without re-saving its settings.
+    HighTerrain = 69,
   }
   public partial class BetterContinentsSettings
   {
@@ -493,6 +497,12 @@ public partial class BetterContinents
         pkg.Write((int)DataKey.HeightMapMask);
         pkg.Write(HeightmapMask);
       }
+      // Only a keyed version (11 and up) holds it: an older one has fixed fields, and a world saved in it is Auto when it is read.
+      if (HighTerrainMode != HighTerrainMode.Auto)
+      {
+        pkg.Write((int)DataKey.HighTerrain);
+        pkg.Write((int)HighTerrainMode);
+      }
 
       if (BaseHeightNoise.NoiseLayers.Count > 0)
       {
@@ -844,6 +854,12 @@ public partial class BetterContinents
             break;
           case DataKey.HeightMapMask:
             HeightmapMask = pkg.ReadSingle();
+            break;
+          case DataKey.HighTerrain:
+            var mode = pkg.ReadInt();
+            HighTerrainMode = HighTerrainModes.Of(mode);
+            if ((int)HighTerrainMode != mode)
+              LogWarning($"The world's settings hold High Terrain {mode}, which this version does not know: it is read as Auto.");
             break;
           case DataKey.BaseHeightNoise:
             BaseHeightNoise = NoiseStackSettings.Deserialize(pkg);

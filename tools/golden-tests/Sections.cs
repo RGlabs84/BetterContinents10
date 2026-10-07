@@ -292,6 +292,11 @@ internal static class Sections
     Fixtures.Heightmap(Path.Combine("fx", "heightonly", "heightmap.png"));
     yield return new("heightonly", new() { [BC.ConfigEnabled] = true, [BC.ConfigMapSourceDir] = "fx/heightonly" });
 
+    // High Terrain On and Off, the two modes a world saves a key for (DataKey.HighTerrain; Auto saves none, and every scenario above is Auto): the same folder, with
+    // Off at an amount Auto would patch for (above 5). Their bytes, in every format, round trips, dumps and samples.
+    yield return new("high-terrain-on", new() { [BC.ConfigEnabled] = true, [BC.ConfigMapSourceDir] = "fx/heightonly", [BC.ConfigHighTerrain] = HighTerrainMode.On });
+    yield return new("high-terrain-off", new() { [BC.ConfigEnabled] = true, [BC.ConfigMapSourceDir] = "fx/heightonly", [BC.ConfigHeightmapAmount] = 12f, [BC.ConfigHighTerrain] = HighTerrainMode.Off });
+
     Directory.CreateDirectory(Path.Combine("fx", "alpha"));
     Fixtures.Heightmap(Path.Combine("fx", "alpha", "heightmap.png"), alpha: true);
     yield return new("alpha", new()

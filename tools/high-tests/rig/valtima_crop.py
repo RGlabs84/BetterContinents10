@@ -1,4 +1,4 @@
-#!/home/rohan/upy/bin/python
+#!/usr/bin/env python3
 # Added by Wubarrk on 2026-10-06 for 16k worlds (0.10.3).
 # Crops a 4096 px square of VALtima's 16,383 px heightmap (4 m per pixel) around its tallest pixel, at the same 4 m per pixel, so that a
 # world of World Size 7692 + Edge Size 500 (16,384 m across) made from it has VALtima's real ground at its real slopes around its summit.
@@ -38,6 +38,15 @@ zs = ((size - 1) / 2.0 - cr) * 4.0
 print(f"crop {size} px from row {r0}, column {c0}: the tallest pixel is at row {cr}, column {cc}, which is x {xs:.0f}, z {zs:.0f} in a world of World Size {size * 2 - 500} + Edge Size 500")
 cm = crop.astype(np.float64) / 65535.0
 print(f"crop: max value {cm.max():.5f} min {cm.min():.5f}, terrain {(cm.min() * AMOUNT - 0.15) * 200:.1f} .. {(cm.max() * AMOUNT - 0.15) * 200:.1f} m")
+# The crop's slopes, in metres of height per metre of ground (a pixel is 4 m): per axis, and |dx| + |dy| of a pixel, which the Mountain biome's tilt term grows with
+# (Heightmap Override All off: up to 4.55 m per unit of it, HighTerrain.RayMargin) and so the steepest pixel is what the rays' 1,000 m margin has to cover.
+metres = (cm * AMOUNT - 0.15) * 200.0
+dx = np.abs(np.diff(metres, axis=1)) / 4.0
+dy = np.abs(np.diff(metres, axis=0)) / 4.0
+both = dx[:-1, :] + dy[:, :-1]
+print(f"crop slopes (m per m): |dx| mean {dx.mean():.2f} p99 {np.percentile(dx, 99):.1f} max {dx.max():.1f}; |dy| mean {dy.mean():.2f} p99 {np.percentile(dy, 99):.1f} max {dy.max():.1f}; "
+      f"|dx| + |dy| mean {both.mean():.2f} p99 {np.percentile(both, 99):.1f} max {both.max():.1f}")
+print(f"the Mountain biome's tilt term at the steepest pixel: up to {4.55 * both.max():.0f} m (4.55 m per unit); the rays' margin is 1000 m, which covers |dx| + |dy| up to about {1000 / 4.55:.0f}")
 gy, gx = np.gradient(cm * AMOUNT * 200.0, 4.0)
 slope = np.hypot(gx, gy)
 print(f"crop: ground slope (rise over run of the heightmap's own pixels): mean {slope.mean():.3f}, p99 {np.percentile(slope, 99):.3f}, max {slope.max():.3f}; (|dx| + |dy|) max {(np.abs(gx) + np.abs(gy)).max():.3f}")

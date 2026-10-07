@@ -281,6 +281,84 @@ internal static partial class Program
     }
   }
 
+  // ---- a transpiler that finds only part of what it expects leaves the method alone -----------------------------------------
+
+  // A copy of the instructions without the one at index (what jumps to it, or starts or ends a block there, goes to the one after it).
+  private static List<CodeInstruction> Without(List<CodeInstruction> code, int index)
+  {
+    var copy = code.Select(i => new CodeInstruction(i)).ToList();
+    var removed = copy[index];
+    copy[index + 1].labels.AddRange(removed.labels);
+    copy[index + 1].blocks.InsertRange(0, removed.blocks);
+    copy.RemoveAt(index);
+    return copy;
+  }
+
+  // A copy with the count instructions from index put in again right after themselves.
+  private static List<CodeInstruction> Twice(List<CodeInstruction> code, int index, int count)
+  {
+    var copy = code.Select(i => new CodeInstruction(i)).ToList();
+    copy.InsertRange(index + count, code.Skip(index).Take(count).Select(i => new CodeInstruction(i.opcode, i.operand)));
+    return copy;
+  }
+
+  private static bool IsFloatConstant(CodeInstruction i, float value) => i.opcode == OpCodes.Ldc_R4 && i.operand is float f && f == value;
+
+  // The ray transpilers patch all they expect or nothing (a game update that moved only one of a ray's two numbers must not leave a ray half rewritten, which
+  // would start it high and keep it short): the real methods of both assemblies with one part taken away, or one part twice, and the blocker ray asked of a
+  // method of another shape, come back as they went in, and the log names the method.
+  private static void PartialTests()
+  {
+    foreach (var (name, assembly) in GameAssemblies())
+    {
+      Section($"the ray transpilers on a method with only part of what they expect: the {name}'s assembly");
+      void Partial(string what, string transpiler, MethodBase original, List<CodeInstruction> input)
+      {
+        int mark = CapturingLogHandler.Lines.Count;
+        var after = Run(transpiler, input, original);
+        Check(after.Select(Show).SequenceEqual(input.Select(Show)) && LabelsKept(input, after)
+              && CapturingLogHandler.Lines.Skip(mark).Any(l => l.Contains("did not find") && l.Contains($"{original.DeclaringType?.Name}.{original.Name}")),
+          $"{name} {what}: left exactly as it was, and the log names {original.DeclaringType?.Name}.{original.Name}");
+      }
+
+      foreach (var parameters in new[] { 1, 2 })
+      {
+        var m = Method(assembly, "ZoneSystem", "GetGroundHeight", parameters);
+        var code = Instructions(name, m);
+        int start = code.FindIndex(i => IsFloatConstant(i, 6000f)), length = code.FindIndex(i => IsFloatConstant(i, 10000f));
+        var label = $"ZoneSystem.GetGroundHeight({parameters} parameter{(parameters == 1 ? "" : "s")})";
+        Check(start >= 0 && length >= 0 && start + 1 < code.Count && code[start + 1].opcode == OpCodes.Stfld, $"{name} {label} has the 6000 m start and the 10000 m length the cases below take apart");
+        Partial($"{label} without its 10000 m length", "RaiseGroundRay", m, Without(code, length));
+        Partial($"{label} without its 6000 m start", "RaiseGroundRay", m, Without(code, start));
+        Partial($"{label} with its start twice", "RaiseGroundRay", m, Twice(code, start, 2));
+        Partial($"{label} with its length twice", "RaiseGroundRay", m, Twice(code, length, 1));
+      }
+
+      foreach (var (type, method, transpiler, up, lengthValue) in new[] { ("ZoneSystem", "GetGroundData", "RaiseGroundDataRay", 5000f, 10000f), ("ClutterSystem", "GetGroundInfo", "RaiseClutterRay", 500f, 1000f) })
+      {
+        var m = Method(assembly, type, method);
+        var code = Instructions(name, m);
+        int origin = Enumerable.Range(0, code.Count - 2).FirstOrDefault(i => IsFloatConstant(code[i], up) && Show(code[i + 1]) == "call op_Multiply" && Show(code[i + 2]) == "call op_Addition", -1);
+        int length = code.FindIndex(i => IsFloatConstant(i, lengthValue));
+        var label = $"{type}.{method}";
+        Check(origin >= 0 && length >= 0, $"{name} {label} has the origin ({up} m over the point) and the length ({lengthValue} m) the cases below take apart");
+        Partial($"{label} without its {lengthValue} m length", transpiler, m, Without(code, length));
+        Partial($"{label} without its {up} m origin", transpiler, m, Without(code, origin));
+        Partial($"{label} without the addition that puts the origin over the point", transpiler, m, Without(code, origin + 2));
+        Partial($"{label} with its origin twice", transpiler, m, Twice(code, origin, 3));
+        Partial($"{label} with its length twice", transpiler, m, Twice(code, length, 1));
+      }
+
+      var blocked = Method(assembly, "ZoneSystem", "IsBlocked");
+      var blockedCode = Instructions(name, blocked);
+      int pair = blockedCode.FindIndex(i => IsFloatConstant(i, 2000f));
+      Check(pair >= 0 && blockedCode[pair + 1].opcode == OpCodes.Add, $"{name} ZoneSystem.IsBlocked has its `p.y += 2000f`");
+      Partial("ZoneSystem.IsBlocked with its 2000 m added twice", "RaiseBlockedRay", blocked, Twice(blockedCode, pair, 2));
+      Partial("ZoneSystem.IsBlocked's IL asked of a static method (ZoneSystem.GetZone)", "RaiseBlockedRay", Method(assembly, "ZoneSystem", "GetZone", 1), blockedCode);
+      Partial("ZoneSystem.IsBlocked's IL asked of a method with two parameters (ZoneSystem.GetGroundHeight)", "RaiseBlockedRay", Method(assembly, "ZoneSystem", "GetGroundHeight", 2), blockedCode);
+    }
+  }
+
   // ---- "dump" ---------------------------------------------------------------------------------------------------------
   [MethodImpl(MethodImplOptions.NoInlining)]
   private static int Dump()

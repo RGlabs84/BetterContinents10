@@ -156,8 +156,8 @@ internal static class Program
     BC.ConfigExportHudKey = cfg.Bind(S, "Hud Hotkey", KeyCode.F9, "hud key");
     BC.ConfigExportWindowKey = cfg.Bind(S, "Window Hotkey", KeyCode.F7, "window key");
     BC.ConfigExportSize = cfg.Bind(S, "Default Size", 4096, new ConfigDescription("size", new AcceptableValueRange<int>(WorldExport.MinSize, WorldExport.MaxSize)));
-    // The schema's own default (1 since the unifying refactor), so this binding is the game's.
-    BC.ConfigExportHeightmapAmount = cfg.Bind(S, "Default Heightmap Amount", SettingsSchema.ExportHeightmapAmount.Default, new ConfigDescription("amount", new AcceptableValueRange<float>(0.01f, 5f)));
+    // The schema's own default (1 since the unifying refactor) and range (0.01 to the most a Heightmap Amount can be, 81), so this binding is the game's.
+    BC.ConfigExportHeightmapAmount = cfg.Bind(S, "Default Heightmap Amount", SettingsSchema.ExportHeightmapAmount.Default, new ConfigDescription("amount", new AcceptableValueRange<float>(0.01f, SettingsSchema.MaxHeightmapAmount)));
     BC.ConfigExportSeaLevel = cfg.Bind(S, "Default Sea Level", 0.5f, new ConfigDescription("sea", new AcceptableValueRange<float>(0f, 1f)));
     var text = File.ReadAllText(path);
     C(text.Contains("[09 BetterContinents.Export]") && text.Contains("Window Hotkey = F7") && text.Contains("Hud Hotkey = F9"), "the file carries the section and the KeyCode values by name");

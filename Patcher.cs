@@ -18,6 +18,11 @@ public partial class BetterContinents
   // order they are switched); biome precision, the base height version and the world size are more than that.
   public static void DynamicPatch()
   {
+    // First: the game's rules that hold a height (HighTerrain.cs), on for a world that wants them (its High Terrain setting: by default a
+    // heightmap read at an amount above 5, the most before 0.10.3) and off for any other. It reads only the settings, and comes before the
+    // steps that can throw (another mod's transpiler can fail a Harmony patch), so that a world that is not high never runs on with the
+    // patches of the one before it.
+    PatchHighTerrain();
     UpdateGeometry();
     PatchHeightmap();
     PatchBiomeColor();
@@ -27,8 +32,6 @@ public partial class BetterContinents
     PatchWorldSize();
     foreach (var toggle in TogglesAfterWorldSize)
       toggle.Update(Settings);
-    // A world whose heightmap is read at an amount above 5, the most before 0.10.3: the game's rules that hold a height (HighTerrain.cs).
-    PatchHighTerrain();
     // The sectors a world past the game's 16 km gets: its own, out to 65 km (WorldSectors).
     WorldSectors.Update(HarmonyInstance, Settings, ExpandWorldSizeGeometry);
     // WorldGenerator caches GetBiome/GetBiomeArea results per grid cell for the lifetime of the

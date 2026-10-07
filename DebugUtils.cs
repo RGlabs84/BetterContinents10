@@ -1,4 +1,4 @@
-﻿// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and alt-biome planting (0.8.1), and on 2026-09-24 for world export and import (0.9.0), and on 2026-09-29 for Expand World Data biomes (0.9.3), and on 2026-10-04 for the unifying refactor and the vegetation twin guard (0.10.0).
+﻿// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and alt-biome planting (0.8.1), and on 2026-09-24 for world export and import (0.9.0), and on 2026-09-29 for Expand World Data biomes (0.9.3), and on 2026-10-04 for the unifying refactor and the vegetation twin guard (0.10.0), and on 2026-10-06 for 16k worlds (0.10.3).
 
 using System;
 using System.Collections.Generic;
@@ -618,6 +618,7 @@ public partial class DebugUtils
                 case SettingDef<int> i: AddSetting(group, i); break;
                 case SettingDef<bool> b: AddSetting(group, b); break;
                 case SettingDef<string> s: AddSetting(group, s); break;
+                case SettingDef<HighTerrainMode> m: AddSetting(group, m); break;
                 default: throw new NotSupportedException($"bc {name} {setting.ConsoleName}: no console value for {setting.ValueType.Name}");
             }
         }
@@ -642,11 +643,21 @@ public partial class DebugUtils
                 setting.Set(BetterContinents.Settings, value);
                 MapKind.Height.Redecode(BetterContinents.Settings);
             }),
+            // High Terrain changes which of the game's rules are patched, not the world: no noise, minimap or terrain rebuild, but the patches
+            // (DynamicPatch), the alt-biome placement that reads the height limit they lift, and the zones, whose plants, creatures and locations follow the rules.
+            LiveChange.Rules => value =>
+            {
+                setting.Set(BetterContinents.Settings, value);
+                HighTerrain.ModeChanged();
+            },
             _ => SetHeightmapValue<T>(value => setting.Set(BetterContinents.Settings, value)),
         };
         Func<T> get = () => setting.Get(BetterContinents.Settings);
         if (setting.Limits is { } limits)
             group.AddValue(setting.ConsoleName, setting.ConsoleLabel, setting.Description, setting.Default, limits.Min, limits.Max, set, get);
+        else if (typeof(T).IsEnum)
+            // An enum is picked from its values: the console's help lists them, and the settings window offers them.
+            group.AddValue(setting.ConsoleName, setting.ConsoleLabel, setting.Description, setting.Default, (T[])Enum.GetValues(typeof(T)), set, get);
         else
             group.AddValue(setting.ConsoleName, setting.ConsoleLabel, setting.Description, setting.Default, set, get);
     }

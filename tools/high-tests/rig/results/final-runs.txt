@@ -1,0 +1,66 @@
+The final runs of 2026-10-07 (final-runs.sh; each run is a world made new in the rig highfix-rig, port 2503).
+DLL under test: BetterContinents-hfx2.dll, md5 0e2c3ed3363b755b55411832057d75eb, built from the tree at 77ce12d (the dist/plugins DLL of tools/run-tests.sh's build).
+The 0.10.2 build: bc-baseline-0.10.2.dll, md5 b0618199007facd6510989e0aeb459a8.
+hfx: the same runs of the 'none' step made before with the DLL of f60a959 (md5 2f496e2d04327bbb2164dc958e6fbe4f), which differs from this one only in the console's parse.
+
+== hfz-high06 (01:45:59)
+pid 953348, started 2026-10-07 01:46:01, world HfzHigh06, label hfz-high06, port 2503
+exit 0 after 70.460 s, 2026-10-07 01:47:11
+== hfz-dungeons (01:47:11)
+pid 1023418, started 2026-10-07 01:47:12, world HfzHigh06, label hfz-dungeons, port 2503
+exit 0 after 19.153 s, 2026-10-07 01:47:31
+== hfz-off81 (01:47:31)
+pid 1025253, started 2026-10-07 01:47:33, world HfzOff81, label hfz-off81, port 2503
+exit 0 after 53.411 s, 2026-10-07 01:48:26
+== hfz-van06o (01:48:26)
+pid 1027714, started 2026-10-07 01:48:27, world HfzVan06o, label hfz-van06o, port 2503
+exit 0 after 89.695 s, 2026-10-07 01:49:57
+== hfz-van06n (01:49:57)
+pid 1030275, started 2026-10-07 01:49:58, world HfzVan06n, label hfz-van06n, port 2503
+exit 0 after 85.666 s, 2026-10-07 01:51:24
+== hfz-on2 (01:51:24)
+pid 1032912, started 2026-10-07 01:51:25, world HfzOn2, label hfz-on2, port 2503
+exit 0 after 83.671 s, 2026-10-07 01:52:49
+== hfz-onvanilla (01:52:49)
+pid 1035442, started 2026-10-07 01:52:50, world HfzOnVan, label hfz-onvanilla, port 2503
+exit 0 after 38.302 s, 2026-10-07 01:53:28
+== hfz-autovanilla (01:53:28)
+pid 1037398, started 2026-10-07 01:53:29, world HfzAutoVan, label hfz-autovanilla, port 2503
+exit 0 after 39.303 s, 2026-10-07 01:54:08
+== hfz-autovanilla2 (02:24:59)
+pid 1050343, started 2026-10-07 02:25:00, world HfzAutoVan2, label hfz-autovanilla2, port 2503
+exit 0 after 37.306 s, 2026-10-07 02:25:38
+== hfz-autovanilla3 (02:25:38)
+pid 1052344, started 2026-10-07 02:25:39, world HfzAutoVan3, label hfz-autovanilla3, port 2503
+exit 0 after 37.305 s, 2026-10-07 02:26:16
+== hfz-onvanilla2 (02:26:16)
+pid 1054293, started 2026-10-07 02:26:17, world HfzOnVan2, label hfz-onvanilla2, port 2503
+exit 0 after 38.313 s, 2026-10-07 02:26:56
+
+== compare_runs.py out hfz hfx (hfz: this DLL; hfx: the same DLL before the console's parse was tightened)
+-- two builds, one world (Heightmap Amount 2, High Terrain Auto): the 0.10.2 build and this one
+hfz-van06o vs hfz-van06n: 9 of 9 files identical; every object identical, in the same order (1093)
+    point table: identical
+-- High Terrain On against Auto, the same world (Heightmap Amount 2)
+hfz-van06n vs hfz-on2: 9 of 9 files identical; the same 1093 objects, listed in another order (the first line that differs is 78)
+    point table: identical
+-- High Terrain On against Auto, a world with no heightmap at all (Heightmap Amount 1)
+hfz-autovanilla vs hfz-onvanilla: 9 of 9 files identical; 1305 and 1305 objects, 445 only in the first and 445 only in the second, in zones (96,0): 752 lines, (-16,-14): 114 lines, (-78,2): 14 lines, (70,0): 10 lines; the other 23 zones identical
+    point table: identical
+-- the noise floor: the same On world made twice, by builds that differ only in the console's parse (hfx and hfz)
+hfx-onvanilla vs hfz-onvanilla: 9 of 9 files identical; 1305 and 1305 objects, 440 only in the first and 440 only in the second, in zones (96,0): 752 lines, (-16,-14): 118 lines, (70,0): 10 lines; the other 24 zones identical
+    point table: identical
+-- and hfz's Auto world against the earlier On run
+hfz-autovanilla vs hfx-onvanilla: 9 of 9 files identical; 1305 and 1305 objects, 64 only in the first and 64 only in the second, in zones (-16,-14): 114 lines, (-78,2): 14 lines; the other 25 zones identical
+    point table: identical
+-- the same no-heightmap world, every run of it: the zones that are not the same in all of them, and the runs that agree (a letter for each distinct content)
+    zone (-16,-14): autovanilla C, autovanilla2 B, autovanilla3 B, onvanilla B, onvanilla2 A
+    zone (-78,2): autovanilla B, autovanilla2 A, autovanilla3 A, onvanilla A, onvanilla2 A
+    zone (70,0): autovanilla A, autovanilla2 B, autovanilla3 B, onvanilla B, onvanilla2 B
+    zone (96,0): autovanilla A, autovanilla2 B, autovanilla3 B, onvanilla B, onvanilla2 B
+    the other 23 zones hold the same objects in all 5 runs
+-- the toggles of the Amount 81 world, typed through the game's console table (bc h ht)
+    after 'bc h ht off': a different table (the game's own rules)
+    after 'bc h ht on': the table of the world as it was made (patched)
+    after 'bc h ht Auto': the table of the world as it was made (patched)
+    a world made with High Terrain Off: its table is identical to the Auto world after 'bc h ht off'

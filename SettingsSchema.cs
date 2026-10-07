@@ -30,6 +30,10 @@ internal enum LiveChange
   Precision,
   /// <summary>Heightmap Alpha: how the heightmap is read - decode it again, then everything Regenerate redoes.</summary>
   HeightmapDecode,
+  /// <summary>High Terrain: which of the game's height rules are patched, not the world itself - DynamicPatch switches the patches, the alt-biome
+  /// placement is made again for the height limit they lift, and the zones are generated again; the loaded terrain, the noise and the minimap are
+  /// left as they are (HighTerrain.ModeChanged).</summary>
+  Rules,
 }
 
 /// <summary>One setting, declared once: its config section, key, type, default, range and description; for a world
@@ -154,7 +158,7 @@ internal static class SettingsSchema
   // ---- 02 Heightmap ---------------------------------------------------------------------------------------------------
   public static readonly SettingDef<string> HeightmapFile = S("Heightmap File", "Path to a heightmap: a square image, 16-bit grey for smooth slopes, white highest (see Heightmap Amount). A heightmap-fine.png beside it (8-bit grey, the same size) adds finer steps. Not used when Directory is set: its heightmap.png is used.", SettingScope.World, "", e => ConfigHeightFile = e);
   // The most a heightmap can be multiplied by: 81 gives -30 m to 16,170 m with Sea Level Adjustment 0.5 (200 m per unit, the sea at 30 m).
-  // A world whose heightmap is read at an amount above 5, the most before 0.10.3, also gets the fixes of HighTerrain.
+  // A world whose heightmap is read at an amount above 5, the most before 0.10.3, also gets the fixes of HighTerrain (by default: see High Terrain).
   internal const float MaxHeightmapAmount = 81f;
   public static readonly SettingDef<float> HeightmapAmount = new("Heightmap Amount", "Multiplier of the heightmap's values. With Sea Level Adjustment 0.5, Heightmap Amount 1 (the default) gives heights of -30 m to 170 m (the sea is at 30 m) and clips vanilla's highest mountains; 2 gives -30 m to 370 m and keeps them all; 81, the most, gives -30 m to 16,170 m. A world whose heightmap is read at an amount above 5, the most older versions allowed, is also given Better Continents' fixes for the height rules the game assumes (what counts as inside a dungeon, where the ground and the grass are looked for, how high plants, creatures and locations may be, which heights the creatures can walk). A world export records the amount its heightmap was made for. At 81 one step of a 16-bit heightmap is 25 cm high: a heightmap-fine.png beside it makes the steps finer.", SettingScope.World, 1f, e => ConfigHeightmapAmount = e)
   { Range = R(0f, MaxHeightmapAmount), Get = s => s.HeightmapAmount, Set = (s, v) => s.HeightmapAmount = v, ConsoleGroup = "h", ConsoleName = "am", ConsoleLabel = "Heightmap Amount" };
@@ -171,6 +175,9 @@ internal static class SettingsSchema
   public static readonly SettingDef<string> RoughmapFile = S("Roughmap File", "Path to a roughmap: a square grey image of where the biomes' own rough ground shows through the heightmap (white) and where the heightmap stays smooth (black). Only used with Heightmap Override All off. Not used when Directory is set: its roughmap.png is used.", SettingScope.World, "", e => ConfigRoughFile = e);
   public static readonly SettingDef<float> RoughmapBlend = new("Roughmap Blend", "How strongly to apply the roughmap file", SettingScope.World, 1f, e => ConfigRoughmapBlend = e)
   { Range = R(0f, 1f), Get = s => s.RoughmapBlend, Set = (s, v) => s.RoughmapBlend = v, ConsoleGroup = "r", ConsoleName = "bl", ConsoleLabel = "Roughmap Blend" };
+  // Last in its section: a setting added in the middle would move the order of every one after it in the file.
+  public static readonly SettingDef<HighTerrainMode> HighTerrain = new("High Terrain", "Whether Better Continents adjusts the game's own rules for high ground. Those rules assume land under about 400 m: what counts as inside a dungeon (anything above 3,000 m), where the ground is looked for from, how high grass, plants, creatures and locations may stand, which ground creatures in dungeons can walk, the Valkyrie's flight height, random events, and the Deep North weather test. Auto (the default): a world whose heightmap is read at a Heightmap Amount above 5 gets the adjustments, and every other world keeps the game's own rules. On: every Better Continents world gets them, whatever its heights. Off: none does, whatever Heightmap Amount is. Off costs a world with high ground: no grass above 500 m, no plants, creatures or locations above about 1,000 m, no terrain, weather or building above 3,000 m (the game takes it for the inside of a dungeon), and no ground found above 6,000 m. A new world takes this setting when it is made (From Config, bc_import, or a Directory's export.cfg) and keeps it; 'bc h ht' changes it in a world that is running (Debug Mode)", SettingScope.World, HighTerrainMode.Auto, e => ConfigHighTerrain = e)
+  { Get = s => s.HighTerrainMode, Set = (s, v) => s.HighTerrainMode = HighTerrainModes.Known(v), ConsoleGroup = "h", ConsoleName = "ht", ConsoleLabel = "High Terrain", OnLiveChange = LiveChange.Rules };
 
   // ---- 03 Biomemap ----------------------------------------------------------------------------------------------------
   public static readonly SettingDef<string> BiomemapFile = S("Biomemap File", "Path to a biome map: a square image with a colour per biome, named by the legend beside it (biomemap.txt, 'Biome: colour' lines, written with the default colours when missing). Not used when Directory is set: its biomemap.png is used.", SettingScope.World, "", e => ConfigBiomeFile = e);
@@ -262,7 +269,7 @@ internal static class SettingsSchema
   [
     new("BetterContinents.Debug", Enabled, DebugMode, DebugResetCommand, OverrideVersion, Directory),
     new("BetterContinents.Global", SkipDefaultLocations, ContinentSize, WorldSize, EdgeSize, SeaLevel, AshlandsGap, DeepNorthGap, Rivers, MapEdgeDropoff, MountainsAllowedAtCenter),
-    new("BetterContinents.Heightmap", HeightmapFile, HeightmapAmount, HeightmapBlend, HeightmapAdd, HeightmapMask, HeightmapOverrideAll, HeightmapAlpha, RoughmapFile, RoughmapBlend),
+    new("BetterContinents.Heightmap", HeightmapFile, HeightmapAmount, HeightmapBlend, HeightmapAdd, HeightmapMask, HeightmapOverrideAll, HeightmapAlpha, RoughmapFile, RoughmapBlend, HighTerrain),
     new("BetterContinents.Biomemap", BiomemapFile, BiomePrecision, TerrainmapFile),
     new("BetterContinents.Forest", ForestScale, ForestAmount, ForestFactorOverrideAllTrees, ForestmapFile, ForestmapMultiply, ForestmapAdd),
     new("BetterContinents.StartPosition", OverrideStartPosition, StartPositionX, StartPositionY),

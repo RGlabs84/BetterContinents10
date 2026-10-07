@@ -260,7 +260,7 @@ internal static partial class Program
         "[01 BetterContinents.Global]", "World Size = 9000", "Edge Size = 400", "Map Edge Drop-off = false", "Skip Default Locations = true",
         "Sea Level Adjustment = 0.45", "Rivers = false", "Mountains Allowed At Center = true", "Continent Size = 2",
         "[02 BetterContinents.Heightmap]", "Heightmap Amount = 2.5", "Heightmap Blend = 1", "Heightmap Add = 0", "Heightmap Mask = 0",
-        "Heightmap Override All = true", "Heightmap Alpha = false",
+        "Heightmap Override All = true", "Heightmap Alpha = false", "High Terrain = off",
         "[03 BetterContinents.Biomemap]", "Biome precision = 3",
         "[04 BetterContinents.Forest]", "Forest Scale = 0.7", "Forest Amount = 0.5", "Forestmap Multiply = 0", "Forestmap Add = 1",
         "Forest Factor Overrides All Trees = true",
@@ -317,6 +317,7 @@ internal static partial class Program
     C(Mathf.Abs(s.SeaLevel - 0.45f) < 1e-5f && s.HeightmapAmount == 2.5f && s.HeightmapBlend == 1f && s.HeightmapAdd == 0f && s.HeightmapMask == 0f
       && s.HeightmapOverrideAll && !s.HeightMapAlpha, "sea level 0.45, Heightmap Amount 2.5, blend 1, add 0, mask 0, override all, no alpha");
     C(!s.MapEdgeDropoff && s.SkipDefaultLocations && !s.RiversEnabled && s.MountainsAllowedAtCenter, "no edge drop-off, skip default locations, no rivers, mountains at the centre");
+    C(s.HighTerrainMode == HighTerrainMode.Off && !HighTerrain.Wanted(s), "'High Terrain = off' (in any case) in export.cfg: the preset's world is in High Terrain Off, whatever its amount");
     C(s.BiomePrecision == 3, $"Biome precision 3 ({s.BiomePrecision})");
     C(Mathf.Abs(s.ForestScaleFactor - 0.7f) < 1e-4f && Mathf.Abs(s.ForestAmount - 0.5f) < 1e-5f && s.ForestmapMultiply == 0f && s.ForestmapAdd == 1f && s.ForestFactorOverrideAllTrees,
       $"Forest Scale 0.7 ({s.ForestScaleFactor}), amount 0.5, multiply 0, add 1, overrides all trees");
@@ -509,10 +510,11 @@ internal static partial class Program
     C(BC.ConfigHeightmapAmount.Value == 2.5f && BC.ConfigBiomePrecision.Value == 3 && BC.ConfigWorldSize.Value == 9000f && BC.ConfigHeatScale.Value == 12f
       && BC.ConfigAltBiomeMode.Value == "PlantedOnly" && BC.ConfigEnabled.Value, "the world settings are the export's (amount 2.5, precision 3, world 9000, heat scale 12, PlantedOnly)");
     C(BC.ConfigSelectedPreset.Value == "From Config", "the preset is 'From Config'");
+    C(BC.ConfigHighTerrain.Value == HighTerrainMode.Off, "High Terrain is the export's (Off)");
     C(BC.ConfigExportHud.Value == hudBefore && !BC.ConfigDebugModeEnabled.Value, "the live Export group and Debug Mode are left alone");
     C(cfg.SaveOnConfigSet, "SaveOnConfigSet is back on");
     var newText = File.ReadAllText(cfgPath);
-    C(newText.Contains("Heightmap Amount = 2.5") && newText.Contains("SelectedPreset = From Config"), "the file on disk has the new values (saved once)");
+    C(newText.Contains("Heightmap Amount = 2.5") && newText.Contains("SelectedPreset = From Config") && newText.Contains("High Terrain = Off"), "the file on disk has the new values (saved once)");
     C(o.Backup != null && File.Exists(o.Backup) && File.ReadAllText(o.Backup) == oldText && !o.Backup.EndsWith(".cfg"),
       "the old file is kept beside it, byte for byte, under a name no config manager lists as a config");
     // "From Config" now builds what the preset holds.
@@ -524,7 +526,7 @@ internal static partial class Program
     // The backup puts the old config back.
     File.Copy(o.Backup!, cfgPath, true);
     cfg.Reload();
-    C(BC.ConfigHeightmapAmount.Value == 1f && BC.ConfigBiomePrecision.Value == 0 && BC.ConfigMapSourceDir.Value == "", "copying the backup back restores the old settings");
+    C(BC.ConfigHeightmapAmount.Value == 1f && BC.ConfigBiomePrecision.Value == 0 && BC.ConfigMapSourceDir.Value == "" && BC.ConfigHighTerrain.Value == HighTerrainMode.Auto, "copying the backup back restores the old settings");
   }
 
   // ---- an export folder as the Directory -----------------------------------------------------------------------------
@@ -563,6 +565,8 @@ internal static partial class Program
     C(s.HeightmapAmount == 2.5f && Mathf.Abs(s.SeaLevel - 0.45f) < 1e-5f && s.BiomePrecision == 3 && s.WorldSize == 9000f && s.HeatMapScale == 12f
       && s.ForestmapMultiply == 0f && s.ForestmapAdd == 1f && s.SkipDefaultLocations && s.AltBiomes?.Mode == BC.AltBiomeMode.PlantedOnly,
       $"the new world gets the export's settings (amount {s.HeightmapAmount}, sea level {s.SeaLevel}, precision 3, world 9000, heat 12, forest 0/1, skip locations, PlantedOnly)");
+    C(s.HighTerrainMode == HighTerrainMode.Off && fromPreset.HighTerrainMode == HighTerrainMode.Off && bare.HighTerrainMode == HighTerrainMode.Auto,
+      "and High Terrain Off from export.cfg too (the config alone says Auto)");
     C(s.HeightmapAmount == fromPreset.HeightmapAmount && s.SeaLevel == fromPreset.SeaLevel && s.BiomePrecision == fromPreset.BiomePrecision
       && s.WorldSize == fromPreset.WorldSize && s.EdgeSize == fromPreset.EdgeSize && s.MapEdgeDropoff == fromPreset.MapEdgeDropoff
       && s.ForestScaleFactor == fromPreset.ForestScaleFactor && s.HeatMapScale == fromPreset.HeatMapScale

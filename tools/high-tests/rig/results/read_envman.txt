@@ -1,0 +1,46 @@
+EnvMan: keys ['m_clouds', 'm_rainClouds', 'm_rainCloudsDownside', 'm_oceanLevelEnvCheckAshlandsDeepnorth']
+environment                 fog night   morning      day   evening   distance (m) where exp(-d*x) = 0.5 / 0.05 (half / 95% fogged), by the day density
+Clear                          0.0100    0.0100   0.0030    0.0100        231 /      999
+Misty                          0.1500    0.1000   0.0200    0.1000         35 /      150
+Darklands_dark                 0.0300    0.0300   0.0300    0.0300         23 /      100
+Heath clear                    0.0200    0.0300   0.0060    0.0100        116 /      499
+DeepForest Mist                0.0200    0.0200   0.0100    0.0200         69 /      300
+GDKing                         0.0200    0.0200   0.0100    0.0200         69 /      300
+Rain                           0.0300    0.0300   0.0300    0.0300         23 /      100
+LightRain                      0.0300    0.0300   0.0300    0.0300         23 /      100
+ThunderStorm                   0.0300    0.0300   0.0300    0.0300         23 /      100
+Eikthyr                        0.0500    0.0500   0.0500    0.0500         14 /       60
+Eikthyr_no_lightning           0.0500    0.0500   0.0500    0.0500         14 /       60
+GoblinKing                     0.0500    0.0500   0.0500    0.0500         14 /       60
+nofogts                        0.0050    0.0050   0.0050    0.0050        139 /      599
+SwampRain                      0.0200    0.0200   0.0200    0.0200         35 /      150
+Bonemass                       0.0200    0.0200   0.0200    0.0200         35 /      150
+Snow                           0.0040    0.0040   0.0040    0.0040        173 /      749
+SnowStorm                      0.0500    0.0500   0.0500    0.0500         14 /       60
+Moder                          0.0030    0.0030   0.0030    0.0030        231 /      999
+Crypt                          0.1000    0.1000   0.1000    0.1000          7 /       30
+SunkenCrypt                    0.2000    0.2000   0.2000    0.2000          3 /       15
+Ghosts                         0.1000    0.1000   0.1000    0.1000          7 /       30
+EnvMan: keys ['m_clouds', 'm_rainClouds', 'm_rainCloudsDownside', 'm_oceanLevelEnvCheckAshlandsDeepnorth']
+environment                 fog night   morning      day   evening   distance (m) where exp(-d*x) = 0.5 / 0.05 (half / 95% fogged), by the day density
+Clear                          0.0100    0.0100   0.0030    0.0100        231 /      999
+Misty                          0.1500    0.1000   0.0200    0.1000         35 /      150
+Darklands_dark                 0.0300    0.0300   0.0300    0.0300         23 /      100
+Heath clear                    0.0200    0.0300   0.0060    0.0100        116 /      499
+DeepForest Mist                0.0200    0.0200   0.0100    0.0200         69 /      300
+GDKing                         0.0200    0.0200   0.0100    0.0200         69 /      300
+Rain                           0.0300    0.0300   0.0300    0.0300         23 /      100
+LightRain                      0.0300    0.0300   0.0300    0.0300         23 /      100
+ThunderStorm                   0.0300    0.0300   0.0300    0.0300         23 /      100
+Eikthyr                        0.0500    0.0500   0.0500    0.0500         14 /       60
+Eikthyr_no_lightning           0.0500    0.0500   0.0500    0.0500         14 /       60
+GoblinKing                     0.0500    0.0500   0.0500    0.0500         14 /       60
+nofogts                        0.0050    0.0050   0.0050    0.0050        139 /      599
+SwampRain                      0.0200    0.0200   0.0200    0.0200         35 /      150
+Bonemass                       0.0200    0.0200   0.0200    0.0200         35 /      150
+Snow                           0.0040    0.0040   0.0040    0.0040        173 /      749
+SnowStorm                      0.0500    0.0500   0.0500    0.0500         14 /       60
+Moder                          0.0030    0.0030   0.0030    0.0030        231 /      999
+Crypt                          0.1000    0.1000   0.1000    0.1000          7 /       30
+SunkenCrypt                    0.2000    0.2000   0.2000    0.2000          3 /       15
+Ghosts                         0.1000    0.1000   0.1000    0.1000          7 /       30

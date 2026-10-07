@@ -262,6 +262,156 @@ heightonly/v9/dump-after-load	n=31 sha=71ca828a410d00f2469650cf
 heightonly/v10/disk	len=13454 sha=3a2e8b481d3702ad6b1da297
 heightonly/v10/network	len=13428 sha=e97c0d00bf9340f031444b4b
 heightonly/v10/dump-after-load	n=31 sha=26318ccf5011c608c8706c08
+high-terrain-on/build-log/count	0
+high-terrain-on/dump/001	Version 12
+high-terrain-on/dump/002	Continent size 0.50000006
+high-terrain-on/dump/003	Mountains amount 0
+high-terrain-on/dump/004	Sea level adjustment 0.5
+high-terrain-on/dump/005	Ocean channels enabled True
+high-terrain-on/dump/006	Ashlands gap enabled False
+high-terrain-on/dump/007	Deep North gap enabled False
+high-terrain-on/dump/008	Rivers enabled True
+high-terrain-on/dump/009	Fix water color True
+high-terrain-on/dump/010	Map edge dropoff True
+high-terrain-on/dump/011	Mountains allowed at center False
+high-terrain-on/dump/012	Heightmap file (96) fx/heightonly/heightmap.png
+high-terrain-on/dump/013	Heightmap amount 1, blend 1, add 0, mask 0
+high-terrain-on/dump/014	Heightmap overrides ALL
+high-terrain-on/dump/015	High Terrain On: the game's rules that hold a height are patched for this world, whatever its heights (what is inside a dungeon, the ground and the grass, altitude limits, the AI's tiles); its land cannot pass 170 m
+high-terrain-on/dump/016	Base height noise stack:
+high-terrain-on/dump/017	Roughmap disabled
+high-terrain-on/dump/018	Biomemap disabled
+high-terrain-on/dump/019	Biome precision 0: the ground takes its biomes from the 4 corners of each 64 m terrain zone (vanilla)
+high-terrain-on/dump/020	Terrainmap disabled
+high-terrain-on/dump/021	Forest scale 0.50000006
+high-terrain-on/dump/022	Forest amount 0.5
+high-terrain-on/dump/023	Forestmap disabled
+high-terrain-on/dump/024	Locationmap disabled
+high-terrain-on/dump/025	Paintmap disabled
+high-terrain-on/dump/026	Lavamap disabled
+high-terrain-on/dump/027	Mossmap disabled
+high-terrain-on/dump/028	Vegetationmap disabled
+high-terrain-on/dump/029	Heatmap disabled
+high-terrain-on/dump/030	Spawnmap disabled
+high-terrain-on/dump/031	Altbiomemap disabled
+high-terrain-on/dump/032	Alt biomes: mode Random, grid WorldEdge, placement seed world seed
+high-terrain-on/dump/033	Alt biomes: chance x1, amount x1, region size x1, distance x1
+high-terrain-on/dump/034	Alt biomes: neighbour fix off, mean sector height off, min sector thickness 0
+high-terrain-on/dump/count	34
+high-terrain-on/loaded-maps	heightmap.png
+high-terrain-on/v11/disk	len=13391 sha=a5ed8ccefdfbd4642060a30e
+high-terrain-on/v11/network	len=13359 sha=abb695635f090e95f1f1d4f6
+high-terrain-on/v11/network-no-alt	len=13359 sha=abb695635f090e95f1f1d4f6
+high-terrain-on/v11/config-version	len=13391 sha=905c01236eca077540fa09a1
+high-terrain-on/cache-id	cf3906662cde0ee487224326158f6e94
+high-terrain-on/v11/disk-roundtrip	same
+high-terrain-on/v11/network-roundtrip	same
+high-terrain-on/v11/dump-after-load	n=32 sha=66d883b62c0ed4f55dd630cd
+high-terrain-on/v1/disk	len=13409 sha=fc89bf47c870ad60685bd5f9
+high-terrain-on/v1/network	len=13383 sha=d3f5eb1928e078815766a171
+high-terrain-on/v1/dump-after-load	n=30 sha=be4ef6281c85627555908bf2
+high-terrain-on/v2/disk	len=13428 sha=43db3cdf4e043170e7ed85f1
+high-terrain-on/v2/network	len=13402 sha=41496f6f1d8c756f29e9ccbf
+high-terrain-on/v2/dump-after-load	n=30 sha=61fc8a69752264de3da5e903
+high-terrain-on/v3/disk	len=13429 sha=e352a28361dbb58459f7ac4b
+high-terrain-on/v3/network	len=13403 sha=079ab954d4d0349bcfabc5a9
+high-terrain-on/v3/dump-after-load	n=30 sha=b2ba692765d38ff87214a203
+high-terrain-on/v4/disk	len=13429 sha=7797aeb43b90743be8fd0d10
+high-terrain-on/v4/network	len=13403 sha=53033a2292fbe3a82440c0d1
+high-terrain-on/v4/dump-after-load	n=30 sha=8cc2f25ed1c3b163533bc1ae
+high-terrain-on/v5/disk	len=13440 sha=a3f22a1257a9e4854edaff12
+high-terrain-on/v5/network	len=13414 sha=f19217622eb4a8a7d3541832
+high-terrain-on/v5/dump-after-load	n=30 sha=1e10403cf54f02e16f574fae
+high-terrain-on/v6/disk	len=13445 sha=e11d0c07701f44920762fd6c
+high-terrain-on/v6/network	len=13419 sha=b39dbf2efa95724020e120ec
+high-terrain-on/v6/dump-after-load	n=31 sha=df7607935502707f16c22585
+high-terrain-on/v7/disk	len=13449 sha=ddf480e582b4f1a4e9b62900
+high-terrain-on/v7/network	len=13423 sha=70173485cbfc2eac920be0cb
+high-terrain-on/v7/dump-after-load	n=31 sha=0353a2d1712643ab8bd8382f
+high-terrain-on/v8/disk	len=13449 sha=d116649bcc1e889a7ef3cae1
+high-terrain-on/v8/network	len=13423 sha=05cde427630364caae63b0e9
+high-terrain-on/v8/dump-after-load	n=31 sha=cd97fb138e2ec1489f80519b
+high-terrain-on/v9/disk	len=13453 sha=d06eaafce0fdf4c480121b1a
+high-terrain-on/v9/network	len=13427 sha=388dc71843f82f51991e47f8
+high-terrain-on/v9/dump-after-load	n=31 sha=71ca828a410d00f2469650cf
+high-terrain-on/v10/disk	len=13454 sha=3a2e8b481d3702ad6b1da297
+high-terrain-on/v10/network	len=13428 sha=e97c0d00bf9340f031444b4b
+high-terrain-on/v10/dump-after-load	n=31 sha=26318ccf5011c608c8706c08
+high-terrain-off/build-log/count	0
+high-terrain-off/dump/001	Version 12
+high-terrain-off/dump/002	Continent size 0.50000006
+high-terrain-off/dump/003	Mountains amount 0
+high-terrain-off/dump/004	Sea level adjustment 0.5
+high-terrain-off/dump/005	Ocean channels enabled True
+high-terrain-off/dump/006	Ashlands gap enabled False
+high-terrain-off/dump/007	Deep North gap enabled False
+high-terrain-off/dump/008	Rivers enabled True
+high-terrain-off/dump/009	Fix water color True
+high-terrain-off/dump/010	Map edge dropoff True
+high-terrain-off/dump/011	Mountains allowed at center False
+high-terrain-off/dump/012	Heightmap file (96) fx/heightonly/heightmap.png
+high-terrain-off/dump/013	Heightmap amount 12, blend 1, add 0, mask 0
+high-terrain-off/dump/014	Heightmap overrides ALL
+high-terrain-off/dump/015	High Terrain Off: the game's own height rules stand, whatever Heightmap Amount is (no grass above 500 m, no plants, creatures or locations above about 1,000 m, inside a dungeon above 3,000 m, no ground found above 6,000 m)
+high-terrain-off/dump/016	Base height noise stack:
+high-terrain-off/dump/017	Roughmap disabled
+high-terrain-off/dump/018	Biomemap disabled
+high-terrain-off/dump/019	Biome precision 0: the ground takes its biomes from the 4 corners of each 64 m terrain zone (vanilla)
+high-terrain-off/dump/020	Terrainmap disabled
+high-terrain-off/dump/021	Forest scale 0.50000006
+high-terrain-off/dump/022	Forest amount 0.5
+high-terrain-off/dump/023	Forestmap disabled
+high-terrain-off/dump/024	Locationmap disabled
+high-terrain-off/dump/025	Paintmap disabled
+high-terrain-off/dump/026	Lavamap disabled
+high-terrain-off/dump/027	Mossmap disabled
+high-terrain-off/dump/028	Vegetationmap disabled
+high-terrain-off/dump/029	Heatmap disabled
+high-terrain-off/dump/030	Spawnmap disabled
+high-terrain-off/dump/031	Altbiomemap disabled
+high-terrain-off/dump/032	Alt biomes: mode Random, grid WorldEdge, placement seed world seed
+high-terrain-off/dump/033	Alt biomes: chance x1, amount x1, region size x1, distance x1
+high-terrain-off/dump/034	Alt biomes: neighbour fix off, mean sector height off, min sector thickness 0
+high-terrain-off/dump/count	34
+high-terrain-off/loaded-maps	heightmap.png
+high-terrain-off/v11/disk	len=13399 sha=da1cdabe9d865f7b422f7795
+high-terrain-off/v11/network	len=13367 sha=4b5c587cfd0873795d5423ae
+high-terrain-off/v11/network-no-alt	len=13367 sha=4b5c587cfd0873795d5423ae
+high-terrain-off/v11/config-version	len=13399 sha=ce11702ea4dc01290dc8867a
+high-terrain-off/cache-id	a56aacd6b88ffa64b31cff574b74d76d
+high-terrain-off/v11/disk-roundtrip	same
+high-terrain-off/v11/network-roundtrip	same
+high-terrain-off/v11/dump-after-load	n=32 sha=a4c122acaacfe761230227d6
+high-terrain-off/v1/disk	len=13409 sha=b21ed6f1c6232702c5a8641b
+high-terrain-off/v1/network	len=13383 sha=907e6c9f17c54b29072636dc
+high-terrain-off/v1/dump-after-load	n=31 sha=42f0892ddebfa35f9de342ba
+high-terrain-off/v2/disk	len=13428 sha=8417e9900733beb45262b637
+high-terrain-off/v2/network	len=13402 sha=930f5f0605db946b8b4afb4d
+high-terrain-off/v2/dump-after-load	n=31 sha=4c5ca8881651f7d5669c292b
+high-terrain-off/v3/disk	len=13429 sha=4d9b38f0c88c40658ae71f05
+high-terrain-off/v3/network	len=13403 sha=559ffb3d3fe3b36380bb2679
+high-terrain-off/v3/dump-after-load	n=31 sha=7d48913ab3c13bf8c0cd5798
+high-terrain-off/v4/disk	len=13429 sha=04563c624697adcfa482768a
+high-terrain-off/v4/network	len=13403 sha=321a5dc9377a95ea03f9aaac
+high-terrain-off/v4/dump-after-load	n=31 sha=0312e8af3397aa8a2c3ac911
+high-terrain-off/v5/disk	len=13440 sha=e5e31d28acbd0246912ae9d2
+high-terrain-off/v5/network	len=13414 sha=ca68b25901f836b518ef123b
+high-terrain-off/v5/dump-after-load	n=31 sha=9bbae05c708a6efaa006ce8d
+high-terrain-off/v6/disk	len=13445 sha=7bd7fdf54b218d5256ec2afd
+high-terrain-off/v6/network	len=13419 sha=27839dc85dcea239d3f4dbc4
+high-terrain-off/v6/dump-after-load	n=32 sha=c274f0e11b53c398c554ce2d
+high-terrain-off/v7/disk	len=13449 sha=d7f34fc3e6a80968ba32de6c
+high-terrain-off/v7/network	len=13423 sha=85369c68c7b8c259038c236b
+high-terrain-off/v7/dump-after-load	n=32 sha=9a8e53acf1d32f2c183a0895
+high-terrain-off/v8/disk	len=13449 sha=cdc8a959113863178a03612c
+high-terrain-off/v8/network	len=13423 sha=716f6743241ab27dfe510351
+high-terrain-off/v8/dump-after-load	n=32 sha=814c48afefa5b7c6ef667b0f
+high-terrain-off/v9/disk	len=13453 sha=1b0e51d576e03f6ae3b67354
+high-terrain-off/v9/network	len=13427 sha=8770fc2722f38b40e534ee73
+high-terrain-off/v9/dump-after-load	n=32 sha=bf638b9a95e196a2ea2f56c7
+high-terrain-off/v10/disk	len=13454 sha=7f26067a26764bb6da38d278
+high-terrain-off/v10/network	len=13428 sha=8d33a27069465423373bed07
+high-terrain-off/v10/dump-after-load	n=32 sha=41f0de66adcab61621c8dcf0
 alpha/build-log/count	0
 alpha/dump/001	Version 12
 alpha/dump/002	Continent size 0.50000006
