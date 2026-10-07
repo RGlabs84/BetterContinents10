@@ -237,11 +237,12 @@ sizes stay what the game says, in metres and grid cells. `Amount Multiplier`, `D
 `Region Size Scale` (2.5) change them.
 
 A bigger grid costs memory and time each time the world loads, on the server and on every client
-as it joins (1.1). The game's own grid holds 4.2 million points; at the practical maximum, a World
-Size + Edge Size of 16350 m (3190 x 3190 points), it holds 10.2 million and takes about 0.2 GB. The
-build samples the biome and height of every point, so a load takes longer in proportion, and `Off`
-does not spare it (1.6). The maximum is the game's own: it files every object beyond about 16.35 km
-from the centre under one shared sector.
+as it joins (1.1). The game's own grid holds 4.2 million points; at a World Size + Edge Size of
+16350 m (3190 x 3190 points) it holds 10.2 million and takes about 0.2 GB, and at 32764 m (6392 x
+6392 points) about 0.8 GB and 25 s, measured on one machine. From 42 km it is capped at 8192 x 8192
+points. The build samples the biome and height of every point, so a load takes longer in proportion,
+and `Off` does not spare it (1.6). A world past 16350 m also needs Wide Sectors, which a new world gets
+by default (see the README); World Size + Edge Size can go up to 65000 m.
 
 ---
 
@@ -251,7 +252,7 @@ from the centre under one shared sector.
 
 | File | Where | Notes |
 |:--|:--|:--|
-| `altbiomemap.png` | the path in `Altbiomemap File` (section `[08 BetterContinents.AltBiomes]`); when `Directory` (section `[00 BetterContinents.Debug]`) is set, only a file of this name in that folder is used, as for every map | Square, any size. Covers the same square as every Better Continents map: centred on the origin, top of the image north (+z), 2 x (World Size + Edge Size) across, which is 21000 m on a vanilla-sized world and on every version 11 world (Expand World Size, when installed, sets its own). Use PNG: a lossy format shifts colours. |
+| `altbiomemap.png` | the path in `Altbiomemap File` (section `[08 BetterContinents.AltBiomes]`); when `Directory` (section `[00 BetterContinents.Debug]`) is set, only a file of this name in that folder is used, as for every map | Square, up to 16384 px across (`Max Map Size` in `[07 BetterContinents.Misc]` can set a lower limit on a machine; a bigger file is refused before it is read, and a world's saved map is never refused). Covers the same square as every Better Continents map: centred on the origin, top of the image north (+z), 2 x (World Size + Edge Size) across, which is 21000 m on a vanilla-sized world and on every version 11 world (Expand World Size, when installed, sets its own). Use PNG: a lossy format shifts colours. |
 | `altbiomemap.txt` | beside the image, named after it (`<image name>.txt`) | Written with the default palette when missing (UTF-8, `\n` line endings, identical to `palettes/altbiomemap.txt`). |
 | `palettes/BetterContinents.gpl` | repository | GIMP palette "Better Continents": the 10 base-biome colours, then the 32 alt-biome colours grouped by base biome (`Biome: Meadows`, `Alt: Troll Black Forest`). |
 | `palettes/altbiomemap.txt` | repository | The default legend, byte for byte as Better Continents writes it. |

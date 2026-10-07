@@ -1,3 +1,66 @@
+- v0.10.3
+  - Maps up to 16,384 x 16,384 pixels. Pictures are read a few rows at a time and kept as tiles: a
+    server making a world from five 16,384 px maps peaked at 1.80 GB of memory, where 0.10.2 needed
+    5.83 GB (measured on one machine). A bigger picture is refused before it is read. `Max Map Size` in
+    [07 BetterContinents.Misc] (4096, 8192 or 16384; 16384 by default) can set a lower limit for map
+    files; it is each machine's own and applies the next time a map is read.
+  - Compact Maps is Auto / On / Off, Auto by default. Auto makes a new world compact when any of its maps
+    but the location and alt-biome maps is more than 8,192 px across, or when its heightmap has fine
+    heights: five 16,384 px maps take 52.6 MB in the world file instead of 352.5 MB. On makes every new
+    world compact and Off none (heightmap-fine.png is then not read). An old `true` reads as On and
+    `false` as Auto.
+  - Worlds past 16 km. Valheim files objects by zone only out to about 16.4 km from the centre. Past that,
+    far objects shared one list that was sent whole to any player out there, a patch about 22.1 km
+    south-west shared its save file with every portal in the world, and the creature spawners of zones
+    past 32.7 km east, west, north or south were moved to the 20 km line at every save. `Wide Sectors` in
+    [07 BetterContinents.Misc] gives every zone out to 65.5 km its own place in memory and in the save,
+    and saves the spawners where they are. Auto, the default, makes every new world past 16,350 m wide and
+    leaves existing worlds as they are. On also converts an existing big world when it loads, one way: the
+    game first saves a copy of the old save, and damage already done is not undone. Off makes no new wide
+    worlds; a wide world stays wide. The setting is read by the machine that runs the world, and a joining
+    player's game follows the world. A wide world needs 0.10.3 or later: an older Better Continents opens
+    it as a world without Better Continents, and an older version, or the game alone, that saves it writes
+    its objects twice. World Size + Edge Size can go up to 65,000 m.
+  - Terrain up to 16 km high. `Heightmap Amount` takes 0 to 81 (it was 0 to 5); at 81, white is 16,170 m
+    on the game's height scale. A world whose heightmap is read at an Amount above 5 gets Better
+    Continents' versions of the game's height rules, which were made for land under about 400 m: inside a
+    dungeon means more than 3,000 m above the ground below, the ground is found at any height, and the
+    altitude limits of 1,000 m or more for plants, creatures, locations and grass are lifted. Worlds read
+    at 5 or less keep the game's own rules. `High Terrain` in [02 BetterContinents.Heightmap] (Auto, On or
+    Off; Auto by default) gives them to every world or to none; its description says what Off costs. A
+    new world keeps the mode it was made with, and `bc h ht` changes it in a running world. Older versions
+    open a world whose High Terrain is On or Off as a world without Better Continents.
+  - Fine heights. An optional `heightmap-fine.png` beside the heightmap adds 1/256 of a 16-bit step to each
+    height, 24 bits in all, so the gentle slopes of a tall world stay smooth. A record inside it ties it to
+    its heightmap by CRC-32. A world made with it is compact, and 0.10.0 to 0.10.2 cannot read it. The
+    world export writes it: `bc_export fine=auto|off|4|8`, or the Fine heights choice in the export window.
+    Auto, the default, writes 4 bits where one step of heightmap.png is more than 1.5 cm, from a Heightmap
+    Amount of about 4.92, so an export at a lower Amount is the same as before.
+  - The world export goes up to 16,384 px, and `Default Heightmap Amount` and `bc_export amount=` take 0.01
+    to 81. An export holds about 100 MB of memory at any size (measured on one machine), because each map is
+    written as it is sampled. `Largest Size` in [09 BetterContinents.Export] (4096, 8192 or 16384; 16384 by
+    default) sets the largest export offered. Above 8,192 px the export leaves the New World preset to
+    `bc_import`.
+  - A world with a very large World Size loads in about a minute. At World Size 32,264 the game's lake
+    search took minutes on every machine at every load; it now takes seconds and finds the same lakes.
+  - Joining a big world: the server's log says how long the download will take. A world's settings
+    package and the `.bcworld` file can be up to 1.5 GB (the file was limited to 512 MB).
+  - The sea's colour and waves in a big world. The game's water shader colours the Ashlands sea red by its
+    own ring of a vanilla-size world, so a bigger world, or one with a heat map, had red water where the
+    sea is cold (on a 32 km world, canals 20 km from the centre). Each 64 m patch of water now takes its
+    colours from the world's own hot sea, the sea that heats swimmers and damages ships; only the sea
+    counts, so lava on land leaves the water beside it plain, and with a heat map the sea is red only
+    where the heat map has heat over it. The shader also draws the waves dying down past its own circle,
+    12,000 m from (0, -4,000) in every direction, which in a big world is most of the sea. Better
+    Continents had moved the waves that boats and fish float on, by the biome map since 0.8.0 and by the
+    world's size since 0.10.0, so they floated on waves that were not drawn. They now float on the waves
+    as drawn, so a big world's far sea is calm to sail too.
+  - Console fixes. `bc clouds` no longer removes the pins on the map, and `bc hide` with no prefix
+    removes only the pins `bc show` and `bc bosses` placed; both used to remove every pin, the player's
+    own too. `bc savepreset` with no name saves under the world's name (it saved a preset with no name).
+    A height layer's `op` sets its opacity (it set its threshold). Adding the first height layer to a
+    world with no heightmap, or deleting the last one, shows at once (it waited for the next change).
+
 - v0.10.2
   - Forest Scale is 0.5 by default, the game's own size of forest and clearing patches. Since 0.7.20 the
     default was 1, which Better Continents turns into patches about five times the game's size, so a new
