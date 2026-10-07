@@ -509,6 +509,39 @@ internal static class Tests
       BetterContinents.BetterContinents.ConfigExportSize = savedSize;
     }
     C(WorldExport.SizeLimit == WorldExport.MaxSize, "with the config not bound the limit is 16384");
+
+    // Fine heights: fine=auto|off|4|8, auto by default, and the options' text says so only when it is not auto.
+    C(d.FineHeights == WorldExport.FineHeightsMode.Auto && !d.ToString().Contains("fine"), "fine heights are auto by default, and the options' text does not mention them");
+    var modes = new (string Text, WorldExport.FineHeightsMode Mode, string Shown)[]
+    {
+      ("fine=auto", WorldExport.FineHeightsMode.Auto, ""), ("fine=off", WorldExport.FineHeightsMode.Off, ", fine off"),
+      ("fine=4", WorldExport.FineHeightsMode.Bits4, ", fine 4 bits"), ("fine=8", WorldExport.FineHeightsMode.Bits8, ", fine 8 bits"), ("FINE=OFF", WorldExport.FineHeightsMode.Off, ", fine off"),
+    };
+    foreach (var (text, mode, shown) in modes)
+      C(WorldExportCommands.TryParse("2048 amount=81 " + text, out var fo, out var fe) && fo.FineHeights == mode && fo.Size == 2048 && fo.HeightmapAmount == 81f
+        && fo.ToString().Contains(", heat scale 10" + shown + "; New World preset") && (shown != "" || !fo.ToString().Contains("fine")), $"'{text}' sets {mode}, and the options' text shows '{shown}' ({fe})");
+    foreach (var bad2 in new[] { "fine=5", "fine=", "fine=on", "fine=0", "fine=16" })
+      C(!WorldExportCommands.TryParse(bad2, out _, out var fineError) && fineError.Contains(bad2), $"'{bad2}' is refused ({fineError})");
+    C(WorldExportCommands.OptionsUsage.Contains("[fine=auto|off|4|8]") && WorldExportCommands.Usage.Contains("[fine=auto|off|4|8]"), "the usage names fine=auto|off|4|8");
+
+    // What fine=auto makes of a Heightmap Amount: 4 bits where one grey step is above 1.5 cm, nothing below; explicit 4 and 8 at any amount.
+    int Bits(float amount, WorldExport.FineHeightsMode mode, bool heightmap = true)
+    {
+      var fb = WorldExport.Options.Default();
+      fb.HeightmapAmount = amount;
+      fb.FineHeights = mode;
+      fb.Heightmap = heightmap;
+      return (int)typeof(WorldExport.Options).GetProperty("FineBits", BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(fb)!;
+    }
+    C(Bits(1f, WorldExport.FineHeightsMode.Auto) == 0 && Bits(2f, WorldExport.FineHeightsMode.Auto) == 0 && Bits(4.9f, WorldExport.FineHeightsMode.Auto) == 0
+      && Bits(4.91f, WorldExport.FineHeightsMode.Auto) == 0, "auto: no fine file at Heightmap Amount 1, 2, 4.9 (a step of 1.495 cm)");
+    C(Bits(4.92f, WorldExport.FineHeightsMode.Auto) == 4 && Bits(5f, WorldExport.FineHeightsMode.Auto) == 4 && Bits(10.8f, WorldExport.FineHeightsMode.Auto) == 4 && Bits(81f, WorldExport.FineHeightsMode.Auto) == 4,
+      "auto: 4 bits from Heightmap Amount 4.92 (a step above 1.5 cm): 5, 10.8 and 81 get them");
+    C(Bits(2f, WorldExport.FineHeightsMode.Bits8) == 8 && Bits(0.01f, WorldExport.FineHeightsMode.Bits4) == 4 && Bits(81f, WorldExport.FineHeightsMode.Bits8) == 8 && Bits(81f, WorldExport.FineHeightsMode.Off) == 0,
+      "fine=8 and fine=4 work at any Heightmap Amount, fine=off at none");
+    C(Bits(81f, WorldExport.FineHeightsMode.Auto, heightmap: false) == 0 && Bits(2f, WorldExport.FineHeightsMode.Bits8, heightmap: false) == 0, "without a heightmap there is no fine file, whatever was asked");
+    C(M.AutoFineBits(4.9f) == 0 && M.AutoFineBits(5f) == 4 && M.GreyStepMetres(4.9f) < M.FineAutoStepMetres && M.GreyStepMetres(5f) > M.FineAutoStepMetres
+      && System.Math.Abs(M.GreyStepMetres(81f) - 0.24720) < 1e-4 && M.FineAutoStepMetres == 0.015, $"a grey step is 200 x amount / 65535 m: {M.GreyStepMetres(4.9f):0.00000} m at 4.9, {M.GreyStepMetres(5f):0.00000} at 5, {M.GreyStepMetres(81f):0.00000} at 81");
   }
 
   // The export window's estimate and notes (ExportHud.Estimate and Notes, private and pure: no GUI call) for the sizes it offers.
@@ -530,6 +563,21 @@ internal static class Tests
     C(n16.Contains("The New World preset is not made at 16384 px") && n16.Contains("about 6.8 GB") && n16.Contains("bc_import") && n16.Contains("over 100 MB"),
       $"16384 px: the preset is left to bc_import, and the maps are a download for every player");
     C(!n16off.Contains("preset"), "16384 px with the preset switched off: nothing about it");
+
+    // Fine heights in the window: the precision line under the fields, the note when they are asked for where they add nothing, the estimate.
+    string FineLine(WorldExport.Options o) => (string)hud.GetMethod("FineInfo", BindingFlags.NonPublic | BindingFlags.Static)!.Invoke(null, [o])!;
+    WorldExport.Options Fine(float amount, WorldExport.FineHeightsMode mode, int size = 4096) { var o = WorldExport.Options.Default(); o.Size = size; o.HeightmapAmount = amount; o.FineHeights = mode; o.Preset = false; return o; }
+    C(FineLine(Fine(1f, WorldExport.FineHeightsMode.Auto)) == "." && FineLine(Fine(81f, WorldExport.FineHeightsMode.Off)) == "." && FineLine(Fine(2f, WorldExport.FineHeightsMode.Auto)) == ".",
+      "the precision line is just a full stop where there is no fine file (as it always was)");
+    C(FineLine(Fine(81f, WorldExport.FineHeightsMode.Auto)) == ", refined to 1.5 cm by heightmap-fine.png." && FineLine(Fine(81f, WorldExport.FineHeightsMode.Bits8)) == ", refined to 0.97 mm by heightmap-fine.png.",
+      $"at Heightmap Amount 81 it says 1.5 cm with 4 bits and 0.97 mm with 8 ({FineLine(Fine(81f, WorldExport.FineHeightsMode.Auto))} / {FineLine(Fine(81f, WorldExport.FineHeightsMode.Bits8))})");
+    var low = Call("Notes", Fine(2f, WorldExport.FineHeightsMode.Bits8)); var lowAuto = Call("Notes", Fine(2f, WorldExport.FineHeightsMode.Auto)); var high = Call("Notes", Fine(81f, WorldExport.FineHeightsMode.Bits8));
+    C(low.Contains("Fine heights add nothing worth their size at Heightmap Amount 2") && low.Contains("is already 6.1 mm.") && !lowAuto.Contains("Fine heights") && !high.Contains("Fine heights"),
+      $"asked for at Heightmap Amount 2 they get a note that they add nothing ({low.Split('\n').Last()}); auto and amount 81 get none");
+    var plain = Call("Estimate", Fine(81f, WorldExport.FineHeightsMode.Off)); var withFine = Call("Estimate", Fine(81f, WorldExport.FineHeightsMode.Auto));
+    C(MemoryMb(withFine) > MemoryMb(plain) && MemoryMb(withFine) <= 150 && Call("Estimate", Fine(81f, WorldExport.FineHeightsMode.Auto, 16384)).Contains($"About {MemoryMb(withFine)} MB"),
+      $"the estimate counts the fine file's band ({MemoryMb(plain)} MB without, {MemoryMb(withFine)} MB with, still the same at any size)");
+    C(Call("Estimate", Fine(1f, WorldExport.FineHeightsMode.Auto)) == Call("Estimate", Fine(1f, WorldExport.FineHeightsMode.Off)), "and the estimate is the old one where there is no fine file");
   }
 
   public static void Json()

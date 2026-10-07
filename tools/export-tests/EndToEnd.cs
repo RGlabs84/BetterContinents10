@@ -197,6 +197,7 @@ internal static class EndToEnd
     Program.C(missing.Count == 0, "every map, legend and text file is written" + (missing.Count > 0 ? ": missing " + string.Join(", ", missing) : ""));
     Program.C(!present.Any(f => f.EndsWith(".tmp")), "no .tmp files are left");
     Program.C(!present.Contains("locationmap.png"), "no location map without locations");
+    Program.C(!present.Contains("heightmap-fine.png"), "no fine heights file at Heightmap Amount 2 (fine=auto leaves it out: a grey step is 0.61 cm)");
     if (missing.Count > 0) return;
 
     // Alt biomes through ImageMapAltBiome, at the game's own grid points.

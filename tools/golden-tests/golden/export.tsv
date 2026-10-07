@@ -1,5 +1,5 @@
 defaults	4096 px, amount 1, sea level 0.5, heights, biomes, locations, forest, heat, alt biomes, lava, moss, paint, sources; zone blend, edge drop-off as the world, forest additive, heat scale 10; New World preset
-usage	[size] [amount=1] [sealevel=0.5] [heatscale=10] [edge=auto|on|off] [forest=additive|exact] [noheight] [nobiomes] [nolocations] [noforest] [noheat] [noaltbiomes] [nolava] [nomoss] [nopaint] [nosources] [nopreset] [perpoint]
+usage	[size] [amount=1] [sealevel=0.5] [heatscale=10] [edge=auto|on|off] [forest=additive|exact] [fine=auto|off|4|8] [noheight] [nobiomes] [nolocations] [noforest] [noheat] [noaltbiomes] [nolava] [nomoss] [nopaint] [nosources] [nopreset] [perpoint]
 format	bc-export/1
 amount2/export.cfg/001	
 amount2/export.cfg/002	[00 BetterContinents.Debug]

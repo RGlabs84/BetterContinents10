@@ -110,6 +110,70 @@ public static class WorldExportMath
   /// <summary>The value a 16-bit pixel decodes to (ImageMapFloat reads L16 as p / 65535).</summary>
   public static float UShortToValue(ushort pixel) => pixel / 65535f;
 
+  // ---- fine heights: heightmap-fine.png beside heightmap.png (format 1) ----------------------------------------------------
+  // The grey value c of heightmap.png stays what it always was. The fine file holds, for the same pixel, the rest of the
+  // height in 1/256 of a grey step as a signed byte f, so the height is N = 256 * c + f in those units, v = N / 16776960 and
+  // metres as for any heightmap. Written with 4 bits, f is a multiple of 16.
+
+  /// <summary>Metres in one grey step of heightmap.png: 200 * amount / 65535 (1.5 cm at amount 5, a quarter of a metre at 81).</summary>
+  public static double GreyStepMetres(float amount) => HeightScale * (double)amount / 65535.0;
+
+  /// <summary>A length in metres the way the notes and the log say it: 1.25 m, 24.7 cm, 1.5 cm, 0.97 mm.</summary>
+  public static string LengthText(double metres) =>
+    metres >= 1.0 ? string.Format(CultureInfo.InvariantCulture, "{0:0.##} m", metres)
+    : metres >= 0.01 ? string.Format(CultureInfo.InvariantCulture, "{0:0.#} cm", metres * 100.0)
+    : string.Format(CultureInfo.InvariantCulture, "{0:0.##} mm", metres * 1000.0);
+
+  /// <summary>What fine=auto goes by: a fine file is made where one grey step is more than 1.5 cm (Heightmap Amount above about 4.92).</summary>
+  public const double FineAutoStepMetres = 0.015;
+
+  /// <summary>The bits fine=auto gives at this Heightmap Amount: 4 where a grey step is above <see cref="FineAutoStepMetres"/>, else 0 (no fine file).</summary>
+  public static int AutoFineBits(float amount) => GreyStepMetres(amount) > FineAutoStepMetres ? 4 : 0;
+
+  /// <summary>Where a height lies on the grey scale, in grey steps: x = clamp01(v) * 65535 for v = (finalHeight + 0.15 - sea
+  /// level adjustment) / amount worked out in double, finalHeight being the height / 200 that the export encodes (after the
+  /// edge drop-off is undone). The grey value written for it is the nearest whole number to x, give or take the rounding of
+  /// the float arithmetic that picks it (<see cref="ValueToUShort"/>), which <see cref="FineOffset"/> makes up for.</summary>
+  public static double FineX(float finalHeight, float seaLevelAdjustment, float amount)
+  {
+    double v = ((double)finalHeight + BaseOffset - seaLevelAdjustment) / amount;
+    return !(v > 0.0) ? 0.0 : v >= 1.0 ? 65535.0 : v * 65535.0;
+  }
+
+  /// <summary>The fine byte for the height x next to the grey value c written for it: the rest (x - c) in 1/256 of a step,
+  /// rounded to a multiple of 2^(8 - bits) (half to even, as numpy's rint does in fine_ref.py) and kept within
+  /// -128 .. 128 - 2^(8 - bits), so 8 bits give -128..127 and 4 bits -128..112. As a signed byte; it is stored as it is
+  /// (255 is -1). 0 for no bits.</summary>
+  public static sbyte FineOffset(double x, int c, int bits)
+  {
+    if (bits < 1 || bits > 8)
+      return 0;
+    int q = 1 << (8 - bits);
+    double f = Math.Round((x - c) * (256.0 / q)) * q;
+    return (sbyte)Math.Max(-128.0, Math.Min(128.0 - q, f));
+  }
+
+  /// <summary>The true height x in 1/256 of a grey step, rounded: what the steep-ground rule compares between neighbours.</summary>
+  public static int FineUnits(double x) => (int)Math.Round(x * 256.0);
+
+  /// <summary>How many bits the fine bytes use, from the OR of all of them: 8 less the trailing zero bits, 0 when every byte is 0
+  /// (the number a reader works out for itself).</summary>
+  public static int FineBitsUsed(int orOfBytes)
+  {
+    orOfBytes &= 255;
+    if (orOfBytes == 0)
+      return 0;
+    int zeros = 0;
+    while (((orOfBytes >> zeros) & 1) == 0)
+      zeros++;
+    return 8 - zeros;
+  }
+
+  /// <summary>The text of the fine file's record, a PNG text chunk with the keyword BetterContinents: the format, the bits the
+  /// bytes use (for people), and the CRC-32 of the heightmap.png file the fine file was made for, 8 hex digits in upper case.</summary>
+  public static string FineRecordText(int bits, uint heightmapCrc) =>
+    string.Format(CultureInfo.InvariantCulture, "Fine Format = 1; Fine Bits = {0}; Heightmap CRC-32 = {1:X8}", bits, heightmapCrc);
+
   /// <summary>8-bit channel for value v: round(clamp01(v) * 255). The game keeps its terrain mask in 8 bits
   /// (Heightmap.m_paintMask is an RGBA32 texture), so lava, moss and paint lose nothing at this depth.</summary>
   public static byte ValueToByte(float value) => !(value > 0f) ? (byte)0 : value >= 1f ? (byte)255 : (byte)(value * 255f + 0.5f);
@@ -214,6 +278,19 @@ public static class WorldExport
   public static double PresetMemoryMb(int size, bool paint) => (double)size * size / 1e6 * (paint ? 26 : 20) + 30;
   public const string Format = "bc-export/1";
 
+  /// <summary>Whether heightmap-fine.png is made beside heightmap.png: more bits of height for every pixel, below the 16 of the
+  /// heightmap (fine heights, format 1). 4 bits refine a grey step to a sixteenth (1.5 cm at Heightmap Amount 81), 8 bits to a
+  /// 256th (1 mm).</summary>
+  public enum FineHeightsMode
+  {
+    /// <summary>4 bits where one grey step of heightmap.png is more than 1.5 cm (Heightmap Amount above about 4.92), none
+    /// below: an export at the amounts it always had is the folder it always was.</summary>
+    Auto,
+    Off,
+    Bits4,
+    Bits8,
+  }
+
   public sealed class Options
   {
     /// <summary>Pixels per side of every image (1024, 2048, 4096, 8192 or 16384 in the HUD). 2048 and up keep the alt-biome map
@@ -269,6 +346,10 @@ public static class WorldExport
     /// <summary>The Heatmap Scale the heat is encoded for (above 0, at most 100): value = gradient / scale. 10 (Better
     /// Continents' default) covers the whole vanilla gradient, which reaches about 8.3 at the southern rim.</summary>
     public float HeatScale = 10f;
+    /// <summary>heightmap-fine.png beside heightmap.png (see <see cref="FineHeightsMode"/>). Auto by default. No config key: it is
+    /// a choice for one export (bc_export fine=auto|off|4|8 and the export window), and deleting the file from a folder is the way
+    /// to a world without it.</summary>
+    public FineHeightsMode FineHeights = FineHeightsMode.Auto;
 
     /// <summary>The built-in defaults, with [09 BetterContinents.Export] Default Size, Default Heightmap Amount and
     /// Default Sea Level applied (LiveConfig; the built-in values where the config is not bound), and no preset on a
@@ -284,6 +365,16 @@ public static class WorldExport
     public Options Clone() => (Options)MemberwiseClone();
 
     internal bool NeedsTerrain => Heightmap || Lava || Moss || Paint;
+
+    /// <summary>The bits heightmap-fine.png carries in this export: 4 or 8, or 0 when there is no such file (no heightmap, fine off,
+    /// or fine=auto at a Heightmap Amount where a grey step is already 1.5 cm or less).</summary>
+    internal int FineBits => !Heightmap ? 0 : FineHeights switch
+    {
+      FineHeightsMode.Off => 0,
+      FineHeightsMode.Bits4 => 4,
+      FineHeightsMode.Bits8 => 8,
+      _ => WorldExportMath.AutoFineBits(HeightmapAmount),
+    };
 
     internal string? Validate()
     {
@@ -316,6 +407,7 @@ public static class WorldExport
       var edge = EdgeDropoff == null ? "as the world" : EdgeDropoff.Value ? "on" : "off";
       return $"{Size} px, amount {Inv(HeightmapAmount)}, sea level {Inv(SeaLevel)}, {string.Join(", ", maps)}; "
              + $"{(ZoneBlend ? "zone blend" : "per-point heights")}, edge drop-off {edge}, forest {(ForestExact ? "exact" : "additive")}, heat scale {Inv(HeatScale)}"
+             + (FineHeights == FineHeightsMode.Auto ? "" : FineHeights == FineHeightsMode.Off ? ", fine off" : $", fine {(FineHeights == FineHeightsMode.Bits4 ? 4 : 8)} bits")
              + (Preset ? "; New World preset" : "; no preset");
     }
   }
@@ -670,6 +762,124 @@ public static class WorldExport
     }
   }
 
+  // The fine heights of the terrain pass (heightmap-fine.png, format 1), made a band of rows at a time. Pixel() stores a pixel's
+  // fine byte as the writer rule makes it (WorldExportMath.FineOffset: 0 under water) and its true height in 1/256 of a grey
+  // step; Finish() then applies the rest of the policy Better Continents' own export follows: f = 0 where the true heights rise
+  // a whole grey step or more to any of the four neighbouring pixels. There the next step is under a pixel away, the extra bits
+  // cannot be seen, and they are noise-like, so they would cost 4 to 8 bits a pixel in the file, in every world made from it and
+  // in every join. That test needs the rows above and below a band: the band is sampled with one row more below it (RunBands'
+  // look-ahead), and the row above is the last row of the band before, kept. Whatever the size of the bands, the bytes come out
+  // the same.
+  internal sealed class FineBands
+  {
+    /// <summary>A grey step in the units of the true heights (256 to a step): ground that rises this much or more to a neighbour gets no fine bits.</summary>
+    public const int SteepUnits = 256;
+
+    public readonly int Size, Bits;
+    private readonly int workers;
+    // The true heights of the rows around the band, in 1/256 grey steps: row 0 is the row above the band (the last of the band
+    // before it), rows 1..count are the band, row count + 1 is the row below it.
+    private readonly int[] units;
+    private bool haveAbove;
+    // Per file row, once its band is finished: its bytes OR-ed together and how many of them are not 0.
+    private readonly byte[] rowOr;
+    private readonly int[] rowFine;
+
+    /// <param name="bandRows">The most rows a band holds; <paramref name="workers"/> the threads Finish uses.</param>
+    public FineBands(int size, int bits, int bandRows, int workers)
+    {
+      Size = size;
+      Bits = bits;
+      this.workers = Math.Max(1, workers);
+      units = new int[(bandRows + 2) * size];
+      rowOr = new byte[size];
+      rowFine = new int[size];
+    }
+
+    /// <summary>Every fine byte is 0 or not: the OR of all of them (after the last band). 0 means the file would change nothing.</summary>
+    public int Or
+    {
+      get
+      {
+        int or = 0;
+        foreach (var b in rowOr)
+          or |= b;
+        return or;
+      }
+    }
+
+    /// <summary>How many pixels have a fine byte that is not 0 (after the last band).</summary>
+    public long Pixels
+    {
+      get
+      {
+        long sum = 0;
+        foreach (var k in rowFine)
+          sum += k;
+        return sum;
+      }
+    }
+
+    /// <summary>The pixel at <paramref name="col"/> of row <paramref name="rowInBand"/> (the row below the band is row count):
+    /// its height x in grey steps (<see cref="WorldExportMath.FineX"/>), the grey value c written for it, and whether it is under
+    /// water. Fills the fine byte of <paramref name="fine"/>, the band buffer of the fine file.</summary>
+    public void Pixel(byte[] fine, int rowInBand, int col, double x, int c, bool underWater)
+    {
+      fine[rowInBand * Size + col] = underWater ? (byte)0 : (byte)WorldExportMath.FineOffset(x, c, Bits);
+      units[(rowInBand + 1) * Size + col] = WorldExportMath.FineUnits(x);
+    }
+
+    /// <summary>The band is sampled: zeroes the fine bytes of ground that rises a grey step or more to a neighbour, keeps the last row's
+    /// height for the band below, and counts what is left. <paramref name="count"/> rows are the band (file rows
+    /// <paramref name="first"/> on); <paramref name="extra"/> is 1 when the row below it was sampled too (0 at the last band).</summary>
+    public void Finish(byte[] fine, int first, int count, int extra, Func<bool>? cancelled = null)
+    {
+      int w = Math.Min(workers, Math.Max(1, count));
+      GameUtils.SimpleParallelFor(w, 0, w, k =>
+      {
+        for (int r = k; r < count; r += w)
+        {
+          if (cancelled != null && cancelled())
+            return;
+          FinishRow(fine, first, r, count, extra > 0);
+        }
+      });
+      // The last row of this band is the row above the next.
+      if (count > 0)
+        Array.Copy(units, count * Size, units, 0, Size);
+      haveAbove = count > 0;
+    }
+
+    private void FinishRow(byte[] fine, int first, int r, int count, bool below)
+    {
+      int n = Size, at = r * n;
+      int row = (r + 1) * n, up = r * n, down = (r + 2) * n;
+      bool hasUp = r > 0 || haveAbove, hasDown = r + 1 < count || below;
+      byte or = 0;
+      int kept = 0;
+      for (int col = 0; col < n; col++)
+      {
+        byte f = fine[at + col];
+        if (f == 0)
+          continue;
+        int u = units[row + col];
+        bool steep = (col > 0 && Math.Abs(u - units[row + col - 1]) >= SteepUnits)
+                     || (col + 1 < n && Math.Abs(u - units[row + col + 1]) >= SteepUnits)
+                     || (hasUp && Math.Abs(u - units[up + col]) >= SteepUnits)
+                     || (hasDown && Math.Abs(u - units[down + col]) >= SteepUnits);
+        if (steep)
+          fine[at + col] = 0;
+        else
+        {
+          or |= f;
+          kept++;
+        }
+      }
+      rowOr[first + r] = or;
+      rowFine[first + r] = kept;
+    }
+  }
+
   private sealed class AltClass(string key, List<string> names)
   {
     public readonly string Key = key;
@@ -722,6 +932,10 @@ public static class WorldExport
     private bool LocationsFull, LocationsGenerated = true;
     private int LocationCount, LocationWritten, LocationNudged, LocationDropped, LocationOutside, LocationTypes, LocationUnnamed;
     private bool LocationsWritten, AltBiomesWritten, HeatWritten, ForestWritten, HeightsWritten;
+    // The fine heights file (heightmap-fine.png), when it was written: the bits its bytes use, and how many pixels have a fine byte
+    // that is not 0.
+    private int FineBitsWritten;
+    private long FinePixels;
     // The New World preset (PresetPass): what the builder did, or why it did not run.
     private WorldImport.Outcome? PresetOutcome;
     private string? PresetSkipped;
@@ -840,7 +1054,7 @@ public static class WorldExport
       // 0.05 is the text files at the end.
       double t = 0.05;
       if (O.NeedsTerrain)
-        t += (ZoneBlend ? 0.1 : 0) + W(3.0) + (O.Heightmap ? W(0.5) : 0) + (O.Lava ? W(0.15) : 0) + (O.Moss ? W(0.15) : 0) + (O.Paint ? W(0.3) : 0);
+        t += (ZoneBlend ? 0.1 : 0) + W(3.0) + (O.Heightmap ? W(0.5) : 0) + (O.FineBits > 0 ? W(0.15) + FineCloseWeight : 0) + (O.Lava ? W(0.15) : 0) + (O.Moss ? W(0.15) : 0) + (O.Paint ? W(0.3) : 0);
       if (O.Biomes)
         t += W(1.0) + W(0.3);
       if (O.Forest)
@@ -984,7 +1198,11 @@ public static class WorldExport
     // rowInBand) fills that row of every output's band buffer; a pixel it does not set must be cleared, because the buffers
     // are reused. Done when every row is written; the outputs are left open for the caller to complete, unless the run failed
     // or was cancelled, which closes and deletes them. A cancel stops within a row per worker.
-    private Task RunBands(int rows, Output[] outputs, Action<int, byte[][], int> sample)
+    // A map that needs to see the rows around a band (the fine heights' steep-ground rule) asks for lookAhead rows: that many
+    // rows after the band are sampled too (fewer at the last band), into rows count.. of the buffers, which are never written,
+    // and finish(first, count, extra, buffers) then runs once the band's own rows are sampled, before it is written. A row
+    // sampled as look-ahead is sampled again as the first row of the next band; it is one row in a band of 128 to 1024.
+    private Task RunBands(int rows, Output[] outputs, Action<int, byte[][], int> sample, int lookAhead = 0, Action<int, int, int, byte[][]>? finish = null)
     {
       rowsDone = 0;
       return OwnThread(() =>
@@ -993,7 +1211,7 @@ public static class WorldExport
         int workers = Math.Max(1, Math.Min(Workers, bandRows));
         var sets = new byte[2][][];
         for (int s = 0; s < 2; s++)
-          sets[s] = [.. outputs.Select(o => new byte[bandRows * o.RowBytes])];
+          sets[s] = [.. outputs.Select(o => new byte[(bandRows + lookAhead) * o.RowBytes])];
         Task? writing = null;
         bool finished = false;
         try
@@ -1001,17 +1219,21 @@ public static class WorldExport
           for (int start = 0, set = 0; start < rows && !cancelRequested; start += bandRows, set ^= 1)
           {
             int first = start, count = Math.Min(bandRows, rows - start);
+            int extra = Math.Min(lookAhead, rows - (first + count));
             var buffers = sets[set];
             GameUtils.SimpleParallelFor(workers, 0, workers, w =>
             {
-              for (int r = w; r < count; r += workers)
+              for (int r = w; r < count + extra; r += workers)
               {
                 if (cancelRequested)
                   return;
                 sample(first + r, buffers, r);
-                Interlocked.Increment(ref rowsDone);
+                if (r < count)
+                  Interlocked.Increment(ref rowsDone);
               }
             });
+            if (finish != null && !cancelRequested)
+              finish(first, count, extra, buffers);
             // The band before this one is written (in order, and its buffers free) before this one goes out.
             writing?.Wait();
             if (cancelRequested)
@@ -1040,10 +1262,11 @@ public static class WorldExport
     }
 
     // Samples and writes the outputs as one phase: Begin, the bands, Await. (Not for outputs that nothing samples.)
-    private IEnumerable Stream(string phase, double weight, int rows, Output[] outputs, Action<int, byte[][], int> sample)
+    private IEnumerable Stream(string phase, double weight, int rows, Output[] outputs, Action<int, byte[][], int> sample,
+      int lookAhead = 0, Action<int, int, int, byte[][]>? finish = null)
     {
       Begin(phase, weight);
-      foreach (var step in Await(RunBands(rows, outputs, sample), RowProgress(rows)))
+      foreach (var step in Await(RunBands(rows, outputs, sample, lookAhead, finish), RowProgress(rows)))
         yield return step;
     }
 
@@ -1070,9 +1293,19 @@ public static class WorldExport
       int n = Size;
       // One output per map, in this order; the band buffers come in the same order.
       var outputs = new List<Output>();
-      int hi = -1, li = -1, mi = -1, pi = -1;
-      Output? heights = null, lava = null, moss = null, paint = null;
+      int hi = -1, fi = -1, li = -1, mi = -1, pi = -1;
+      Output? heights = null, fineOut = null, lava = null, moss = null, paint = null;
       if (O.Heightmap) { heights = Open("heightmap.png", 1, 16, new HeightmapRecord(O.HeightmapAmount, O.SeaLevel)); hi = outputs.Count; outputs.Add(heights); }
+      // The fine heights beside it, from the same heights in the same bands (8-bit grey). Its record holds the CRC-32 of the finished
+      // heightmap.png, so it is written after the pixels, when that file is whole (FineFiles).
+      FineBands? fine = null;
+      if (O.FineBits > 0)
+      {
+        fineOut = Open("heightmap-fine.png", 1, 8);
+        fi = outputs.Count;
+        outputs.Add(fineOut);
+        fine = new FineBands(n, O.FineBits, Math.Min(BandRows, n), Workers);
+      }
       if (O.Lava) { lava = Open("lavamap.png", 1, 8); li = outputs.Count; outputs.Add(lava); }
       if (O.Moss) { moss = Open("mossmap.png", 1, 8); mi = outputs.Count; outputs.Add(moss); }
       if (O.Paint) { paint = Open("paintmap.png", 3, 8); pi = outputs.Count; outputs.Add(paint); }
@@ -1093,9 +1326,11 @@ public static class WorldExport
       // Sampling and writing in one pass: the weight is both, as they were when the maps were written after it.
       var grids = corners;
       foreach (var step in Stream(O.Heightmap ? "Sampling heights" : "Sampling terrain masks",
-                 W(3.0) + (O.Heightmap ? W(0.5) : 0) + (O.Lava ? W(0.15) : 0) + (O.Moss ? W(0.15) : 0) + (O.Paint ? W(0.3) : 0), n, [.. outputs],
+                 W(3.0) + (O.Heightmap ? W(0.5) : 0) + (fine != null ? W(0.15) : 0) + (O.Lava ? W(0.15) : 0) + (O.Moss ? W(0.15) : 0) + (O.Paint ? W(0.3) : 0), n, [.. outputs],
                  (row, buffers, r) => TerrainRow(row, r, grids, hi < 0 ? null : buffers[hi], li < 0 ? null : buffers[li], mi < 0 ? null : buffers[mi],
-                   pi < 0 ? null : buffers[pi], stats)))
+                   pi < 0 ? null : buffers[pi], stats, fi < 0 ? null : buffers[fi], fine),
+                 lookAhead: fine == null ? 0 : 1,
+                 finish: fine == null ? null : (first, count, extra, buffers) => fine.Finish(buffers[fi], first, count, extra, () => cancelRequested)))
         yield return step;
       corners = null;
 
@@ -1124,6 +1359,9 @@ public static class WorldExport
                     + "export again with a larger heightmap amount (and a matching sea level) to keep them.");
         if (RingClipped > 0)
           Notes.Add($"Heights: {RingClipped} pixel(s) in the edge ring between {Inv(WorldR)} m and {Inv(TotalR)} m were clipped (the world edge falls away there).");
+        if (fineOut != null)
+          foreach (var step in FineFiles(fineOut, fine!))
+            yield return step;
       }
       if (lava != null)
       {
@@ -1159,6 +1397,48 @@ public static class WorldExport
       }
     }
 
+    // The fine file is whole after heightmap.png is: its record names that file's CRC-32, read from the finished file, and goes
+    // after the pixels. A fine file in which every byte is 0 changes nothing and is not kept (as with the lava and moss maps).
+    private const double FineCloseWeight = 0.02;
+
+    private IEnumerable FineFiles(Output output, FineBands fine)
+    {
+      int bits = WorldExportMath.FineBitsUsed(fine.Or);
+      if (bits == 0)
+      {
+        output.Writer.Dispose();
+        Skip(FineCloseWeight);
+        Notes.Add("Heights: no pixel needs fine heights (the ground is under water, steeper than a grey step a pixel, or on a whole grey step), so there is no heightmap-fine.png.");
+        yield break;
+      }
+      Begin("Writing heightmap-fine.png", FineCloseWeight);
+      var heightmapPath = Path.Combine(Dir, "heightmap.png");
+      uint crc = 0;
+      var task = Task.Run(() =>
+      {
+        crc = PngRowWriter.FileCrc32(heightmapPath);
+        output.Writer.Complete(HeightmapRecord.Keyword, WorldExportMath.FineRecordText(bits, crc));
+      });
+      foreach (var step in Await(task, () => 50f, needsWorld: false))
+        yield return step;
+      Written.Add(output.Relative.Replace('\\', '/'));
+      FineBitsWritten = bits;
+      FinePixels = fine.Pixels;
+      var greyStep = WorldExportMath.GreyStepMetres(O.HeightmapAmount);
+      Notes.Add($"Heights: heightmap-fine.png refines heightmap.png from steps of {WorldExportMath.LengthText(greyStep)} to {WorldExportMath.LengthText(greyStep / (1 << bits))} on {FineCoverage()}; "
+                + "under water and where the ground rises a whole step or more between neighbouring pixels they stay at the heightmap's own steps.");
+      if (O.FineHeights != FineHeightsMode.Auto && WorldExportMath.AutoFineBits(O.HeightmapAmount) == 0)
+        Notes.Add($"Heights: at Heightmap Amount {Inv(O.HeightmapAmount)} one step of heightmap.png is already {WorldExportMath.LengthText(greyStep)}, so heightmap-fine.png adds nothing worth its size "
+                  + "(fine=auto leaves it out below a Heightmap Amount of about 4.9).");
+    }
+
+    // How much of the picture has a fine byte: "12.3% of the pixels", or their number when it is under a tenth of a percent.
+    private string FineCoverage()
+    {
+      var share = 100.0 * FinePixels / ((double)Size * Size);
+      return share >= 0.1 ? $"{share:0.#}% of the pixels" : $"{FinePixels} pixel(s)";
+    }
+
     private void CornerRow(int r, Heightmap.Biome[] corners)
     {
       float z = (cornerMin + r) * 64f - 32f;
@@ -1175,7 +1455,10 @@ public static class WorldExport
     private static bool MistlandsGround(Heightmap.Biome b) => b == Heightmap.Biome.Mistlands || EWD.Terrain(b) == Heightmap.Biome.Mistlands;
 
     // The maps' bytes go to rowInBand of the band buffers: 16-bit grey (heights) big endian, 8-bit grey (lava, moss), RGB (paint).
-    private void TerrainRow(int fileRow, int rowInBand, Heightmap.Biome[]? corners, byte[]? heights, byte[]? lava, byte[]? moss, byte[]? paint, TerrainRowStats[] stats)
+    // With fine heights, fineBytes is the fine file's band buffer and fine its bookkeeping (FineBands); a row sampled as the band's
+    // look-ahead only needs its heights, but is made as any other.
+    private void TerrainRow(int fileRow, int rowInBand, Heightmap.Biome[]? corners, byte[]? heights, byte[]? lava, byte[]? moss, byte[]? paint, TerrainRowStats[] stats,
+      byte[]? fineBytes = null, FineBands? fine = null)
     {
       int n = Size;
       float wz = WorldExportMath.FileRowToWorldZ(fileRow, n, Total);
@@ -1255,7 +1538,12 @@ public static class WorldExport
           if (EdgeDropoff && !inside)
             WorldExportMath.TryUndoEdgeDropoff(fh, d, WorldR, TotalR, out fh);
           float v = (fh + WorldExportMath.BaseOffset - Sla) / O.HeightmapAmount;
-          Put16(heights, 2 * i, WorldExportMath.ValueToUShort(v, out int clip));
+          ushort grey = WorldExportMath.ValueToUShort(v, out int clip);
+          Put16(heights, 2 * i, grey);
+          // The same height again in double, for the fine byte; the grey value above is what it always was. Under water means the
+          // height the world has there (before the edge drop-off was undone for the file), below the game's 30 m.
+          if (fine != null)
+            fine.Pixel(fineBytes!, rowInBand, col, WorldExportMath.FineX(fh, Sla, O.HeightmapAmount), grey, h < WorldExportMath.WaterLevel);
           if (inside)
           {
             if (clip < 0) st.Low++;
@@ -2084,7 +2372,13 @@ public static class WorldExport
           break;
         default:
           if (ext != null)
+          {
             Original(ext);
+            // A heightmap with fine heights is a pair: its heightmap-fine.png goes beside it, with the record naming the CRC-32 of the
+            // bytes just written as the heightmap (ImageMapFloat.FineSourceBytes), so the pair reads back as it does in this world.
+            if (map is ImageMapFloat height && height.FineSourceBytes(source!) is { } fine)
+              output(stem + "-fine.png", p => File.WriteAllBytes(p, fine));
+          }
           break;
       }
     }
@@ -2369,14 +2663,22 @@ public static class WorldExport
       l.Add("  detail and the random layout of things come out closest to the exported world.");
       l.Add("");
       l.Add("WHAT EACH FILE IS");
+      // The names are 17 wide; heightmap-fine.png needs 18.
+      int w = Written.Contains("heightmap-fine.png") ? 18 : 17;
       void Entry(string name, string what)
       {
         if (Written.Contains(name))
-          l.Add($"  {name,-17} {what}");
+          l.Add($"  {name.PadRight(w)} {what}");
       }
       Entry("heightmap.png", $"How high the ground is (16-bit grey): black {Inv(floor, "0.#")} m, white {Inv(ceiling, "0.#")} m, the sea (30 m) {Inv(wl, "0.####")}.");
       if (Written.Contains("heightmap.png"))
-        l.Add($"  {"",-17} Only right at Heightmap Amount {Inv(O.HeightmapAmount)} and Sea Level Adjustment {Inv(O.SeaLevel)} (export.cfg sets both).");
+        l.Add($"  {"".PadRight(w)} Only right at Heightmap Amount {Inv(O.HeightmapAmount)} and Sea Level Adjustment {Inv(O.SeaLevel)} (export.cfg sets both).");
+      Entry("heightmap-fine.png", $"Finer heights for heightmap.png (8-bit grey): {FineBitsWritten} more bits for each pixel, a step of {WorldExportMath.LengthText(WorldExportMath.GreyStepMetres(O.HeightmapAmount))} refined to {WorldExportMath.LengthText(WorldExportMath.GreyStepMetres(O.HeightmapAmount) / (1 << FineBitsWritten))},");
+      if (Written.Contains("heightmap-fine.png"))
+      {
+        l.Add($"  {"".PadRight(w)} where the ground is gentle. Better Continents reads it with heightmap.png. If you edit heightmap.png, delete");
+        l.Add($"  {"".PadRight(w)} heightmap-fine.png or export again: Better Continents ignores a fine file whose CRC does not match.");
+      }
       Entry("biomemap.png", "Which biome is where, in Better Continents' biome colours (biomemap.txt lists them).");
       Entry("locationmap.png", "One dot per location: start temple, bosses, traders, dungeons (locationmap.txt names the colours).");
       Entry("forestmap.png", ForestWritten && O.ForestExact
@@ -2390,16 +2692,18 @@ public static class WorldExport
       Entry("terrainmap.png", "This world's own ground colour map, copied so the rebuilt world keeps it (terrainmap.txt).");
       Entry("vegetationmap.png", "This world's own vegetation map: which plants may grow where (vegetationmap.txt).");
       Entry("spawnmap.png", "This world's own spawn map: which creatures may appear where (spawnmap.txt).");
-      if (Written.Any(w => w.StartsWith("sources/")))
-        l.Add($"  {"sources/",-17} The loaded world's own Better Continents maps as its settings keep them (not loaded).");
-      l.Add($"  {"export.cfg",-17} The settings that load this folder (way C). It keeps the world's Biome precision ({EffectiveBiomePrecision(Settings)}):");
-      l.Add($"  {"",-17} how closely the ground follows the biome map inside each 64 m terrain zone.");
-      l.Add($"  {"manifest.json",-17} Every number about this export, for tools.");
+      if (Written.Any(x => x.StartsWith("sources/")))
+        l.Add($"  {"sources/".PadRight(w)} The loaded world's own Better Continents maps as its settings keep them (not loaded).");
+      l.Add($"  {"export.cfg".PadRight(w)} The settings that load this folder (way C). It keeps the world's Biome precision ({EffectiveBiomePrecision(Settings)}):");
+      l.Add($"  {"".PadRight(w)} how closely the ground follows the biome map inside each 64 m terrain zone.");
+      l.Add($"  {"manifest.json".PadRight(w)} Every number about this export, for tools.");
       l.Add("  Delete a map from the folder, then remake the preset (B), to let the game make that part itself.");
       l.Add("");
       l.Add("EDITING, AND CUTTING AND PASTING BETWEEN EXPORTS");
       l.Add("  - Edit the PNGs in any image editor. Keep them square PNGs of the same size, and keep heightmap.png,");
       l.Add("    forestmap.png and heatmap.png 16-bit grey (an 8-bit save turns smooth slopes into steps).");
+      if (Written.Contains("heightmap-fine.png"))
+        l.Add("  - heightmap-fine.png goes with the heightmap.png it was exported with: after you edit heightmap.png, delete it (or export again).");
       l.Add("  - Two exports line up pixel for pixel when they have the same size, heightmap amount and sea level");
       l.Add("    (size, heightmapAmount, seaLevel and totalSize in manifest.json). Then an area cut from one pastes into the");
       l.Add("    same place of the other, and the heights there come out the same.");
@@ -2424,7 +2728,14 @@ public static class WorldExport
       if (HeightsWritten)
       {
         l.Add($"  Heights: metres = (v x {Inv(O.HeightmapAmount)} - 0.15 + {Inv(Sla)}) x 200, v = pixel / 65535.");
-        l.Add($"  One step of the 16-bit grey is {Inv((ceiling - floor) / 65535f, "0.###")} m, so no height is stored finer than that.");
+        if (Written.Contains("heightmap-fine.png"))
+        {
+          l.Add($"  One step of the 16-bit grey is {Inv((ceiling - floor) / 65535f, "0.###")} m. heightmap-fine.png refines it: its byte f for a pixel, read as a signed number (0 to 127,");
+          l.Add("  then 255 is -1 down to 128 is -128), counts 256ths of a step, in multiples of " + (1 << (8 - FineBitsWritten)) + " here, and v = (256 x pixel + f) / 16776960 takes the place of");
+          l.Add("  pixel / 65535. f is 0 under water and where the ground rises a whole step or more to a neighbouring pixel.");
+        }
+        else
+          l.Add($"  One step of the 16-bit grey is {Inv((ceiling - floor) / 65535f, "0.###")} m, so no height is stored finer than that.");
         if (EdgeDropoff)
           l.Add($"  Past {Inv(WorldR)} m the heightmap holds the ground before Better Continents' edge drop-off, which rebuilds the edge.");
       }
@@ -2521,6 +2832,13 @@ public static class WorldExport
         { "files", files },
         { "notes", Notes.ToList() },
       };
+      if (Written.Contains("heightmap-fine.png"))
+      {
+        // Only when there is a fine file, so the manifest of an export without one is the one it always was.
+        int at = m.FindIndex(kv => kv.Key == "heightEncoding") + 1;
+        m.Insert(at, new KeyValuePair<string, object?>("fineBits", FineBitsWritten));
+        m.Insert(at + 1, new KeyValuePair<string, object?>("fineEncoding", "signed offset, 1/256 step, format 1"));
+      }
       return WorldExportJson.Write(m);
     }
 
@@ -2573,6 +2891,8 @@ public static class WorldExport
         lines.Add($"heights {MinMetres:0.#} m to {MaxMetres:0.#} m inside the world; "
                   + (clipped == 0 ? "no pixel clipped." : $"{ClippedLow} pixel(s) clipped low and {ClippedHigh} high (a larger heightmap amount keeps them)."));
       }
+      if (FineBitsWritten > 0)
+        lines.Add($"fine heights: heightmap-fine.png refines {FineCoverage()} from steps of {WorldExportMath.LengthText(WorldExportMath.GreyStepMetres(O.HeightmapAmount))} to {WorldExportMath.LengthText(WorldExportMath.GreyStepMetres(O.HeightmapAmount) / (1 << FineBitsWritten))}.");
       if (LocationsWritten)
       {
         var line = $"{LocationWritten} of {LocationCount} locations in the location map";

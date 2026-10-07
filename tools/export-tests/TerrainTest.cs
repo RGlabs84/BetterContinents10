@@ -17,8 +17,14 @@ namespace ExportTest;
 // synthetic biome and height functions (the real ones need Unity's native Perlin noise).
 internal static class TerrainTest
 {
+  // A test can swap the fake world for its own terrain (FineTest's terraces and flooded world): one biome and one height
+  // function of the world position. null, as in every other test, is the three-biome world below.
+  internal static Func<float, float, float> HeightOverride;
+
   public static Heightmap.Biome Biome(float x, float z)
   {
+    if (HeightOverride != null)
+      return Heightmap.Biome.Meadows;
     // Borders that do not line up with the 64 m zones, three biomes.
     int k = ((int)Math.Floor((x + 37f) / 211f) + (int)Math.Floor((z - 11f) / 157f)) % 3;
     if (k < 0) k += 3;
@@ -27,6 +33,11 @@ internal static class TerrainTest
 
   public static float Height(Heightmap.Biome b, float x, float z, out Color mask)
   {
+    if (HeightOverride != null)
+    {
+      mask = new Color(0f, 0f, 0f, 0f);
+      return HeightOverride(x, z);
+    }
     switch (b)
     {
       case Heightmap.Biome.AshLands:
@@ -97,7 +108,7 @@ internal static class TerrainTest
       var stats = Array.CreateInstance(statsType, n);
       var terrainRow = jobType.GetMethod("TerrainRow", BindingFlags.NonPublic | BindingFlags.Instance)!;
       for (int r = 0; r < n; r++)
-        terrainRow.Invoke(job, [r, r, corners, heights, lava, moss, paint, stats]);
+        terrainRow.Invoke(job, [r, r, corners, heights, lava, moss, paint, stats, null, null]);
 
       int bad = 0, blended = 0, lavaBad = 0, mossBad = 0, paintBad = 0;
       for (int r = 0; r < n; r++)

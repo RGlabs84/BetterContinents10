@@ -46,7 +46,7 @@ public partial class DebugUtils
 public static class WorldExportCommands
 {
     public const string OptionsUsage =
-        "[size] [amount=1] [sealevel=0.5] [heatscale=10] [edge=auto|on|off] [forest=additive|exact] "
+        "[size] [amount=1] [sealevel=0.5] [heatscale=10] [edge=auto|on|off] [forest=additive|exact] [fine=auto|off|4|8] "
         + "[noheight] [nobiomes] [nolocations] [noforest] [noheat] [noaltbiomes] [nolava] [nomoss] [nopaint] [nosources] [nopreset] [perpoint]";
 
     public const string Usage = "bc_export [status | cancel | server <options> | <options>] - options: " + OptionsUsage;
@@ -74,6 +74,7 @@ public static class WorldExportCommands
                 output("Writes heightmap, biome, location, forest, heat, alt-biome, lava, moss and paint maps, export.cfg, README.txt and manifest.json,");
                 output("and a New World preset \"<world> <time>\": pick it in the New World screen to make a world from the export.");
                 output($"size: {WorldExport.MinSize} to {WorldExport.SizeLimit} pixels a side (powers of two from 1024 are the usual ones{(WorldExport.SizeLimit < WorldExport.MaxSize ? $"; Largest Size in the config stops at {WorldExport.SizeLimit}" : "")}); amount: the Heightmap Amount the heights are encoded for, above 0 and up to {WorldExport.MaxHeightmapAmount:0}.");
+                output("fine: heightmap-fine.png beside heightmap.png, 4 bits (a sixteenth of one of its steps) or 8 bits (a 256th) more of height; auto (the default) makes it with 4 bits where a step is above 1.5 cm, from a Heightmap Amount of about 5.");
                 output("After editing the PNGs, bc_import makes the preset again (bc_import help).");
                 output($"Defaults, from [09 BetterContinents.Export] in BetterContinents.cfg: {WorldExport.Options.Default()}");
                 output("The same section's Hud turns on the export HUD: a status box (Hud Hotkey, F9) and an export window (Window Hotkey, F7).");
@@ -211,6 +212,13 @@ public static class WorldExportCommands
                     case "forest":
                         if (value == "additive") options.ForestExact = false;
                         else if (value == "exact") options.ForestExact = true;
+                        else ok = false;
+                        break;
+                    case "fine":
+                        if (value == "auto") options.FineHeights = WorldExport.FineHeightsMode.Auto;
+                        else if (value == "off") options.FineHeights = WorldExport.FineHeightsMode.Off;
+                        else if (value == "4") options.FineHeights = WorldExport.FineHeightsMode.Bits4;
+                        else if (value == "8") options.FineHeights = WorldExport.FineHeightsMode.Bits8;
                         else ok = false;
                         break;
                     default:

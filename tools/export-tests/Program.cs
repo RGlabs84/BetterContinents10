@@ -69,6 +69,26 @@ internal static class Program
     Directory.CreateDirectory(work);
     try
     {
+      // BCEXPORT_ONLY=fine: the fine heights tests alone (the commands and the window's text, then the terrain test whose generator stubs
+      // the exports use), for working on them. BCEXPORT_ONLY=big: just the big export (BCEXPORT_BIG=<size>, BCEXPORT_AMOUNT) and its cancel.
+      if (Environment.GetEnvironmentVariable("BCEXPORT_ONLY") == "big" && int.TryParse(Environment.GetEnvironmentVariable("BCEXPORT_BIG"), out var bigOnly) && bigOnly > 0)
+      {
+        TerrainTest.Run();
+        BigExport.Run(work, bigOnly, float.TryParse(Environment.GetEnvironmentVariable("BCEXPORT_AMOUNT"), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var amountOnly) ? amountOnly : 81f);
+        BigExport.CancelAt(work, bigOnly);
+        System.Console.WriteLine($"{checks} checks, {failures} failures");
+        return failures == 0 ? 0 : 1;
+      }
+      if (Environment.GetEnvironmentVariable("BCEXPORT_ONLY") == "fine")
+      {
+        Tests.Commands();
+        Tests.HudText();
+        PngRowWriterTest.Run(work);
+        TerrainTest.Run();
+        FineTest.Run(work);
+        System.Console.WriteLine($"{checks} checks, {failures} failures");
+        return failures == 0 ? 0 : 1;
+      }
       Tests.Math();
       Tests.HeightRoundTrip(work);
       Tests.Amount81(work);
@@ -87,6 +107,7 @@ internal static class Program
       Tests.ConfigAndReadme(work);
       TerrainTest.Run();
       EndToEnd.Run(work);
+      FineTest.Run(work);
       // Past the usual sizes: BCEXPORT_BIG=8192 (or 16384) runs the whole export there, with its memory measured.
       if (int.TryParse(Environment.GetEnvironmentVariable("BCEXPORT_BIG"), out var big) && big > 0)
       {

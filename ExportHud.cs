@@ -365,7 +365,8 @@ public static class ExportHud
     fieldInfo = problem == null
       ? $"Waterline at {Inv(WorldExportMath.WaterlineValue(o.HeightmapAmount, o.SeaLevel))}; heights from "
         + $"{WorldExportMath.ValueToMetres(0f, o.HeightmapAmount, o.SeaLevel):0} m to {WorldExportMath.ValueToMetres(1f, o.HeightmapAmount, o.SeaLevel):0} m, "
-        + $"in steps of {(WorldExportMath.ValueToMetres(1f, o.HeightmapAmount, o.SeaLevel) - WorldExportMath.ValueToMetres(0f, o.HeightmapAmount, o.SeaLevel)) / 65535f:0.###} m."
+        + $"in steps of {(WorldExportMath.ValueToMetres(1f, o.HeightmapAmount, o.SeaLevel) - WorldExportMath.ValueToMetres(0f, o.HeightmapAmount, o.SeaLevel)) / 65535f:0.###} m"
+        + FineInfo(o)
       : "";
     notes = Notes(o);
   }
@@ -385,7 +386,20 @@ public static class ExportHud
       list.Add("On a client the location map holds only the locations the server shows on the map; 'bc_export server' exports the server's own world (admins).");
     if (o.EdgeDropoff == false)
       list.Add("Drop-off off also removes the world edge: no edge push, and the sea goes on for ever.");
+    if (o.Heightmap && (o.FineHeights == WorldExport.FineHeightsMode.Bits4 || o.FineHeights == WorldExport.FineHeightsMode.Bits8) && WorldExportMath.AutoFineBits(o.HeightmapAmount) == 0)
+      list.Add($"Fine heights add nothing worth their size at Heightmap Amount {Inv(o.HeightmapAmount)}: one step of heightmap.png is already "
+               + $"{WorldExportMath.LengthText(WorldExportMath.GreyStepMetres(o.HeightmapAmount))}. They help from a Heightmap Amount of about 5, where a step is more than 1.5 cm.");
     return string.Join("\n", list);
+  }
+
+  // What the fine heights file makes of the grey step, for the line under the encoding fields: ", refined to 1.5 cm by
+  // heightmap-fine.png." where the export makes one, else just the full stop.
+  private static string FineInfo(WorldExport.Options o)
+  {
+    int bits = o.FineBits;
+    if (bits == 0)
+      return ".";
+    return $", refined to {WorldExportMath.LengthText(WorldExportMath.GreyStepMetres(o.HeightmapAmount) / (1 << bits))} by heightmap-fine.png.";
   }
 
   // Pixels, a rough size per map before compression, the memory it holds, and a rough time. The times are guesses from
@@ -395,13 +409,15 @@ public static class ExportHud
     double mpx = (double)o.Size * o.Size / 1e6;
     int grey16 = (o.Heightmap ? 1 : 0) + (o.Forest ? 1 : 0) + (o.Heat ? 1 : 0);
     int colour = (o.Biomes ? 1 : 0) + (o.AltBiomes ? 1 : 0) + (o.Locations ? 1 : 0) + (o.Paint ? 1 : 0);
-    int grey8 = (o.Lava ? 1 : 0) + (o.Moss ? 1 : 0);
+    int fine = o.FineBits > 0 ? 1 : 0;
+    int grey8 = (o.Lava ? 1 : 0) + (o.Moss ? 1 : 0) + fine;
     double raw = mpx * (2 * grey16 + 3 * colour + grey8);
     // The maps are written as they are sampled, a band of rows (about two million pixels) at a time: two bands of every map
     // being written (up to 7 bytes a pixel for the terrain pass), the encoders' buffers and the zone corners, whatever the size
     // (measured: 32 MB over the process offline and 80 MB over an idle dedicated server, at 16384 px; 0.9 and 4.4 GB before
     // 0.10.3, which held a whole map a pass).
-    double memory = Math.Min(mpx, 2.1) * 2 * 7 + 70;
+    // With fine heights the band holds a byte a pixel more, and 4 bytes of height to tell steep ground by.
+    double memory = Math.Min(mpx, 2.1) * 2 * 7 + 70 + (fine > 0 ? Math.Min(mpx, 2.1) * 6 : 0);
     double preset = PresetMemory(o);
     var time = o.Size <= 1024 ? "well under a minute" : o.Size <= 2048 ? "about a minute" : o.Size <= 4096 ? "a few minutes"
       : o.Size <= 8192 ? "several minutes" : "a quarter of an hour or more";
@@ -524,6 +540,20 @@ public static class ExportHud
     heatScaleText = Field("Heat Scale", heatScaleText, s);
     if (fieldInfo.Length > 0)
       GUILayout.Label(fieldInfo, s.Dim);
+    GUILayout.BeginHorizontal();
+    GUILayout.Label("Fine heights:", s.Text, GUILayout.Width(LabelWidth));
+    if (Radio(o.FineHeights == WorldExport.FineHeightsMode.Auto, "auto"))
+      o.FineHeights = WorldExport.FineHeightsMode.Auto;
+    if (Radio(o.FineHeights == WorldExport.FineHeightsMode.Off, "off"))
+      o.FineHeights = WorldExport.FineHeightsMode.Off;
+    if (Radio(o.FineHeights == WorldExport.FineHeightsMode.Bits4, "4 bits"))
+      o.FineHeights = WorldExport.FineHeightsMode.Bits4;
+    if (Radio(o.FineHeights == WorldExport.FineHeightsMode.Bits8, "8 bits"))
+      o.FineHeights = WorldExport.FineHeightsMode.Bits8;
+    GUILayout.FlexibleSpace();
+    GUILayout.EndHorizontal();
+    GUILayout.Label("heightmap-fine.png: more bits of height beside heightmap.png. Auto makes it, with 4 bits, where a step of the heightmap is above 1.5 cm "
+                    + "(from a Heightmap Amount of about 5).", s.Dim);
     o.ZoneBlend = GUILayout.Toggle(o.ZoneBlend, "Heights as the game builds terrain (zone-corner biome blend)");
     o.ForestExact = GUILayout.Toggle(o.ForestExact, "Exact forest (Forestmap Multiply 1 / Add 1; harder to paint)");
     GUILayout.BeginHorizontal();

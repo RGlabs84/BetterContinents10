@@ -66,7 +66,7 @@ internal static class PngRowWriterTest
   }
 
   // The chunks of a PNG file, checking each CRC: (type, data).
-  static List<(string Type, byte[] Data)> Chunks(byte[] file, out bool crcOk)
+  internal static List<(string Type, byte[] Data)> Chunks(byte[] file, out bool crcOk)
   {
     crcOk = file.Length > 8 && file.Take(8).SequenceEqual(new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A });
     var list = new List<(string, byte[])>();
@@ -197,6 +197,62 @@ internal static class PngRowWriterTest
       C(ok && chunks.Select(c => c.Type).First(t => t != "IHDR") == "tEXt" && chunks.Count(c => c.Type == "tEXt") == 1, "the text chunk is one tEXt chunk before the pixels");
       C(back != null && back.Amount == 81f && back.SeaLevel == 0.5f, $"it reads back as the record of Heightmap Amount 81 ({back?.Text})");
       C(chunks.All(c => c.Type is "IHDR" or "tEXt" or "IDAT" or "IEND"), "no other chunk is written (no gAMA, pHYs, sRGB)");
+    }
+
+    // A text chunk after the pixels (the fine heights file's record, whose CRC-32 is only known once the heightmap is finished):
+    // between the last IDAT and IEND, beside a text chunk before the pixels, read by ImageSharp; and a file completed without
+    // one is the file it always was.
+    {
+      var picture = Picture(61, 33, 1, 8, 11);
+      var plain = Path.Combine(work, "after-plain.png");
+      var both = Path.Combine(work, "after-both.png");
+      var viaNull = Path.Combine(work, "after-null.png");
+      const string text = "Fine Format = 1; Fine Bits = 4; Heightmap CRC-32 = 0A1B2C3D";
+      Write(plain, picture, 61, 33, 1, 8, [10]);
+      using (var writer = new PngRowWriter(viaNull, 61, 33, 1, 8))
+      {
+        writer.WriteRows(picture, 0, 33);
+        writer.Complete(null, null);
+      }
+      using (var writer = new PngRowWriter(both, 61, 33, 1, 8, HeightmapRecord.Keyword, new HeightmapRecord(81f, 0.5f).Text))
+      {
+        writer.WriteRows(picture, 0, 17);
+        writer.WriteRows(picture, 17 * writer.RowBytes, 16);
+        writer.Complete(HeightmapRecord.Keyword, text);
+        writer.Complete(HeightmapRecord.Keyword, "ignored: it is complete");
+      }
+      var chunks = Chunks(File.ReadAllBytes(both), out var ok);
+      var types = chunks.Select(c => c.Type).ToList();
+      int lastIdat = types.LastIndexOf("IDAT");
+      C(ok && types[0] == "IHDR" && types[1] == "tEXt" && types[2] == "IDAT" && types[lastIdat + 1] == "tEXt" && types[lastIdat + 2] == "IEND" && types.Count == lastIdat + 3 && types.Count(t => t == "tEXt") == 2,
+        $"a text chunk after the pixels sits between the last IDAT and IEND, beside the one before them ({string.Join(" ", types.Distinct())})");
+      string Text(byte[] data) { int z = Array.IndexOf(data, (byte)0); return System.Text.Encoding.Latin1.GetString(data, z + 1, data.Length - z - 1); }
+      C(Text(chunks[lastIdat + 1].Data) == text && System.Text.Encoding.Latin1.GetString(chunks[lastIdat + 1].Data, 0, HeightmapRecord.Keyword.Length) == HeightmapRecord.Keyword, "its keyword and text are what was given");
+      using (var image = Image.Load<L8>(both))
+      {
+        var meta = image.Metadata.GetPngMetadata().TextData.ToList();
+        C(meta.Count == 2 && meta.Any(t => t.Keyword == HeightmapRecord.Keyword && t.Value == text) && HeightmapRecord.From(meta) is { Amount: 81f },
+          "ImageSharp reads both chunks, and the heightmap's own record is still found");
+        C(Enumerable.Range(0, 61 * 33).All(i => image[i % 61, i / 61].PackedValue == picture[i]), "the pixels are untouched");
+      }
+      C(File.ReadAllBytes(plain).SequenceEqual(File.ReadAllBytes(viaNull)), "Complete(null, null) writes the file Complete() always did, byte for byte");
+      uint Bitwise(byte[] bytes)
+      {
+        uint crc = 0xFFFFFFFF;
+        foreach (var b in bytes)
+        {
+          crc ^= b;
+          for (int k = 0; k < 8; k++)
+            crc = (crc & 1) != 0 ? (crc >> 1) ^ 0xEDB88320u : crc >> 1;
+        }
+        return ~crc;
+      }
+      var all = File.ReadAllBytes(both);
+      C(PngRowWriter.FileCrc32(both) == Bitwise(all) && PngRowWriter.FileCrc32(plain) == Bitwise(File.ReadAllBytes(plain)), "FileCrc32 is the CRC-32 of the file's bytes (checked against a bitwise one)");
+      var wide = new byte[3 * (1 << 20) + 12345];
+      new Random(5).NextBytes(wide);
+      File.WriteAllBytes(Path.Combine(work, "crc-wide.bin"), wide);
+      C(PngRowWriter.FileCrc32(Path.Combine(work, "crc-wide.bin")) == Bitwise(wide), "and over a file of several megabytes read in blocks");
     }
 
     // An unfinished file is not left behind, and an incomplete image cannot be completed.

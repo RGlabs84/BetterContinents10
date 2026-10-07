@@ -112,7 +112,9 @@ internal static class BigExport
     Program.C(!WorldExport.IsRunning && WorldExport.Phase == "Done" && WorldExport.LastError == null,
       $"the {n} px export finishes: phase {WorldExport.Phase}, error {WorldExport.LastError ?? "none"}");
     var present = Directory.Exists(dir) ? Directory.GetFiles(dir).Select(Path.GetFileName).ToHashSet() : new HashSet<string>();
-    var expected = new[] { "heightmap.png", "biomemap.png", "forestmap.png", "heatmap.png", "altbiomemap.png", "lavamap.png", "mossmap.png", "paintmap.png", "export.cfg", "README.txt", "manifest.json" };
+    bool fineWritten = M.AutoFineBits(amount) > 0;
+    var expected = new[] { "heightmap.png", "biomemap.png", "forestmap.png", "heatmap.png", "altbiomemap.png", "lavamap.png", "mossmap.png", "paintmap.png", "export.cfg", "README.txt", "manifest.json" }
+      .Concat(fineWritten ? ["heightmap-fine.png"] : []).ToArray();
     var missing = expected.Where(f => !present.Contains(f)).ToList();
     Program.C(missing.Count == 0 && !present.Any(f => f.EndsWith(".tmp")), "every map and text file is written, no .tmp is left" + (missing.Count > 0 ? ": missing " + string.Join(", ", missing) : ""));
     foreach (var f in expected.Where(f => f.EndsWith(".png") && present.Contains(f)))
@@ -151,6 +153,8 @@ internal static class BigExport
         }
       });
     }
+    if (fineWritten)
+      FineChecks(dir, n, amount, o.SeaLevel);
     // One grey step is (ceiling - floor) / 65535 metres; the pixel is the nearest step.
     float step = (M.ValueToMetres(1f, amount, o.SeaLevel) - M.ValueToMetres(0f, amount, o.SeaLevel)) / 65535f;
     Program.C(seen > 1000 && worstMetres <= step * 0.51f + 0.01f, $"{seen} sampled heights are within half a grey step ({step:0.###} m) of the fake terrain (worst {worstMetres:0.###} m)");
@@ -237,6 +241,73 @@ internal static class BigExport
       Program.C(image.Width == n && image.Height == n, "altbiomemap.png decodes at this size");
 
     Cleanup(dir);
+  }
+
+  // heightmap-fine.png at this size: 8-bit grey of the same size, 4 bits, its record (after the pixels) naming the CRC-32 of the heightmap.png beside it,
+  // and its bytes at every 61st row and 67th column against the writer rule on the fake world (with the policy's neighbours worked out the same way).
+  static void FineChecks(string dir, int n, float amount, float seaLevel)
+  {
+    var path = Path.Combine(dir, "heightmap-fine.png");
+    float sla = M.SeaLevelAdjustment(seaLevel), T = BC.TotalSize, worldR = BC.WorldRadius, totalR = BC.TotalRadius;
+    // The height of the fake world at a pixel as the export stores it: the grey value, x in double, and whether it is under water.
+    (ushort Grey, double X, bool Wet) At(int r, int col)
+    {
+      float wx = M.PixelToWorld(col, n, T), wz = M.FileRowToWorldZ(r, n, T);
+      float h = Expected(wx, wz, out _, out _, out _, out _, out _);
+      float fh = h / 200f;
+      float d = Mathf.Sqrt(wx * wx + wz * wz);
+      if (d > worldR)
+        M.TryUndoEdgeDropoff(fh, d, worldR, totalR, out fh);
+      var grey = M.ValueToUShort((fh + 0.15f - sla) / amount, out _);
+      double v = ((double)fh + (double)0.15f - (double)sla) / (double)amount;
+      v = !(v > 0.0) ? 0.0 : v >= 1.0 ? 1.0 : v;
+      return (grey, v * 65535.0, h < 30f);
+    }
+    long wrong = 0, seen = 0, nonZero = 0, nibble = 0;
+    using (var image = Image.Load<L8>(path))
+    {
+      Program.C(image.Width == n && image.Height == n, $"heightmap-fine.png is {image.Width} x {image.Height} and 8-bit grey");
+      image.ProcessPixelRows(acc =>
+      {
+        for (int r = 0; r < n; r += 61)
+        {
+          var row = acc.GetRowSpan(r);
+          for (int c = 0; c < n; c += 67)
+          {
+            var px = At(r, c);
+            byte want = 0;
+            if (!px.Wet)
+            {
+              var units = (long)Math.Round(px.X * 256.0);
+              long steepest = 0;
+              foreach (var (dr, dc) in new[] { (0, -1), (0, 1), (-1, 0), (1, 0) })
+              {
+                int rr = r + dr, cc = c + dc;
+                if (rr < 0 || rr >= n || cc < 0 || cc >= n)
+                  continue;
+                steepest = Math.Max(steepest, Math.Abs(units - (long)Math.Round(At(rr, cc).X * 256.0)));
+              }
+              if (steepest < 256)
+                want = (byte)M.FineOffset(px.X, px.Grey, 4);
+            }
+            seen++;
+            if (row[c].PackedValue != want) wrong++;
+            if (row[c].PackedValue != 0) nonZero++;
+            if ((row[c].PackedValue & 15) != 0) nibble++;
+          }
+        }
+      });
+    }
+    Program.C(seen > 1000 && wrong == 0 && nibble == 0, $"{seen} sampled fine bytes are the writer rule's ({wrong} differ; {nonZero} are not 0; {nibble} with bits in the low nibble)");
+    var fileBytes = File.ReadAllBytes(path);
+    var chunks = PngRowWriterTest.Chunks(fileBytes, out var ok);
+    var types = chunks.Select(c => c.Type).ToList();
+    int lastIdat = types.LastIndexOf("IDAT");
+    var text = chunks[lastIdat + 1].Data;
+    string record = System.Text.Encoding.Latin1.GetString(text, 17, text.Length - 17);
+    uint crc = PngRowWriter.FileCrc32(Path.Combine(dir, "heightmap.png"));
+    Program.C(ok && types[lastIdat + 1] == "tEXt" && types[lastIdat + 2] == "IEND" && record == $"Fine Format = 1; Fine Bits = 4; Heightmap CRC-32 = {crc:X8}",
+      $"its record, after the pixels, names the CRC-32 of the heightmap.png beside it ({record})");
   }
 
   // A cancel at this size, a little way into the terrain pass: it stops within a band, and the files and the folder go.

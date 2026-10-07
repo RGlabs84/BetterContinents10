@@ -13,9 +13,10 @@ namespace BetterContinents;
 // It writes the PNG of the usual export maps (8 or 16 bits a sample, grey, RGB or RGBA, no palette, no interlacing): a
 // scanline filter chosen per row (the one with the smallest sum of absolute values, the way the PNG specification
 // suggests and ImageSharp does by default), the filtered rows deflated by System.IO.Compression (the codec MapTiles already
-// uses in the game) inside a zlib stream, IDAT chunks of 128 KB, and an optional tEXt chunk, which is all the metadata an
-// export writes. The file is <path>.tmp until Complete, so a crash never leaves a half-written map under a name Better
-// Continents would load.
+// uses in the game) inside a zlib stream, IDAT chunks of 128 KB, and up to two tEXt chunks, which is all the metadata an
+// export writes: one before the pixels (the heightmap's record) and one after them (the fine heights file's, which holds the
+// CRC-32 of a file that is finished later). The file is <path>.tmp until Complete, so a crash never leaves a half-written map
+// under a name Better Continents would load.
 internal sealed class PngRowWriter : IDisposable
 {
   private static readonly byte[] Signature = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
@@ -79,14 +80,7 @@ internal sealed class PngRowWriter : IDisposable
       header[9] = channels == 1 ? (byte)0 : channels == 3 ? (byte)2 : (byte)6;
       Chunk(file, "IHDR", header, header.Length);
       if (textKeyword != null && text != null)
-      {
-        var keyword = Latin1(textKeyword);
-        var value = Latin1(text);
-        var body = new byte[keyword.Length + 1 + value.Length];
-        Buffer.BlockCopy(keyword, 0, body, 0, keyword.Length);
-        Buffer.BlockCopy(value, 0, body, keyword.Length + 1, value.Length);
-        Chunk(file, "tEXt", body, body.Length);
-      }
+        TextChunk(file, textKeyword, text);
       idat = new IdatStream(file, ChunkBytes);
       // The zlib header: deflate, a 32 KB window, the default level, no preset dictionary.
       idat.WriteByte(0x78);
@@ -117,7 +111,12 @@ internal sealed class PngRowWriter : IDisposable
   }
 
   /// <summary>Writes the end of the file, closes it and renames it to its name. The image must be complete.</summary>
-  public void Complete()
+  public void Complete() => Complete(null, null);
+
+  /// <summary>Like <see cref="Complete()"/>, with a text chunk <paramref name="textKeyword"/> = <paramref name="text"/> after the
+  /// pixels (before the end of the file), for a record that can only be written once the image is: the fine heights file holds
+  /// the CRC-32 of the heightmap that is finished after it, and PNG allows a text chunk anywhere between the header and the end.</summary>
+  public void Complete(string? textKeyword, string? text)
   {
     if (completed)
       return;
@@ -131,6 +130,8 @@ internal sealed class PngRowWriter : IDisposable
     BigEndian(trailer, 0, adler);
     idat.Write(trailer, 0, 4);
     idat.Finish();
+    if (textKeyword != null && text != null)
+      TextChunk(file, textKeyword, text);
     Chunk(file, "IEND", [], 0);
     file.Dispose();
     completed = true;
@@ -257,6 +258,17 @@ internal sealed class PngRowWriter : IDisposable
     return bytes;
   }
 
+  // A tEXt chunk: the keyword, a zero byte and the text, both as ISO 8859-1.
+  private static void TextChunk(Stream to, string textKeyword, string text)
+  {
+    var keyword = Latin1(textKeyword);
+    var value = Latin1(text);
+    var body = new byte[keyword.Length + 1 + value.Length];
+    Buffer.BlockCopy(keyword, 0, body, 0, keyword.Length);
+    Buffer.BlockCopy(value, 0, body, keyword.Length + 1, value.Length);
+    Chunk(to, "tEXt", body, body.Length);
+  }
+
   private static void BigEndian(byte[] to, int at, uint v)
   {
     to[at] = (byte)(v >> 24);
@@ -351,6 +363,18 @@ internal sealed class PngRowWriter : IDisposable
     for (int i = 0; i < count; i++)
       c = CrcTable[(c ^ data[offset + i]) & 0xFF] ^ (c >> 8);
     return ~c;
+  }
+
+  /// <summary>CRC-32 of a whole file (what zlib.crc32 gives for its bytes), read a megabyte at a time.</summary>
+  internal static uint FileCrc32(string path)
+  {
+    using var input = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, 1 << 20);
+    var buffer = new byte[1 << 20];
+    uint crc = 0;
+    int read;
+    while ((read = input.Read(buffer, 0, buffer.Length)) > 0)
+      crc = Crc32(crc, buffer, 0, read);
+    return crc;
   }
 
   /// <summary>Adler-32 (the zlib one) of a byte range, continued from <paramref name="adler"/> (1 to start).</summary>
