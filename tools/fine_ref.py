@@ -171,7 +171,9 @@ def record_parts(texts):
 
 
 def heightmap_record(texts):
-    """The heightmap's own record (a world export's): (Heightmap Amount, Sea Level Adjustment), or None."""
+    """The heightmap's own record (a world export's): (Heightmap Amount, the Sea Level Adjustment SETTING, 0..1), or None.
+    Better Continents writes the config value under that key (0.5 at the default), not the adjustment it makes of it
+    (sea_adjustment: 0 at 0.5)."""
     for keyword, text in texts:
         if keyword != KEYWORD:
             continue
@@ -567,7 +569,7 @@ def amount_and_sla(args, coarse):
     elif args.sea_level is not None:
         sla = sea_adjustment(args.sea_level)
     else:
-        sla = record[1] if record else 0.0
+        sla = sea_adjustment(record[1]) if record else 0.0
     return amount, sla, record
 
 
@@ -700,7 +702,8 @@ def write_pair(folder, rows, width, height, bits, amount, sla, policy=True, alph
     os.makedirs(folder, exist_ok=True)
     hp = os.path.join(folder, name + '.png')
     fp = fine_path(hp)
-    record = f'Heightmap Amount = {float_text(amount)}; Sea Level Adjustment = {float_text(sla)}'
+    # The setting, as Better Continents' own record holds it: sla = 1 - 2 x setting.
+    record = f'Heightmap Amount = {float_text(amount)}; Sea Level Adjustment = {float_text((1.0 - sla) / 2.0)}'
     hw = PngWriter(hp, width, height, 16, 1 if alpha_rows is None else 2, filters, texts=[(KEYWORD, record)])
     fw = PngWriter(fp, width, height, 8, 1, filters, texts=())
     used = nonzero = clipped = 0
@@ -744,7 +747,7 @@ def cmd_write(args):
             return 2
         record = heightmap_record(src.texts)
         a0 = args.from_amount if args.from_amount is not None else (record[0] if record else None)
-        s0 = args.from_sea_adjust if args.from_sea_adjust is not None else (record[1] if record else 0.0)
+        s0 = args.from_sea_adjust if args.from_sea_adjust is not None else (sea_adjustment(record[1]) if record else 0.0)
         if a0 is None:
             print('give --from-amount: the heightmap has no record', file=sys.stderr)
             return 2
