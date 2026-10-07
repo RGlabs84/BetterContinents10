@@ -39,8 +39,8 @@ method named here is the same in both, which `tools/sector-tests` checks).
   Dirty chunks come from `SetDirtyChunks` (:773): `GetZonesChunk` and its three merged parents (`ChunkIndexFromIndexAndSize`, masks
   `0xFEFE`, `0xFCFC`, `0xF8F8`, which work on 8 bits per axis).
 * `ZoneSystem.ChunkPortal = new ChunkIndex(1, 0)` is the key the portals are saved under, and `LoadChunks` loads every object in that
-  file as a portal. Chunk (1, 0) is also the sector chunk of zones -248..-241 by -256..-249 (22.7 km from the centre). In the
-  game's own sectors nothing is ever there; in a world past 22.7 km it is where the two collide: the later write of the file wins and the
+  file as a portal. Chunk (1, 0) is also the sector chunk of zones -248..-241 by -256..-249 (22.1 km from the centre at their nearest corner). In the
+  game's own sectors nothing is ever there; in a world past 22.1 km it is where the two collide: the later write of the file wins and the
   other's objects are lost, or are read as portals.
 * A chunk with no objects left is never written again, so its file keeps what it held. (The game's own, not changed here.)
 

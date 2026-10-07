@@ -36,22 +36,41 @@ internal static class AshlandsWater
   private static bool? headless;
   private static bool Headless => headless ??= SystemInfo.graphicsDeviceType == GraphicsDeviceType.Null;
 
+  // The water surfaces that have started, so that Refresh needs nothing of the game's: DynamicPatch also runs without the engine
+  // (the offline tests), where WaterVolume's own statics (Shader.PropertyToID) cannot run.
+  private static readonly List<WaterVolume> Volumes = [];
+
   [HarmonyPatch(typeof(WaterVolume), "Start")]
   private static class WaterVolumeStart
   {
     [HarmonyPostfix]
-    private static void Postfix(WaterVolume __instance) => Apply(__instance);
+    private static void Postfix(WaterVolume __instance)
+    {
+      if (Headless)
+        return;
+      // Surfaces go with their zones: the ones destroyed since are dropped now and then.
+      if (Volumes.Count % 256 == 255)
+        Prune();
+      Volumes.Add(__instance);
+      Apply(__instance);
+    }
   }
 
   /// <summary>DynamicPatch: a world was loaded or left, or its settings changed. After the patches are switched, as the
   /// hot sea is what they make it.</summary>
   internal static void Refresh()
   {
-    if (Headless)
+    if (Volumes.Count == 0)
       return;
-    Gpu.Changed.RemoveWhere(r => r == null);
-    foreach (var volume in WaterVolume.Instances)
+    Prune();
+    foreach (var volume in Volumes)
       Apply(volume);
+  }
+
+  private static void Prune()
+  {
+    Volumes.RemoveAll(v => v == null);
+    Gpu.Changed.RemoveWhere(r => r == null);
   }
 
   private static void Apply(WaterVolume volume)

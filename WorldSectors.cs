@@ -58,7 +58,7 @@ internal static class WorldSectors
     internal const int VanillaLastZone = 255;
     // The game's ChunkPortal, chunk (1, 0), is the key its portal file is saved under: a chunk of zones with the same key
     // would be written over it, or read as portals. The block of zones that is chunk (1, 0) in the game's order (zones -248 to
-    // -241 by -256 to -249, 22.7 km out) is kept at chunk (159, 0) instead, where the zones 1016 to 1023 by -256 to -249 would
+    // -241 by -256 to -249, from 22.1 km out) is kept at chunk (159, 0) instead, where the zones 1016 to 1023 by -256 to -249 would
     // have been (67 km out, past the world's largest disc), which have no sector then.
     internal const int PortalChunkX = 1;
     internal const int MovedChunkX = 159;
@@ -158,7 +158,7 @@ internal static class WorldSectors
     if (mode == WideSectorsMode.Off)
     {
       BetterContinents.Log($"Sectors: Wide Sectors is Off, so this new world, which reaches {reach:0} m, has the game's own sectors: what lies beyond 16.4 km shares one sector, "
-        + "and beyond 22.7 km some of it shares the game's portal file.");
+        + "and beyond 22.1 km some of it shares the game's portal file.");
       return false;
     }
     settings.WideSectors = true;

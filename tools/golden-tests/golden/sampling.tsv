@@ -109,7 +109,7 @@ high-terrain-on/locations/Runestone_Meadows
 high-terrain-on/base-height-v3	n=4010 min=-2 max=0.33522585 sha=796fde1051b898667ba28208
 high-terrain-on/getbiome-prefix	n=8020 min=1 max=2 sha=4b91b98a3662c926f503b199
 high-terrain-on/isashlands	n=16040 min=0 max=1 sha=6c2b4abae9de0cfc037071f7
-high-terrain-on/isdeepnorth	n=16040 min=-1 max=1 sha=ce25cc9acce7422ac350c37e
+high-terrain-on/isdeepnorth	n=8020 min=0 max=1 sha=2c7a4e48856512a1e42ad6a3
 high-terrain-on/ashlands-gradient	n=4010 min=-1E-05 max=-1E-05 sha=5f926809bfe151a0bcec709a
 high-terrain-on/forest-factor	n=12030 min=-10499.999 max=10499.999 sha=fafdc5f1acb832f1477d612f
 high-terrain-on/precision	0
@@ -139,7 +139,7 @@ high-terrain-off/locations/Runestone_Meadows
 high-terrain-off/base-height-v3	n=4010 min=-2 max=5.6643586 sha=ca93939d1cf2b005fa9e2b2f
 high-terrain-off/getbiome-prefix	n=8020 min=1 max=2 sha=4b91b98a3662c926f503b199
 high-terrain-off/isashlands	n=16040 min=0 max=1 sha=6c2b4abae9de0cfc037071f7
-high-terrain-off/isdeepnorth	n=16040 min=-1 max=1 sha=ce25cc9acce7422ac350c37e
+high-terrain-off/isdeepnorth	n=8020 min=0 max=1 sha=2c7a4e48856512a1e42ad6a3
 high-terrain-off/ashlands-gradient	n=4010 min=-1E-05 max=-1E-05 sha=5f926809bfe151a0bcec709a
 high-terrain-off/forest-factor	n=12030 min=-10499.999 max=10499.999 sha=fafdc5f1acb832f1477d612f
 high-terrain-off/precision	0
