@@ -2,6 +2,7 @@
 
 using System;
 using System.Collections;
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -231,9 +232,29 @@ public partial class BetterContinents : BaseUnityPlugin
     private static float Normalize(float x) => Geometry.Normalize(x);
     private static Vector2 NormalizedToWorld(Vector2 p) => Geometry.NormalizedToWorld(p);
 
-    public static void Log(string msg) => Debug.Log($"[BetterContinents] {msg}");
-    public static void LogError(string msg) => Debug.LogError($"[BetterContinents] {msg}");
-    public static void LogWarning(string msg) => Debug.LogWarning($"[BetterContinents] {msg}");
+    public static void Log(string msg) => Write(LogType.Log, msg);
+    public static void LogError(string msg) => Write(LogType.Error, msg);
+    public static void LogWarning(string msg) => Write(LogType.Warning, msg);
+
+    // Unity hands a line logged on a worker thread to nothing that writes BepInEx's LogOutput.log or the game's own log, so the lines of
+    // work done on a worker (a new world's settings, NewWorldBuild; a world import) wait here for the main thread (Update, FlushWorkerLog).
+    // Offline (no Awake) every line is written at once.
+    private static readonly ConcurrentQueue<(LogType Type, string Line)> workerLog = new();
+    private static void Write(LogType type, string msg)
+    {
+      var line = $"[BetterContinents] {msg}";
+      if (mainThreadId != 0 && Thread.CurrentThread.ManagedThreadId != mainThreadId)
+        workerLog.Enqueue((type, line));
+      else
+        Debug.unityLogger.Log(type, line);
+    }
+
+    /// <summary>Main thread: the lines logged on workers since last time, in their order.</summary>
+    internal static void FlushWorkerLog()
+    {
+      while (workerLog.TryDequeue(out var entry))
+        Debug.unityLogger.Log(entry.Type, entry.Line);
+    }
 
     public static bool AllowDebugActions => ZNet.instance
                                             && ZNet.instance.IsServer()
@@ -319,6 +340,8 @@ public partial class BetterContinents : BaseUnityPlugin
 
     public void Update()
     {
+        // The lines logged on workers (Log).
+        FlushWorkerLog();
         // Reloads BetterContinents.cfg on the main thread once a change on disk has settled.
         LiveConfig.Update();
         // The far sea's colours, where it is now (AshlandsWater).

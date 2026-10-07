@@ -158,6 +158,8 @@ internal static class NewWorldBuild
     if (popup != null && OnTop(popup))
       UnifiedPopup.Pop();
     busy = false;
+    // The lines the work logged, before those of the save.
+    BetterContinents.FlushWorkerLog();
     Made? made = null;
     try
     {
