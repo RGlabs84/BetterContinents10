@@ -369,60 +369,639 @@ internal sealed class BakedLayer
   // A new layer from this one (spec 2.6): see LayerEdit.
   public LayerEdit Edit() => new(this);
 
+  // The layer a preset keeps (spec 3.3): the compiler's records and sections, without the records baked in game and the registry. This one
+  // itself when there are none of either. `dropped` is how many in-game records are left out.
+  public BakedLayer WithoutInGame(out int dropped)
+  {
+    dropped = (int)(Placements - RecordsOfSource(0));
+    if (dropped == 0 && !HasRegistry)
+      return this;
+    var edit = Edit();
+    foreach (var source in RecordsBySource().Keys.Where(k => k != 0).ToList())
+      edit.RemoveSource(source);
+    edit.DropRegistry();
+    return edit.Build().Layer;
+  }
+
   public override string ToString() => $"layer r{Revision}: {Placements:N0} records in {rows.Length} zones, {palette.Length} palette entries, {Length:N0} bytes";
 }
 
 // The changes to a layer, collected, and written as a new one (spec 2.6, 6.2, 10): palette entries are only ever appended, records are
 // added and removed by value, a compiler's new file replaces source 0, and Build writes the layer: the zones it touched are encoded
 // again and every other block is copied byte for byte, the revision is the old one plus 1, and the zones whose look changed come back
-// with it. One edit builds one layer; make another with Edit() for the next change.
-internal sealed partial class LayerEdit
+// with it. One edit builds one layer; make another with Edit() for the next change. Not for several threads at once.
+internal sealed class LayerEdit
 {
-  private readonly BakedLayer? basis;
-
-  internal LayerEdit(BakedLayer? basis)
+  // What an edit knows of one zone it was asked about: a block to copy while nothing has touched it, or the zone decoded and changed.
+  private sealed class ZoneWork
   {
-    this.basis = basis;
+    public readonly ZoneKey Key;
+    // While the zone is still a copy of a block: the layer it is in and its row there.
+    public BakedLayer? Source;
+    public int SourceRow = -1;
+    // A file's zone: its records that an in-game bake owns are left out when it is decoded.
+    public bool DropInGame;
+    public List<ZoneRecord>? Records;
+    public ZoneSections Sections = new();
+    // The records' y and the pieces' heights, in m; valid with HasBounds (the zone has records).
+    public double YMin, YMax;
+    public bool HasBounds;
+
+    public ZoneWork(ZoneKey key)
+    {
+      Key = key;
+    }
+
+    public bool IsCopy => Records == null && !DropInGame;
+
+    public void Materialize()
+    {
+      if (Records != null)
+        return;
+      if (Source == null)
+      {
+        Records = new List<ZoneRecord>();
+        return;
+      }
+      var row = Source.Zones[SourceRow];
+      var data = Source.Decode(row);
+      Records = new List<ZoneRecord>(data.Count);
+      for (int k = 0; k < data.Count; k++)
+      {
+        var r = data.Record(k);
+        if (DropInGame && r.HasSource)
+          continue;
+        Records.Add(r);
+      }
+      Sections = ZoneSections.Of(data);
+      HasBounds = row.Placements > 0;
+      YMin = row.YMin;
+      YMax = row.YMax;
+      Source = null;
+    }
+
+    // The zone's bounds take in a record at y (m) that reaches `height` above it.
+    public void Grow(double y, double height)
+    {
+      if (!HasBounds)
+      {
+        YMin = y;
+        YMax = y + height;
+        HasBounds = true;
+        return;
+      }
+      if (y < YMin) YMin = y;
+      if (y + height > YMax) YMax = y + height;
+    }
+
+    // A conservative union with a row's bounds (a zone that gets records from two layers).
+    public void Grow(ZoneRow row)
+    {
+      if (row.Placements == 0)
+        return;
+      if (!HasBounds)
+      {
+        YMin = row.YMin;
+        YMax = row.YMax;
+        HasBounds = true;
+        return;
+      }
+      if (row.YMin < YMin) YMin = row.YMin;
+      if (row.YMax > YMax) YMax = row.YMax;
+    }
   }
 
-  // A layer made in game where there was none: the first change makes revision 1.
-  public static LayerEdit New(string producer) => throw new NotImplementedException();
+  // One zone of the layer being written.
+  private sealed class FinalZone
+  {
+    public ZoneKey Key;
+    public byte[] Block = Array.Empty<byte>();
+    public int Offset, Length;
+    public int Count, Live;
+    public ZoneFlags Flags;
+    public float YMin, YMax;
+    // Whether the block is a copy of one in another layer (and which): nothing is compared if it is the basis' own.
+    public BakedLayer? CopyOf;
+  }
+
+  private readonly BakedLayer? basis;
+  private string producer;
+  private readonly List<PaletteEntry> palette = new();
+  private readonly Dictionary<PaletteEntry, int> paletteIndex = new();
+  private readonly List<OperationInfo> operations = new();
+  private int nextOperation = 1;
+  private bool registryWanted;
+  private readonly Dictionary<ZoneKey, ZoneWork> work = new();
+  private bool replaced, mutated, built;
+  private BakedLayer? file;
+
+  internal LayerEdit(BakedLayer? basis, string? producer = null)
+  {
+    this.basis = basis;
+    this.producer = basis?.Producer ?? producer ?? $"{BakedFormat.ProducerPrefix}{ModInfo.Version} (bc_bake)";
+    if (basis != null)
+    {
+      foreach (var entry in basis.Palette)
+      {
+        palette.Add(entry);
+        if (!paletteIndex.ContainsKey(entry))
+          paletteIndex[entry] = palette.Count - 1;
+      }
+      operations.AddRange(basis.Registry.Operations);
+      nextOperation = basis.Registry.NextOperation;
+      registryWanted = basis.HasRegistry;
+    }
+  }
+
+  // A layer made in game where there was none: the first change makes revision 1. The producer reads "Better Continents <version> (bc_bake)"
+  // when none is given.
+  public static LayerEdit New(string? producer = null) => new(null, producer);
 
   public BakedLayer? Basis => basis;
 
   // The number the next operation takes (a bake's number is also its records' source). Peek before making records; AddOperation takes it.
-  public ushort NextOperationNumber => throw new NotImplementedException();
+  public ushort NextOperationNumber
+  {
+    get
+    {
+      if (nextOperation > ushort.MaxValue)
+        throw new InvalidOperationException("the world has used all 65,535 operation numbers");
+      return (ushort)nextOperation;
+    }
+  }
 
-  // A number the journal on disk has used for an operation that never reached a layer: the next one is above it, and none is reused.
-  public void EnsureNextOperation(int atLeast) => throw new NotImplementedException();
+  // A number the journal on disk has used for an operation that never reached a layer: the next one is at least this, and none is reused.
+  public void EnsureNextOperation(int atLeast)
+  {
+    if (atLeast > nextOperation)
+      nextOperation = atLeast;
+  }
 
   // The palette index of an entry: an equal entry's, or a new one appended after the last (indices never move). Throws past 65,535.
-  public int PaletteIndexFor(PaletteEntry entry) => throw new NotImplementedException();
+  public int PaletteIndexFor(PaletteEntry entry)
+  {
+    if (entry == null)
+      throw new ArgumentNullException(nameof(entry));
+    if (paletteIndex.TryGetValue(entry, out int known))
+      return known;
+    if (palette.Count >= BakedFormat.MaxPalette)
+      throw new BakedFormatException($"the palette would pass {BakedFormat.MaxPalette} entries");
+    BakedCodec.Validate(entry, "palette entry " + palette.Count + " (" + entry.Name + ")");
+    Mutated();
+    palette.Add(entry);
+    paletteIndex[entry] = palette.Count - 1;
+    return palette.Count - 1;
+  }
+
+  private void Mutated()
+  {
+    if (built)
+      throw new InvalidOperationException("an edit builds one layer");
+    mutated = true;
+  }
+
+  private ZoneWork Work(ZoneKey key, bool materialize)
+  {
+    if (!work.TryGetValue(key, out var w))
+    {
+      w = new ZoneWork(key);
+      if (!replaced && basis != null && basis.TryGetZoneRow(key, out var row))
+      {
+        w.Source = basis;
+        w.SourceRow = row.Index;
+      }
+      work[key] = w;
+    }
+    if (materialize)
+      w.Materialize();
+    return w;
+  }
 
   // Adds records (each in the zone it names, with its palette index from PaletteIndexFor). `height`: how far above its y a record
   // reaches, for the zone's y bounds (0 when not known).
-  public void AddRecords(IEnumerable<ZoneRecord> records, float height = 0f) => throw new NotImplementedException();
+  public void AddRecords(IEnumerable<ZoneRecord> records, float height = 0f)
+  {
+    Mutated();
+    foreach (var r in records)
+    {
+      if (r.Palette >= palette.Count)
+        throw new BakedFormatException($"a record names palette entry {r.Palette}, and the palette has {palette.Count}", "zone " + r.Zone);
+      if (!r.Zone.InRange)
+        throw new BakedFormatException($"the zone is outside {BakedFormat.FirstZone} to {BakedFormat.LastZone}", "zone " + r.Zone);
+      if ((r.Flags & ~RecordFlags.All) != 0)
+        throw new BakedFormatException("a record has a flag format 1 does not know", "zone " + r.Zone);
+      var w = Work(r.Zone, true);
+      w.Records!.Add(r);
+      w.Grow(r.Y / 1000.0, height);
+    }
+  }
 
   // Removes records by value, one for each given; returns how many were found (a record that is not there is not an error).
-  public int RemoveRecords(IEnumerable<ZoneRecord> records) => throw new NotImplementedException();
+  public int RemoveRecords(IEnumerable<ZoneRecord> records)
+  {
+    Mutated();
+    var wanted = new Dictionary<ZoneKey, Dictionary<ZoneRecord, int>>();
+    foreach (var r in records)
+    {
+      if (!wanted.TryGetValue(r.Zone, out var counts))
+        wanted[r.Zone] = counts = new Dictionary<ZoneRecord, int>();
+      counts.TryGetValue(r, out int n);
+      counts[r] = n + 1;
+    }
+    int removed = 0;
+    foreach (var request in wanted)
+    {
+      var zone = request.Key;
+      var counts = request.Value;
+      if (!work.ContainsKey(zone) && (replaced || basis == null || !basis.Has(zone)))
+        continue;
+      var w = Work(zone, true);
+      var kept = new List<ZoneRecord>(w.Records!.Count);
+      foreach (var r in w.Records!)
+      {
+        if (counts.TryGetValue(r, out int left) && left > 0)
+        {
+          counts[r] = left - 1;
+          removed++;
+        }
+        else
+          kept.Add(r);
+      }
+      w.Records = kept;
+    }
+    return removed;
+  }
 
   // Removes the records of the given zones (all zones when null) that the test accepts; returns how many.
-  public int RemoveWhere(IEnumerable<ZoneKey>? zones, Func<ZoneRecord, bool> test) => throw new NotImplementedException();
+  public int RemoveWhere(IEnumerable<ZoneKey>? zones, Func<ZoneRecord, bool> test)
+  {
+    Mutated();
+    IEnumerable<ZoneKey> keys = zones ?? AllZones();
+    int removed = 0;
+    foreach (var zone in keys.Distinct().ToList())
+    {
+      if (!work.ContainsKey(zone) && (replaced || basis == null || !basis.Has(zone)))
+        continue;
+      var w = Work(zone, true);
+      int before = w.Records!.Count;
+      if (before == 0)
+        continue;
+      w.Records = w.Records.Where(r => !test(r)).ToList();
+      removed += before - w.Records.Count;
+    }
+    return removed;
+  }
+
+  // Every zone this edit has, as the layer it builds will have it: the basis' and the ones the edit made.
+  private IEnumerable<ZoneKey> AllZones()
+  {
+    var keys = new HashSet<ZoneKey>(work.Keys);
+    if (!replaced && basis != null)
+      foreach (var row in basis.Zones)
+        keys.Add(row.Key);
+    return keys;
+  }
 
   // Removes every record of an in-game bake, in every zone; returns how many.
-  public int RemoveSource(int source) => throw new NotImplementedException();
+  public int RemoveSource(int source)
+  {
+    if (source <= 0 || source > ushort.MaxValue)
+      throw new ArgumentOutOfRangeException(nameof(source), "an in-game bake is 1 to 65535");
+    // Only the zones the layer says hold records of that bake, and the ones already changed.
+    var zones = new HashSet<ZoneKey>(work.Keys);
+    if (!replaced && basis != null)
+      for (int i = 0; i < basis.Zones.Count; i++)
+        foreach (var kv in basis.InfoOf(i).SourceCounts)
+          if (kv.Key == source)
+            zones.Add(basis.Zones[i].Key);
+    return RemoveWhere(zones, r => r.HasSource && r.Source == source);
+  }
 
   // `bc_bake load` (spec 6.2): the file's compiler records and zone sections replace the layer's; every in-game record stays; the palette
   // is rebuilt (the file's entries in its order, then the entries in-game records still use, in first-use order). Returns the records of
-  // the file that an in-game bake owns, which are left out.
-  public int ReplaceSource0(BakedLayer file) => throw new NotImplementedException();
+  // the file that an in-game bake owns, which are left out. It comes before any other change of the edit.
+  public int ReplaceSource0(BakedLayer fileLayer)
+  {
+    if (mutated || replaced)
+      throw new InvalidOperationException("ReplaceSource0 comes before any other change");
+    Mutated();
+    replaced = true;
+    file = fileLayer;
+    producer = fileLayer.Producer;
+    palette.Clear();
+    paletteIndex.Clear();
+    foreach (var entry in fileLayer.Palette)
+    {
+      palette.Add(entry);
+      if (!paletteIndex.ContainsKey(entry))
+        paletteIndex[entry] = palette.Count - 1;
+    }
+    int leftOut = 0;
+    foreach (var row in fileLayer.Zones)
+    {
+      var sources = fileLayer.InfoOf(row.Index).SourceCounts;
+      var w = new ZoneWork(row.Key) { Source = fileLayer, SourceRow = row.Index, DropInGame = sources.Length > 0 };
+      foreach (var kv in sources)
+        leftOut += kv.Value;
+      work[row.Key] = w;
+    }
+    // The in-game records of the layer being replaced stay, on the new palette.
+    if (basis != null)
+      for (int i = 0; i < basis.Zones.Count; i++)
+      {
+        var row = basis.Zones[i];
+        if (basis.InfoOf(i).SourceCounts.Length == 0)
+          continue;
+        var data = basis.Decode(row);
+        var w = Work(row.Key, true);
+        for (int k = 0; k < data.Count; k++)
+        {
+          var r = data.Record(k);
+          if (!r.HasSource)
+            continue;
+          r.Palette = (ushort)PaletteIndexFor(basis.Palette[r.Palette]);
+          w.Records!.Add(r);
+        }
+        w.Grow(row);
+      }
+    return leftOut;
+  }
+
+  // For tools and tests that make a compiler's layer: sets a zone's sections (its clear mask, ground, paint and extras, and the two flags the
+  // sections do not decide). In-game operations write no section.
+  internal void SetSections(ZoneKey zone, ZoneSections sections)
+  {
+    Mutated();
+    Work(zone, true).Sections = sections;
+  }
+
+  // For tests: the blocks of every zone are encoded again instead of copied.
+  internal void ReencodeAll()
+  {
+    Mutated();
+    foreach (var key in AllZones().ToList())
+      Work(key, true);
+  }
+
+  // Leaves the registry out of the layer (a preset's: the world made from it has no history). No record may name a bake by then.
+  internal void DropRegistry()
+  {
+    Mutated();
+    operations.Clear();
+    nextOperation = 1;
+    registryWanted = false;
+  }
 
   // Adds an operation to the registry; its number must be NextOperationNumber.
-  public void AddOperation(OperationInfo operation) => throw new NotImplementedException();
+  public void AddOperation(OperationInfo operation)
+  {
+    if (operation == null)
+      throw new ArgumentNullException(nameof(operation));
+    if (operation.Number != NextOperationNumber)
+      throw new ArgumentException($"the next operation is number {NextOperationNumber}, not {operation.Number}", nameof(operation));
+    Mutated();
+    operations.Add(operation);
+    nextOperation++;
+    registryWanted = true;
+  }
 
   // Marks an operation undone (or in the layer again), and drops its value sets when it is undone.
-  public void SetOperationState(int number, OperationState state) => throw new NotImplementedException();
+  public void SetOperationState(int number, OperationState state)
+  {
+    Mutated();
+    int at = operations.FindIndex(o => o.Number == number);
+    if (at < 0)
+      throw new ArgumentException($"there is no operation {number}", nameof(number));
+    var op = operations[at].WithState(state);
+    operations[at] = state == OperationState.Undone ? op.WithValueSets(Array.Empty<ValueSet>()) : op;
+  }
+
+  // ------------------------------------------------------------------------------------------------ writing
 
   // Writes the layer. Changed: the zones to rebuild on a client (their block, sections or palette entries differ), by (z, x).
-  public (BakedLayer Layer, ZoneKey[] Changed) Build() => throw new NotImplementedException();
+  public (BakedLayer Layer, ZoneKey[] Changed) Build()
+  {
+    if (built)
+      throw new InvalidOperationException("an edit builds one layer");
+    built = true;
+    var roles = new BakedRole[palette.Count];
+    for (int i = 0; i < roles.Length; i++)
+      roles[i] = palette[i].Role;
+
+    // The zones, in the index's order.
+    var keys = new List<ZoneKey>(replaced ? work.Keys : AllZones());
+    keys.Sort();
+    var zones = new List<FinalZone>(keys.Count);
+    foreach (var key in keys)
+    {
+      var zone = Finish(key, roles);
+      if (zone != null)
+        zones.Add(zone);
+    }
+
+    // The registry keeps at most 1,000 operations; older ones that no record points to go.
+    var kept = TrimOperations(zones);
+    bool writeRegistry = registryWanted || kept.Count > 0;
+    var registry = new Registry((ushort)Math.Min(nextOperation, ushort.MaxValue), kept.ToArray());
+
+    var flags = HeaderFlags.None;
+    long placements = 0;
+    foreach (var zone in zones)
+    {
+      placements += zone.Count;
+      if ((zone.Flags & ZoneFlags.Ground) != 0) flags |= HeaderFlags.Ground;
+      if ((zone.Flags & ZoneFlags.Paint) != 0) flags |= HeaderFlags.Paint;
+      if ((zone.Flags & ZoneFlags.ClearMask) != 0) flags |= HeaderFlags.ClearMask;
+    }
+    if (writeRegistry)
+      flags |= HeaderFlags.Registry;
+    uint revision = basis == null ? 1u : basis.Revision + 1;
+
+    var bytes = Assemble(revision, flags, placements, registry, writeRegistry, zones);
+    var layer = BakedLayer.Parse(bytes, bytes.Length, replaced ? file : basis);
+    return (layer, ChangedZones(layer, zones));
+  }
+
+  // One zone of the layer being written: a block copied from the layer it was in, or the zone's records encoded again. Null when the zone
+  // has nothing left (no records, no sections, no flags): it leaves the index.
+  private FinalZone? Finish(ZoneKey key, BakedRole[] roles)
+  {
+    ZoneWork? w = null;
+    work.TryGetValue(key, out w);
+    if (w == null || w.IsCopy)
+    {
+      BakedLayer source;
+      ZoneRow row;
+      if (w != null)
+      {
+        source = w.Source!;
+        row = source.Zones[w.SourceRow];
+      }
+      else
+      {
+        source = basis!;
+        source.TryGetZoneRow(key, out row);
+      }
+      return new FinalZone
+      {
+        Key = key, Block = source.Bytes, Offset = row.Offset, Length = row.Length, Count = row.Placements, Live = row.Live, Flags = row.Flags,
+        YMin = row.YMin, YMax = row.YMax, CopyOf = source,
+      };
+    }
+    w.Materialize();
+    var records = w.Records!;
+    if (records.Count == 0 && w.Sections.IsEmpty)
+      return null;
+    records.Sort();
+    int live = 0;
+    foreach (var r in records)
+      if (roles[r.Palette] == BakedRole.Live)
+        live++;
+    var raw = BakedCodec.EncodeBlockRaw(records, w.Sections, out int rawLength, out var zoneFlags);
+    var block = BakedFormat.Deflate(raw, rawLength);
+    return new FinalZone
+    {
+      Key = key, Block = block, Offset = 0, Length = block.Length, Count = records.Count, Live = live, Flags = zoneFlags,
+      YMin = records.Count > 0 && w.HasBounds ? (float)w.YMin : 0f, YMax = records.Count > 0 && w.HasBounds ? (float)w.YMax : 0f,
+    };
+  }
+
+  // The operations to write: all, or the newest 1,000 and every older one that a record still points to.
+  private List<OperationInfo> TrimOperations(List<FinalZone> zones)
+  {
+    if (operations.Count <= BakedFormat.MaxOperations)
+      return operations;
+    var inUse = new HashSet<int>();
+    foreach (var zone in zones)
+    {
+      // A copied block's bakes are known from its layer's index; an encoded one's from its records.
+      if (zone.CopyOf != null)
+      {
+        if (zone.CopyOf.TryGetZoneRow(zone.Key, out var row))
+          foreach (var kv in zone.CopyOf.InfoOf(row.Index).SourceCounts)
+            inUse.Add(kv.Key);
+      }
+      else if (work.TryGetValue(zone.Key, out var w) && w.Records != null)
+        foreach (var r in w.Records)
+          if (r.HasSource)
+            inUse.Add(r.Source);
+    }
+    var kept = new List<OperationInfo>(operations);
+    for (int i = 0; i < kept.Count && kept.Count > BakedFormat.MaxOperations;)
+    {
+      if (inUse.Contains(kept[i].Number))
+        i++;
+      else
+        kept.RemoveAt(i);
+    }
+    return kept;
+  }
+
+  private byte[] Assemble(uint revision, HeaderFlags flags, long placements, Registry registry, bool writeRegistry, List<FinalZone> zones)
+  {
+    long estimate = 4096 + zones.Count * (long)BakedFormat.ZoneRowBytes;
+    foreach (var zone in zones)
+      estimate += zone.Length;
+    if (estimate > BakedFormat.MaxLayer)
+      throw new BakedFormatException($"the layer would be about {estimate / (1024 * 1024)} MB, over the {BakedFormat.MaxLayer / (1024 * 1024)} MB format 1 allows");
+    var w = new BakedWriter((int)Math.Min(estimate + 65536, int.MaxValue - 1));
+    foreach (char c in BakedFormat.Magic)
+      w.U8(c);
+    w.U16(BakedFormat.FormatVersion);
+    w.U16((int)flags);
+    w.U32(revision);
+    w.U32((uint)palette.Count);
+    w.U32((uint)zones.Count);
+    w.U64((ulong)placements);
+    w.U32(0);
+    w.Str(producer);
+    BakedCodec.WritePalette(w, palette);
+    if (writeRegistry)
+      BakedCodec.WriteRegistry(w, registry);
+    long offset = w.Length + zones.Count * (long)BakedFormat.ZoneRowBytes;
+    foreach (var zone in zones)
+    {
+      BakedCodec.WriteIndexRow(w, zone.Key, checked((int)offset), zone.Length, zone.Count, zone.Live, zone.Flags, zone.YMin, zone.YMax);
+      offset += zone.Length;
+    }
+    foreach (var zone in zones)
+      w.Bytes(zone.Block, zone.Offset, zone.Length);
+    uint crc = BakedFormat.Crc32(w.Buffer_, 0, w.Length);
+    w.U32(crc);
+    if (w.Length > BakedFormat.MaxLayer)
+      throw new BakedFormatException($"the layer is {w.Length / (1024 * 1024)} MB, over the {BakedFormat.MaxLayer / (1024 * 1024)} MB format 1 allows");
+    return w.ToArray();
+  }
+
+  // The zones whose look differs from the basis': new, gone, or with another block, other sections, or a palette entry that changed.
+  private ZoneKey[] ChangedZones(BakedLayer layer, List<FinalZone> zones)
+  {
+    var changed = new List<ZoneKey>();
+    if (basis == null)
+    {
+      foreach (var zone in zones)
+        changed.Add(zone.Key);
+      return changed.ToArray();
+    }
+    // Entries that are not what the basis' palette held at their index (only a palette that was rebuilt can have them).
+    bool[]? differs = null;
+    for (int i = 0; i < basis.Palette.Count; i++)
+    {
+      if (i < layer.Palette.Count && basis.Palette[i].Equals(layer.Palette[i]))
+        continue;
+      differs ??= new bool[basis.Palette.Count];
+      differs[i] = true;
+    }
+    foreach (var zone in zones)
+    {
+      if (!basis.TryGetZoneRow(zone.Key, out var old))
+      {
+        changed.Add(zone.Key);
+        continue;
+      }
+      if (ReferenceEquals(zone.CopyOf, basis))
+        continue;
+      layer.TryGetZoneRow(zone.Key, out var now);
+      if (now.Length != old.Length || now.Flags != old.Flags || now.Placements != old.Placements || now.Live != old.Live
+          || !SameBytes(basis.Bytes, old.Offset, layer.Bytes, now.Offset, now.Length))
+      {
+        changed.Add(zone.Key);
+        continue;
+      }
+      if (differs != null && UsesAny(basis, old, differs))
+        changed.Add(zone.Key);
+    }
+    // A zone the edit took out of the index.
+    var present = new HashSet<ZoneKey>(zones.Select(z => z.Key));
+    foreach (var row in basis.Zones)
+      if (!present.Contains(row.Key))
+        changed.Add(row.Key);
+    changed.Sort();
+    return changed.ToArray();
+  }
+
+  private static bool SameBytes(byte[] a, int aAt, byte[] b, int bAt, int count)
+  {
+    for (int i = 0; i < count; i++)
+      if (a[aAt + i] != b[bAt + i])
+        return false;
+    return true;
+  }
+
+  // Whether a zone's records use any of the marked palette entries.
+  private static bool UsesAny(BakedLayer layer, ZoneRow row, bool[] marked)
+  {
+    if (row.Placements == 0)
+      return false;
+    var scratch = new byte[Math.Max(4096, row.Length * 4)];
+    int n = BakedFormat.Inflate(layer.Bytes, row.Offset, row.Length, ref scratch, BakedFormat.MaxInflated, "zone " + row.Key);
+    var r = new BakedReader(scratch, 4, n);
+    for (int k = 0; k < row.Placements; k++)
+    {
+      int p = r.U16();
+      if (p < marked.Length && marked[p])
+        return true;
+    }
+    return false;
+  }
 }

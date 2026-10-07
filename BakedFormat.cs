@@ -1676,6 +1676,27 @@ internal static class BakedCodec
     return palette;
   }
 
+  // What a palette entry must be for the file to hold it; throws BakedFormatException naming the entry otherwise.
+  public static void Validate(PaletteEntry entry, string where)
+  {
+    if (entry.Candidates.Length < 1 || entry.Candidates.Length > 8)
+      throw new BakedFormatException($"it has {entry.Candidates.Length} candidates (1 to 8)", where);
+    if (entry.Layer > 31)
+      throw new BakedFormatException($"its layer is {entry.Layer} (0 to 31)", where);
+    if ((entry.Flags & ~PaletteFlags.All) != 0)
+      throw new BakedFormatException("it has a flag format 1 does not know", where);
+    if (entry.Boxes.Length > 255 || entry.Tags.Length > 255)
+      throw new BakedFormatException("it has over 255 boxes or tags", where);
+    foreach (var c in entry.Candidates)
+      if (!BakedFormat.IsWritable(c.Name))
+        throw new BakedFormatException($"the prefab name '{c.Name}' is over 255 characters or has one outside ASCII, which the format cannot hold", where);
+    if (!BakedFormat.IsWritable(entry.Tint) || !BakedFormat.IsWritable(entry.TintFilter))
+      throw new BakedFormatException("its tint or material filter is over 255 characters or has one outside ASCII", where);
+    foreach (var tag in entry.Tags)
+      if (!BakedFormat.IsWritable(tag.Key) || (tag.Type == TagType.String && !BakedFormat.IsWritable(tag.Text)))
+        throw new BakedFormatException($"the tag '{tag.Key}' is over 255 characters or has one outside ASCII", where);
+  }
+
   public static void WritePalette(BakedWriter w, IReadOnlyList<PaletteEntry> palette)
   {
     if (palette.Count > BakedFormat.MaxPalette)
@@ -1683,15 +1704,7 @@ internal static class BakedCodec
     for (int e = 0; e < palette.Count; e++)
     {
       var entry = palette[e];
-      string where = "palette entry " + e + " (" + entry.Name + ")";
-      if (entry.Candidates.Length < 1 || entry.Candidates.Length > 8)
-        throw new BakedFormatException($"it has {entry.Candidates.Length} candidates (1 to 8)", where);
-      if (entry.Layer > 31)
-        throw new BakedFormatException($"its layer is {entry.Layer} (0 to 31)", where);
-      if ((entry.Flags & ~PaletteFlags.All) != 0)
-        throw new BakedFormatException("it has a flag format 1 does not know", where);
-      if (entry.Boxes.Length > 255 || entry.Tags.Length > 255)
-        throw new BakedFormatException("it has over 255 boxes or tags", where);
+      Validate(entry, "palette entry " + e + " (" + entry.Name + ")");
       w.U8(entry.Candidates.Length);
       foreach (var c in entry.Candidates)
       {
