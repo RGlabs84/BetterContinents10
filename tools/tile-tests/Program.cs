@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-10-04 for the unifying refactor (0.10.0).
+// Added by Wubarrk on 2026-10-04 for the unifying refactor (0.10.0), and modified on 2026-10-06 for 16k worlds (0.10.3).
 //
 // Offline checks of the maps' tiles (MapTiles.cs): the codec round trip in every shape and transform; damage refused;
 // every map kind sampling bit for bit as the whole decoded picture did before (the old code is kept here as the
@@ -83,11 +83,24 @@ internal static partial class Program
     UnityEngine.Debug.unityLogger.logHandler = new LogHandler();
     if (args.Length > 1 && args[0] == "measure")
       return Measure(args[1]);
+    if (args.Length > 3 && args[0] == "measure16k")
+      return Measure16k(args);
+    if (args.Length > 2 && args[0] == "measure16k-load")
+      return Measure16kLoad(args);
+    if (args.Length > 0 && args[0] == "big")
+      return Big16k();
+    if (args.Length > 2 && args[0] == "big-kind")
+      return BigKind(args[1], args[2] == "1");
     Work = Path.Combine(Path.GetTempPath(), "bc-tile-tests-" + Environment.ProcessId);
     Directory.CreateDirectory(Work);
     try
     {
       Codec();
+      PngRowsTests();
+      PngWriterTests();
+      LargeSizes();
+      LocationMaps();
+      PackageTests();
       Damage();
       FloatMaps();
       DecodedMaps();

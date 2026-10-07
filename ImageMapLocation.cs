@@ -1,4 +1,4 @@
-﻿// Modified by Wubarrk on 2026-09-24 for world export and import (0.9.0), and on 2026-09-29 for Expand World Data locations (0.9.3), and on 2026-10-04 for the unifying refactor (0.10.0).
+﻿// Modified by Wubarrk on 2026-09-24 for world export and import (0.9.0), and on 2026-09-29 for Expand World Data locations (0.9.3), and on 2026-10-04 for the unifying refactor (0.10.0), and on 2026-10-06 for 16k worlds (0.10.3).
 
 using System;
 using System.Collections.Generic;
@@ -182,28 +182,72 @@ internal class ImageMapLocation() : ImageMapBase()
     // Internal for WorldExport, which gives each location its default colour here where it is not shared.
     internal static readonly string DefaultColors = "StartTemple: 255,0,0|Eikthyrnir: 255,153,0|GDKing: 0,255,0|GoblinKing: 255,255,0|Bonemass: 0,255,255|Dragonqueen: 74,134,232|Vendor_BlackForest: 0,0,255|AbandonedLogCabin02: 230,184,175|AbandonedLogCabin03: 230,184,175|AbandonedLogCabin04: 230,184,175|TrollCave02: 201,218,248|Crypt2: 255,242,204|Crypt3: 255,242,204|Crypt4: 255,242,204|SunkenCrypt4: 69,129,142|Dolmen03: 255,229,153|Dolmen01: 255,229,153|Dolmen02: 255,229,153|Ruin3: 221,126,107|StoneTower1: 204,65,37|StoneTower3: 204,65,37|MountainGrave01: 106,168,79|Grave1: 127,96,96|InfestedTree01: 182,215,168|WoodHouse1: 109,158,235|WoodHouse10: 109,158,235|WoodHouse11: 109,158,235|WoodHouse12: 109,158,235|WoodHouse13: 109,158,235|WoodHouse2: 109,158,235|WoodHouse3: 109,158,235|WoodHouse4: 109,158,235|WoodHouse5: 109,158,235|WoodHouse6: 109,158,235|WoodHouse7: 109,158,235|WoodHouse8: 109,158,235|WoodHouse9: 109,158,235|StoneHouse3: 118,165,175|StoneHouse4: 118,165,175|Meteorite: 147,196,125|StoneTowerRuins04: 166,28,0|StoneTowerRuins05: 166,28,0|SwampRuin1: 19,79,92|SwampRuin2: 19,79,92|Ruin1: 39,78,19|Ruin2: 39,78,19|DrakeLorestone: 133,32,12|Runestone_Boars: 91,15,0|Runestone_Draugr: 79,204,204|Runestone_Greydwarfs: 234,153,153|Runestone_Meadows: 224,102,102|Runestone_Mountains: 204,0,0|Runestone_Plains: 153,0,0|Runestone_Swamps: 102,0,0|ShipSetting01: 208,224,227|ShipWreck01: 252,229,205|ShipWreck02: 252,229,205|ShipWreck03: 252,229,205|ShipWreck04: 252,229,205|GoblinCamp2: 191,144,0|DrakeNest01: 255,217,102|FireHole: 241,194,50|Greydwarf_camp1: 217,228,211|StoneCircle: 162,196,201|StoneHenge1: 249,203,156|StoneHenge2: 249,203,156|StoneHenge3: 249,203,156|StoneHenge4: 249,203,156|StoneHenge5: 249,203,156|StoneHenge6: 249,203,156|StoneTowerRuins03: 246,178,107|StoneTowerRuins07: 246,178,107|StoneTowerRuins08: 246,178,107|StoneTowerRuins09: 246,178,107|StoneTowerRuins10: 246,178,107|SwampHut5: 230,145,56|SwampHut1: 230,145,56|SwampHut2: 230,145,56|SwampHut3: 230,145,56|SwampHut4: 230,145,56|Waymarker01: 164,195,244|Waymarker02: 164,195,244|MountainWell1: 56,118,29|SwampWell1: 12,52,61|WoodFarm1: 180,95,6|WoodVillage1: 120,63,4|Mistlands_DvergrBossEntrance1: 153,0,255|Hildir_camp: 255,105,180";
     public bool CreateMap() => CreateMap<Rgba32>();
-    protected override bool LoadTextureToMap<T>(Image<T> image)
+    // The picture's colours where a pin can be, in tiles of 128 x 128 pixels: a tile that is all black (the one colour no pin is
+    // made of) is not held at all. A location map is black with a few small coloured pins, and a 16384 px one held as an array
+    // of colours was a gigabyte.
+    private sealed class PinPixels(int size)
+    {
+        private const int Shift = TileBlock.Shift, Side = TileBlock.Side, Mask = TileBlock.Mask;
+        private readonly int tiles = TileBlock.TilesFor(size);
+        private readonly Color32[]?[] held = new Color32[]?[TileBlock.TilesFor(size) * TileBlock.TilesFor(size)];
+        private static readonly Color32 Black = new(0, 0, 0, 255);
+
+        internal static bool IsBlack(Color32 c) => c.r == 0 && c.g == 0 && c.b == 0 && c.a == 255;
+
+        // Whether no pixel of the tile holding (x, y) was ever anything but black.
+        internal bool AllBlack(int x, int y) => held[(y >> Shift) * tiles + (x >> Shift)] == null;
+
+        internal Color32 this[int x, int y]
+        {
+            get => held[(y >> Shift) * tiles + (x >> Shift)] is { } tile ? tile[((y & Mask) << Shift) | (x & Mask)] : Black;
+            set
+            {
+                int t = (y >> Shift) * tiles + (x >> Shift);
+                var tile = held[t];
+                if (tile == null)
+                {
+                    if (IsBlack(value))
+                        return;
+                    tile = new Color32[Side * Side];
+                    for (int i = 0; i < tile.Length; i++)
+                        tile[i] = Black;
+                    held[t] = tile;
+                }
+                tile[((y & Mask) << Shift) | (x & Mask)] = value;
+            }
+        }
+    }
+
+    protected override bool LoadTextureToMap<T>(MapPicture<T> picture)
     {
         var black = new Color32(0, 0, 0, 255);
         var sw = new Stopwatch();
         sw.Start();
-        var img = (Image<Rgba32>)(Image)image;
-        var pixels = LoadPixels(img, Convert);
-        int Index(int x, int y) => y * Size + x;
+        var img = (MapPicture<Rgba32>)(object)picture;
+        var pixels = new PinPixels(Size);
+        img.ReadRows(0, Size, (r, row) =>
+        {
+            for (int x = 0; x < row.Length; x++)
+            {
+                var color = Convert(row[x]);
+                if (!PinPixels.IsBlack(color))
+                    pixels[x, r] = color;
+            }
+        });
 
         bool Compare(Color32 a, Color32 b) => a.r == b.r && a.g == b.g && a.b == b.b;
         Queue<Vector2i> q = new();
 
         void FloodFill(int x, int y, Action<int, int> fillfn)
         {
-            var sourceColor = pixels[Index(x, y)];
-            bool CheckValidity(int xc, int yc) => xc >= 0 && xc < Size && yc >= 0 && yc < Size && Compare(pixels[Index(xc, yc)], sourceColor);
+            var sourceColor = pixels[x, y];
+            bool CheckValidity(int xc, int yc) => xc >= 0 && xc < Size && yc >= 0 && yc < Size && Compare(pixels[xc, yc], sourceColor);
 
             q.Clear();
 
             void Enqueue(int xa, int ya)
             {
-                pixels[Index(xa, ya)] = black;
+                pixels[xa, ya] = black;
                 q.Enqueue(new Vector2i(xa, ya));
             }
 
@@ -220,7 +264,7 @@ internal class ImageMapLocation() : ImageMapBase()
                 var point = q.Dequeue();
                 var x1 = point.x;
                 var y1 = point.y;
-                if (q.Count > Size * Size)
+                if (q.Count > (long)Size * Size)
                 {
                     throw new Exception($"Flood fill on spawn location failed:  started at pixel {x}, {Size - y}, color #{ColorUtility.ToHtmlStringRGB(sourceColor)}");
                 }
@@ -240,8 +284,14 @@ internal class ImageMapLocation() : ImageMapBase()
         {
             for (int x = 0; x < Size; ++x)
             {
-                int i = Index(x, y);
-                var color = pixels[i];
+                // A tile that holds nothing but black has no pin: on to the next (a pin found in this row has changed the
+                // tiles it fills, and each is looked at again where it is reached).
+                if ((x & TileBlock.Mask) == 0 && pixels.AllBlack(x, y))
+                {
+                    x = Math.Min(Size, x + TileBlock.Side) - 1;
+                    continue;
+                }
+                var color = pixels[x, y];
                 if (!color.Equals(black))
                 {
                     var area = new List<Vector2Int>();

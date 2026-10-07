@@ -151,7 +151,10 @@ public partial class BetterContinents
         private static int SettingsReceiveBufferBytesReceived;
         private static int SettingsReceiveHash;
 
-        private static int GetHashCode<T>(T[] array) where T : struct
+        private static int GetHashCode<T>(T[] array) where T : struct => array == null ? 0 : GetHashCode(array, array.Length);
+
+        // The same over the first `length` elements (a package's buffer is longer than the package).
+        private static int GetHashCode<T>(T[] array, int length) where T : struct
         {
             unchecked
             {
@@ -160,9 +163,9 @@ public partial class BetterContinents
                     return 0;
                 }
                 int hash = 17;
-                foreach (T element in array)
+                for (int i = 0; i < length; i++)
                 {
-                    hash = hash * 31 + element.GetHashCode();
+                    hash = hash * 31 + array[i].GetHashCode();
                 }
                 return hash;
             }
@@ -195,7 +198,14 @@ public partial class BetterContinents
 
             public static string Add(ZPackage package)
             {
-                var id = PackageID(package);
+                var data = PackageBytes.Buffer(package, out int length);
+                return Add(data, length);
+            }
+
+            // A package's bytes (the first `length` of data), as the cache holds them.
+            public static string Add(byte[] data, int length)
+            {
+                var id = PackageID(data, length);
                 var filePath = GetCachePath(id);
                 if (File.Exists(filePath))
                 {
@@ -204,7 +214,8 @@ public partial class BetterContinents
                 }
                 Log($"Adding cache entry {filePath}");
                 Directory.CreateDirectory(Path.GetDirectoryName(filePath));
-                File.WriteAllBytes(filePath + ".tmp", package.GetArray());
+                using (var file = File.Create(filePath + ".tmp"))
+                    file.Write(data, 0, length);
                 File.Move(filePath + ".tmp", filePath);
                 return id;
             }
@@ -248,7 +259,11 @@ public partial class BetterContinents
             // "bc_cache import" and the plugin-tree seed scan skip duplicates with.
             internal static bool CacheItemExists(string id) => File.Exists(GetCachePath(id));
 
-            public static ZPackage LoadCacheItem(string id) => new(File.ReadAllBytes(GetCachePath(id)));
+            public static ZPackage LoadCacheItem(string id)
+            {
+                using var file = File.OpenRead(GetCachePath(id));
+                return PackageBytes.Read(file, checked((int)file.Length));
+            }
 
             public static void DeleteCacheItem(string id) => File.Delete(GetCachePath(id));
 
@@ -263,7 +278,10 @@ public partial class BetterContinents
                 return hex.ToString();
             }
 
-            public static string PackageID(ZPackage package) => ByteArrayToString(package.GenerateHash()).Substring(0, 32).ToLower();
+            public static string PackageID(ZPackage package) => ByteArrayToString(PackageBytes.Hash(package)).Substring(0, 32).ToLower();
+
+            // The same id from a package's bytes (the first `length` of data).
+            public static string PackageID(byte[] data, int length) => ByteArrayToString(PackageBytes.Hash(data, length)).Substring(0, 32).ToLower();
         }
 
         private class BCClientInfo
@@ -355,7 +373,7 @@ public partial class BetterContinents
                     SettingsReceiveBufferBytesReceived = 0;
                     Log($"Receiving settings from server ({SettingsReceiveBuffer.Length} bytes)");
 
-                    UI.Add("ConfigDownload", () => UI.ProgressBar(SettingsReceiveBufferBytesReceived * 100 / SettingsReceiveBuffer.Length, $"Better Continents: downloading world settings from server ..."));
+                    UI.Add("ConfigDownload", () => UI.ProgressBar((int)(SettingsReceiveBufferBytesReceived * 100L / Math.Max(SettingsReceiveBuffer.Length, 1)), $"Better Continents: downloading world settings from server ..."));
                 });
 
                 peer.m_rpc.Register("BetterContinentsConfigPacket", (ZRpc rpc, int offset, int packetHash, ZPackage packet) =>
@@ -451,13 +469,15 @@ public partial class BetterContinents
             {
                 Log($"Settings transfer complete, unpacking them now");
 
+                var received = SettingsReceiveBuffer;
                 var loadingTask = Task.Run(() =>
                 {
-                    var settingsPkg = new ZPackage(SettingsReceiveBuffer);
+                    var settingsPkg = new ZPackage(received);
                     var settings = BetterContinentsSettings.Load(settingsPkg);
                     // 0.9.0: Add's return is this package's id - the same one a join check computes - remembered
-                    // as "the current world" below, once we're back on the main thread.
-                    var id = WorldCache.Add(settingsPkg);
+                    // as "the current world" below, once we're back on the main thread. 0.10.3: from the received bytes
+                    // themselves, not from a copy of them (a 16384 px world is hundreds of megabytes).
+                    var id = WorldCache.Add(received, received.Length);
                     return (settings, id);
                 });
 
@@ -470,6 +490,10 @@ public partial class BetterContinents
                 {
                     UI.Remove("ReceivedSettings");
                 }
+
+                // The received bytes are in the cache and in the settings now: not kept for the whole session as well.
+                SettingsReceiveBuffer = [];
+                received = null!;
 
                 if (loadingTask.IsFaulted)
                 {
@@ -686,11 +710,13 @@ public partial class BetterContinents
 
                 var settingsPackage = new ZPackage();
                 Settings.Serialize(settingsPackage, true);
+                // The package's own buffer (0.10.3: no copy of it), hashed once (it was twice, each time over a copy).
+                var settingsData = PackageBytes.Buffer(settingsPackage, out int settingsLength);
+                string cacheId = WorldCache.PackageID(settingsData, settingsLength);
 
-                if (WorldCache.CacheItemExists(settingsPackage, bcClientInfo.worldCache))
+                if (WorldCache.CacheItemExists(cacheId, bcClientInfo.worldCache))
                 {
                     // We send hash and id
-                    string cacheId = WorldCache.PackageID(settingsPackage);
                     Log($"Client {bcClientInfo} already has cached settings for world, instructing it to load those (id {cacheId})");
                     rpc.Invoke("BetterContinentsConfigLoadFromCache", cacheId);
                 }
@@ -699,9 +725,8 @@ public partial class BetterContinents
                     Log($"Client {bcClientInfo} doesn't have cached settings, sending them now");
                     Settings.Dump();
 
-                    var settingsData = settingsPackage.GetArray();
-                    Log($"Sending settings package header for {settingsData.Length} byte stream");
-                    rpc.Invoke("BetterContinentsConfigStart", settingsData.Length, GetHashCode(settingsData));
+                    Log($"Sending settings package header for {settingsLength} byte stream");
+                    rpc.Invoke("BetterContinentsConfigStart", settingsLength, GetHashCode(settingsData, settingsLength));
 
                     const int SendChunkSize = 128 * 1024;
 
@@ -709,6 +734,10 @@ public partial class BetterContinents
                     var transferRate = ConfigSettingsTransferRate?.Value ?? TransferRate.Default;
                     int? rateBytesPerSecond = TransferRate.BytesPerSecond(transferRate);
                     Log($"Settings transfer rate: {TransferRate.Describe(transferRate)} (server setting)");
+                    // The send loop below moves one 128 KiB chunk a frame (about 4 MB/s at most), whatever the rate: what a world of
+                    // this size will take at the best, so a server's log says why a player is still downloading.
+                    double bytesPerSecond = Math.Min(rateBytesPerSecond ?? VanillaSteamSendRate, 4_000_000);
+                    Log($"The {settingsLength / 1048576.0:F1} MB of settings take about {settingsLength / bytesPerSecond:F0} s to send at that rate.");
                     bool rateRaised = false;
                     if (rateBytesPerSecond.HasValue)
                     {
@@ -733,11 +762,11 @@ public partial class BetterContinents
                         }
                     }
                     float transferStartedAt = Time.realtimeSinceStartup;
-                    int nextProgressLogAt = Mathf.Max(settingsData.Length / 10, 1);
+                    int nextProgressLogAt = Mathf.Max(settingsLength / 10, 1);
 
-                    for (int sentBytes = 0; sentBytes < settingsData.Length;)
+                    for (int sentBytes = 0; sentBytes < settingsLength;)
                     {
-                        int packetSize = Mathf.Min(settingsData.Length - sentBytes, SendChunkSize);
+                        int packetSize = Mathf.Min(settingsLength - sentBytes, SendChunkSize);
                         var packet = ArraySlice(settingsData, sentBytes, packetSize);
                         rpc.Invoke("BetterContinentsConfigPacket", sentBytes, GetHashCode(packet),
                             new ZPackage(packet));
@@ -752,10 +781,10 @@ public partial class BetterContinents
                         }
 
                         sentBytes += packetSize;
-                        if (sentBytes >= nextProgressLogAt || sentBytes == settingsData.Length)
+                        if (sentBytes >= nextProgressLogAt || sentBytes == settingsLength)
                         {
-                            Log($"Sent {sentBytes} of {settingsData.Length} bytes");
-                            nextProgressLogAt += Mathf.Max(settingsData.Length / 10, 1);
+                            Log($"Sent {sentBytes} of {settingsLength} bytes");
+                            nextProgressLogAt += Mathf.Max(settingsLength / 10, 1);
                         }
                         float timeout = Time.time + 30;
                         // Keep up to two chunks in flight (Steam's own send buffer is 512 KiB) instead of draining to one.
@@ -773,7 +802,7 @@ public partial class BetterContinents
                     if (rateRaised)
                         RestoreSteamSendRate(rpc, "transfer done");
                     float transferSeconds = Mathf.Max(Time.realtimeSinceStartup - transferStartedAt, 0.001f);
-                    Log($"Settings sent: {settingsData.Length} bytes in {transferSeconds:F1} s ({settingsData.Length / transferSeconds / 1024f:F0} KB/s)");
+                    Log($"Settings sent: {settingsLength} bytes in {transferSeconds:F1} s ({settingsLength / transferSeconds / 1024f:F0} KB/s)");
                 }
                 yield return new WaitUntil(() => bcClientInfo.readyForPeerInfo || !peer.m_socket.IsConnected());
 

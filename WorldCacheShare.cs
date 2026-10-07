@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-09-24 for world export and import (0.9.0).
+// Added by Wubarrk on 2026-09-24 for world export and import (0.9.0), and modified on 2026-10-06 for 16k worlds (0.10.3).
 
 // 0.9.0: a shareable form of the world cache (BetterContinents.ZNetPatch.WorldCache). Joining a Better Continents
 // world streams its settings package to every new client once per world revision (11.8 MB for a 2048 px world);
@@ -20,9 +20,12 @@ public static class WorldCacheShare
 {
   public const string Extension = ".bcworld";
 
-  // A file this large could not be a settings package (even an 8192 world's is nowhere near this), so it is not
-  // worth reading fully just to refuse it - protects the startup scan against a huge, wrongly-named file.
-  private const long MaxReasonableSize = 512L * 1024 * 1024;
+  // A file this large could not be a settings package, so it is not worth reading fully just to refuse it - protects the
+  // startup scan against a huge, wrongly-named file. A package is a MemoryStream, so the size of the largest the game can
+  // make (PackageBytes.MaxLength, 1.5 GB). A world of 16384 px maps made with Compact Maps (every such world) is a few tens of
+  // megabytes (a biome map, a spawn map) to a few hundred (several noisy 16-bit maps); this was 512 MB, which a world of a
+  // few large heightmaps could pass.
+  private const long MaxReasonableSize = PackageBytes.MaxLength;
 
   public sealed class ExportResult
   {
@@ -141,7 +144,7 @@ public static class WorldCacheShare
   // a "<same>.txt" sidecar, into outputDir (created if missing).
   internal static ExportResult WriteExportFiles(byte[] bytes, string worldName, string seedName, string outputDir)
   {
-    var id = WorldCache.PackageID(new ZPackage(bytes));
+    var id = WorldCache.PackageID(bytes, bytes.Length);
     var baseName = $"{SafeFileName(worldName)}-{id}";
     Directory.CreateDirectory(outputDir);
     var filePath = Path.Combine(outputDir, baseName + Extension);
@@ -251,7 +254,7 @@ public static class WorldCacheShare
     string id;
     try
     {
-      id = WorldCache.PackageID(new ZPackage(bytes));
+      id = WorldCache.PackageID(bytes, bytes.Length);
     }
     catch (Exception e)
     {
@@ -263,7 +266,7 @@ public static class WorldCacheShare
 
     try
     {
-      WorldCache.Add(new ZPackage(bytes));
+      WorldCache.Add(bytes, bytes.Length);
     }
     catch (Exception e)
     {

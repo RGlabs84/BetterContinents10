@@ -1,4 +1,4 @@
-﻿// Modified by Wubarrk on 2026-10-04 for the unifying refactor (0.10.0).
+﻿// Modified by Wubarrk on 2026-10-04 for the unifying refactor (0.10.0), and on 2026-10-06 for 16k worlds (0.10.3).
 
 using System;
 using System.Collections.Generic;
@@ -17,6 +17,7 @@ internal class ImageMapTerrain() : ImageMapColor()
     public static ImageMapTerrain? Create(byte[] data, string colors) => Create(data, "", colors);
     // A world made since 0.10: its legend and tiles (DataKey.TiledMap).
     internal static ImageMapTerrain FromBlock(byte[] block) => FromBlock<ImageMapTerrain>(block);
+    internal static ImageMapTerrain FromBlock(System.IO.Stream block) => FromBlock<ImageMapTerrain>(block);
     private static readonly string DefaultColors = "Default: 000000|Meadows: 00FF00|BlackForest: 007F00|Swamp: 7F7F00|Mountain: FFFFFF|Plains: FFFF00|Mistlands: 7F7F7F|AshLands: FF0000|DeepNorth: 00FFFF|Ocean: 0000FF";
 
     private static readonly Dictionary<string, Color32?> TerrainGrounds = new() {

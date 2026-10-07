@@ -1,4 +1,4 @@
-﻿// Modified by Wubarrk on 2026-09-24 for world export and import (0.9.0), and on 2026-10-04 for the unifying refactor (0.10.0).
+﻿// Modified by Wubarrk on 2026-09-24 for world export and import (0.9.0), and on 2026-10-04 for the unifying refactor (0.10.0), and on 2026-10-06 for 16k worlds (0.10.3).
 
 using System;
 using System.Collections.Generic;
@@ -79,17 +79,17 @@ abstract class ImageMapColor() : ImageMapBase()
         return true;
     }
 
-    protected override bool LoadTextureToMap<T>(Image<T> image)
+    protected override bool LoadTextureToMap<T>(MapPicture<T> picture)
     {
         var st = new Stopwatch();
         st.Start();
 
-        var img = (Image<Rgba32>)(Image)image;
+        var img = (MapPicture<Rgba32>)(object)picture;
         grid = ColorGrid.From(Rows(img, 1, true,
-            (row, band, at) => { for (int x = 0; x < row.Length; x++) band[at + x] = row[x].R; },
-            (row, band, at) => { for (int x = 0; x < row.Length; x++) band[at + x] = row[x].G; },
-            (row, band, at) => { for (int x = 0; x < row.Length; x++) band[at + x] = row[x].B; },
-            (row, band, at) => { for (int x = 0; x < row.Length; x++) band[at + x] = row[x].A; }), Colors, Compact);
+            (row, band, at, y) => { for (int x = 0; x < row.Length; x++) band[at + x] = row[x].R; },
+            (row, band, at, y) => { for (int x = 0; x < row.Length; x++) band[at + x] = row[x].G; },
+            (row, band, at, y) => { for (int x = 0; x < row.Length; x++) band[at + x] = row[x].B; },
+            (row, band, at, y) => { for (int x = 0; x < row.Length; x++) band[at + x] = row[x].A; }), Colors, Compact);
 
         BetterContinents.Log($"Time to calculate colors from {FilePath}: {st.ElapsedMilliseconds} ms");
         return true;
@@ -106,9 +106,11 @@ abstract class ImageMapColor() : ImageMapBase()
     // The tiles that are decoded now (tests and the console).
     internal int DecodedTiles => grid?.DecodedTiles() ?? 0;
 
-    // The legend's colour for each colour of the picture, or the picture's own colour where the legend has none; read
-    // tile by tile with the legend the map was decoded with.
-    private sealed class ColorGrid : TileGrid<Color32?>
+    // Every pixel's colour as the picture had it (red, green, blue and alpha in one number), in tiles; the legend's colour for
+    // each is found when a sample reads it (Resolve), or the picture's own colour where the legend has none. The legend is the
+    // one the map was decoded with. A pixel takes four bytes (the colour it reads as, with whether the legend gave one, took
+    // eight), so a 16384 px map decoded whole is a gigabyte, not two, and each tile decodes without a lookup.
+    private sealed class ColorGrid : TileGrid<uint>
     {
         private readonly Dictionary<Rgba32, Color32?> colors;
 
@@ -126,52 +128,67 @@ abstract class ImageMapColor() : ImageMapBase()
             return grid;
         }
 
-        internal override long TileBytes => 8L * TileBlock.Pixels;
+        internal override long TileBytes => 4L * TileBlock.Pixels;
 
-        private Color32? Read(ushort r, ushort g, ushort b, ushort a)
+        private static uint Pack(ushort r, ushort g, ushort b, ushort a) => (uint)((byte)r | (byte)g << 8 | (byte)b << 16 | (byte)a << 24);
+
+        // The legend's colour for a pixel, or its own colour where the legend has none.
+        internal Color32? Resolve(uint pixel)
         {
-            var pixel = new Rgba32((byte)r, (byte)g, (byte)b, (byte)a);
-            if (colors.TryGetValue(pixel, out var color))
+            var rgba = new Rgba32((byte)pixel, (byte)(pixel >> 8), (byte)(pixel >> 16), (byte)(pixel >> 24));
+            if (colors.TryGetValue(rgba, out var color))
                 return color;
-            return new Color32(pixel.R, pixel.G, pixel.B, pixel.A);
+            return new Color32(rgba.R, rgba.G, rgba.B, rgba.A);
         }
 
-        protected override Color32?[] FromValues(ushort[] values)
+        protected override uint[] FromValues(ushort[] values)
         {
-            var tile = new Color32?[TileBlock.Pixels];
+            var tile = new uint[TileBlock.Pixels];
             const int P = TileBlock.Pixels;
             for (int i = 0; i < P; i++)
-                tile[i] = Read(values[i], values[P + i], values[2 * P + i], values[3 * P + i]);
+                tile[i] = Pack(values[i], values[P + i], values[2 * P + i], values[3 * P + i]);
             return tile;
         }
 
-        protected override Color32? UniformValue(ushort[] channels) => Read(channels[0], channels[1], channels[2], channels[3]);
+        protected override uint UniformValue(ushort[] channels) => Pack(channels[0], channels[1], channels[2], channels[3]);
 
-        // The picture's own colour (RGBA), for writing it back out (a compressed grid's).
-        internal Rgba32 Source(int x, int y)
+        // The picture's own colours (RGBA bytes) of tile row ty, for writing the picture back out (a compressed grid's): row r of the
+        // band (r from 0, at most 128 of them) pixel x's red at band[(r * Size + x) * 4], then green, blue and alpha. Every tile of the
+        // row is decoded once (it was each of 128 times, once for each pixel row of it, on a 16384 px map: minutes).
+        internal void ReadSourceBand(int ty, byte[] band)
         {
             var block = Block!;
-            int t = (y >> Shift) * Tiles + (x >> Shift);
-            if (block.IsUniform(t))
-                return new Rgba32((byte)block.UniformValue(t, 0), (byte)block.UniformValue(t, 1), (byte)block.UniformValue(t, 2), (byte)block.UniformValue(t, 3));
-            var values = Scratch(t);
-            int i = ((y & Mask) << Shift) | (x & Mask);
             const int P = TileBlock.Pixels;
-            return new Rgba32((byte)values[i], (byte)values[P + i], (byte)values[2 * P + i], (byte)values[3 * P + i]);
+            int rows = block.Extent(ty);
+            for (int tx = 0; tx < Tiles; tx++)
+            {
+                int t = ty * Tiles + tx, x0 = tx << Shift, w = block.Extent(tx);
+                if (block.IsUniform(t))
+                {
+                    byte r = (byte)block.UniformValue(t, 0), g = (byte)block.UniformValue(t, 1), b = (byte)block.UniformValue(t, 2), a = (byte)block.UniformValue(t, 3);
+                    for (int y = 0; y < rows; y++)
+                        for (int x = 0, at = (y * Size + x0) * 4; x < w; x++, at += 4)
+                        {
+                            band[at] = r;
+                            band[at + 1] = g;
+                            band[at + 2] = b;
+                            band[at + 3] = a;
+                        }
+                    continue;
+                }
+                block.Decode(t, scratch);
+                for (int y = 0; y < rows; y++)
+                    for (int x = 0, at = (y * Size + x0) * 4, i = y << Shift; x < w; x++, i++, at += 4)
+                    {
+                        band[at] = (byte)scratch[i];
+                        band[at + 1] = (byte)scratch[P + i];
+                        band[at + 2] = (byte)scratch[2 * P + i];
+                        band[at + 3] = (byte)scratch[3 * P + i];
+                    }
+            }
         }
 
-        // The last tile read for Source, decoded once while a writer walks its rows.
-        private int scratchTile = -1;
         private readonly ushort[] scratch = new ushort[4 * TileBlock.Pixels];
-        private ushort[] Scratch(int t)
-        {
-            if (scratchTile != t)
-            {
-                Block!.Decode(t, scratch);
-                scratchTile = t;
-            }
-            return scratch;
-        }
     }
 
     // ---- a world made since 0.10 saves and sends its tiles (DataKey.TiledMap) ---------------------------------------
@@ -181,19 +198,28 @@ abstract class ImageMapColor() : ImageMapBase()
     // The legend as the map keeps it (SourceColors), then the picture's colours in tiles.
     internal byte[] ToBlock()
     {
-        var block = grid?.Block ?? throw new InvalidOperationException($"{FilePath} holds no compressed tiles to save");
         using var stream = new System.IO.MemoryStream();
         using var writer = new System.IO.BinaryWriter(stream);
-        writer.Write(BlockVersion);
-        writer.Write(SourceColors);
-        block.WriteTo(writer);
+        WriteBlock(writer);
         writer.Flush();
         return stream.ToArray();
     }
 
-    protected static T FromBlock<T>(byte[] block) where T : ImageMapColor, new()
+    // The same, written where the caller says (a package is written straight into: no array of the block is made).
+    internal void WriteBlock(System.IO.BinaryWriter writer)
     {
-        using var reader = new System.IO.BinaryReader(new System.IO.MemoryStream(block, false));
+        var block = grid?.Block ?? throw new InvalidOperationException($"{FilePath} holds no compressed tiles to save");
+        writer.Write(BlockVersion);
+        writer.Write(SourceColors);
+        block.WriteTo(writer);
+        writer.Flush();
+    }
+
+    protected static T FromBlock<T>(byte[] block) where T : ImageMapColor, new() => FromBlock<T>(new System.IO.MemoryStream(block, false));
+
+    protected static T FromBlock<T>(System.IO.Stream block) where T : ImageMapColor, new()
+    {
+        using var reader = new System.IO.BinaryReader(block);
         var version = reader.ReadByte();
         if (version != BlockVersion)
             throw new System.IO.InvalidDataException($"a colour map saved in format {version}, which this version of Better Continents cannot read");
@@ -217,11 +243,23 @@ abstract class ImageMapColor() : ImageMapBase()
         if (SourceData.Length > 0 || grid is not { Compressed: true })
             return SourceData;
         lock (grid)
+        {
+            // A band of 128 rows at a time, the rows asked for from the top of the map down: each tile is decoded once.
+            var band = new byte[4 * TileBlock.Side * Size];
+            int bandRow = -1;
             return Png<Rgba32>((y, row) =>
             {
-                for (int x = 0; x < Size; x++)
-                    row[x] = grid.Source(x, y);
+                int ty = y >> TileBlock.Shift;
+                if (ty != bandRow)
+                {
+                    grid.ReadSourceBand(ty, band);
+                    bandRow = ty;
+                }
+                int at = (y & TileBlock.Mask) * Size * 4;
+                for (int x = 0; x < Size; x++, at += 4)
+                    row[x] = new Rgba32(band[at], band[at + 1], band[at + 2], band[at + 3]);
             }, SixLabors.ImageSharp.Formats.Png.PngColorType.RgbWithAlpha, SixLabors.ImageSharp.Formats.Png.PngBitDepth.Bit8);
+        }
     }
 
     protected virtual void ParseColors()
@@ -264,7 +302,12 @@ abstract class ImageMapColor() : ImageMapBase()
         int y0 = Mathf.Clamp(yi, 0, Size - 1);
         int y1 = Mathf.Clamp(yi + 1, 0, Size - 1);
 
-        grid!.Quad(x0, x1, y0, y1, out var p00, out var p10, out var p01, out var p11);
+        grid!.Quad(x0, x1, y0, y1, out var q00, out var q10, out var q01, out var q11);
+        // Four pixels, often one colour: the legend is asked once for each.
+        var p00 = grid.Resolve(q00);
+        var p10 = q10 == q00 ? p00 : grid.Resolve(q10);
+        var p01 = q01 == q00 ? p00 : q01 == q10 ? p10 : grid.Resolve(q01);
+        var p11 = q11 == q00 ? p00 : q11 == q10 ? p10 : q11 == q01 ? p01 : grid.Resolve(q11);
         if (p00 == null || p10 == null || p01 == null || p11 == null)
         {
             color = UnityEngine.Color.black;

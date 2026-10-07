@@ -1,4 +1,4 @@
-// Modified by Wubarrk on 2026-09-22 for alt-biome planting (0.8.1), and on 2026-09-24 for world export and import (0.9.0), and on 2026-10-04 for the unifying refactor (0.10.0).
+// Modified by Wubarrk on 2026-09-22 for alt-biome planting (0.8.1), and on 2026-09-24 for world export and import (0.9.0), and on 2026-10-04 for the unifying refactor (0.10.0), and on 2026-10-06 for 16k worlds (0.10.3).
 
 using System;
 using System.Collections.Generic;
@@ -216,6 +216,8 @@ public partial class BetterContinents
         return;
       }
       var version = formatVersion ?? (int.TryParse(ConfigOverrideVersion.Value, out var v) ? v : SavedVersion);
+      // Room for as many bytes as the last package of this kind took, so the stream does not grow by doubling.
+      PackageBytes.Reserve(pkg, network ? sentLength : savedLength);
       pkg.Write(version);
       if (version < 11)
       {
@@ -269,11 +271,11 @@ public partial class BetterContinents
         if (HeightMapAlpha)
           pkg.Write((int)DataKey.HeightMapAlpha);
         if (tiled && HeightMap.Compact)
-          WriteTiled(pkg, DataKey.HeightMap, HeightMap.ToBlock());
+          WriteTiled(pkg, DataKey.HeightMap, HeightMap.WriteBlock, "the heightmap");
         else
         {
           pkg.Write((int)DataKey.HeightMap);
-          pkg.Write(HeightMap.SourceBytes());
+          WriteBytes(pkg, HeightMap.SourceBytes(), "the heightmap");
         }
         if (!network)
         {
@@ -303,11 +305,11 @@ public partial class BetterContinents
       if (BiomeMap != null)
       {
         if (tiled && BiomeMap.Compact)
-          WriteTiled(pkg, DataKey.BiomeMap, BiomeMap.ToBlock(network));
+          WriteTiled(pkg, DataKey.BiomeMap, w => BiomeMap.WriteBlock(w, network), "the biome map");
         else
         {
           pkg.Write((int)DataKey.BiomeMap);
-          pkg.Write(BiomeMap.Serialize(network));
+          WriteBytes(pkg, BiomeMap.Serialize(network), "the biome map");
         }
 
         if (!network)
@@ -319,10 +321,11 @@ public partial class BetterContinents
       if (SpawnMap != null)
       {
         if (tiled && SpawnMap.Compact)
-          WriteTiled(pkg, DataKey.SpawnMap, SpawnMap.ToBlock());
+          WriteTiled(pkg, DataKey.SpawnMap, SpawnMap.WriteBlock, "the spawn map");
         else
         {
           pkg.Write((int)DataKey.SpawnMap);
+          PackageBytes.Guard(pkg, "the spawn map", (long)SpawnMap.Size * SpawnMap.Size);
           SpawnMap.Serialize(pkg);
         }
 
@@ -335,10 +338,11 @@ public partial class BetterContinents
       if (VegetationMap != null)
       {
         if (tiled && VegetationMap.Compact)
-          WriteTiled(pkg, DataKey.VegetationMap, VegetationMap.ToBlock());
+          WriteTiled(pkg, DataKey.VegetationMap, VegetationMap.WriteBlock, "the vegetation map");
         else
         {
           pkg.Write((int)DataKey.VegetationMap);
+          PackageBytes.Guard(pkg, "the vegetation map", (long)VegetationMap.Size * VegetationMap.Size);
           VegetationMap.Serialize(pkg);
         }
 
@@ -385,11 +389,11 @@ public partial class BetterContinents
       if (RoughMap != null)
       {
         if (tiled && RoughMap.Compact)
-          WriteTiled(pkg, DataKey.RoughMap, RoughMap.ToBlock());
+          WriteTiled(pkg, DataKey.RoughMap, RoughMap.WriteBlock, "the roughmap");
         else
         {
           pkg.Write((int)DataKey.RoughMap);
-          pkg.Write(RoughMap.SourceBytes());
+          WriteBytes(pkg, RoughMap.SourceBytes(), "the roughmap");
         }
         if (!network)
         {
@@ -413,11 +417,11 @@ public partial class BetterContinents
       if (!UseRoughInvertedAsFlat && FlatMap != null)
       {
         if (tiled && FlatMap.Compact)
-          WriteTiled(pkg, DataKey.FlatMap, FlatMap.ToBlock());
+          WriteTiled(pkg, DataKey.FlatMap, FlatMap.WriteBlock, "the flatmap");
         else
         {
           pkg.Write((int)DataKey.FlatMap);
-          pkg.Write(FlatMap.SourceBytes());
+          WriteBytes(pkg, FlatMap.SourceBytes(), "the flatmap");
         }
         if (!network)
         {
@@ -429,11 +433,11 @@ public partial class BetterContinents
       if (ForestMap != null)
       {
         if (tiled && ForestMap.Compact)
-          WriteTiled(pkg, DataKey.ForestMap, ForestMap.ToBlock());
+          WriteTiled(pkg, DataKey.ForestMap, ForestMap.WriteBlock, "the forest map");
         else
         {
           pkg.Write((int)DataKey.ForestMap);
-          pkg.Write(ForestMap.SourceBytes());
+          WriteBytes(pkg, ForestMap.SourceBytes(), "the forest map");
         }
         if (!network)
         {
@@ -483,12 +487,12 @@ public partial class BetterContinents
       if (TerrainMap != null)
       {
         if (tiled && TerrainMap.Compact)
-          WriteTiled(pkg, DataKey.TerrainMap, TerrainMap.ToBlock());
+          WriteTiled(pkg, DataKey.TerrainMap, TerrainMap.WriteBlock, "the terrain map");
         else
         {
           pkg.Write((int)DataKey.TerrainMap);
           pkg.Write(TerrainMap.SourceColors);
-          pkg.Write(TerrainMap.SourceBytes());
+          WriteBytes(pkg, TerrainMap.SourceBytes(), "the terrain map");
         }
         if (!network)
         {
@@ -499,12 +503,12 @@ public partial class BetterContinents
       if (PaintMap != null)
       {
         if (tiled && PaintMap.Compact)
-          WriteTiled(pkg, DataKey.PaintMap, PaintMap.ToBlock());
+          WriteTiled(pkg, DataKey.PaintMap, PaintMap.WriteBlock, "the paint map");
         else
         {
           pkg.Write((int)DataKey.PaintMap);
           pkg.Write(PaintMap.SourceColors);
-          pkg.Write(PaintMap.SourceBytes());
+          WriteBytes(pkg, PaintMap.SourceBytes(), "the paint map");
         }
         if (!network)
         {
@@ -515,11 +519,11 @@ public partial class BetterContinents
       if (LavaMap != null)
       {
         if (tiled && LavaMap.Compact)
-          WriteTiled(pkg, DataKey.LavaMap, LavaMap.ToBlock());
+          WriteTiled(pkg, DataKey.LavaMap, LavaMap.WriteBlock, "the lava map");
         else
         {
           pkg.Write((int)DataKey.LavaMap);
-          pkg.Write(LavaMap.SourceBytes());
+          WriteBytes(pkg, LavaMap.SourceBytes(), "the lava map");
         }
         if (!network)
         {
@@ -531,11 +535,11 @@ public partial class BetterContinents
       if (MossMap != null)
       {
         if (tiled && MossMap.Compact)
-          WriteTiled(pkg, DataKey.MossMap, MossMap.ToBlock());
+          WriteTiled(pkg, DataKey.MossMap, MossMap.WriteBlock, "the moss map");
         else
         {
           pkg.Write((int)DataKey.MossMap);
-          pkg.Write(MossMap.SourceBytes());
+          WriteBytes(pkg, MossMap.SourceBytes(), "the moss map");
         }
         if (!network)
         {
@@ -547,11 +551,11 @@ public partial class BetterContinents
       if (HeatMap != null)
       {
         if (tiled && HeatMap.Compact)
-          WriteTiled(pkg, DataKey.HeatMap, HeatMap.ToBlock());
+          WriteTiled(pkg, DataKey.HeatMap, HeatMap.WriteBlock, "the heat map");
         else
         {
           pkg.Write((int)DataKey.HeatMap);
-          pkg.Write(HeatMap.SourceBytes());
+          WriteBytes(pkg, HeatMap.SourceBytes(), "the heat map");
         }
         if (!network)
         {
@@ -615,18 +619,36 @@ public partial class BetterContinents
           }
         }
       }
+      pkg.Flush();
+      if (network)
+        sentLength = pkg.m_stream.Length;
+      else
+        savedLength = pkg.m_stream.Length;
     }
 
-    // A map in tiles (a world made since 0.10): DataKey.TiledMap, the map's own key, its block.
-    private static void WriteTiled(ZPackage pkg, DataKey key, byte[] block)
+    // How long the last package of each kind was (Serialize): the room it starts with.
+    private long savedLength, sentLength;
+
+    // A map in tiles (a world made since 0.10): DataKey.TiledMap, the map's own key, its block. The block is written straight
+    // into the package (0.10.3: it was an array of its own first, and the package copied that); the package is checked
+    // against its limit after it, as a block of tiles is a small part of it.
+    private static void WriteTiled(ZPackage pkg, DataKey key, Action<System.IO.BinaryWriter> block, string what)
     {
       pkg.Write((int)DataKey.TiledMap);
       pkg.Write((int)key);
-      pkg.Write(block);
+      PackageBytes.WriteBlock(pkg, block);
+      PackageBytes.Guard(pkg, what, 0);
+    }
+
+    // A map's bytes (the picture's, or a biome map's one byte a pixel), after a check that the package has room for them.
+    private static void WriteBytes(ZPackage pkg, byte[] bytes, string what)
+    {
+      PackageBytes.Guard(pkg, what, bytes.Length);
+      pkg.Write(bytes);
     }
 
     // Whether the key is one of a map this version reads in tiles.
-    private bool ReadTiledMap(DataKey key, byte[] block)
+    private bool ReadTiledMap(DataKey key, System.IO.Stream block)
     {
       switch (key)
       {
@@ -934,7 +956,11 @@ public partial class BetterContinents
             break;
           case DataKey.TiledMap:
             var mapKey = (DataKey)pkg.ReadInt();
-            if (!ReadTiledMap(mapKey, pkg.ReadByteArray()))
+            bool known;
+            // The block is read from the package's own buffer, not from a copy of it.
+            using (var block = PackageBytes.ReadBlock(pkg))
+              known = ReadTiledMap(mapKey, block);
+            if (!known)
             {
               LogError("Failed to load the save file. Unknown feature: tiles of " + mapKey);
               EnabledForThisWorld = false;

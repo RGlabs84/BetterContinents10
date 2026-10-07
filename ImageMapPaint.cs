@@ -1,4 +1,4 @@
-﻿// Modified by Wubarrk on 2026-10-04 for the unifying refactor (0.10.0).
+﻿// Modified by Wubarrk on 2026-10-04 for the unifying refactor (0.10.0), and on 2026-10-06 for 16k worlds (0.10.3).
 
 using System;
 using System.Collections.Generic;
@@ -23,6 +23,7 @@ internal class ImageMapPaint() : ImageMapColor()
     public static ImageMapPaint? Create(byte[] data, string colors) => Create(data, "", colors);
     // A world made since 0.10: its legend and tiles (DataKey.TiledMap).
     internal static ImageMapPaint FromBlock(byte[] block) => FromBlock<ImageMapPaint>(block);
+    internal static ImageMapPaint FromBlock(System.IO.Stream block) => FromBlock<ImageMapPaint>(block);
     private static readonly string DefaultColors = "";
 
     public override bool LoadSourceImage() => LoadSourceImageAndColors(DefaultColors);

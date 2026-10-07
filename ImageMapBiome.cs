@@ -1,4 +1,4 @@
-﻿// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0), and on 2026-09-24 for world export and import (0.9.0), and on 2026-09-29 for Expand World Data biomes (0.9.3), and on 2026-10-04 for the unifying refactor (0.10.0).
+﻿// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0), and on 2026-09-24 for world export and import (0.9.0), and on 2026-09-29 for Expand World Data biomes (0.9.3), and on 2026-10-04 for the unifying refactor (0.10.0), and on 2026-10-06 for 16k worlds (0.10.3).
 
 using System;
 using System.Collections.Generic;
@@ -352,7 +352,7 @@ internal class ImageMapBiome() : ImageMapBase
             .Select(kv => $"{BiomeRegistry.Name(kv.Key)}: {kv.Value.r:X2}{kv.Value.g:X2}{kv.Value.b:X2}");
     private static readonly Heightmap.Biome[] DefaultOrder = [.. DefaultColorTable().Keys];
     public bool CreateMap() => CreateMap<Rgba32>();
-    protected override bool LoadTextureToMap<T>(Image<T> image)
+    protected override bool LoadTextureToMap<T>(MapPicture<T> picture)
     {
         if (Colors.Count == 0)
         {
@@ -361,9 +361,6 @@ internal class ImageMapBiome() : ImageMapBase
             // A legend with nothing in it is an error too: a reload keeps the world's map.
             LegendErrors = Math.Max(LegendErrors, 1);
         }
-        static int ColorDistance(Color32 a, Color32 b) =>
-            (a.r - b.r) * (a.r - b.r) + (a.g - b.g) * (a.g - b.g) + (a.b - b.b) * (a.b - b.b);
-
         var st = new Stopwatch();
         st.Start();
 
@@ -371,19 +368,46 @@ internal class ImageMapBiome() : ImageMapBase
         // The legend's colours, then those of skipped entries, which read as None.
         var candidates = Colors.Select(d => (Biome: d.Key, Color: d.Value))
             .Concat(Unresolved.Select(u => (Biome: Heightmap.Biome.None, u.Color))).ToList();
-        var img = (Image<Rgba32>)(Image)image;
+        var img = (MapPicture<Rgba32>)(object)picture;
         var counts = new long[256];
-        var rows = Rows(img, 1, false, (row, band, at) =>
+        // Most pixels repeat the colour of one a few pixels back: the last pixel's colour, and a small table of the latest colours
+        // by their red, green and blue (the comparer ignores alpha, so does this), are asked before the dictionary is. A 16384 px
+        // map is 268 million lookups.
+        uint lastKey = uint.MaxValue;
+        byte lastByte = 0;
+        var tableKeys = new uint[4096];
+        for (int i = 0; i < tableKeys.Length; i++)
+            tableKeys[i] = uint.MaxValue;
+        var tableBytes = new byte[4096];
+        var rows = Rows(img, 1, false, (row, band, at, y) =>
         {
             for (int x = 0; x < row.Length; x++)
             {
-                var color = Convert(row[x]);
-                if (!colorMapping.TryGetValue(color, out var biome))
+                var pixel = row[x];
+                uint key = (uint)(pixel.R | pixel.G << 8 | pixel.B << 16);
+                byte b;
+                if (key == lastKey)
+                    b = lastByte;
+                else
                 {
-                    biome = candidates.OrderBy(d => ColorDistance(color, d.Color)).First().Biome;
-                    colorMapping.Add(color, biome);
+                    int slot = (int)((key * 2654435761u) >> 20);
+                    if (tableKeys[slot] == key)
+                        b = tableBytes[slot];
+                    else
+                    {
+                        var color = Convert(pixel);
+                        if (!colorMapping.TryGetValue(color, out var biome))
+                        {
+                            biome = Nearest(color, candidates);
+                            colorMapping.Add(color, biome);
+                        }
+                        b = BiomeRegistry.ToByte(biome);
+                        tableKeys[slot] = key;
+                        tableBytes[slot] = b;
+                    }
+                    lastKey = key;
+                    lastByte = b;
                 }
-                var b = BiomeRegistry.ToByte(biome);
                 counts[b]++;
                 band[at + x] = b;
             }
@@ -398,6 +422,28 @@ internal class ImageMapBiome() : ImageMapBase
 
         BetterContinents.Log($"Time to calculate biomes from {FilePath}: {st.ElapsedMilliseconds} ms");
         return true;
+    }
+
+    private static int ColorDistance(Color32 a, Color32 b) =>
+        (a.r - b.r) * (a.r - b.r) + (a.g - b.g) * (a.g - b.g) + (a.b - b.b) * (a.b - b.b);
+
+    // The biome of the legend colour nearest to a picture's colour, the first of those as near (what OrderBy(distance).First() gave).
+    // A method of its own, not a lambda inside the pixel loop: a lambda that captures the pixel's colour makes the compiler allocate
+    // a closure for every pixel, which was 6 GB of garbage on a 16384 px map.
+    private static Heightmap.Biome Nearest(Color32 color, List<(Heightmap.Biome Biome, Color32 Color)> candidates)
+    {
+        var best = candidates[0];
+        int nearest = ColorDistance(color, best.Color);
+        for (int i = 1; i < candidates.Count; i++)
+        {
+            int distance = ColorDistance(color, candidates[i].Color);
+            if (distance < nearest)
+            {
+                nearest = distance;
+                best = candidates[i];
+            }
+        }
+        return best.Biome;
     }
 
     public Heightmap.Biome GetValue(float x, float y)
@@ -475,9 +521,17 @@ internal class ImageMapBiome() : ImageMapBase
     // (the client reads the map as the server does, without Expand World Data's names).
     internal byte[] ToBlock(bool network)
     {
-        var block = grid?.Block ?? throw new InvalidOperationException($"{FilePath} holds no compressed tiles to save");
         using var stream = new MemoryStream();
         using var writer = new BinaryWriter(stream);
+        WriteBlock(writer, network);
+        writer.Flush();
+        return stream.ToArray();
+    }
+
+    // The same, written where the caller says (a package is written straight into: no array of the block is made).
+    internal void WriteBlock(BinaryWriter writer, bool network)
+    {
+        var block = grid?.Block ?? throw new InvalidOperationException($"{FilePath} holds no compressed tiles to save");
         writer.Write(BlockVersion);
         block.WriteTo(writer);
         writer.Write(tail.Length);
@@ -488,12 +542,13 @@ internal class ImageMapBiome() : ImageMapBase
             for (int b = 0; b <= 32; b++)
                 writer.Write((uint)decode[b]);
         writer.Flush();
-        return stream.ToArray();
     }
 
-    internal static ImageMapBiome FromBlock(byte[] block)
+    internal static ImageMapBiome FromBlock(byte[] block) => FromBlock(new MemoryStream(block, false));
+
+    internal static ImageMapBiome FromBlock(Stream block)
     {
-        using var reader = new BinaryReader(new MemoryStream(block, false));
+        using var reader = new BinaryReader(block);
         var version = reader.ReadByte();
         if (version != BlockVersion)
             throw new InvalidDataException($"a biome map saved in format {version}, which this version of Better Continents cannot read");
@@ -503,6 +558,9 @@ internal class ImageMapBiome() : ImageMapBase
         int tailLength = reader.ReadInt32();
         if (tailLength < 0 || tailLength > reader.BaseStream.Length - reader.BaseStream.Position)
             throw new InvalidDataException("a biome map ends early");
+        // The map's bytes are one array (Serialize): a square past int.MaxValue cannot be one, so no map this large was ever saved.
+        if ((long)tiles.Size * tiles.Size + tailLength >= int.MaxValue)
+            throw new InvalidDataException($"a biome map of {tiles.Size} x {tiles.Size} pixels is more than this version of Better Continents reads");
         var map = new ImageMapBiome
         {
             grid = new ByteGrid(tiles),

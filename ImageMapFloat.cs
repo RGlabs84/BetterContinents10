@@ -1,4 +1,4 @@
-﻿// Modified by Wubarrk on 2026-09-24 for world export and import (0.9.0), and on 2026-10-04 for the unifying refactor (0.10.0).
+﻿// Modified by Wubarrk on 2026-09-24 for world export and import (0.9.0), and on 2026-10-04 for the unifying refactor (0.10.0), and on 2026-10-06 for 16k worlds (0.10.3).
 
 using System;
 using System.Diagnostics;
@@ -107,40 +107,40 @@ internal class ImageMapFloat : ImageMapBase
         _ => CreateMap<L16>(),
     };
     public bool CreateMapLegacy() => CreateMap<Rgba32>();
-    protected override bool LoadTextureToMap<T>(Image<T> image)
+    protected override bool LoadTextureToMap<T>(MapPicture<T> picture)
     {
         var sw = new Stopwatch();
         sw.Start();
         // Only a blending heightmap (La32) keeps its alpha: the legacy one (La16) was never read.
-        pixels = image switch
+        pixels = picture switch
         {
-            Image<L16> grey => new Pixels(ValueFormat.Grey16, Grid(Rows(grey, 2, true, (row, band, at) =>
+            MapPicture<L16> grey => new Pixels(ValueFormat.Grey16, Grid(Rows(grey, 2, true, (row, band, at, y) =>
             {
                 for (int x = 0; x < row.Length; x++)
                     band[at + x] = row[x].PackedValue;
             })), null),
-            Image<La16> greyAlpha => new Pixels(ValueFormat.GreyAlpha8, Grid(Rows(greyAlpha, 1, true, (row, band, at) =>
+            MapPicture<La16> greyAlpha => new Pixels(ValueFormat.GreyAlpha8, Grid(Rows(greyAlpha, 1, true, (row, band, at, y) =>
             {
                 for (int x = 0; x < row.Length; x++)
                     band[at + x] = row[x].L;
             })), null),
-            Image<La32> greyAlpha => new Pixels(ValueFormat.GreyAlpha16, Grid(Rows(greyAlpha, 2, true, (row, band, at) =>
+            MapPicture<La32> greyAlpha => new Pixels(ValueFormat.GreyAlpha16, Grid(Rows(greyAlpha, 2, true, (row, band, at, y) =>
             {
                 for (int x = 0; x < row.Length; x++)
                     band[at + x] = row[x].L;
-            })), Grid(Rows(greyAlpha, 2, true, (row, band, at) =>
+            })), Grid(Rows(greyAlpha, 2, true, (row, band, at, y) =>
             {
                 for (int x = 0; x < row.Length; x++)
                     band[at + x] = row[x].A;
             }))),
-            Image<Rgba32> rgba => new Pixels(ValueFormat.Rgba8, Grid(Rows(rgba, 1, true, (row, band, at) =>
+            MapPicture<Rgba32> rgba => new Pixels(ValueFormat.Rgba8, Grid(Rows(rgba, 1, true, (row, band, at, y) =>
             {
                 for (int x = 0; x < row.Length; x++)
                     band[at + x] = row[x].R;
             })), null),
             _ => throw new NotSupportedException($"a float map read as {typeof(T).Name}"),
         };
-        Record = HeightmapRecord.From(SixLabors.ImageSharp.MetadataExtensions.GetPngMetadata(image.Metadata).TextData);
+        Record = HeightmapRecord.From(picture.Text);
 
         BetterContinents.Log($"Time to process {FilePath}: {sw.ElapsedMilliseconds} ms");
 
@@ -213,9 +213,17 @@ internal class ImageMapFloat : ImageMapBase
 
     internal byte[] ToBlock()
     {
-        var p = pixels is { Values.Compressed: true } held ? held : throw new InvalidOperationException($"{FilePath} holds no compressed tiles to save");
         using var stream = new MemoryStream();
         using var writer = new BinaryWriter(stream);
+        WriteBlock(writer);
+        writer.Flush();
+        return stream.ToArray();
+    }
+
+    // The same, written where the caller says (a package is written straight into: no array of the block is made).
+    internal void WriteBlock(BinaryWriter writer)
+    {
+        var p = pixels is { Values.Compressed: true } held ? held : throw new InvalidOperationException($"{FilePath} holds no compressed tiles to save");
         writer.Write(BlockVersion);
         writer.Write((byte)p.Format);
         writer.Write(Record != null);
@@ -228,12 +236,13 @@ internal class ImageMapFloat : ImageMapBase
         writer.Write(p.Alphas != null);
         p.Alphas?.Block!.WriteTo(writer);
         writer.Flush();
-        return stream.ToArray();
     }
 
-    internal static ImageMapFloat FromBlock(byte[] block)
+    internal static ImageMapFloat FromBlock(byte[] block) => FromBlock(new MemoryStream(block, false));
+
+    internal static ImageMapFloat FromBlock(Stream block)
     {
-        using var reader = new BinaryReader(new MemoryStream(block, false));
+        using var reader = new BinaryReader(block);
         var version = reader.ReadByte();
         if (version != BlockVersion)
             throw new InvalidDataException($"a map saved in format {version}, which this version of Better Continents cannot read");

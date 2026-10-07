@@ -1,10 +1,11 @@
-﻿// Modified by Wubarrk on 2026-09-24 for world export and import (0.9.0), and on 2026-09-29 for Expand World Data biomes (0.9.3), and on 2026-10-04 for the unifying refactor (0.10.0).
+﻿// Modified by Wubarrk on 2026-09-24 for world export and import (0.9.0), and on 2026-09-29 for Expand World Data biomes (0.9.3), and on 2026-10-04 for the unifying refactor (0.10.0), and on 2026-10-06 for 16k worlds (0.10.3).
 
 using System;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Formats.Png;
 using SixLabors.ImageSharp.PixelFormats;
@@ -29,6 +30,11 @@ internal abstract class ImageMapBase()
   // picture is read and kept, and the world saves the picture, as always.
   internal bool Compact;
 
+  // The largest picture a new map reads, in pixels across: 16384 x 16384 is 268 million pixels (537 MB as 16-bit grey), and
+  // holds a world of 32 km at 2 m a pixel. A picture a world was made with before is never refused (it is read from the
+  // world's settings, not from a file).
+  internal const int MaxMapSize = 16384;
+
   public virtual bool LoadSourceImage()
   {
     if (!File.Exists(FilePath))
@@ -38,6 +44,13 @@ internal abstract class ImageMapBase()
     }
     try
     {
+      // The picture's size first, from the file's first bytes: a picture too large is refused before the whole file is read.
+      if (PictureSize(FilePath) is { } picture && (picture.Width > MaxMapSize || picture.Height > MaxMapSize))
+      {
+        BetterContinents.LogError($"Cannot use texture {FilePath}: it is {picture.Width} x {picture.Height} pixels, and the largest map Better Continents reads is {MaxMapSize} x {MaxMapSize}. " +
+          "Scale it down (at 2 m a pixel, 16384 pixels hold a world 32.7 km across).");
+        return false;
+      }
       SourceData = File.ReadAllBytes(FilePath);
       return true;
     }
@@ -48,28 +61,55 @@ internal abstract class ImageMapBase()
     }
   }
 
+  // A picture's width and height from its header, without reading the rest of the file: a PNG's own IHDR (always the first
+  // chunk) or, for any other kind of file, what ImageSharp makes of its start; null when neither says.
+  internal static (int Width, int Height)? PictureSize(string path)
+  {
+    using var stream = File.OpenRead(path);
+    var header = new byte[24];
+    int read = 0, n;
+    while (read < header.Length && (n = stream.Read(header, read, header.Length - read)) > 0)
+      read += n;
+    if (read == header.Length && header[0] == 137 && header[1] == 80 && header[2] == 78 && header[3] == 71 && header[12] == 'I' && header[13] == 'H' && header[14] == 'D' && header[15] == 'R')
+    {
+      long width = (uint)(header[16] << 24 | header[17] << 16 | header[18] << 8 | header[19]);
+      long height = (uint)(header[20] << 24 | header[21] << 16 | header[22] << 8 | header[23]);
+      return (width > int.MaxValue ? int.MaxValue : (int)width, height > int.MaxValue ? int.MaxValue : (int)height);
+    }
+    try
+    {
+      stream.Position = 0;
+      var info = Image.Identify(Configuration.Default, stream);
+      return info == null ? null : (info.Width, info.Height);
+    }
+    catch (Exception)
+    {
+      // A format ImageSharp does not know, or a damaged start: the picture is read (and refused) the usual way.
+      return null;
+    }
+  }
+
   protected static Color32 Convert(Rgba32 pixel) => new(pixel.R, pixel.G, pixel.B, pixel.A);
 
   protected Image<T> LoadImage<T>() where T : unmanaged, IPixel<T> => Image.Load<T>(Configuration.Default, SourceData);
 
-  protected abstract bool LoadTextureToMap<T>(Image<T> image) where T : unmanaged, IPixel<T>;
+  // Reads the picture's rows and builds the map from them (picture: map row 0 is the south).
+  protected abstract bool LoadTextureToMap<T>(MapPicture<T> picture) where T : unmanaged, IPixel<T>;
 
-  public R[] LoadPixels<T, R>(Image<T> image, Func<T, R> converter) where T : unmanaged, IPixel<T>
+  // Every pixel of the picture through a converter, row by row as the map holds them (the whole picture in one array).
+  public R[] LoadPixels<T, R>(MapPicture<T> picture, Func<T, R> converter) where T : unmanaged, IPixel<T>
   {
-    var pixels = new R[image.Width * image.Height];
-    image.ProcessPixelRows(acc =>
+    int size = picture.Width;
+    var pixels = new R[(long)size * picture.Height];
+    picture.ReadRows(0, picture.Height, (r, row) =>
     {
-      for (int y = 0; y < acc.Height; y++)
-      {
-        var row = acc.GetRowSpan(y);
-        for (int x = 0; x < row.Length; x++)
-        {
-          pixels[y * row.Length + x] = converter(row[x]);
-        }
-      }
+      long at = (long)r * size;
+      for (int x = 0; x < row.Length; x++)
+        pixels[at + x] = converter(row[x]);
     });
     return pixels;
   }
+
   protected bool CreateMap<T>() where T : unmanaged, IPixel<T>
   {
     try
@@ -77,7 +117,27 @@ internal abstract class ImageMapBase()
       var sw = new Stopwatch();
       sw.Start();
 
-      // Cast disambiguates to the correct return type for some reason
+      // A PNG of a kind PngRows reads is decoded a band of rows at a time, as the map's tiles are made from it, and never
+      // whole in memory; any other picture (and a PNG that turns out damaged) is decoded whole by ImageSharp, as always.
+      if (PngRows<T>.TryOpen(SourceData) is { } streamed)
+      {
+        try
+        {
+          using (streamed)
+          {
+            if (!ValidateDimensions(streamed.Width, streamed.Height))
+              return false;
+            Size = streamed.Width;
+            BetterContinents.Log($"Time to load {FilePath}: {sw.ElapsedMilliseconds} ms");
+            return Made(LoadTextureToMap(streamed));
+          }
+        }
+        catch (PngRowsException e)
+        {
+          BetterContinents.Log($"{FilePath}: {e.Message}; reading it whole instead.");
+        }
+      }
+
       using var image = LoadImage<T>();
       if (!ValidateDimensions(image.Width, image.Height))
       {
@@ -85,16 +145,48 @@ internal abstract class ImageMapBase()
       }
       Size = image.Width;
 
-      image.Mutate(x => x.Flip(FlipMode.Vertical));
-
       BetterContinents.Log($"Time to load {FilePath}: {sw.ElapsedMilliseconds} ms");
+      if (Size >= 4096)
+        BetterContinents.Log($"{FilePath} is a picture of a kind that is read whole ({Size} x {Size}: {(long)Size * Size * System.Runtime.CompilerServices.Unsafe.SizeOf<T>() >> 20} MB at once) " +
+          "rather than a few rows at a time; 8-bit and 16-bit grey, RGB, RGBA and palette PNGs without interlacing are the kinds read by rows.");
 
-      return LoadTextureToMap(image);
+      try
+      {
+        return Made(LoadTextureToMap(new ImagePicture<T>(image)));
+      }
+      finally
+      {
+        // ImageSharp keeps the buffers it rented for the next picture; this process has no next picture soon.
+        ReleaseImageMemory();
+      }
     }
     catch (Exception ex)
     {
       BetterContinents.LogError($"Cannot load texture {FilePath}: {ex.Message}");
       return false;
+    }
+  }
+
+  // A compact map keeps its tiles, not the file's bytes (as a world read from its settings has none either): 168 MB for a
+  // 16384 px heightmap, held by every map of a world being made until it is saved. A picture wanted again is read from its file
+  // (Redecode), or written out from the tiles (SourceBytes).
+  private bool Made(bool made)
+  {
+    if (made && Compact)
+      SourceData = [];
+    return made;
+  }
+
+  // ImageSharp's pooled buffers (up to a gigabyte after a 16384 px picture) are given back.
+  private static void ReleaseImageMemory()
+  {
+    try
+    {
+      Configuration.Default.MemoryAllocator.ReleaseRetainedResources();
+    }
+    catch (Exception)
+    {
+      // An allocator that cannot release holds nothing worth the trouble.
     }
   }
 
@@ -121,23 +213,21 @@ internal abstract class ImageMapBase()
   internal virtual byte[] SourceBytes() => SourceData;
 
   // One channel of a picture's row, into the band a map's tiles are made from: row[x]'s value at band[at + x].
-  protected delegate void RowValues<TPixel>(Span<TPixel> row, ushort[] band, int at) where TPixel : unmanaged, IPixel<TPixel>;
+  // y: the map row the picture's row is (0 = south), for a channel that has something to say about where a pixel is.
+  protected delegate void RowValues<TPixel>(Span<TPixel> row, ushort[] band, int at, int y) where TPixel : unmanaged, IPixel<TPixel>;
 
   // The picture's pixels as rows for the tiles, a band of rows at a time, one RowValues per channel. median: the values
-  // are amounts (heights, densities, colours) the median predictor may suit when compressing, not categories.
-  protected static MapRows Rows<TPixel>(Image<TPixel> image, int bytes, bool median, params RowValues<TPixel>[] channels)
+  // are amounts (heights, densities, colours) the median predictor may suit when compressing, not categories. The bands are
+  // asked for from the top of the map down (TileBlock.Encode, TileGrid.Fill), which is the order a PNG's file has its rows in.
+  protected static MapRows Rows<TPixel>(MapPicture<TPixel> picture, int bytes, bool median, params RowValues<TPixel>[] channels)
     where TPixel : unmanaged, IPixel<TPixel>
   {
-    int size = image.Width;
+    int size = picture.Width;
     return new MapRows(size, channels.Length, bytes, median, (y0, rows, band) =>
-      image.ProcessPixelRows(accessor =>
+      picture.ReadRows(y0, rows, (r, row) =>
       {
-        for (int r = 0; r < rows; r++)
-        {
-          var row = accessor.GetRowSpan(y0 + r);
-          for (int c = 0; c < channels.Length; c++)
-            channels[c](row, band, (c * TileBlock.Side + r) * size);
-        }
+        for (int c = 0; c < channels.Length; c++)
+          channels[c](row, band, (c * TileBlock.Side + r) * size, y0 + r);
       }));
   }
 
@@ -149,24 +239,60 @@ internal abstract class ImageMapBase()
   protected byte[] Png<TPixel>(RowFill<TPixel> fill, PngColorType type, PngBitDepth depth, HeightmapRecord? record = null)
     where TPixel : unmanaged, IPixel<TPixel>
   {
-    using var image = new Image<TPixel>(Size, Size);
-    image.ProcessPixelRows(accessor =>
+    // Written a row at a time (PngWriter): ImageSharp's encoder takes a whole image, 537 MB for a 16384 px 16-bit map.
+    var pixels = new TPixel[Size];
+    return PngWriter.Write(Size, Size, (int)type, (int)depth, (file, raw) =>
     {
-      for (int y = 0; y < Size; y++)
-        fill(y, accessor.GetRowSpan(Size - 1 - y));
-    });
-    var encoder = new PngEncoder
+      fill(Size - 1 - file, pixels);
+      RawRow(pixels, raw);
+    }, record == null ? null : HeightmapRecord.Keyword, record?.Text);
+  }
+
+  // A row of pixels as the bytes of a PNG of their type (16-bit values big-endian).
+  private static void RawRow<TPixel>(TPixel[] pixels, byte[] raw) where TPixel : unmanaged, IPixel<TPixel>
+  {
+    if (typeof(TPixel) == typeof(L16))
     {
-      ColorType = type,
-      BitDepth = depth,
-      CompressionLevel = PngCompressionLevel.DefaultCompression,
-      ChunkFilter = record == null ? PngChunkFilter.ExcludeAll : PngChunkFilter.ExcludeAll & ~PngChunkFilter.ExcludeTextChunks,
-    };
-    if (record != null)
-      image.Metadata.GetPngMetadata().TextData.Add(new PngTextData(HeightmapRecord.Keyword, record.Text, "", ""));
-    using var stream = new MemoryStream();
-    image.Save(stream, encoder);
-    return stream.ToArray();
+      var from = MemoryMarshal.Cast<TPixel, L16>(pixels);
+      for (int x = 0; x < from.Length; x++)
+      {
+        raw[2 * x] = (byte)(from[x].PackedValue >> 8);
+        raw[2 * x + 1] = (byte)from[x].PackedValue;
+      }
+    }
+    else if (typeof(TPixel) == typeof(La32))
+    {
+      var from = MemoryMarshal.Cast<TPixel, La32>(pixels);
+      for (int x = 0; x < from.Length; x++)
+      {
+        raw[4 * x] = (byte)(from[x].L >> 8);
+        raw[4 * x + 1] = (byte)from[x].L;
+        raw[4 * x + 2] = (byte)(from[x].A >> 8);
+        raw[4 * x + 3] = (byte)from[x].A;
+      }
+    }
+    else if (typeof(TPixel) == typeof(La16))
+    {
+      var from = MemoryMarshal.Cast<TPixel, La16>(pixels);
+      for (int x = 0; x < from.Length; x++)
+      {
+        raw[2 * x] = from[x].L;
+        raw[2 * x + 1] = from[x].A;
+      }
+    }
+    else if (typeof(TPixel) == typeof(Rgba32))
+    {
+      var from = MemoryMarshal.Cast<TPixel, Rgba32>(pixels);
+      for (int x = 0; x < from.Length; x++)
+      {
+        raw[4 * x] = from[x].R;
+        raw[4 * x + 1] = from[x].G;
+        raw[4 * x + 2] = from[x].B;
+        raw[4 * x + 3] = from[x].A;
+      }
+    }
+    else
+      throw new NotSupportedException($"a PNG of {typeof(TPixel).Name} pixels");
   }
 
   public virtual void SerializeLegacy(ZPackage pkg, int version, bool network)

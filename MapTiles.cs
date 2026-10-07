@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-10-04 for the unifying refactor (0.10.0).
+// Added by Wubarrk on 2026-10-04 for the unifying refactor (0.10.0), and modified on 2026-10-06 for 16k worlds (0.10.3).
 
 using System;
 using System.Collections.Generic;
@@ -193,7 +193,8 @@ internal sealed class TileBlock
     var modes = new byte[tiles * tiles];
     var payloads = new byte[tiles * tiles][];
     var band = new ushort[channels * Side * size];
-    for (int ty = 0; ty < tiles; ty++)
+    // From the top of the map down: a PNG's rows come from its file in that order (MapRows.Read), and the tiles do not mind.
+    for (int ty = tiles - 1; ty >= 0; ty--)
     {
       int y0 = ty << Shift, rows = Math.Min(Side, size - y0);
       read(y0, rows, band);
@@ -209,24 +210,39 @@ internal sealed class TileBlock
 
   private static TileBlock Assemble(int size, int channels, int bytes, byte[] modes, byte[][] payloads)
   {
-    using var stream = new MemoryStream();
-    using var writer = new BinaryWriter(stream);
-    writer.Write(FormatVersion);
-    writer.Write(size);
-    writer.Write((byte)channels);
-    writer.Write((byte)bytes);
-    writer.Write((byte)Shift);
+    // The block's exact length first, so it is written once into an array of its own (a stream and a copy of it held the
+    // compressed tiles of a 16384 px map two to three times over).
+    long length = 3 + 4 + 1 + 4;
+    for (int t = 0; t < modes.Length; t++)
+      length += 1 + (modes[t] != Uniform ? 4 : 0) + payloads[t].Length;
+    if (length > int.MaxValue)
+      throw new InvalidOperationException($"a map of {size} pixels across is {length:N0} bytes of tiles, more than a block can hold");
+    var data = new byte[length];
+    int at = 0;
+    void Put(byte b) => data[at++] = b;
+    void PutInt(int v)
+    {
+      data[at++] = (byte)v;
+      data[at++] = (byte)(v >> 8);
+      data[at++] = (byte)(v >> 16);
+      data[at++] = (byte)(v >> 24);
+    }
+    Put(FormatVersion);
+    PutInt(size);
+    Put((byte)channels);
+    Put((byte)bytes);
+    Put((byte)Shift);
     for (int t = 0; t < modes.Length; t++)
     {
-      writer.Write(modes[t]);
+      Put(modes[t]);
       if (modes[t] != Uniform)
-        writer.Write(payloads[t].Length);
-      writer.Write(payloads[t]);
+        PutInt(payloads[t].Length);
+      Buffer.BlockCopy(payloads[t], 0, data, at, payloads[t].Length);
+      at += payloads[t].Length;
+      payloads[t] = null!;
     }
-    writer.Flush();
-    writer.Write(Crc32.Compute(stream.GetBuffer(), 0, (int)stream.Length));
-    writer.Flush();
-    return Read(stream.ToArray());
+    PutInt((int)Crc32.Compute(data, 0, at));
+    return Read(data);
   }
 
   // The tile at column x0 of a band (w by h pixels) into values, as Decode writes a tile.
@@ -257,15 +273,20 @@ internal sealed class TileBlock
       return value;
     }
 
-    // The smallest of the transforms tried; the first of equals.
+    // The smallest of the transforms tried; the first of equals. Each is compressed into one of two streams the thread keeps
+    // (the better stays, the other is written over), and only the winner is copied out: a 16384 px map is 16384 tiles, and a
+    // stream and an array for each of three tries were two gigabytes of garbage.
     mode = Raw;
-    var best = Deflate(scratch.Raw, ToInterleaved(values, scratch.Raw, w, h, channels, bytes));
+    var best = scratch.First;
+    var other = scratch.Second;
+    int bestLength = Deflate(scratch.Raw, ToInterleaved(values, scratch.Raw, w, h, channels, bytes), best);
     if (channels > 1 || bytes > 1)
     {
-      var planes = Deflate(scratch.Raw, ToPlanes(values, scratch.Raw, w, h, channels, bytes));
-      if (planes.Length < best.Length)
+      int planesLength = Deflate(scratch.Raw, ToPlanes(values, scratch.Raw, w, h, channels, bytes), other);
+      if (planesLength < bestLength)
       {
-        best = planes;
+        (best, other) = (other, best);
+        bestLength = planesLength;
         mode = Planes;
       }
     }
@@ -274,14 +295,17 @@ internal sealed class TileBlock
       var residuals = scratch.Residuals;
       for (int c = 0; c < channels; c++)
         ApplyMedian(values, residuals, c * Pixels, w, h, bytes);
-      var predicted = Deflate(scratch.Raw, ToPlanes(residuals, scratch.Raw, w, h, channels, bytes));
-      if (predicted.Length < best.Length)
+      int predictedLength = Deflate(scratch.Raw, ToPlanes(residuals, scratch.Raw, w, h, channels, bytes), other);
+      if (predictedLength < bestLength)
       {
-        best = predicted;
+        (best, other) = (other, best);
+        bestLength = predictedLength;
         mode = Median;
       }
     }
-    return best;
+    var result = new byte[bestLength];
+    Buffer.BlockCopy(best.GetBuffer(), 0, result, 0, bestLength);
+    return result;
   }
 
   // Whether every pixel of a tile (w by h, as Decode writes it) holds the same value in each channel.
@@ -401,12 +425,13 @@ internal sealed class TileBlock
       }
   }
 
-  private static byte[] Deflate(byte[] raw, int count)
+  // raw[0 .. count) compressed into `into` (emptied first); how long the result is.
+  private static int Deflate(byte[] raw, int count, MemoryStream into)
   {
-    using var stream = new MemoryStream();
-    using (var deflate = new DeflateStream(stream, CompressionMode.Compress, true))
+    into.SetLength(0);
+    using (var deflate = new DeflateStream(into, CompressionMode.Compress, true))
       deflate.Write(raw, 0, count);
-    return stream.ToArray();
+    return (int)into.Length;
   }
 
   private static void Inflate(byte[] data, int offset, int length, byte[] into, int count)
@@ -429,18 +454,22 @@ internal sealed class TileBlock
     internal readonly ushort[] Values = new ushort[4 * Pixels];
     internal readonly ushort[] Residuals = new ushort[4 * Pixels];
     internal readonly byte[] Raw = new byte[8 * Pixels];
+    // The compressed bytes of the tries of EncodeTile.
+    internal readonly MemoryStream First = new(), Second = new();
     internal static Scratch Get() => current ??= new Scratch();
   }
 }
 
-// CRC-32 (IEEE 802.3, as zip and PNG use).
+// CRC-32 (IEEE 802.3, as zip and PNG use), eight bytes at a time (a 16384 px world's tiles and pictures are hundreds of
+// megabytes, and every one is checked when it is read: a byte at a time took a second for 400 MB).
 internal static class Crc32
 {
   private static readonly uint[] Table = Build();
 
   private static uint[] Build()
   {
-    var table = new uint[256];
+    // Table[k * 256 + n]: the CRC of byte n followed by k zero bytes; k = 0 is the plain table.
+    var table = new uint[8 * 256];
     for (uint n = 0; n < 256; n++)
     {
       uint c = n;
@@ -448,14 +477,28 @@ internal static class Crc32
         c = (c & 1) != 0 ? 0xEDB88320u ^ (c >> 1) : c >> 1;
       table[n] = c;
     }
+    for (int n = 0; n < 256; n++)
+      for (int k = 1; k < 8; k++)
+      {
+        uint c = table[(k - 1) * 256 + n];
+        table[k * 256 + n] = table[c & 0xFF] ^ (c >> 8);
+      }
     return table;
   }
 
   internal static uint Compute(byte[] data, int offset, int count)
   {
+    var t = Table;
     uint crc = 0xFFFFFFFFu;
-    for (int i = offset, end = offset + count; i < end; i++)
-      crc = Table[(crc ^ data[i]) & 0xFF] ^ (crc >> 8);
+    int i = offset, end = offset + count;
+    for (int fast = end - 8; i <= fast; i += 8)
+    {
+      uint low = crc ^ (uint)(data[i] | data[i + 1] << 8 | data[i + 2] << 16 | data[i + 3] << 24);
+      crc = t[7 * 256 + (low & 0xFF)] ^ t[6 * 256 + ((low >> 8) & 0xFF)] ^ t[5 * 256 + ((low >> 16) & 0xFF)] ^ t[4 * 256 + (low >> 24)]
+          ^ t[3 * 256 + data[i + 4]] ^ t[2 * 256 + data[i + 5]] ^ t[256 + data[i + 6]] ^ t[data[i + 7]];
+    }
+    for (; i < end; i++)
+      crc = t[(crc ^ data[i]) & 0xFF] ^ (crc >> 8);
     return ~crc;
   }
 }
@@ -580,7 +623,7 @@ internal abstract class TileGrid<T> : TileGrid
     var band = new ushort[channels * TileBlock.Side * size];
     var values = Buffer();
     var uniform = new ushort[channels];
-    for (int ty = 0; ty < Tiles; ty++)
+    for (int ty = Tiles - 1; ty >= 0; ty--)
     {
       int y0 = ty << Shift, h = Math.Min(TileBlock.Side, size - y0);
       rows.Read(y0, h, band);

@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-09-22 for alt-biome planting (0.8.1), and on 2026-09-25 for version-agnostic wording (0.9.1), and modified on 2026-10-04 for the unifying refactor (0.10.0).
+// Added by Wubarrk on 2026-09-22 for alt-biome planting (0.8.1), and on 2026-09-25 for version-agnostic wording (0.9.1), and modified on 2026-10-04 for the unifying refactor (0.10.0), and on 2026-10-06 for 16k worlds (0.10.3).
 
 using System;
 using System.Collections.Generic;
@@ -258,64 +258,84 @@ internal class ImageMapAltBiome() : ImageMapBase()
   #endregion
 
   #region Decoding
-  protected override bool LoadTextureToMap<T>(Image<T> image)
+  protected override bool LoadTextureToMap<T>(MapPicture<T> picture)
   {
     var sw = Stopwatch.StartNew();
-    var img = (Image<Rgba32>)(Image)image;
+    var img = (MapPicture<Rgba32>)(object)picture;
     var palette = Classes.Select((c, i) => (c, i)).Where(t => t.i > 0 && !t.c.IsPin).ToList();
     var cache = new Dictionary<uint, byte>();
-    var unknown = new Dictionary<uint, int>();
+    // Each colour no legend colour matches: how many pixels, and the first of them in the map (south first, then west to east,
+    // the order the log lists them in whatever order the rows come in).
+    var unknown = new Dictionary<uint, (int Count, long First)>();
     int planted = 0;
     const int tolSq = ColorTolerance * ColorTolerance;
-    Map = LoadPixels(img, (Rgba32 p) =>
+    var classes = new byte[(long)Size * Size];
+    img.ReadRows(0, Size, (r, row) =>
     {
-      uint key = ((uint)p.R << 24) | ((uint)p.G << 16) | ((uint)p.B << 8) | p.A;
-      if (!cache.TryGetValue(key, out var cls))
+      long at = (long)r * Size;
+      // The last pixel's colour and class: most pixels are the colour of the one before.
+      uint lastKey = 0;
+      byte lastClass = 0;
+      bool have = false;
+      for (int x = 0; x < row.Length; x++)
       {
-        cls = 0;
-        // Transparent means "not painted", so the overlay can be exported straight from a layer.
-        if (p.A >= AlphaThreshold)
+        var p = row[x];
+        uint key = ((uint)p.R << 24) | ((uint)p.G << 16) | ((uint)p.B << 8) | p.A;
+        byte cls;
+        if (have && key == lastKey)
+          cls = lastClass;
+        else if (!cache.TryGetValue(key, out cls))
         {
-          var c = new Color32(p.R, p.G, p.B, 255);
-          int best = ColorDistanceSq(c, new Color32(0, 0, 0, 255));
-          bool matched = best <= tolSq;
-          foreach (var (entry, index) in palette)
+          cls = 0;
+          // Transparent means "not painted", so the overlay can be exported straight from a layer.
+          if (p.A >= AlphaThreshold)
           {
-            var d = ColorDistanceSq(c, entry.Color);
-            if (d <= tolSq && d < best)
+            var c = new Color32(p.R, p.G, p.B, 255);
+            int best = ColorDistanceSq(c, new Color32(0, 0, 0, 255));
+            bool matched = best <= tolSq;
+            foreach (var (entry, index) in palette)
             {
-              best = d;
-              cls = (byte)index;
-              matched = true;
+              var d = ColorDistanceSq(c, entry.Color);
+              if (d <= tolSq && d < best)
+              {
+                best = d;
+                cls = (byte)index;
+                matched = true;
+              }
             }
+            if (!matched)
+              cls = 255;
           }
-          if (!matched)
-            cls = 255;
+          cache[key] = cls;
         }
-        cache[key] = cls;
+        lastKey = key;
+        lastClass = cls;
+        have = true;
+        if (cls == 255)
+        {
+          long position = at + x;
+          unknown[key] = unknown.TryGetValue(key, out var seen) ? (seen.Count + 1, Math.Min(seen.First, position)) : (1, position);
+          cls = 0;
+        }
+        else if (cls != 0)
+          planted++;
+        classes[at + x] = cls;
       }
-      if (cls == 255)
-      {
-        unknown[key] = unknown.TryGetValue(key, out var count) ? count + 1 : 1;
-        return (byte)0;
-      }
-      if (cls != 0)
-        planted++;
-      return cls;
     });
+    Map = classes;
     PlantedPixels = planted;
 
     BetterContinents.Log($"Alt-biome map {FilePath}: {Size}x{Size}, {planted} planted pixels, decoded in {sw.ElapsedMilliseconds} ms.");
     if (unknown.Count > 0)
     {
-      var total = unknown.Values.Sum();
+      var total = unknown.Values.Sum(u => u.Count);
       BetterContinents.LogWarning($"Alt-biome map {Path.GetFileName(FilePath)}: {total} pixels in {unknown.Count} colours match no legend colour (within {ColorTolerance}) and are treated as unplanted. Most common:");
-      foreach (var kv in unknown.OrderByDescending(kv => kv.Value).Take(5))
+      foreach (var kv in unknown.OrderByDescending(kv => kv.Value.Count).ThenBy(kv => kv.Value.First).Take(5))
       {
         var c = new Color32((byte)(kv.Key >> 24), (byte)(kv.Key >> 16), (byte)(kv.Key >> 8), 255);
         var nearest = palette.OrderBy(t => ColorDistanceSq(c, t.c.Color)).Select(t => t.c).FirstOrDefault();
         var hint = nearest == null ? "" : $", nearest legend colour #{nearest.ColorHex} ({nearest.Names}) is {Mathf.Sqrt(ColorDistanceSq(c, nearest.Color)):0} away";
-        BetterContinents.LogWarning($"    #{c.r:X2}{c.g:X2}{c.b:X2}: {kv.Value} pixels{hint}");
+        BetterContinents.LogWarning($"    #{c.r:X2}{c.g:X2}{c.b:X2}: {kv.Value.Count} pixels{hint}");
       }
     }
     return true;
@@ -408,7 +428,7 @@ internal class ImageMapAltBiome() : ImageMapBase()
       map.Pins.Add(pin);
     }
     map.Size = pkg.ReadInt();
-    if (map.Size < 0 || map.Size > 16384)
+    if (map.Size < 0 || map.Size > MaxMapSize)
       throw new InvalidDataException($"alt-biome map declares an impossible size {map.Size}");
     map.Map = DecodeRle(pkg.ReadByteArray(), map.Size * map.Size);
     map.Legend = pkg.ReadString();

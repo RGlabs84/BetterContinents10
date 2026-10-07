@@ -203,9 +203,37 @@ public partial class BetterContinents
       BaseHeightNoise = new();
 
       var dir = c.Get(ConfigMapSourceDir);
+      CompactForLargeMaps(c, dir);
       foreach (var kind in MapKind.LoadOrder)
         kind.Load(this, c, dir, lean);
       AltBiomes = AltBiomeSettings.FromConfig(c);
+    }
+
+    // A picture of more pixels than this across (8192: 67 million pixels) makes a world with Compact Maps on, whatever the
+    // setting says. Saved as pictures, a map of 16384 pixels across takes 268 MB for each biome, spawn and vegetation map (a
+    // byte a pixel, uncompressed), which the world file holds and every joining player is sent, and every decoded map takes
+    // 0.5 to 1 GB of memory for as long as the world runs; as tiles they take a few megabytes (the biome map) to a hundred
+    // (a noisy heightmap), and a few tiles at a time are decoded as the world reads them. int.MaxValue switches this off.
+    internal static int CompactAbove = 8192;
+
+    private void CompactForLargeMaps(ConfigValues c, string dir)
+    {
+      // Tiles are saved only by a world of the newest settings version (DataKey.TiledMap), and a map of the alt-biome or
+      // location kind holds none (a class per pixel, run-length encoded; the positions of the pins).
+      if (CompactMaps || Version < UnifiedVersion)
+        return;
+      foreach (var kind in MapKind.LoadOrder)
+      {
+        if (kind.FileSetting == null || kind == MapKind.Location || kind == MapKind.AltBiome)
+          continue;
+        var path = GetPath(dir, kind.FileName, c.Get(kind.FileSetting.Entry));
+        if (path == "" || !File.Exists(path) || ImageMapBase.PictureSize(path) is not { } size || Math.Max(size.Width, size.Height) <= CompactAbove)
+          continue;
+        CompactMaps = true;
+        Log($"Compact Maps is on for this world, whatever the setting: {kind.Name} {path} is {size.Width} x {size.Height} pixels (more than {CompactAbove} across). " +
+          "A map that large is kept, saved and sent to joining players as compressed tiles: as pictures it would take gigabytes of memory and a world file of hundreds of megabytes.");
+        return;
+      }
     }
 
     #region Setters
@@ -498,7 +526,7 @@ public partial class BetterContinents
       using BinaryReader binaryReader = new(File.OpenRead(path));
       int count = binaryReader.ReadInt32();
       if (count < 0 || count > binaryReader.BaseStream.Length) throw new Exception("Invalid data length");
-      return Load(new ZPackage(binaryReader.ReadBytes(count)));
+      return Load(PackageBytes.Read(binaryReader, count));
     }
 
     public void Save(string path) => Save(path, false);
@@ -510,11 +538,12 @@ public partial class BetterContinents
       var zpackage = new ZPackage();
       Serialize(zpackage, false, true, currentFormat ? SavedVersion : null);
 
-      byte[] binaryData = zpackage.GetArray();
+      // The package's own buffer, not a copy of it.
+      var binaryData = PackageBytes.Buffer(zpackage, out int length);
       Directory.CreateDirectory(Path.GetDirectoryName(path));
       using BinaryWriter binaryWriter = new(File.Create(path + ".tmp"));
-      binaryWriter.Write(binaryData.Length);
-      binaryWriter.Write(binaryData);
+      binaryWriter.Write(length);
+      binaryWriter.Write(binaryData, 0, length);
       binaryWriter.Flush();
       File.Move(path + ".tmp", path);
     }
@@ -543,7 +572,7 @@ public partial class BetterContinents
       {
         var binaryReader = (BinaryReader)fileReader;
         int count = binaryReader.ReadInt32();
-        return Load(new ZPackage(binaryReader.ReadBytes(count)));
+        return Load(PackageBytes.Read(binaryReader, count));
       }
       catch (Exception e)
       {
@@ -561,7 +590,7 @@ public partial class BetterContinents
       var zpackage = new ZPackage();
       Serialize(zpackage, false);
 
-      byte[] binaryData = zpackage.GetArray();
+      var binaryData = PackageBytes.Buffer(zpackage, out int length);
       // 1.0.15: FileWriter gained a CloudStorageFileGrouping parameter, inserted before the existing
       // FileHelperType/FileSource ones (assembly_utils.decompiled.cs:4705). Our .BetterContinents
       // sidecar isn't one of the extensions SaveSystem.IsWorldSaveExtension recognises out of the box
@@ -573,8 +602,8 @@ public partial class BetterContinents
       // Steam Cloud bucket as the world files it configures, instead of syncing independently and
       // potentially desyncing from them.
       var fileWriter = new FileWriter(path, CloudStorageFileGrouping.SameFolder, FileHelpers.FileHelperType.Binary, fileSource);
-      fileWriter.m_binary.Write(binaryData.Length);
-      fileWriter.m_binary.Write(binaryData);
+      fileWriter.m_binary.Write(length);
+      fileWriter.m_binary.Write(binaryData, 0, length);
       fileWriter.Finish();
     }
 

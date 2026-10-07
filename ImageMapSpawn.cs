@@ -1,4 +1,4 @@
-﻿// Modified by Wubarrk on 2026-09-24 for world export and import (0.9.0), and on 2026-10-04 for the unifying refactor (0.10.0).
+﻿// Modified by Wubarrk on 2026-09-24 for world export and import (0.9.0), and on 2026-10-04 for the unifying refactor (0.10.0), and on 2026-10-06 for 16k worlds (0.10.3).
 
 using System;
 using System.Collections.Generic;
@@ -181,6 +181,16 @@ internal class ImageMapSpawn() : ImageMapBase
   // The legend as Serialize writes it, then the indices in tiles and the bytes past the square.
   internal byte[] ToBlock()
   {
+    using var stream = new MemoryStream();
+    using var writer = new BinaryWriter(stream);
+    WriteBlock(writer);
+    writer.Flush();
+    return stream.ToArray();
+  }
+
+  // The same, written where the caller says (a package is written straight into: no array of the block is made).
+  internal void WriteBlock(BinaryWriter writer)
+  {
     var block = grid?.Block ?? throw new InvalidOperationException($"{FilePath} holds no compressed tiles to save");
     var legend = new ZPackage();
     legend.Write(Colors.Count);
@@ -193,8 +203,6 @@ internal class ImageMapSpawn() : ImageMapBase
       legend.Write(color.a);
       legend.Write(Entries[i].Data);
     }
-    using var stream = new MemoryStream();
-    using var writer = new BinaryWriter(stream);
     writer.Write(BlockVersion);
     var legendBytes = legend.GetArray();
     writer.Write(legendBytes.Length);
@@ -203,12 +211,13 @@ internal class ImageMapSpawn() : ImageMapBase
     writer.Write(tail.Length);
     writer.Write(tail);
     writer.Flush();
-    return stream.ToArray();
   }
 
-  internal static ImageMapSpawn FromBlock(byte[] block)
+  internal static ImageMapSpawn FromBlock(byte[] block) => FromBlock(new MemoryStream(block, false));
+
+  internal static ImageMapSpawn FromBlock(Stream block)
   {
-    using var reader = new BinaryReader(new MemoryStream(block, false));
+    using var reader = new BinaryReader(block);
     var version = reader.ReadByte();
     if (version != BlockVersion)
       throw new InvalidDataException($"a spawn or vegetation map saved in format {version}, which this version of Better Continents cannot read");
@@ -224,6 +233,9 @@ internal class ImageMapSpawn() : ImageMapBase
     int tailLength = reader.ReadInt32();
     if (tailLength < 0 || tailLength > reader.BaseStream.Length - reader.BaseStream.Position)
       throw new InvalidDataException("a spawn or vegetation map ends early");
+    // The map's bytes are one array (Indices): a square past int.MaxValue cannot be one, so no map this large was ever saved.
+    if ((long)tiles.Size * tiles.Size + tailLength >= int.MaxValue)
+      throw new InvalidDataException($"a spawn or vegetation map of {tiles.Size} x {tiles.Size} pixels is more than this version of Better Continents reads");
     map.grid = new ByteGrid(tiles);
     map.tail = reader.ReadBytes(tailLength);
     map.Size = tiles.Size;
@@ -251,12 +263,12 @@ internal class ImageMapSpawn() : ImageMapBase
       entry.LoadPrefabs(scene);
   }
 
-  protected override bool LoadTextureToMap<T>(Image<T> image)
+  protected override bool LoadTextureToMap<T>(MapPicture<T> picture)
   {
     var st = new Stopwatch();
     st.Start();
 
-    var img = (Image<Rgba32>)(Image)image;
+    var img = (MapPicture<Rgba32>)(object)picture;
     var colorToIndex = new Dictionary<Rgba32, int>();
 
     // Build color to index mapping
@@ -266,8 +278,11 @@ internal class ImageMapSpawn() : ImageMapBase
       colorToIndex[new(c.r, c.g, c.b, c.a)] = i;
     }
 
-    bool warned = false;
-    byte IndexOf(Rgba32 pixel)
+    // The first pixel in the picture of a colour the legend does not have, by where it is in the map (south first, then west
+    // to east), whatever order the rows come in: the log names it.
+    Rgba32? firstUnknown = null;
+    int unknownX = 0, unknownY = 0;
+    byte IndexOf(Rgba32 pixel, int x, int y)
     {
       // Black color always means nothing is done.
       if (pixel.R == 0 && pixel.G == 0 && pixel.B == 0 && pixel.A == 255)
@@ -277,20 +292,37 @@ internal class ImageMapSpawn() : ImageMapBase
         return (byte)index;
       else
       {
-        if (!warned)
+        if (firstUnknown == null || y < unknownY || (y == unknownY && x < unknownX))
         {
-          warned = true;
-          BetterContinents.LogWarning($"{Path.GetFileName(FilePath)}: Unknown color {pixel} found in the image.");
+          firstUnknown = pixel;
+          unknownX = x;
+          unknownY = y;
         }
         return (byte)255;
       }
     }
-    grid = ByteGrid.From(Rows(img, 1, false, (row, band, at) =>
+    grid = ByteGrid.From(Rows(img, 1, false, (row, band, at, y) =>
     {
+      // A pixel is mostly the colour of the one before it, in its row: the last answer is kept (a 16384 px map is 268 million
+      // lookups). A pixel that repeats an unknown colour is never the first of them in the map: the one before it is.
+      uint last = 0;
+      byte lastIndex = 0;
+      bool have = false;
       for (int x = 0; x < row.Length; x++)
-        band[at + x] = IndexOf(row[x]);
+      {
+        var pixel = row[x];
+        if (!have || pixel.PackedValue != last)
+        {
+          lastIndex = IndexOf(pixel, x, y);
+          last = pixel.PackedValue;
+          have = true;
+        }
+        band[at + x] = lastIndex;
+      }
     }), Compact);
     tail = [];
+    if (firstUnknown is { } unknown)
+      BetterContinents.LogWarning($"{Path.GetFileName(FilePath)}: Unknown color {unknown} found in the image.");
 
     BetterContinents.Log($"Time to calculate colors from {FilePath}: {st.ElapsedMilliseconds} ms");
     return true;

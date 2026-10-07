@@ -105,6 +105,7 @@ internal static partial class Program
       WorldSizeVersions();
       NewWorlds();
       Amount81();
+      LargeMaps();
       // Past the usual sizes: BCIMPORT_BIG=<size> makes an export folder of that size into a preset (the heightmap alone, or with
       // every map when BCIMPORT_ALL=1), with its memory measured.
       if (int.TryParse(Environment.GetEnvironmentVariable("BCIMPORT_BIG"), out var big) && big > 0)
@@ -903,6 +904,67 @@ internal static partial class Program
     BC.BetterContinentsSettings.Create();
     C(!LogHandler.Has("was made by a world export"), "read at the Amount it was made for: nothing to say");
     BC.ConfigHeightmapAmount.Value = 1f;
+    BC.ConfigMapSourceDir.Value = "";
+  }
+
+  // ---- a map over 8192 px across: Compact Maps whatever the setting says (0.10.3) ----------------------------------------------
+
+  static void LargeMaps()
+  {
+    Section("a new world with a map over 8192 px across is made with Compact Maps on, whatever the setting says");
+    var big = Path.Combine(root, "BigMaps", "maps");
+    Directory.CreateDirectory(big);
+    // A real picture one row high: past the size that counts (its width), and no map (it is not square), so nothing big is made.
+    void Strip(string file, int width)
+    {
+      using var image = new Image<L16>(width, 1);
+      image.Save(Path.Combine(big, file), new PngEncoder { ColorType = PngColorType.Grayscale, BitDepth = PngBitDepth.Bit16, ChunkFilter = PngChunkFilter.ExcludeAll });
+    }
+    foreach (var file in Directory.GetFiles(big))
+      File.Delete(file);
+    BC.ConfigMapSourceDir.Value = big;
+    BC.ConfigCompactMaps.Value = false;
+    Strip("forestmap.png", 8192);
+    var edge = BC.BetterContinentsSettings.Create();
+    C(!edge.CompactMaps && edge.Version == 12, "8192 px across: as the setting says (off)");
+    Strip("forestmap.png", 8193);
+    lock (LogHandler.Lines) LogHandler.Lines.Clear();
+    var over = BC.BetterContinentsSettings.Create();
+    C(over.CompactMaps && LogHandler.Has("Compact Maps is on for this world, whatever the setting") && LogHandler.Has("8193 x 1 pixels"),
+      "8193 px across: Compact Maps is on, and the log says which map made it so");
+    var info = new List<string>();
+    over.Dump(info.Add);
+    C(info.Any(l => l.Contains("Compact Maps (experimental)")), "bc info says so");
+
+    // Which maps count: the biome map does; the location and alt-biome maps hold no tiles.
+    File.Delete(Path.Combine(big, "forestmap.png"));
+    Strip("locationmap.png", 9000);
+    Strip("altbiomemap.png", 9000);
+    C(!BC.BetterContinentsSettings.Create().CompactMaps, "a location map or an alt-biome map of 9000 px does not make it so (they hold no tiles)");
+    Strip("biomemap.png", 9000);
+    C(BC.BetterContinentsSettings.Create().CompactMaps, "a biome map of 9000 px does");
+    // It is a rule of a new world of the newest settings version only (tiles are saved by no other), and it can be switched off.
+    BC.ConfigOverrideVersion.Value = "11";
+    var old = BC.BetterContinentsSettings.Create();
+    C(!old.CompactMaps && old.Version == 11, "a world made at settings version 11 (Override version) keeps its maps as pictures");
+    BC.ConfigOverrideVersion.Value = "";
+    int was = BC.BetterContinentsSettings.CompactAbove;
+    try
+    {
+      BC.BetterContinentsSettings.CompactAbove = int.MaxValue;
+      C(!BC.BetterContinentsSettings.Create().CompactMaps, "with the threshold out of reach it is off");
+      BC.BetterContinentsSettings.CompactAbove = 100;
+      Strip("biomemap.png", 101);
+      C(BC.BetterContinentsSettings.Create().CompactMaps, "and the threshold is the one number");
+    }
+    finally
+    {
+      BC.BetterContinentsSettings.CompactAbove = was;
+    }
+    BC.ConfigCompactMaps.Value = true;
+    Strip("biomemap.png", 64);
+    C(BC.BetterContinentsSettings.Create().CompactMaps, "Compact Maps on in the config: on");
+    BC.ConfigCompactMaps.Value = false;
     BC.ConfigMapSourceDir.Value = "";
   }
 }
