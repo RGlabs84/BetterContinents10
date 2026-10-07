@@ -1,10 +1,11 @@
-// Added by Wubarrk on 2026-10-04 for the unifying refactor (0.10.0).
+// Added by Wubarrk on 2026-10-04 for the unifying refactor (0.10.0), and modified on 2026-10-06 for 16k worlds (0.10.3).
 //
 // Offline checks of the world's size: WorldGeometry against 0.9.4's maths, BetterContinents.SetSize (Expand World
 // Size's way in), the size a world's maps span (MapGeometry: Expand World Size's, a world's own since 0.10, or
 // vanilla's), and WorldSizeHelper, which moves the game's edge of the world: when a group is patched (again), its
 // transpilers on the installed game's IL, which group's size each one reads, and the world-size group patched for real;
-// the layout a world made since 0.10 gets at its own size (Layout.cs); and the water depth patch on the game's IL (Water.cs).
+// the layout a world made since 0.10 gets at its own size (Layout.cs); the water depth patch on the game's IL (Water.cs); and the
+// lakes' merge (Lakes.cs).
 // "dotnet run -c Release -- dump" lists the constants of every method the transpilers rewrite.
 
 using System;
@@ -112,6 +113,7 @@ internal static partial class Program
     PatchTests();
     WaterTests();
     LayoutTests();
+    LakeTests();
     WorldSizeHelper.EdgeChecks.Assume(WorldGeometry.Vanilla);
     WorldSizeHelper.WorldSize.Assume(WorldGeometry.Vanilla);
     WorldSizeHelper.Layout.Assume(WorldGeometry.Vanilla);

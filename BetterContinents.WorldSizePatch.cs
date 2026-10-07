@@ -1,4 +1,4 @@
-// Modified by Wubarrk on 2026-10-04 for the unifying refactor (0.10.0).
+// Modified by Wubarrk on 2026-10-04 for the unifying refactor (0.10.0), and on 2026-10-06 for 16k worlds (0.10.3).
 
 using System;
 using System.Collections.Generic;
@@ -188,7 +188,10 @@ public class WorldSizeHelper
     // The lakes the rivers run between, and the streams' sources: searched for within World Size.
     new Part(() => AccessTools.Method(typeof(WorldGenerator), nameof(WorldGenerator.FindLakes)), transpiler: nameof(FindLakesTranspiler)),
     new Part(() => AccessTools.Method(typeof(WorldGenerator), nameof(WorldGenerator.FindStreamStartPoint)),
-      transpiler: nameof(FindStreamStartPointTranspiler)));
+      transpiler: nameof(FindStreamStartPointTranspiler)),
+    // The game merges the lake points that search found by looking at every remaining point for each one it merges: minutes, on the
+    // server and on every client that joins, for the lake points of a world of 32000 m (up to 200,000: LakeMerge finds the same lakes).
+    new Part(() => AccessTools.Method(typeof(WorldGenerator), nameof(WorldGenerator.MergePoints)), prefix: nameof(MergePointsPrefix)));
 
   // Expand World Data, when installed, gives the locations its own distances at the world's size (its location data is
   // in fractions of the world's radius, which Better Continents tells it: PatchWorldSize), so they are not scaled again.
@@ -413,6 +416,16 @@ public class WorldSizeHelper
   {
     var radius = Layout.Size.WorldRadius;
     return new Constants(instructions).Replace(-10000f, -radius).Replace(10000f, radius).Replace(-10000f, -radius).Replace(10000f, radius).Codes;
+  }
+
+  // WorldGenerator.MergePoints(List<Vector2> points, float range): LakeMerge's answer for a long list of points, the game's to the last
+  // bit, which takes seconds where the game's own takes minutes; a short list is left to the game's code.
+  private static bool MergePointsPrefix(List<Vector2> points, float range, ref List<Vector2> __result)
+  {
+    if (points.Count < LakeMerge.FastAbove || LakeMerge.Merge(points, range) is not { } merged)
+      return true;
+    __result = merged;
+    return false;
   }
 
   // ---- the minimap --------------------------------------------------------------------------------------------------
