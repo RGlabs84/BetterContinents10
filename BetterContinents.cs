@@ -321,6 +321,8 @@ public partial class BetterContinents : BaseUnityPlugin
     {
         // Reloads BetterContinents.cfg on the main thread once a change on disk has settled.
         LiveConfig.Update();
+        // The far sea's colours, where it is now (AshlandsWater).
+        AshlandsWater.Tick();
     }
 
     // One line at startup that says whether the 0.8.1 world-generation fixes are bound, so a server log shows it
