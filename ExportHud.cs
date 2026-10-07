@@ -419,8 +419,10 @@ public static class ExportHud
     // With fine heights the band holds a byte a pixel more, and 4 bytes of height to tell steep ground by.
     double memory = Math.Min(mpx, 2.1) * 2 * 7 + 70 + (fine > 0 ? Math.Min(mpx, 2.1) * 6 : 0);
     double preset = PresetMemory(o);
-    var time = o.Size <= 1024 ? "well under a minute" : o.Size <= 2048 ? "about a minute" : o.Size <= 4096 ? "a few minutes"
-      : o.Size <= 8192 ? "several minutes" : "a quarter of an hour or more";
+    // Measured on a dedicated server (8 workers): 12 s at 4096 px, 43 s at 8192, about 3 minutes at 16384; a game that is also
+    // drawing the world takes longer.
+    var time = o.Size <= 2048 ? "well under a minute" : o.Size <= 4096 ? "under a minute" : o.Size <= 8192 ? "a minute or two"
+      : "a few minutes";
     var text = $"{o.Size} x {o.Size} px = {mpx:0.#} million pixels a map. Before compression a 16-bit map is {2 * mpx:0} MB and a colour map "
                + $"{3 * mpx:0} MB ({raw:0} MB for these maps; the PNGs are usually much smaller). About {memory:0} MB of memory while it runs";
     if (o.Preset)

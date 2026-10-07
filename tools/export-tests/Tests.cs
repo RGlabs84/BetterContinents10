@@ -558,7 +558,7 @@ internal static class Tests
       $"the memory it says holds no matter the size, as the maps are written band by band ({MemoryMb(e4)}, {MemoryMb(e8)}, {MemoryMb(e16)} MB)");
     C(e8.Contains("819 MB while the preset is made") && Call("Estimate", At(8192, paint: false)).Contains("691 MB while the preset is made") && e16.Contains("and no preset") && !e16.Contains("while the preset is made"),
       "the preset's memory is said up to 8192 px (819 MB, 691 without the paint map), and at 16384 px that there is none");
-    C(e16.Contains("a quarter of an hour") && e8.Contains("several minutes"), "and the time");
+    C(e16.Contains("a few minutes") && e8.Contains("a minute or two") && e4.Contains("under a minute"), "and the time, as measured on a server (43 s at 8192 px, about 3 minutes at 16384)");
     var n8 = Call("Notes", At(8192)); var n16 = Call("Notes", At(16384)); var n16off = Call("Notes", At(16384, preset: false));
     C(n8.Contains("needs about 0.8 GB") && n8.Contains("bc_import") && !n8.Contains("is not made"), $"8192 px: the preset's memory ({n8.Split('\n')[1]})");
     C(n16.Contains("The New World preset is not made at 16384 px") && n16.Contains("it takes about 1.4 GB more memory to make, many times what the export itself uses") && !n16.Contains("decodes every map")
