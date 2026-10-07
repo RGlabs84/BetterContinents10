@@ -7,7 +7,13 @@
 //   Plan.cs     the game's own save planning (ZDOMan.GetSaveClonePerChunk and what it calls), patched, run on made-up worlds:
 //               the same chunks as the game's for a world inside its sectors; for a world past them every object in exactly one
 //               chunk, nothing lost after a change, nothing written twice
-//   Session.cs  when the map is on (the world's size, the save's chunks), switching it, and loading an older save
+//   Session.cs  when the map is on (a world's settings, the save's chunks), switching it, the sector array's width, zone regeneration,
+//               and Utils.SmallPosition
+//   Modes.cs    the Wide Sectors setting (Auto, On, Off) and the marker a wide world carries: which worlds the map is on for, how a new
+//               world is made, how the marker is saved, sent and read, a client following the server
+//   Migration.cs  a save made with the game's sectors, converted on a fake world folder that keeps the chunk files by version, on the
+//               game's planning and an older game's; what a load leaves alone; a wide save whose patches cannot be installed (the
+//               world is not loaded); the calls that reach WorldSectors and the two patches on the game's load
 // "dotnet run -c Release -- dump" lists the constants of the methods the transpilers rewrite, on both assemblies.
 
 using System;
@@ -56,9 +62,11 @@ internal static partial class Program
     var dirs = new[] { AppContext.BaseDirectory, Path.Combine(libs, "1.0", "client"), libs };
     AssemblyLoadContext.Default.Resolving += (context, name) =>
     {
+      // Steamworks.NET is the assembly "com.rlabrecque.steamworks.net" in a file called steamworks.net.dll.
+      var file = name.Name == "com.rlabrecque.steamworks.net" ? "steamworks.net" : name.Name;
       foreach (var dir in dirs)
       {
-        var path = Path.Combine(dir, name.Name + ".dll");
+        var path = Path.Combine(dir, file + ".dll");
         if (File.Exists(path))
           return context.LoadFromAssemblyPath(Path.GetFullPath(path));
       }
@@ -81,22 +89,52 @@ internal static partial class Program
   {
     Debug.unityLogger.logHandler = new CapturingLogHandler();
     foreach (var (name, test) in new (string, Action)[] { ("MapTests", MapTests), ("IlTests", IlTests), ("BindingTests", BindingTests), ("PlanTests", PlanTests), ("SessionTests", SessionTests) })
-      try
-      {
-        test();
-      }
-      catch (Exception e)
-      {
-        // Exception.ToString() can fail here (a stack frame in a module the test does not have): say what is known.
-        checks++;
-        failures++;
-        var chain = new System.Text.StringBuilder();
-        for (var inner = e; inner != null; inner = inner.InnerException)
-          chain.Append(inner == e ? "" : " / inner ").Append(inner.GetType().FullName).Append(": ").Append(inner.Message);
-        System.Console.WriteLine($"CRASH {name}: {chain}");
-      }
+      Guarded(name, test);
     System.Console.WriteLine($"sector-tests: {checks - failures}/{checks} checks passed");
     return failures == 0 ? 0 : 1;
+  }
+
+  // What is known of an exception: its messages, and its frames one by one (Exception.ToString() can fail to format when a frame is in a module the
+  // test does not have).
+  private static string CrashText(Exception e)
+  {
+    var text = new System.Text.StringBuilder();
+    for (var inner = e; inner != null; inner = inner.InnerException)
+      text.Append(inner == e ? "" : " / inner ").Append(inner.GetType().FullName).Append(": ").Append(inner.Message);
+    text.Append("\n   in ");
+    try
+    {
+      foreach (var frame in new System.Diagnostics.StackTrace(e, false).GetFrames().Take(10))
+      {
+        try
+        {
+          text.Append(frame.GetMethod() is { } m ? $"{m.DeclaringType?.Name}.{m.Name}" : "?").Append(" < ");
+        }
+        catch
+        {
+          text.Append("? < ");
+        }
+      }
+    }
+    catch
+    {
+    }
+    return text.ToString();
+  }
+
+  // A test that crashes is one failed check, with where it crashed, and the tests after it still run.
+  private static void Guarded(string name, Action test)
+  {
+    try
+    {
+      test();
+    }
+    catch (Exception e)
+    {
+      checks++;
+      failures++;
+      System.Console.WriteLine($"CRASH {name}: {CrashText(e)}");
+    }
   }
 
   [MethodImpl(MethodImplOptions.NoInlining)]

@@ -385,6 +385,8 @@ MigrationBackup/
 ExportedObj/
 .consulo/
 *.csproj
+# The offline suites' projects (tools/*/) are part of the repository: a new one is added without git add -f.
+!tools/**/*.csproj
 *.unityproj
 *.sln
 *.booproj

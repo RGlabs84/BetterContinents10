@@ -32,7 +32,7 @@ public partial class BetterContinents
             AltBiomeControl.ResetServerAssignment();
             AltBiomeControl.ServerPeer = null;
             // What the last world's save made of the sectors goes with the world.
-            WorldSectors.SessionStarts();
+            WorldSectors.SessionStarts(hosted: false);
             DynamicPatch();
         }
         private static readonly Presets presets = new();

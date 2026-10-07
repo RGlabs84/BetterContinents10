@@ -196,8 +196,9 @@ internal static partial class Program
     C(recordBack.Record is { Amount: 1.25f, SeaLevel: 0.4f } && reread.Record is { Amount: 1.25f, SeaLevel: 0.4f },
       "a heightmap's record is saved with its tiles, and written back into the picture rebuilt from them");
 
-    // Better Continents 0.9 stops at the tiles' key: it is new, so it reads the world as vanilla instead of misreading it. (Keys added since are newer still.)
-    C((int)BC.DataKey.TiledMap == 67 && Enum.GetValues(typeof(BC.DataKey)).Cast<int>().Count(k => k <= 67) == 68, "the tiles' key is 67, after every key 0.9 knows (0 to 66)");
+    // Better Continents 0.9 stops at the tiles' key: it is new, so it reads the world as vanilla instead of misreading it. (The keys of
+    // 0.10.3 follow it: 68 for wide sectors, 69 for High Terrain.)
+    C((int)BC.DataKey.TiledMap == 67 && Enumerable.Range(0, 68).All(key => Enum.IsDefined(typeof(BC.DataKey), key)), "the tiles' key is 67, after every key 0.9 knows (0 to 66, none missing)");
   }
 
   // ---- the cache ----------------------------------------------------------------------------------------------------

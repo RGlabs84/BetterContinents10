@@ -1,6 +1,7 @@
 // Added by Wubarrk on 2026-10-06 for 16k worlds (0.10.3).
 
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -17,18 +18,21 @@ namespace BetterContinents;
 // to 1023 (-65.6 km to 65.5 km) a sector and a save chunk of its own, on the server and on the clients. See
 // tools/sector-tests/DESIGN.md for the game code this follows and why each patch is needed.
 //
-// What is patched, while a world needs it (Wanted: Better Continents is on for the world and its World Size + Edge Size is
-// past 16,350 m; or the save already holds chunks of the wider area, ForcedBySave):
+// What is patched, while a world needs it (Wanted: Better Continents is on for the world, its World Size + Edge Size is past
+// 16,350 m, and it is a wide world: its settings say so (WideSectors), or this machine is told to convert the worlds it runs (the
+// Wide Sectors setting, On); or the save already holds chunks of the wider area, ForcedBySave):
 //   - the five functions that turn a zone into a sector, a sector into a chunk, and a chunk into its zones (SectorMap),
 //   - the array's allocation (ZDOMan.ResetSectorArray: 2048 x 2048 sectors, 32 MB),
 //   - the three save-planning methods of ZDOMan (GetSaveClonePerChunk, AddObjectsPerChunk, DecideChunkSize), whose 64 x 64
 //     chunks and 512 x 512 sectors are constants of their code, which a transpiler widens to 256 x 256 and 2048 x 2048,
-//   - Utils.SmallPosition, which writes an object at y = 0 (every zone's _ZoneCtrl) in two shorts and, beyond 20,000 m,
-//     clamps it to 20,000 m.
+//   - Utils.SmallPosition, which writes an object at y = 0 (every zone's _ZoneCtrl) in two shorts and, when one of its
+//     coordinates is not a short (a zone 512 or more out, past 32,767 m) and the other is whole, clamps it to 20,000 m.
 // A world that does not need it keeps the game's own code, byte for byte.
 //
 // The inner area (zones -256 to 255) keeps the game's sector order and chunk numbers, so a vanilla-size world's save does not
-// change, and a world saved before 0.10.3 whose far objects were all filed in chunk (0, 0) is migrated when it loads.
+// change. A world saved with the game's sectors, whose far objects are all filed in chunk (0, 0), is converted when it loads on a
+// machine that is told to (Wide Sectors On): the objects move to chunks of their own, and the game saves a copy of the old save
+// before the first save of the new one (LoadedChunks).
 internal static class WorldSectors
 {
   // ---- the sector map -----------------------------------------------------------------------------------------------
@@ -125,11 +129,42 @@ internal static class WorldSectors
   // How far out a size has objects: its radius, or nothing when it makes no world.
   private static float Reach(WorldGeometry? size) => size != null && size.TotalRadius > 0f && !float.IsNaN(size.TotalRadius) ? size.TotalRadius : 0f;
 
-  // Whether a world needs the map: Better Continents is on for it and its size (its own, or Expand World Size's when that
-  // has sent one) reaches past the game's sectors. A world made by an older Better Continents is the same: it has the
-  // same objects far out, in the one list.
-  internal static bool Wanted(BetterContinents.BetterContinentsSettings settings, WorldGeometry? expandWorldSize) =>
-    settings.EnabledForThisWorld && Math.Max(Reach(settings.OwnGeometry), Reach(expandWorldSize)) > VanillaReach;
+  // How far out a world has objects: its own size, or Expand World Size's when that has sent one and is larger.
+  internal static float Reach(BetterContinents.BetterContinentsSettings settings, WorldGeometry? expandWorldSize) =>
+    Math.Max(Reach(settings.OwnGeometry), Reach(expandWorldSize));
+
+  // This machine's Wide Sectors setting; Auto where the config is not bound (the offline suites, which can also set it).
+  internal static WideSectorsMode Mode => ModeOverride ?? BetterContinents.ConfigWideSectors?.Value ?? WideSectorsMode.Auto;
+  internal static WideSectorsMode? ModeOverride;
+
+  // Whether a world needs the map: Better Continents is on for it, its size (its own, or Expand World Size's when that has sent one) reaches
+  // past the game's sectors, and it is a wide world: its settings say so (WideSectors: it was made wide, or converted), or this machine is told
+  // to convert the worlds it runs (On) and runs this one (hosted: single player, the host or a dedicated server). A client never decides: it
+  // follows the settings it was sent, whatever its own Wide Sectors says. A world whose save holds chunks of the wider area needs it too
+  // (ForcedBySave), which Update adds.
+  internal static bool Wanted(BetterContinents.BetterContinentsSettings settings, WorldGeometry? expandWorldSize, WideSectorsMode mode, bool hosted) =>
+    settings.EnabledForThisWorld && Reach(settings, expandWorldSize) > VanillaReach && (settings.WideSectors || (mode == WideSectorsMode.On && hosted));
+
+  // A new world takes its settings (BetterContinentsSettings.FromConfig, and a preset's world when it is made): Auto and On make a world that
+  // reaches past the game's sectors a wide one, which its settings say for good (WideSectors); Off leaves it on the game's, and a world that is
+  // wide already (a preset made so) stays wide. Whether the world is wide.
+  internal static bool NewWorld(BetterContinents.BetterContinentsSettings settings, WideSectorsMode mode, WorldGeometry? expandWorldSize)
+  {
+    if (settings.WideSectors || !settings.EnabledForThisWorld)
+      return settings.WideSectors;
+    var reach = Reach(settings, expandWorldSize);
+    if (reach <= VanillaReach)
+      return false;
+    if (mode == WideSectorsMode.Off)
+    {
+      BetterContinents.Log($"Sectors: Wide Sectors is Off, so this new world, which reaches {reach:0} m, has the game's own sectors: what lies beyond 16.4 km shares one sector, "
+        + "and beyond 22.7 km some of it shares the game's portal file.");
+      return false;
+    }
+    settings.WideSectors = true;
+    BetterContinents.Log($"Sectors: this new world reaches {reach:0} m, so it is made with wide sectors (Wide Sectors is {mode}): every zone out to {SectorMap.LastZone * 64 + 32} m has a sector and save chunks of its own.");
+    return true;
+  }
 
   // Whether the patches are on.
   internal static bool Active { get; private set; }
@@ -138,22 +173,58 @@ internal static class WorldSectors
   // next session starts (SessionStarts).
   internal static bool ForcedBySave { get; private set; }
 
-  // What DynamicPatch asks for: the map for a world that needs it, off for any other.
-  internal static void Update(Harmony harmony, BetterContinents.BetterContinentsSettings settings, WorldGeometry? expandWorldSize) =>
-    Switch(harmony, ForcedBySave || Wanted(settings, expandWorldSize), settings, expandWorldSize);
+  // This machine runs the world of this session (single player, the host, a dedicated server): it loads the save, and may convert it.
+  // A client does not.
+  internal static bool Hosted { get; private set; }
 
-  // A new session (ZNet.SetServer): nothing is known of its save yet.
-  internal static void SessionStarts() => ForcedBySave = false;
+  // What DynamicPatch asks for: the map for a world that needs it, off for any other. With Wide Sectors On, a world this machine runs that
+  // reaches past the game's sectors is a wide world from then on: its settings say so, and are saved so.
+  internal static void Update(Harmony harmony, BetterContinents.BetterContinentsSettings settings, WorldGeometry? expandWorldSize)
+  {
+    var mode = Mode;
+    Switch(harmony, ForcedBySave || Wanted(settings, expandWorldSize, mode, Hosted), settings, expandWorldSize);
+    bool reaches = settings.EnabledForThisWorld && Reach(settings, expandWorldSize) > VanillaReach;
+    if (Active && Hosted && reaches && mode == WideSectorsMode.On && !settings.WideSectors)
+    {
+      settings.WideSectors = true;
+      BetterContinents.Log("Sectors: Wide Sectors is On, so this world is a wide world from now on: its settings say so, and are saved with the world.");
+    }
+    if (Hosted && reaches && !Active && !settings.WideSectors && mode == WideSectorsMode.Auto && !warnedKeeps)
+    {
+      warnedKeeps = true;
+      BetterContinents.Log("Sectors: this world reaches past 16,350 m. Unless its save was made with wide sectors, it keeps the game's own sectors while Wide Sectors is Auto: what lies beyond "
+        + "16.4 km shares one sector. Wide Sectors On converts it when it loads (the game saves a copy of the world first).");
+    }
+    if (Hosted && Active && mode == WideSectorsMode.Off && (settings.WideSectors || ForcedBySave))
+      NoteOffStays(settings.WideSectors ? "its settings say it is a wide world" : "its save has chunks only the wide sectors write");
+  }
 
-  private static bool warnedBeyond;
+  // A new session (ZNet.SetServer, or the main menu): nothing is known of its save yet. hosted: this machine runs the world.
+  internal static void SessionStarts(bool hosted)
+  {
+    ForcedBySave = false;
+    Hosted = hosted;
+    warnedKeeps = warnedOffStays = false;
+  }
+
+  private static bool warnedBeyond, warnedKeeps, warnedOffStays;
   // What the last refused switch asked for (said once).
   private static bool? warnedStay;
+
+  // Wide Sectors is Off, and the world is wide: once a session, why it stays.
+  private static void NoteOffStays(string why)
+  {
+    if (warnedOffStays)
+      return;
+    warnedOffStays = true;
+    BetterContinents.Log($"Sectors: Wide Sectors is Off, but this world stays wide: {why}.");
+  }
 
   // On or off. The sectors an existing game holds are not moved: a change comes only while no object is in them (the main
   // menu, a client before the server's objects arrive, a server before its world loads), or it is left for the next session.
   private static void Switch(Harmony harmony, bool on, BetterContinents.BetterContinentsSettings? settings, WorldGeometry? expandWorldSize)
   {
-    if (on && !warnedBeyond && settings != null && Math.Max(Reach(settings.OwnGeometry), Reach(expandWorldSize)) > MaxReach)
+    if (on && !warnedBeyond && settings != null && Reach(settings, expandWorldSize) > MaxReach)
     {
       warnedBeyond = true;
       BetterContinents.LogWarning($"Sectors: this world reaches past {MaxReach} m. Zones out to 65,504 m have their own sectors; objects beyond share one, as the game's do beyond 16.4 km.");
@@ -171,7 +242,12 @@ internal static class WorldSectors
     if (on)
     {
       if (!TryPatch(harmony))
+      {
+        // A world whose save is wide has its own explanation (MappingLoaded).
+        if (!ForcedBySave)
+          BetterContinents.LogError("Sectors: the world runs on the game's own sectors: objects beyond 16.4 km share one sector, as before.");
         return;
+      }
       Active = true;
       ResizeLive();
       BetterContinents.Log($"Sectors: every zone from {SectorMap.FirstZone} to {SectorMap.LastZone} (to {SectorMap.LastZone * 64 + 32} m) has a sector and save chunks of its own "
@@ -179,7 +255,13 @@ internal static class WorldSectors
     }
     else
     {
-      Unpatch(harmony);
+      // A patch left on while the array is the game's would file an object in a sector that is not there: the sectors stay wide, and the
+      // next session tries again.
+      if (!Unpatch(harmony))
+      {
+        BetterContinents.LogError("Sectors: the wide sectors could not be taken off, so they stay on until the next session.");
+        return;
+      }
       Active = false;
       ResizeLive();
       BetterContinents.Log("Sectors: the game's own sectors (zones -256 to 255).");
@@ -198,8 +280,49 @@ internal static class WorldSectors
         ForcedBySave = true;
         BetterContinents.Log($"Sectors: the save has a chunk ({chunk.Chunk & 0xFF}, {chunk.Chunk >> 8}) beyond the game's 64 x 64, so it was saved with the wide sectors.");
         Switch(harmony, true, null, null);
+        if (!Active)
+          RefuseToLoad(chunk);
+        else if (Hosted && Mode == WideSectorsMode.Off)
+          NoteOffStays("its save has chunks only the wide sectors write");
         return;
       }
+  }
+
+  // The save has chunks only the wide sectors write, and they could not be turned on. Loaded on the game's sectors, every object beyond 16.4 km
+  // would go into one list and be saved again in chunk (0, 0) on top of the chunks it is in: twice. The game's own way to stop is its load
+  // error (ZNet.m_loadError): the game then saves nothing ("Skipping world save"), and a game that runs the world goes back to the menu
+  // (Game.FixedUpdate: "World load failed, exiting without save"), where the error is shown. A dedicated server does not stop by itself:
+  // it would run a world nobody could save, so it stops here, as it does for a failed alt-biome planting (AltBiomeControl.FailLoad).
+  private static void RefuseToLoad(ZoneSystem.ChunkIndex chunk)
+  {
+    var world = ZNet.World?.m_name ?? "?";
+    var message = $"Better Continents: the world '{world}' was saved with wide sectors (its save has a chunk ({chunk.Chunk & 0xFF}, {chunk.Chunk >> 8}) beyond the game's 64 x 64), "
+      + "which could not be turned on, so it is not loaded, and nothing is saved over it: on the game's own sectors every object beyond 16.4 km would be saved twice. The log names the patch that failed.";
+    BetterContinents.LogError(message);
+    BetterContinents.LastConnectionError = message;
+    ZNet.m_loadError = true;
+    try
+    {
+      BetterContinents.instance?.StartCoroutine(StopAfterRefusal());
+    }
+    catch (Exception e)
+    {
+      BetterContinents.LogWarning($"Sectors: could not stop the session cleanly: {e.Message}");
+    }
+  }
+
+  private static IEnumerator StopAfterRefusal()
+  {
+    yield return null;
+    var net = ZNet.instance;
+    if (net != null && net.IsDedicated())
+    {
+      BetterContinents.LogError("Sectors: stopping the dedicated server because the world was not loaded (see the error above).");
+      Application.Quit(1);
+      yield break;
+    }
+    ZNet.m_connectionStatus = ZNet.ConnectionStatus.ErrorConnectFailed;
+    Game.instance?.Logout(save: false);
   }
 
   private static bool CanSwitch()
@@ -218,67 +341,142 @@ internal static class WorldSectors
     man.m_objectsBySector = new List<ZDO>[width * width];
   }
 
-  // ---- loading a save made before ------------------------------------------------------------------------------------
+  // ---- loading a save made with the game's sectors --------------------------------------------------------------------
 
-  // ZDOMan.LoadChunks's postfix, for a save made with the game's own sectors (0.10.2 and before, or a world that has no map):
+  // The game's own zones, which its 512 x 512 sectors file one by one.
+  private static bool InGame(Vector2s zone) =>
+    zone.x >= SectorMap.VanillaFirstZone && zone.x <= SectorMap.VanillaLastZone && zone.y >= SectorMap.VanillaFirstZone && zone.y <= SectorMap.VanillaLastZone;
+
+  // ZDOMan.LoadChunks's postfix, for a save made with the game's own sectors (a world the wide sectors are now turned on for, by Wide Sectors
+  // On or by its settings). What it holds in the wrong chunk for them:
   //
-  // 1. Everything beyond the game's sectors was filed in chunk (0, 0). That chunk stays in the save's chunk list as it was, and is not
-  //    written again unless it changes, so the objects, now in chunks of their own, would be in the save twice. The chunk is taken out
-  //    of the list: it is written again with what is left in its own zones if there is any, and the file it was is removed with the
-  //    next load's orphans.
+  // 1. Everything beyond the game's sectors was filed in chunk (0, 0). The objects are in their sectors by now (the load files them by
+  //    position), but the save does not know it: chunk (0, 0) stays in its chunk list with the file it has, which is written again only when it
+  //    changes, so the objects, saved in chunks of their own, would be in the save twice. Every such object is marked changed, so that its chunk is
+  //    written by any version of the game (the one this is written for also writes a chunk that is missing from the list; an older one only a
+  //    changed one). Chunk (0, 0) is marked changed too when anything is left in its zones (and the server's ghost zones): the game writes it
+  //    again under its next version, which is a new file name, and removes the old file once the new chunk list is written. Taken out of the list
+  //    it would be written under version 1, which can be the name of the file the saved list still has, over it, before the new list exists.
+  //    With nothing left in it, it leaves the list and nothing is written in its place; the old file goes with the next load's orphans.
   // 2. The 8 x 8 zones at -248 to -241 by -256 to -249 were chunk (1, 0), the key the game's portals are saved under (ZoneSystem.ChunkPortal),
-  //    which loads every object in it as a portal. An object there that is not a portal is put in its sector, and the portals are saved
-  //    again without it (the objects themselves go to chunk (159, 0)).
+  //    which loads every object in it as a portal. An object there that is not a portal is put in its sector and marked changed, and the portals
+  //    are saved again without it (the objects themselves go to chunk (159, 0)).
+  //
+  // Moving any object asks the game to copy the old save before its first save (World.m_createBackupBeforeSaving), and says so: an older Better
+  // Continents, or the game alone, that saves the converted world writes those objects twice.
+  //
+  // A save that has chunks of the wide sectors needs none of this; it is only looked at, for what an older version wrote over it (WarnOfTwins).
   internal static void LoadedChunks(ZDOMan man)
   {
     if (!Active || man.m_chunkSaveMapping is not { } mapping)
       return;
-    foreach (var chunk in mapping.Chunks.Keys)
-      if (SectorMap.IsWideChunk(chunk.Chunk))
+    var portals = Game.instance?.PortalPrefabHash;
+    if (mapping.Chunks.Keys.Any(chunk => SectorMap.IsWideChunk(chunk.Chunk)))
+    {
+      WarnOfTwins(man, mapping, portals);
+      return;
+    }
+    var beyond = ObjectsBeyond(man);
+    var block = portals == null ? new List<ZDO>() : TakeFromPortalChunk(man, portals);
+    if (beyond.Count == 0 && block.Count == 0)
+      return;
+    foreach (var zdo in beyond.Concat(block))
+      man.SetDirtySector(zdo);
+    var first = new ZoneSystem.ChunkIndex(0, 0);
+    string pile = "";
+    if (beyond.Count > 0 && mapping.Chunks.ContainsKey(first))
+    {
+      if (HoldsObjects(man, first.Chunk))
       {
-        // A save made with the wide sectors has no object in the portals' chunk but portals. One that has (every object of its zones
-        // is also in chunk (159, 0)) was saved again by a Better Continents without the wide sectors, or by the game alone.
-        if (Game.instance?.PortalPrefabHash is { } portals && man.m_portalObjects.Values.Sum(l => l.Count(z => !portals.Contains(z.GetPrefab()))) is var strays and > 0)
-          BetterContinents.LogWarning($"Sectors: the portals' chunk (1, 0) of this save holds {strays} objects that are not portals. This world was saved after the wide sectors by "
-            + "a version of Better Continents without them (or without Better Continents), which files those zones' objects there: they are in the world twice.");
-        return;
+        man.SetDirtyChunks(new ZoneSystem.SectorIndex(0));
+        pile = "chunk (0, 0) is written again, under a new file name, with what lies in its own zones";
       }
-    int far = 0;
+      else
+      {
+        mapping.Chunks.Remove(first);
+        pile = "chunk (0, 0) leaves the chunk list: nothing lies in its own zones";
+      }
+    }
+    if (block.Count > 0)
+      man.SetDirtyPortals();
+    if (ZNet.World is { } world)
+      world.m_createBackupBeforeSaving = true;
+    BetterContinents.Log($"Sectors: {beyond.Count} objects lie beyond the game's sectors, where the save filed them in chunk (0, 0), and {block.Count} are of the zones the game's save files as its portals' chunk (1, 0) "
+      + $"(chunk (159, 0) here): they are written in chunks of their own at the next save{(pile.Length > 0 ? "; " + pile : "")}.");
+    BetterContinents.LogWarning($"Sectors: this world was saved with the game's sectors and is converted to the wide ones. Before its first save the game saves a copy of it as "
+      + $"'{ZNet.World?.m_worldName ?? "<world>"}_backup_<date and time>', beside it. Do not open or save the converted world with a Better Continents that has no wide sectors (or without Better Continents): "
+      + "it would write those objects twice.");
+  }
+
+  // The objects that lie in the wide map's zones past the game's: the game's sectors filed them in sector 0. An object past the map is in sector 0
+  // in both (the server's ghost zones are, wherever the world's size reaches), so it is not one.
+  private static List<ZDO> ObjectsBeyond(ZDOMan man)
+  {
+    var beyond = new List<ZDO>();
     foreach (var list in man.m_objectsBySector)
       if (list != null)
         foreach (var zdo in list)
         {
           var zone = ZoneSystem.GetZone(zdo.GetPosition());
-          if (zone.x < SectorMap.VanillaFirstZone || zone.x > SectorMap.VanillaLastZone || zone.y < SectorMap.VanillaFirstZone || zone.y > SectorMap.VanillaLastZone)
-            far++;
+          if (!InGame(zone) && SectorMap.SectorToIndex(zone.x, zone.y) != 0)
+            beyond.Add(zdo);
         }
-    if (far > 0)
+    return beyond;
+  }
+
+  // The objects of the portals' chunk that are not portals: put in their sectors.
+  private static List<ZDO> TakeFromPortalChunk(ZDOMan man, List<int> portals)
+  {
+    var taken = new List<ZDO>();
+    foreach (var sector in man.m_portalObjects.Keys.ToList())
     {
-      var first = new ZoneSystem.ChunkIndex(0, 0);
-      BetterContinents.Log($"Sectors: {far} objects lie beyond the game's sectors, where an earlier save filed them in chunk (0, 0): "
-        + (mapping.Chunks.Remove(first) ? "that chunk is written again, with what lies in its own zones, and the rest in chunks of their own, at the next save." : "they are written in chunks of their own at the next save."));
+      var list = man.m_portalObjects[sector];
+      for (int i = list.Count - 1; i >= 0; i--)
+        if (!portals.Contains(list[i].GetPrefab()))
+        {
+          var zdo = list[i];
+          list.RemoveAt(i);
+          man.InitialAddToSector(zdo, zdo.GetSectorIndex());
+          taken.Add(zdo);
+        }
+      if (list.Count == 0)
+        man.m_portalObjects.Remove(sector);
     }
-    int misfiled = 0;
-    var portalPrefabs = Game.instance?.PortalPrefabHash;
-    if (portalPrefabs != null)
-      foreach (var sector in man.m_portalObjects.Keys.ToList())
-      {
-        var list = man.m_portalObjects[sector];
-        for (int i = list.Count - 1; i >= 0; i--)
-          if (!portalPrefabs.Contains(list[i].GetPrefab()))
-          {
-            var zdo = list[i];
-            list.RemoveAt(i);
-            man.InitialAddToSector(zdo, zdo.GetSectorIndex());
-            misfiled++;
-          }
-        if (list.Count == 0)
-          man.m_portalObjects.Remove(sector);
-      }
-    if (misfiled > 0)
+    return taken;
+  }
+
+  // Whether any object is in the sectors of a chunk: the game plans a chunk when its sectors hold any (GetSaveClonePerChunk counts them all).
+  private static bool HoldsObjects(ZDOMan man, ushort chunk)
+  {
+    uint x0 = (uint)(chunk & 0xFF) * SectorMap.ZonesPerChunk, y0 = (uint)(chunk >> 8) * SectorMap.ZonesPerChunk;
+    for (uint y = y0; y < y0 + SectorMap.ZonesPerChunk; y++)
+      for (uint x = x0; x < x0 + SectorMap.ZonesPerChunk; x++)
+        if (man.m_objectsBySector[SectorMap.IndicesToIndex(x, y)] is { Count: > 0 })
+          return true;
+    return false;
+  }
+
+  // A save made with the wide sectors that a version without them saved again: its chunk (1, 0), the portals', holds the objects of the zones
+  // that are chunk (159, 0) here, and its chunk (0, 0) holds every object beyond 16.4 km. The objects load twice. Nothing repairs them; this says so.
+  private static void WarnOfTwins(ZDOMan man, ChunkSaveMapping mapping, List<int>? portals)
+  {
+    // A save made with the wide sectors has no object in the portals' chunk but portals.
+    if (portals != null && man.m_portalObjects.Values.Sum(list => list.Count(zdo => !portals.Contains(zdo.GetPrefab()))) is var strays and > 0)
+      BetterContinents.LogWarning($"Sectors: the portals' chunk (1, 0) of this save holds {strays} objects that are not portals. This world was saved after the wide sectors by "
+        + "a version of Better Continents without them (or without Better Continents), which files those zones' objects there: they are in the world twice.");
+    // Nor has chunk (0, 0) an object that lies outside its own zones.
+    if (mapping.Chunks.TryGetValue(new ZoneSystem.ChunkIndex(0, 0), out var pile))
     {
-      man.SetDirtyPortals();
-      BetterContinents.Log($"Sectors: {misfiled} objects of the zones the game's save files as its portals' chunk (1, 0) are put in their sectors; they are written in chunk (159, 0) at the next save.");
+      int inZones = 0;
+      for (uint y = 0; y < SectorMap.ZonesPerChunk; y++)
+        for (uint x = 0; x < SectorMap.ZonesPerChunk; x++)
+          if (man.m_objectsBySector[SectorMap.IndicesToIndex(x, y)] is { } list)
+            foreach (var zdo in list)
+              if (zdo.Persistent && portals?.Contains(zdo.GetPrefab()) != true)
+                inZones++;
+      if (pile.m_numZDOs > inZones)
+        BetterContinents.LogWarning($"Sectors: chunk (0, 0) of this save holds {pile.m_numZDOs} objects, but {inZones} of them lie in its own zones. This world was saved after the wide sectors by "
+          + $"a version of Better Continents without them (or without Better Continents), which files everything beyond 16.4 km in chunk (0, 0): the other {pile.m_numZDOs - inZones} are in the world twice.");
     }
   }
 
@@ -362,7 +560,7 @@ internal static class WorldSectors
     }
     catch (Exception e)
     {
-      BetterContinents.LogError($"Sectors: could not patch {Hooks[done.Count].Name} ({e.Message}), so the game's own sectors stay on: objects beyond 16.4 km share one sector, as before.");
+      BetterContinents.LogError($"Sectors: could not patch {Hooks[done.Count].Name} ({e.Message}); the patches of the others are taken off again.");
       done.Add(Hooks[done.Count]);
       foreach (var hook in done)
         try
@@ -377,17 +575,38 @@ internal static class WorldSectors
     }
   }
 
-  private static void Unpatch(Harmony harmony)
+  // For the offline tests: called with a hook's name before its patch is taken off (one that throws is a hook that cannot be).
+  internal static Action<string>? BeforeUnpatch;
+
+  // Takes every patch off. False when one could not be: the others are patched again, so that what stays is all of it, the wide sectors as they
+  // were, never half of them.
+  private static bool Unpatch(Harmony harmony)
   {
+    var removed = new List<Hook>();
+    bool failed = false;
     foreach (var hook in Hooks)
       try
       {
+        BeforeUnpatch?.Invoke(hook.Name);
         hook.Unpatch(harmony);
+        removed.Add(hook);
       }
       catch (Exception e)
       {
+        failed = true;
         BetterContinents.LogError($"Sectors: could not take the patch off {hook.Name}: {e.Message}");
       }
+    if (failed)
+      foreach (var hook in removed)
+        try
+        {
+          hook.Patch(harmony);
+        }
+        catch (Exception e)
+        {
+          BetterContinents.LogError($"Sectors: could not patch {hook.Name} again: {e.Message}");
+        }
+    return !failed;
   }
 
   // The names of the game's parameters (ZoneSystem.SectorToIndex(int sectorX, int sectorY), IndicesToIndex(uint x, uint y),
@@ -431,9 +650,11 @@ internal static class WorldSectors
   }
 
   // Utils.SmallPosition(Vector3 v): (true, the position as two shorts) for an object at y = 0 whose x and z are whole numbers
-  // in a short's range, else (false, _). The game also answers (true, +-20000) for an x or z past +-20000 when the other is
-  // whole, which saves a _ZoneCtrl (the zone's marker, at the zone's centre, y = 0) 25 km out as one at 20 km. This is the
-  // game's function without those two clamps; for every position within 20,000 m it answers as the game does.
+  // in a short's range (within 32,767 m), else (false, _). The game also answers (true, +-20000) when one of them is such a whole
+  // number and the other, past +-20000, is not (it is beyond a short, or has a fraction): that saves a _ZoneCtrl (the zone's marker,
+  // at the zone's centre, y = 0) of a zone 512 or more out (32,768 m and beyond: no short holds it) as one at 20 km, and it is all
+  // a _ZoneCtrl ever meets of it, as the zone centres are whole. This is the game's function without those two clamps; for every
+  // position within 20,000 m, and for every position whose coordinates are both whole shorts, it answers as the game does.
   private static bool SmallPositionPrefix(Vector3 v, ref (bool, Vector2s) __result)
   {
     __result = SmallPosition(v.x, v.y, v.z);

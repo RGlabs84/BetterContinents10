@@ -17,7 +17,7 @@ namespace BetterContinents;
 
 public partial class BetterContinents
 {
-    private static string? LastConnectionError = null;
+    internal static string? LastConnectionError = null;
 
     // Dealing with settings, synchronization of them in multiplayer
     [HarmonyPatch]
@@ -60,7 +60,8 @@ public partial class BetterContinents
             // settings yet (LiveConfig).
             ClientInfo.Clear();
             LiveConfig.ClearServerValues();
-            WorldSectors.SessionStarts();
+            // Wide Sectors: a machine that runs the world (server) decides for it; a client follows the settings the server sends.
+            WorldSectors.SessionStarts(server);
             if (server)
             {
                 var settings = ResolveWorldSettingsPath(world);

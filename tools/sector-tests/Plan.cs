@@ -47,6 +47,16 @@ internal static partial class Program
     public string Key => $"{Number & 0xFF},{Number >> 8}/{Size}";
   }
 
+  // A chunk file in the world's folder: yy_xx__size_version.chunk, the name ChunkSaveMapping.GetChunkFilename gives it.
+  private readonly record struct FileKey(ushort Number, byte Size, uint Version)
+  {
+    public override string ToString() => $"{Number >> 8:x2}_{Number & 0xFF:x2}__{Size}_{Version}";
+  }
+
+  // What a save leaves in the world's folder: the chunk list its .chunks file has, every chunk file (a file the list does not name is
+  // an orphan: a load removes it), and the objects, which the files do not carry ids for (a load gives them theirs).
+  private sealed record Folder(ChunkSaveMapping List, Dictionary<FileKey, List<ZDOID>> Files, Dictionary<ZDOID, ZDO> World);
+
   private sealed class Fake
   {
     public readonly ZDOMan Man = Make<ZDOMan>();
@@ -55,8 +65,16 @@ internal static partial class Program
     public ChunkSaveMapping Mapping => GetField<ChunkSaveMapping>(Man, "m_chunkSaveMapping");
     public HashSet<ZoneSystem.ChunkIndex> Dirty => GetField<HashSet<ZoneSystem.ChunkIndex>[]>(Man, "m_dirtyChunks")[0];
     public List<ZDO>[] Sectors => GetField<List<ZDO>[]>(Man, "m_objectsBySector");
-    public readonly Dictionary<ChunkKey, List<ZDOID>> Disk = [];
     public Dictionary<ZDOID, ZDO> ById => GetField<Dictionary<ZDOID, ZDO>>(Man, "m_objectsByID");
+    public Dictionary<ZoneSystem.SectorIndex, List<ZDO>> Portals => GetField<Dictionary<ZoneSystem.SectorIndex, List<ZDO>>>(Man, "m_portalObjects");
+
+    // The world's folder: the files in it, and the chunk list its .chunks file has. The ZDOMan's own list (Mapping) is a copy the game works on,
+    // which a load makes from this, and a save replaces.
+    public readonly Dictionary<FileKey, List<ZDOID>> Disk = [];
+    public ChunkSaveMapping Committed = new();
+    // How many times a save wrote a file the committed chunk list still names, before the new list was written (a crash then leaves that list
+    // pointing at a file that is no longer what it was).
+    public int Overwrites;
 
     public Fake(int width, bool portalChunk = false)
     {
@@ -85,6 +103,43 @@ internal static partial class Program
       (Sectors[index] ??= []).Add(zdo);
     }
 
+    // As loading the portals' chunk does: the object is a portal, in the portal list of the sector it lies in (and in no sector list).
+    public void LoadAsPortal(ZDO zdo)
+    {
+      World[zdo.m_uid] = zdo;
+      ById[zdo.m_uid] = zdo;
+      var sector = ZoneSystem.GetSectorIndex(zdo.GetPosition());
+      if (!Portals.TryGetValue(sector, out var list))
+        Portals[sector] = list = [];
+      list.Add(zdo);
+    }
+
+    // What ZDOMan.LoadChunks does with a folder: removes the files the chunk list does not name, and loads every file the list names (the objects of
+    // the portals' chunk as portals, any other file's by position). An object that is in two files is two objects: here, twice in its sector's list.
+    // afterChunkList runs where ChunkSaveMapping.Load's postfix does, after the chunk list is read and before any object is: a save that needs
+    // the wide sectors turns them on there.
+    public static Fake LoadFrom(Folder folder, int width, Action<Fake> afterChunkList = null)
+    {
+      var fake = new Fake(width);
+      fake.Committed = folder.List.Clone();
+      SetField(fake.Man, "m_chunkSaveMapping", folder.List.Clone());
+      afterChunkList?.Invoke(fake);
+      foreach (var (file, ids) in folder.Files)
+        fake.Disk[file] = ids;
+      foreach (var file in fake.Disk.Keys.Where(f => !fake.Listed.Contains(f)).ToList())
+        fake.Disk.Remove(file);
+      foreach (var file in fake.Listed.ToList())
+        foreach (var id in fake.Disk[file])
+        {
+          var zdo = folder.World[id];
+          if (file.Number == ZoneSystem.ChunkPortal.Chunk && file.Size == ZoneSystem.ChunkPortal.m_chunkSize)
+            fake.LoadAsPortal(zdo);
+          else
+            fake.Load(zdo);
+        }
+      return fake;
+    }
+
     // A new object, a change (the object is saved again) or a removal, as the game does them.
     public void Create(ZDO zdo)
     {
@@ -110,30 +165,65 @@ internal static partial class Program
       return plan.Select(t => new Chunk(t.Item1.Chunk, t.Item1.m_chunkSize, t.Item2.Select(z => z.m_uid).ToList())).ToList();
     }
 
-    // What ZDOMan.SaveChunks, DeleteOldChunks and the end of a save do with a plan: the chunk list keeps the chunks (a chunk that
-    // is merged into a bigger one, or split from one, replaces it), and each file now holds what the plan gave it.
+    // The name of the file that holds a chunk now, as ChunkSaveMapping.GetChunkOldFilename finds it: the chunk's own, else the one of the bigger
+    // chunk it was split from.
+    private static FileKey? FileOf(ChunkSaveMapping list, ZoneSystem.ChunkIndex index)
+    {
+      if (list.Get(index) is { } own)
+        return new FileKey(index.Chunk, index.m_chunkSize, own.m_version);
+      for (byte size = 3; size > index.m_chunkSize; size--)
+      {
+        var bigger = ZoneSystem.ChunkIndexFromIndexAndSize(index, size);
+        if (list.Get(bigger) is { } info)
+          return new FileKey(bigger.Chunk, bigger.m_chunkSize, info.m_version);
+      }
+      return null;
+    }
+
+    // What ZDOMan.SaveChunks, DeleteOldChunks and the end of a save do with a plan: each planned chunk is written under its next version (a new
+    // file name; a chunk that is not in the list yet has version 1, or its parent's plus 1), the new chunk list is written after the files, and
+    // then the old file of every chunk written is removed, by the names the game's own list gives them (a chunk it does not list has none).
     public void Save(List<Chunk> plan)
     {
-      var current = Mapping.Clone();
+      var old = Mapping;
+      var next = old.Clone();
       foreach (var chunk in plan)
-        current.CreateOrUpdate(new ZoneSystem.ChunkIndex(chunk.Number, chunk.Size));
+        next.CreateOrUpdate(new ZoneSystem.ChunkIndex(chunk.Number, chunk.Size));
+      var named = Listed.ToHashSet();
       foreach (var chunk in plan)
       {
-        current.Get(new ZoneSystem.ChunkIndex(chunk.Number, chunk.Size)).m_numZDOs = chunk.Ids.Count;
-        Disk[new ChunkKey(chunk.Number, chunk.Size)] = chunk.Ids;
+        var info = next.Get(new ZoneSystem.ChunkIndex(chunk.Number, chunk.Size));
+        info.m_numZDOs = chunk.Ids.Count;
+        var file = new FileKey(chunk.Number, chunk.Size, info.m_version);
+        if (named.Contains(file))
+          Overwrites++;
+        Disk[file] = chunk.Ids;
       }
-      SetField(Man, "m_chunkSaveMapping", current);
-      // A file whose chunk is not in the list any more was deleted with the old ones.
-      var keep = current.Chunks.Where(kv => kv.Value.SaveChunk).Select(kv => new ChunkKey(kv.Key.Chunk, kv.Key.m_chunkSize)).ToHashSet();
-      foreach (var key in Disk.Keys.ToList())
-        if (!keep.Contains(key))
-          Disk.Remove(key);
+      Committed = next.Clone();
+      foreach (var chunk in plan)
+        if (FileOf(old, new ZoneSystem.ChunkIndex(chunk.Number, chunk.Size)) is { } gone)
+          Disk.Remove(gone);
+      SetField(Man, "m_chunkSaveMapping", next);
       Dirty.Clear();
       GetField<bool[]>(Man, "m_dirtyPortalObjects")[0] = false;
     }
 
+    // The folder as it is now, for a load.
+    public Folder Snapshot() => new(Committed.Clone(), new Dictionary<FileKey, List<ZDOID>>(Disk), new Dictionary<ZDOID, ZDO>(World));
+
+    // Whether a chunk file the committed list names holds the object, and the file satisfies a test.
+    public bool Holds(ZDO zdo, Func<FileKey, bool> where) =>
+      Listed.Any(file => Disk.TryGetValue(file, out var ids) && ids.Contains(zdo.m_uid) && where(file));
+
+    // The files the committed chunk list names.
+    public IEnumerable<FileKey> Listed =>
+      Committed.Chunks.Values.Where(info => info.SaveChunk).Select(info => new FileKey(info.m_chunkIndex.Chunk, info.m_chunkIndex.m_chunkSize, info.m_version));
+
     // What a load would read back: the objects of every file in the chunk list, which the game files by position.
-    public List<ZDOID> DiskIds => Disk.Values.SelectMany(l => l).ToList();
+    public List<ZDOID> DiskIds => Listed.Where(Disk.ContainsKey).SelectMany(file => Disk[file]).ToList();
+
+    // The objects in the sector lists, each as often as it is in them (an object twice in the world is counted twice).
+    public int ObjectsInSectors => Sectors.Sum(list => list?.Count ?? 0) + Portals.Values.Sum(list => list.Count);
   }
 
   private readonly record struct ChunkKey(ushort Number, byte Size);
@@ -144,6 +234,9 @@ internal static partial class Program
     var origin = Map.ZoneFromChunk(chunk.Number);
     var zone = ZoneSystem.GetZone(position);
     int side = 8 << chunk.Size;
+    // What the map does not reach is in sector 0, as in the game, which is in chunk (0, 0).
+    if (chunk.Number == 0 && chunk.Size == 0 && ZoneSystem.GetSectorIndex(position).Sector == 0)
+      return true;
     return zone.x >= origin.x && zone.x < origin.x + side && zone.y >= origin.y && zone.y < origin.y + side;
   }
 
@@ -253,6 +346,9 @@ internal static partial class Program
     return plans;
   }
 
+  // A position as text. (Vector3.ToString goes through a Unity module the tests do not have.)
+  private static string At(Vector3 p) => $"({p.x:0.##}, {p.y:0.##}, {p.z:0.##})";
+
   // What a plan must be: no object twice, no chunk twice, every object in a chunk that reaches its zone, no chunk that is the
   // portals' key, and every object that is new or changed in a chunk of the plan (every one at the first save).
   private static void CheckPlan(Fake fake, List<Chunk> plan, List<ZDO> mustBeIn, string what, List<string> problems, bool requireAll)
@@ -267,12 +363,12 @@ internal static partial class Program
       {
         if (!seen.Add(id)) problems.Add($"{what}: object {id} twice");
         if (!fake.World.TryGetValue(id, out var zdo)) problems.Add($"{what}: object {id} is not in the world");
-        else if (!InChunk(chunk, zdo.GetPosition())) problems.Add($"{what}: object {id} at {zdo.GetPosition()} is in chunk {chunk.Key}, which does not reach its zone");
+        else if (!InChunk(chunk, zdo.GetPosition())) problems.Add($"{what}: object {id} at {At(zdo.GetPosition())} is in chunk {chunk.Key}, which does not reach its zone");
       }
     }
     foreach (var zdo in mustBeIn)
       if (fake.World.ContainsKey(zdo.m_uid) && !seen.Contains(zdo.m_uid))
-        problems.Add($"{what}: object {zdo.m_uid} at {zdo.GetPosition()} changed, or is new, and is in no chunk of the plan");
+        problems.Add($"{what}: object {zdo.m_uid} at {At(zdo.GetPosition())} changed, or is new, and is in no chunk of the plan");
     if (requireAll && seen.Count != fake.World.Count)
       problems.Add($"{what}: {seen.Count} of the {fake.World.Count} objects are in the plan");
   }
@@ -284,6 +380,7 @@ internal static partial class Program
     var distinct = ids.ToHashSet();
     if (distinct.Count != ids.Count) problems.Add($"{what}: {ids.Count - distinct.Count} objects are in two files");
     if (!distinct.SetEquals(fake.World.Keys.Where(id => fake.World[id].Persistent))) problems.Add($"{what}: the files hold {distinct.Count} objects, the world {fake.World.Count}");
+    if (fake.Overwrites != 0) problems.Add($"{what}: {fake.Overwrites} chunk files were written over a file the saved chunk list still names");
   }
 
   private static string Describe(List<Chunk> plan) =>
@@ -314,7 +411,7 @@ internal static partial class Program
     Check(merged > 0 && total > 50, $"the worlds exercise the game's merging of chunks ({merged} of {total} planned chunks are merged)");
 
     // 2. The wide sectors, on the same worlds: the same chunks, in the same files.
-    var wide = new BC.BetterContinentsSettings { EnabledForThisWorld = true, Version = 12, WorldSize = 24000f, EdgeSize = 500f };
+    var wide = new BC.BetterContinentsSettings { EnabledForThisWorld = true, Version = 12, WorldSize = 24000f, EdgeSize = 500f, WideSectors = true };
     WorldSectors.Update(harmony, wide, null);
     Check(WorldSectors.Active, "a world of 24500 m turns the wide sectors on");
     problems.Clear();

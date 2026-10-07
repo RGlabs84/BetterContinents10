@@ -87,6 +87,20 @@ internal static partial class Program
         refusedBumps++;
     }
     Check(bumps == 13 && refusedBumps == 13, $"GetSaveClonePerChunk: each of its 13 constants changed by one is refused ({refusedBumps} of {bumps})");
+    // The chunk size each of the 7 calls gives (1, 2, 3 to DecideChunkSize; 0, 1, 2, 3 to AddObjectsPerChunk) is not widened, and is checked too.
+    int callBumps = 0, callRefused = 0;
+    for (int i = 4; i < gs.Count; i++)
+    {
+      if (gs[i].opcode != OpCodes.Call && gs[i].opcode != OpCodes.Callvirt || gs[i].operand is not MethodBase { Name: "DecideChunkSize" or "AddObjectsPerChunk" })
+        continue;
+      var copy = gs.Select(x => new CodeInstruction(x)).ToList();
+      copy[i - 3].opcode = OpCodes.Ldc_I4;
+      copy[i - 3].operand = (WorldSectors.IntLoad(gs[i - 3]) ?? 0) + 1;
+      callBumps++;
+      if (Throws(() => WorldSectors.GetSaveClonePerChunkTranspiler(copy).ToList()))
+        callRefused++;
+    }
+    Check(callBumps == 7 && callRefused == 7, $"GetSaveClonePerChunk: the chunk size of each of its 7 calls changed by one is refused ({callRefused} of {callBumps})");
 
     // The client's and the server's IL are the same for every method the hooks rewrite or replace.
     var names = new[] { ("ZDOMan", "GetSaveClonePerChunk"), ("ZDOMan", "AddObjectsPerChunk"), ("ZDOMan", "DecideChunkSize"), ("ZDOMan", "ResetSectorArray"),

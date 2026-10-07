@@ -1,4 +1,4 @@
-﻿// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0).
+﻿// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0), and on 2026-10-06 for 16k worlds (0.10.3).
 
 using System;
 using System.IO;
@@ -92,6 +92,9 @@ public partial class BetterContinents
         // World is being created, so bake our settings from the preset
         Log($"[Saving][{__instance.m_name}] bWorldBeingCreated flag set, first time save of {__instance.m_name}, applying selected preset '{ConfigSelectedPreset.Value}'");
         settingsToSave = Presets.LoadActivePreset();
+        // Wide Sectors: a world made from a preset file (one made before it, or on a machine that has it Off) that reaches past the game's sectors
+        // is made wide too, by this machine's choice; a world made From Config already is.
+        WorldSectors.NewWorld(settingsToSave, ConfigWideSectors.Value, ExpandWorldSizeGeometry);
         bWorldBeingCreated = false;
       }
       else

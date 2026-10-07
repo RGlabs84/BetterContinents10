@@ -87,7 +87,11 @@ public partial class BetterContinents
     // (MapTiles.cs), followed by the map's own key (HeightMap, BiomeMap, ...) and its block. Better Continents 0.9 stops at
     // it ("Unknown feature") and treats the world as vanilla without re-saving its settings.
     TiledMap,
-    // 0.10.3 (69; 68 is left for the key of the wide sectors): High Terrain, the mode as an int (HighTerrainMode), written only when it is not Auto, so
+    // 0.10.3 (68): the world uses wide sectors (WorldSectors.cs): a flag, written only by a world that does (made wide, or converted),
+    // so that every other world saves byte for byte as before. An older Better Continents stops at it ("Unknown feature") and treats
+    // the world as vanilla, as it does a world with compact maps. The number is explicit: it is part of the file format.
+    WideSectors = 68,
+    // 0.10.3 (69): High Terrain, the mode as an int (HighTerrainMode), written only when it is not Auto, so
     // that every world that does not set it saves byte for byte as it did, and a world without the key reads as Auto. Better Continents 0.10.2 and
     // older stop at it ("Unknown feature") and treat the world as vanilla without re-saving its settings.
     HighTerrain = 69,
@@ -197,6 +201,10 @@ public partial class BetterContinents
     // What the Compact Maps setting said when this world was made (SetCompactMaps); not saved. Off keeps it from being compact whatever
     // its maps, and from reading a heightmap-fine.png (FineHeightsRule).
     internal CompactMapsMode CompactMapsChoice;
+    // Wide sectors (WorldSectors.cs): the world has a sector and save chunks of its own for every zone out to 65 km, where the game gives everything
+    // past 16.4 km one shared sector. Set when a world that reaches past the game's sectors is made with Wide Sectors Auto or On (FromConfig), or
+    // converted by a machine that has it On; saved under DataKey.WideSectors by that world only, and a joining player's game follows it (it is sent).
+    internal bool WideSectors;
 
     // This world's World Size and Edge Size as a size; null when they make no world (no size at all, or not a number).
     internal WorldGeometry? OwnGeometry
@@ -618,6 +626,8 @@ public partial class BetterContinents
       }
       if (!FixWaterColor)
         pkg.Write((int)DataKey.FixWaterColor);
+      if (WideSectors)
+        pkg.Write((int)DataKey.WideSectors);
 
       if (includeAltBiomes)
       {
@@ -947,6 +957,9 @@ public partial class BetterContinents
             break;
           case DataKey.FixWaterColor:
             FixWaterColor = false;
+            break;
+          case DataKey.WideSectors:
+            WideSectors = true;
             break;
           case DataKey.SpawnMap:
             SpawnMap = ImageMapSpawn.Create(pkg, "");

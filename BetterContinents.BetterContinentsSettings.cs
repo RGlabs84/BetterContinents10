@@ -161,6 +161,8 @@ public partial class BetterContinents
       Version = NewWorldVersion(values, overridable);
       MapsFromExport = values.FromExport;
       ReadConfig(values, lean);
+      // Wide Sectors: a world that reaches past the game's sectors is made with the wide ones (Auto and On), as its size is now known.
+      WorldSectors.NewWorld(this, values.Get(SettingsSchema.WideSectors.Entry), ExpandWorldSizeGeometry);
       WarnHeightmapRecord();
     }
 
@@ -411,6 +413,8 @@ public partial class BetterContinents
         output($"Mountains allowed at center {MountainsAllowedAtCenter}");
         if (CompactMaps)
           output("Compact Maps: the maps are held and saved as compressed tiles, each decoded when the world reads it");
+        if (WideSectors)
+          output("Wide sectors: every zone out to 65504 m has a sector and save chunks of its own, where the game gives everything past 16.4 km one shared sector");
 
         if (HeightMap != null)
         {

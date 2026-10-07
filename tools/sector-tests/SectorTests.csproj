@@ -21,6 +21,8 @@
     <!-- BetterContinents.dll is built against BepInEx's HarmonyX 0Harmony, which cannot initialise on .NET 8;
          Lib.Harmony has the same assembly name and the API surface Better Continents touches here. -->
     <PackageReference Include="Lib.Harmony" Version="2.3.6" />
+    <!-- The settings' maps (read and written by the Wide Sectors tests) are ImageSharp pictures. -->
+    <PackageReference Include="SixLabors.ImageSharp" Version="2.1.13" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="BetterContinents"><HintPath>$(BcDll)</HintPath></Reference>

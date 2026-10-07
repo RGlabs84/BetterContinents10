@@ -27,6 +27,7 @@ public partial class BetterContinents : BaseUnityPlugin
     public static ConfigEntry<CompactMapsMode> ConfigCompactMaps;
     public static ConfigEntry<int> ConfigMapMemory;
     public static ConfigEntry<int> ConfigMaxMapSize;
+    public static ConfigEntry<WideSectorsMode> ConfigWideSectors;
     public static ConfigEntry<int> ConfigFileVersion;
 
     public static ConfigEntry<bool> ConfigEnabled;

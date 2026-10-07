@@ -11,7 +11,9 @@
 #   twin-tests        the vegetation twin guard, bc_twins' scan, the PlaceVegetation tracking on the game's IL
 #   size-tests        the world's size: WorldGeometry, SetSize, the edge-of-world patches on the game's IL; the water depth patch
 #   sector-tests      the sectors of a world past the game's 16 km (WorldSectors): the sector, index and chunk map for all 2048 x 2048 zones, the
-#                     transpilers on the game's IL (client and dedicated server), the game's save planning run patched, and when the map is on
+#                     transpilers on the game's IL (client and dedicated server), the game's save planning run patched, when the map is on (the
+#                     Wide Sectors setting, the world's marker, the save's chunks), the conversion of a save made with the game's sectors, and what
+#                     happens when the patches cannot be installed
 #   tile-tests        the maps' tiles: the codec, every map kind sampling as before, saves in tiles, the cache
 #   zone-tests        zone regeneration: what protects a zone (pieces, tombstones, players, worked ground), locations kept whole,
 #                     the plan and the work, saves and stops in the middle, requests and errors (Unity's coroutines stood in for),
