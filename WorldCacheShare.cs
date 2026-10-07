@@ -22,7 +22,7 @@ public static class WorldCacheShare
 
   // A file this large could not be a settings package, so it is not worth reading fully just to refuse it - protects the
   // startup scan against a huge, wrongly-named file. A package is a MemoryStream, so the size of the largest the game can
-  // make (PackageBytes.MaxLength, 1.5 GB). A world of 16384 px maps made with Compact Maps (every such world) is a few tens of
+  // make (PackageBytes.MaxLength, 1.5 GB). A world of 16384 px maps made compact (every such world, unless Compact Maps is Off) is a few tens of
   // megabytes (a biome map, a spawn map) to a few hundred (several noisy 16-bit maps); this was 512 MB, which a world of a
   // few large heightmaps could pass.
   private const long MaxReasonableSize = PackageBytes.MaxLength;

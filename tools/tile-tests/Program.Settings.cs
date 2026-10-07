@@ -1,7 +1,7 @@
-// Added by Wubarrk on 2026-10-04 for the unifying refactor (0.10.0).
+// Added by Wubarrk on 2026-10-04 for the unifying refactor (0.10.0), and modified on 2026-10-06 for 16k worlds (0.10.3).
 //
-// A world made since 0.10 saving and reading its maps: as pictures with Compact Maps off, as before, and as tiles with it
-// on; the cache under threads and a tiny budget; the speed of a sample against the whole decoded picture; and
+// A world made since 0.10 saving and reading its maps: as pictures when it is not compact, as before, and as tiles when it
+// is; the cache under threads and a tiny budget; the speed of a sample against the whole decoded picture; and
 // "measure", for a folder of real maps.
 
 using System;
@@ -126,14 +126,20 @@ internal static partial class Program
     C(!pNet.CompactMaps && Differs(plain, pNet, N) == null, "sent to a client, it reads the same, decoded");
     var p11 = Read(Save(plain, false, 11));
     C(!p11.CompactMaps && Differs(plain, p11, N) == null, "saved in version 11, it reads the same");
-    // The setting: off unless switched on, read when a world is made, and only for the newest settings version.
+    // The setting: Auto unless chosen, read when a world is made, and On makes only a world of the newest settings version compact
+    // (Auto leaves it to the maps, Off to none: CompactForLargeMaps and NoteFine, tools/import-tests).
     var s11 = new BC.BetterContinentsSettings { Version = 11 };
     var s12 = new BC.BetterContinentsSettings { Version = 12 };
-    SettingsSchema.CompactMaps.Set!(s11, true);
-    SettingsSchema.CompactMaps.Set!(s12, true);
-    C(!SettingsSchema.CompactMaps.Default && SettingsSchema.CompactMaps.Scope == SettingScope.World && SettingsSchema.CompactMaps.Section == "07 BetterContinents.Misc"
-      && SettingsSchema.Scalars.Contains(SettingsSchema.CompactMaps) && !s11.CompactMaps && s12.CompactMaps,
-      "[07 BetterContinents.Misc] Compact Maps: off by default, read when a world is made, and only for a world of settings version 12");
+    var sAuto = new BC.BetterContinentsSettings { Version = 12 };
+    var sOff = new BC.BetterContinentsSettings { Version = 12 };
+    SettingsSchema.CompactMaps.Set!(s11, CompactMapsMode.On);
+    SettingsSchema.CompactMaps.Set!(s12, CompactMapsMode.On);
+    SettingsSchema.CompactMaps.Set!(sAuto, CompactMapsMode.Auto);
+    SettingsSchema.CompactMaps.Set!(sOff, CompactMapsMode.Off);
+    C(SettingsSchema.CompactMaps.Default == CompactMapsMode.Auto && SettingsSchema.CompactMaps.Scope == SettingScope.World && SettingsSchema.CompactMaps.Section == "07 BetterContinents.Misc"
+      && SettingsSchema.Scalars.Contains(SettingsSchema.CompactMaps) && !s11.CompactMaps && s12.CompactMaps && !sAuto.CompactMaps && !sOff.CompactMaps
+      && s12.CompactMapsChoice == CompactMapsMode.On && sAuto.CompactMapsChoice == CompactMapsMode.Auto && sOff.CompactMapsChoice == CompactMapsMode.Off,
+      "[07 BetterContinents.Misc] Compact Maps: Auto by default, read when a world is made; On makes only a world of settings version 12 compact, Auto and Off leave it to the maps");
 
     Section("Compact Maps on: a world made since 0.10 saves, sends and reads its maps as tiles");
     var world = World(N, alpha: false, compact: true);

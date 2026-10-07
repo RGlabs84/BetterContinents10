@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-10-04 for the unifying refactor (0.10.0).
+// Added by Wubarrk on 2026-10-04 for the unifying refactor (0.10.0), and modified on 2026-10-06 for 16k worlds (0.10.3).
 
 using System;
 using System.IO;
@@ -50,8 +50,16 @@ public partial class BetterContinents
       // Where the config points now: bc reload's fallback when the map's own file is gone.
       internal virtual string ConfigPath => GetPath(ConfigMapSourceDir.Value, FileName, FileSetting!.Entry.Value);
 
+      // The heightmap is the one map with a file beside its own: heightmap-fine.png, if the world reads it (FineHeightsRule), makes the world
+      // compact (NoteFine), before the maps read after it are made.
       public static readonly MapKind Height = new MapKind<ImageMapFloat>("Heightmap", "heightmap.png", SettingsSchema.HeightmapFile, "h", "hm",
-        s => s.HeightMap, (s, m) => s.HeightMap = m, (s, path) => ImageMapFloat.Create(path, s.HeightmapAlphaMode, s.CompactMaps), false, (s, m) => m.CreateMap(s.HeightmapAlphaMode));
+        s => s.HeightMap, (s, m) => s.HeightMap = m, (s, path) => s.NoteFine(ImageMapFloat.Create(path, s.HeightmapAlphaMode, s.CompactMaps, s.FineHeightsRule)), false,
+        (s, m) =>
+        {
+          m.FineWish = s.FineHeightsRule;
+          m.CreateMap(s.HeightmapAlphaMode);
+          s.NoteFine(m);
+        });
       public static readonly MapKind Biome = new BiomeMapKind();
       public static readonly MapKind Terrain = new MapKind<ImageMapTerrain>("Terrainmap", "terrainmap.png", SettingsSchema.TerrainmapFile, "terrain", "terrain",
         s => s.TerrainMap, (s, m) => s.TerrainMap = m, (s, path) => ImageMapTerrain.Create(path, s.TerrainNamesEwdGrounds, s.CompactMaps), true,

@@ -105,6 +105,7 @@ internal static partial class Program
       Damage();
       FloatMaps();
       DecodedMaps();
+      FineHeightsTests();
       BiomeMaps();
       SpawnMaps();
       ColourMaps();

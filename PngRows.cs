@@ -289,6 +289,18 @@ internal sealed class PngRows<TPixel> : MapPicture<TPixel> where TPixel : unmana
         },
         _ => null,
       };
+    // Fine heights (heightmap-fine.png): 8-bit grey as it is, the byte a signed offset in 1/256 of a step.
+    if (typeof(TPixel) == typeof(L8))
+      return (colorType, depth) switch
+      {
+        (0, 8) => (raw, row) =>
+        {
+          var to = MemoryMarshal.Cast<TPixel, L8>(row);
+          for (int x = 0; x < to.Length; x++)
+            to[x] = new L8(raw[x + 1]);
+        },
+        _ => null,
+      };
     if (typeof(TPixel) == typeof(La16))
       return (colorType, depth) switch
       {

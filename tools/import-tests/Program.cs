@@ -106,6 +106,10 @@ internal static partial class Program
       NewWorlds();
       Amount81();
       LargeMaps();
+      CompactModes();
+      CompactValues();
+      FineImport();
+      FineWithEachValue();
       // Past the usual sizes: BCIMPORT_BIG=<size> makes an export folder of that size into a preset (the heightmap alone, or with
       // every map when BCIMPORT_ALL=1), with its memory measured.
       if (int.TryParse(Environment.GetEnvironmentVariable("BCIMPORT_BIG"), out var big) && big > 0)
@@ -425,7 +429,7 @@ internal static partial class Program
     // Only a world of the newest settings version: this export's (spanning 21000 m) is a version 11 one, and stays
     // decoded; the same folder read as a new world's (version 12) is compact.
     var compact = SettingsSchema.CompactMaps.Entry;
-    compact.Value = true;
+    compact.Value = CompactMapsMode.On;
     try
     {
       var cplan = WorldImport.MakePlan(folder);
@@ -446,7 +450,7 @@ internal static partial class Program
     }
     finally
     {
-      compact.Value = false;
+      compact.Value = CompactMapsMode.Auto;
     }
   }
 
@@ -907,11 +911,11 @@ internal static partial class Program
     BC.ConfigMapSourceDir.Value = "";
   }
 
-  // ---- a map over 8192 px across: Compact Maps whatever the setting says (0.10.3) ----------------------------------------------
+  // ---- a map over 8192 px across: Compact Maps on Auto (0.10.3) ------------------------------------------------------------------
 
   static void LargeMaps()
   {
-    Section("a new world with a map over 8192 px across is made with Compact Maps on, whatever the setting says");
+    Section("a new world with a map over 8192 px across is made with Compact Maps on (Auto, the default)");
     var big = Path.Combine(root, "BigMaps", "maps");
     Directory.CreateDirectory(big);
     // A real picture one row high: past the size that counts (its width), and no map (it is not square), so nothing big is made.
@@ -923,18 +927,18 @@ internal static partial class Program
     foreach (var file in Directory.GetFiles(big))
       File.Delete(file);
     BC.ConfigMapSourceDir.Value = big;
-    BC.ConfigCompactMaps.Value = false;
+    BC.ConfigCompactMaps.Value = CompactMapsMode.Auto;
     Strip("forestmap.png", 8192);
     var edge = BC.BetterContinentsSettings.Create();
-    C(!edge.CompactMaps && edge.Version == 12, "8192 px across: as the setting says (off)");
+    C(!edge.CompactMaps && edge.Version == 12, "8192 px across: as the setting says (pictures)");
     Strip("forestmap.png", 8193);
     lock (LogHandler.Lines) LogHandler.Lines.Clear();
     var over = BC.BetterContinentsSettings.Create();
-    C(over.CompactMaps && LogHandler.Has("Compact Maps is on for this world, whatever the setting") && LogHandler.Has("8193 x 1 pixels"),
+    C(over.CompactMaps && LogHandler.Has("Compact Maps is Auto and") && LogHandler.Has("8193 x 1 pixels"),
       "8193 px across: Compact Maps is on, and the log says which map made it so");
     var info = new List<string>();
     over.Dump(info.Add);
-    C(info.Any(l => l.Contains("Compact Maps (experimental)")), "bc info says so");
+    C(info.Any(l => l.Contains("Compact Maps: the maps are held and saved as compressed tiles")), "bc info says so");
 
     // Which maps count: the biome map does; the location and alt-biome maps hold no tiles.
     File.Delete(Path.Combine(big, "forestmap.png"));
@@ -961,10 +965,10 @@ internal static partial class Program
     {
       BC.BetterContinentsSettings.CompactAbove = was;
     }
-    BC.ConfigCompactMaps.Value = true;
+    BC.ConfigCompactMaps.Value = CompactMapsMode.On;
     Strip("biomemap.png", 64);
     C(BC.BetterContinentsSettings.Create().CompactMaps, "Compact Maps on in the config: on");
-    BC.ConfigCompactMaps.Value = false;
+    BC.ConfigCompactMaps.Value = CompactMapsMode.Auto;
     BC.ConfigMapSourceDir.Value = "";
   }
 }

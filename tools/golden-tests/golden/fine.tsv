@@ -1,0 +1,553 @@
+8-bit/build-log/001	[Log] [BetterContinents] Fine heights: heightmap-fine.png refines heightmap.png with 8 bits a pixel: ground in steps of 0.97 mm at Heightmap Amount 81 (heightmap.png alone: 24.7 cm), <size> of tiles, <n> bits a pixel. A Better Continents older than this one cannot read a world made with fine heights.
+8-bit/build-log/002	[Log] [BetterContinents] Compact Maps is on for this world: its heightmap has fine heights (heightmap-fine.png), which a world keeps as compressed tiles, and so it does its maps.
+8-bit/build-log/003	[Warning] [BetterContinents] fx/fine8/heightmap.png was made by a world export for Heightmap Amount 81 and Sea Level Adjustment 0, but this new world reads it at Heightmap Amount 81 and Sea Level Adjustment 0.5, so its land is not at the heights it was made for. The export's export.cfg has the settings it needs.
+8-bit/build-log/count	3
+8-bit/dump/001	Version 12
+8-bit/dump/002	Continent size 0.50000006
+8-bit/dump/003	Mountains amount 0
+8-bit/dump/004	Sea level adjustment 0.5
+8-bit/dump/005	Ocean channels enabled True
+8-bit/dump/006	Ashlands gap enabled False
+8-bit/dump/007	Deep North gap enabled False
+8-bit/dump/008	Rivers enabled True
+8-bit/dump/009	Fix water color True
+8-bit/dump/010	Map edge dropoff True
+8-bit/dump/011	Mountains allowed at center False
+8-bit/dump/012	Compact Maps: the maps are held and saved as compressed tiles, each decoded when the world reads it
+8-bit/dump/013	Heightmap file (300) fx/fine8/heightmap.png
+8-bit/dump/014	Fine heights: 8 bits a pixel on top of the heightmap's 16: ground in steps of 0.97 mm at Heightmap Amount 81 (the heightmap alone: 24.7 cm)
+8-bit/dump/015	Heightmap amount 81, blend 1, add 0, mask 0
+8-bit/dump/016	High terrain: the land can reach 16170 m, so the game's rules that hold a height are patched (what is inside a dungeon, the ground and the grass, altitude limits, the AI's tiles)
+8-bit/dump/017	Heightmap made by a world export for Heightmap Amount 81, Sea Level Adjustment 0
+8-bit/dump/018	Heightmap overrides ALL
+8-bit/dump/019	Base height noise stack:
+8-bit/dump/020	Roughmap disabled
+8-bit/dump/021	Biomemap disabled
+8-bit/dump/022	Biome precision 0: the ground takes its biomes from the 4 corners of each 64 m terrain zone (vanilla)
+8-bit/dump/023	Terrainmap disabled
+8-bit/dump/024	Forest scale 0.50000006
+8-bit/dump/025	Forest amount 0.5
+8-bit/dump/026	Forestmap disabled
+8-bit/dump/027	Locationmap disabled
+8-bit/dump/028	Paintmap disabled
+8-bit/dump/029	Lavamap disabled
+8-bit/dump/030	Mossmap disabled
+8-bit/dump/031	Vegetationmap disabled
+8-bit/dump/032	Heatmap disabled
+8-bit/dump/033	Spawnmap disabled
+8-bit/dump/034	Altbiomemap disabled
+8-bit/dump/035	Alt biomes: mode Random, grid WorldEdge, placement seed world seed
+8-bit/dump/036	Alt biomes: chance x1, amount x1, region size x1, distance x1
+8-bit/dump/037	Alt biomes: neighbour fix off, mean sector height off, min sector thickness 0
+8-bit/dump/count	37
+8-bit/fine-bits	8
+8-bit/compact	True
+8-bit/v12/disk	len=85069 sha=48e17de02d285d04b23a90c4
+8-bit/v12/network	len=85042 sha=cdde0260452b2df6b16ce835
+8-bit/cache-id	f9f47759913fd0efe6b3aa35afeeabaf
+8-bit/v12/disk-roundtrip	same
+8-bit/v12/dump-after-load	n=35 sha=54d0b4a49c28f064bd4868be
+8-bit/v11/disk	len=14975 sha=1113853e58631a6fdbcb989a
+8-bit/v11/log/001	[Warning] [BetterContinents] Fine heights: the world is saved in settings version 11 (Override version), which has no room for them, so its heightmap is saved without them. The world reads them until it is loaded again.
+8-bit/v11/log/count	1
+8-bit/heightmap	n=4010 min=0.25000125 max=2.3589957 sha=41f20a085d87098658b34a46
+8-bit/roughmap	n=4010 min=0.5 max=0.6 sha=e83d4a6b0db80ddf69cc1644
+8-bit/flatmap	n=4010 min=0.25 max=0.25 sha=44a7f8f6bd2426271a9e8ded
+8-bit/forest	n=4010 min=0.145071 max=1.850145 sha=eeb3281d59709601259340cd
+8-bit/heat	n=4010 min=0 max=0 sha=6ef9465fabb1f843e42bc313
+8-bit/biome	n=4010 min=0 max=0 sha=6ef9465fabb1f843e42bc313
+8-bit/paint-AshLands	n=16040 min=0.1 max=0.4 sha=cea63d3346deec2efc1bc59f
+8-bit/paint-Mistlands	n=16040 min=0.1 max=0.4 sha=cea63d3346deec2efc1bc59f
+8-bit/paint-Meadows	n=16040 min=0.1 max=0.4 sha=cea63d3346deec2efc1bc59f
+8-bit/terrain	n=20050 min=0 max=0.5 sha=8a15252b13aae7d655289dcf
+8-bit/VegetationMap	none
+8-bit/SpawnMap	none
+8-bit/locations/StartTemple	
+8-bit/locations/Eikthyrnir	
+8-bit/locations/Vendor_BlackForest	
+8-bit/locations/Runestone_Meadows:alias	
+8-bit/locations/Hildir_camp	
+8-bit/locations/Runestone_Meadows	
+8-bit/base-height-v3	n=4010 min=-2 max=2.2089956 sha=fd49f0cd1cf44dca79620264
+8-bit/getbiome-prefix	n=8020 min=1 max=2 sha=4b91b98a3662c926f503b199
+8-bit/isashlands	n=16040 min=0 max=1 sha=6c2b4abae9de0cfc037071f7
+8-bit/isdeepnorth	n=16040 min=-1 max=1 sha=ce25cc9acce7422ac350c37e
+8-bit/ashlands-gradient	n=4010 min=-1E-05 max=-1E-05 sha=5f926809bfe151a0bcec709a
+8-bit/forest-factor	n=12030 min=-10499.999 max=10499.999 sha=fafdc5f1acb832f1477d612f
+8-bit/precision	0
+8-bit/override-all	True
+8-bit/altbiome-map	none
+8-bit/altbiome-settings	len=37 sha=9096fc807cffab9346cccab0
+8-bit/after-load	same
+4-bit/build-log/001	[Log] [BetterContinents] Fine heights: heightmap-fine.png refines heightmap.png with 4 bits a pixel: ground in steps of 1.5 cm at Heightmap Amount 81 (heightmap.png alone: 24.7 cm), <size> of tiles, <n> bits a pixel. A Better Continents older than this one cannot read a world made with fine heights.
+4-bit/build-log/002	[Log] [BetterContinents] Compact Maps is on for this world: its heightmap has fine heights (heightmap-fine.png), which a world keeps as compressed tiles, and so it does its maps.
+4-bit/build-log/003	[Warning] [BetterContinents] fx/fine4/heightmap.png was made by a world export for Heightmap Amount 81 and Sea Level Adjustment 0, but this new world reads it at Heightmap Amount 81 and Sea Level Adjustment 0.5, so its land is not at the heights it was made for. The export's export.cfg has the settings it needs.
+4-bit/build-log/count	3
+4-bit/dump/001	Version 12
+4-bit/dump/002	Continent size 0.50000006
+4-bit/dump/003	Mountains amount 0
+4-bit/dump/004	Sea level adjustment 0.5
+4-bit/dump/005	Ocean channels enabled True
+4-bit/dump/006	Ashlands gap enabled False
+4-bit/dump/007	Deep North gap enabled False
+4-bit/dump/008	Rivers enabled True
+4-bit/dump/009	Fix water color True
+4-bit/dump/010	Map edge dropoff True
+4-bit/dump/011	Mountains allowed at center False
+4-bit/dump/012	Compact Maps: the maps are held and saved as compressed tiles, each decoded when the world reads it
+4-bit/dump/013	Heightmap file (300) fx/fine4/heightmap.png
+4-bit/dump/014	Fine heights: 4 bits a pixel on top of the heightmap's 16: ground in steps of 1.5 cm at Heightmap Amount 81 (the heightmap alone: 24.7 cm)
+4-bit/dump/015	Heightmap amount 81, blend 1, add 0, mask 0
+4-bit/dump/016	High terrain: the land can reach 16170 m, so the game's rules that hold a height are patched (what is inside a dungeon, the ground and the grass, altitude limits, the AI's tiles)
+4-bit/dump/017	Heightmap made by a world export for Heightmap Amount 81, Sea Level Adjustment 0
+4-bit/dump/018	Heightmap overrides ALL
+4-bit/dump/019	Base height noise stack:
+4-bit/dump/020	Roughmap disabled
+4-bit/dump/021	Biomemap disabled
+4-bit/dump/022	Biome precision 0: the ground takes its biomes from the 4 corners of each 64 m terrain zone (vanilla)
+4-bit/dump/023	Terrainmap disabled
+4-bit/dump/024	Forest scale 0.50000006
+4-bit/dump/025	Forest amount 0.5
+4-bit/dump/026	Forestmap disabled
+4-bit/dump/027	Locationmap disabled
+4-bit/dump/028	Paintmap disabled
+4-bit/dump/029	Lavamap disabled
+4-bit/dump/030	Mossmap disabled
+4-bit/dump/031	Vegetationmap disabled
+4-bit/dump/032	Heatmap disabled
+4-bit/dump/033	Spawnmap disabled
+4-bit/dump/034	Altbiomemap disabled
+4-bit/dump/035	Alt biomes: mode Random, grid WorldEdge, placement seed world seed
+4-bit/dump/036	Alt biomes: chance x1, amount x1, region size x1, distance x1
+4-bit/dump/037	Alt biomes: neighbour fix off, mean sector height off, min sector thickness 0
+4-bit/dump/count	37
+4-bit/fine-bits	4
+4-bit/compact	True
+4-bit/v12/disk	len=34788 sha=b2f6fed7c440a5bbc35c5c7b
+4-bit/v12/network	len=34761 sha=df94506594259a8459685e98
+4-bit/cache-id	b2bdf749aadb6ad24f58d97e42efb7c3
+4-bit/v12/disk-roundtrip	same
+4-bit/v12/dump-after-load	n=35 sha=e668bdf368aa45fbbd62fe37
+4-bit/v11/disk	len=14975 sha=26eda3ac922f415ad401f4ce
+4-bit/v11/log/001	[Warning] [BetterContinents] Fine heights: the world is saved in settings version 11 (Override version), which has no room for them, so its heightmap is saved without them. The world reads them until it is loaded again.
+4-bit/v11/log/count	1
+4-bit/heightmap	n=4010 min=0.24966812 max=2.3590856 sha=d2c38072bb1e41204b0e29a7
+4-bit/roughmap	n=4010 min=0.5 max=0.6 sha=e83d4a6b0db80ddf69cc1644
+4-bit/flatmap	n=4010 min=0.25 max=0.25 sha=44a7f8f6bd2426271a9e8ded
+4-bit/forest	n=4010 min=0.145071 max=1.850145 sha=eeb3281d59709601259340cd
+4-bit/heat	n=4010 min=0 max=0 sha=6ef9465fabb1f843e42bc313
+4-bit/biome	n=4010 min=0 max=0 sha=6ef9465fabb1f843e42bc313
+4-bit/paint-AshLands	n=16040 min=0.1 max=0.4 sha=cea63d3346deec2efc1bc59f
+4-bit/paint-Mistlands	n=16040 min=0.1 max=0.4 sha=cea63d3346deec2efc1bc59f
+4-bit/paint-Meadows	n=16040 min=0.1 max=0.4 sha=cea63d3346deec2efc1bc59f
+4-bit/terrain	n=20050 min=0 max=0.5 sha=8a15252b13aae7d655289dcf
+4-bit/VegetationMap	none
+4-bit/SpawnMap	none
+4-bit/locations/StartTemple	
+4-bit/locations/Eikthyrnir	
+4-bit/locations/Vendor_BlackForest	
+4-bit/locations/Runestone_Meadows:alias	
+4-bit/locations/Hildir_camp	
+4-bit/locations/Runestone_Meadows	
+4-bit/base-height-v3	n=4010 min=-2 max=2.2090855 sha=f14d666a359ab78bf75475d3
+4-bit/getbiome-prefix	n=8020 min=1 max=2 sha=4b91b98a3662c926f503b199
+4-bit/isashlands	n=16040 min=0 max=1 sha=6c2b4abae9de0cfc037071f7
+4-bit/isdeepnorth	n=16040 min=-1 max=1 sha=ce25cc9acce7422ac350c37e
+4-bit/ashlands-gradient	n=4010 min=-1E-05 max=-1E-05 sha=5f926809bfe151a0bcec709a
+4-bit/forest-factor	n=12030 min=-10499.999 max=10499.999 sha=fafdc5f1acb832f1477d612f
+4-bit/precision	0
+4-bit/override-all	True
+4-bit/altbiome-map	none
+4-bit/altbiome-settings	len=37 sha=9096fc807cffab9346cccab0
+4-bit/after-load	same
+blend/build-log/001	[Log] [BetterContinents] Fine heights: heightmap-fine.png refines heightmap.png with 8 bits a pixel: ground in steps of 0.97 mm at Heightmap Amount 81 (heightmap.png alone: 24.7 cm), <size> of tiles, <n> bits a pixel. A Better Continents older than this one cannot read a world made with fine heights.
+blend/build-log/002	[Log] [BetterContinents] Compact Maps is on for this world: its heightmap has fine heights (heightmap-fine.png), which a world keeps as compressed tiles, and so it does its maps.
+blend/build-log/003	[Warning] [BetterContinents] fx/fine8-alpha/heightmap.png was made by a world export for Heightmap Amount 81 and Sea Level Adjustment 0, but this new world reads it at Heightmap Amount 81 and Sea Level Adjustment 0.5, so its land is not at the heights it was made for. The export's export.cfg has the settings it needs.
+blend/build-log/count	3
+blend/dump/001	Version 12
+blend/dump/002	Continent size 0.50000006
+blend/dump/003	Mountains amount 0
+blend/dump/004	Sea level adjustment 0.5
+blend/dump/005	Ocean channels enabled True
+blend/dump/006	Ashlands gap enabled False
+blend/dump/007	Deep North gap enabled False
+blend/dump/008	Rivers enabled True
+blend/dump/009	Fix water color True
+blend/dump/010	Map edge dropoff True
+blend/dump/011	Mountains allowed at center False
+blend/dump/012	Compact Maps: the maps are held and saved as compressed tiles, each decoded when the world reads it
+blend/dump/013	Heightmap file (300) fx/fine8-alpha/heightmap.png
+blend/dump/014	Fine heights: 8 bits a pixel on top of the heightmap's 16: ground in steps of 0.97 mm at Heightmap Amount 81 (the heightmap alone: 24.7 cm)
+blend/dump/015	Heightmap amount 81, blend 1, add 0, mask 0
+blend/dump/016	High terrain: the land can reach 16170 m, so the game's rules that hold a height are patched (what is inside a dungeon, the ground and the grass, altitude limits, the AI's tiles)
+blend/dump/017	Heightmap made by a world export for Heightmap Amount 81, Sea Level Adjustment 0
+blend/dump/018	Heightmap alpha: full precision, blended with the game's own terrain by the alpha
+blend/dump/019	Heightmap overrides ALL
+blend/dump/020	Base height noise stack:
+blend/dump/021	Roughmap disabled
+blend/dump/022	Biomemap disabled
+blend/dump/023	Biome precision 0: the ground takes its biomes from the 4 corners of each 64 m terrain zone (vanilla)
+blend/dump/024	Terrainmap disabled
+blend/dump/025	Forest scale 0.50000006
+blend/dump/026	Forest amount 0.5
+blend/dump/027	Forestmap disabled
+blend/dump/028	Locationmap disabled
+blend/dump/029	Paintmap disabled
+blend/dump/030	Lavamap disabled
+blend/dump/031	Mossmap disabled
+blend/dump/032	Vegetationmap disabled
+blend/dump/033	Heatmap disabled
+blend/dump/034	Spawnmap disabled
+blend/dump/035	Altbiomemap disabled
+blend/dump/036	Alt biomes: mode Random, grid WorldEdge, placement seed world seed
+blend/dump/037	Alt biomes: chance x1, amount x1, region size x1, distance x1
+blend/dump/038	Alt biomes: neighbour fix off, mean sector height off, min sector thickness 0
+blend/dump/count	38
+blend/fine-bits	8
+blend/compact	True
+blend/v12/disk	len=89043 sha=a41d08a8caec1d33f45f3c61
+blend/v12/network	len=89010 sha=641d5fb4fbbbb7ff6a9f22fd
+blend/cache-id	79e4d911632df579359d947de8e350ce
+blend/v12/disk-roundtrip	same
+blend/v12/dump-after-load	n=36 sha=6725c75f275c8bd93d96d792
+blend/v11/disk	len=33000 sha=6995f5b09ede33c59be754cd
+blend/v11/log/001	[Warning] [BetterContinents] Fine heights: the world is saved in settings version 11 (Override version), which has no room for them, so its heightmap is saved without them. The world reads them until it is loaded again.
+blend/v11/log/count	1
+blend/heightmap	n=4010 min=0.25000125 max=2.3589957 sha=41f20a085d87098658b34a46
+blend/roughmap	n=4010 min=0.5 max=0.6 sha=e83d4a6b0db80ddf69cc1644
+blend/flatmap	n=4010 min=0.25 max=0.25 sha=44a7f8f6bd2426271a9e8ded
+blend/forest	n=4010 min=0.145071 max=1.850145 sha=eeb3281d59709601259340cd
+blend/heat	n=4010 min=0 max=0 sha=6ef9465fabb1f843e42bc313
+blend/biome	n=4010 min=0 max=0 sha=6ef9465fabb1f843e42bc313
+blend/paint-AshLands	n=16040 min=0.1 max=0.4 sha=cea63d3346deec2efc1bc59f
+blend/paint-Mistlands	n=16040 min=0.1 max=0.4 sha=cea63d3346deec2efc1bc59f
+blend/paint-Meadows	n=16040 min=0.1 max=0.4 sha=cea63d3346deec2efc1bc59f
+blend/terrain	n=20050 min=0 max=0.5 sha=8a15252b13aae7d655289dcf
+blend/VegetationMap	none
+blend/SpawnMap	none
+blend/locations/StartTemple	
+blend/locations/Eikthyrnir	
+blend/locations/Vendor_BlackForest	
+blend/locations/Runestone_Meadows:alias	
+blend/locations/Hildir_camp	
+blend/locations/Runestone_Meadows	
+blend/base-height-v3	n=4010 min=-2 max=2.2089956 sha=fd49f0cd1cf44dca79620264
+blend/getbiome-prefix	n=8020 min=1 max=2 sha=4b91b98a3662c926f503b199
+blend/isashlands	n=16040 min=0 max=1 sha=6c2b4abae9de0cfc037071f7
+blend/isdeepnorth	n=16040 min=-1 max=1 sha=ce25cc9acce7422ac350c37e
+blend/ashlands-gradient	n=4010 min=-1E-05 max=-1E-05 sha=5f926809bfe151a0bcec709a
+blend/forest-factor	n=12030 min=-10499.999 max=10499.999 sha=fafdc5f1acb832f1477d612f
+blend/precision	0
+blend/override-all	True
+blend/altbiome-map	none
+blend/altbiome-settings	len=37 sha=9096fc807cffab9346cccab0
+blend/after-load	same
+no-file/build-log/001	[Warning] [BetterContinents] fx/fine-none/heightmap.png was made by a world export for Heightmap Amount 81 and Sea Level Adjustment 0, but this new world reads it at Heightmap Amount 81 and Sea Level Adjustment 0.5, so its land is not at the heights it was made for. The export's export.cfg has the settings it needs.
+no-file/build-log/count	1
+no-file/dump/001	Version 12
+no-file/dump/002	Continent size 0.50000006
+no-file/dump/003	Mountains amount 0
+no-file/dump/004	Sea level adjustment 0.5
+no-file/dump/005	Ocean channels enabled True
+no-file/dump/006	Ashlands gap enabled False
+no-file/dump/007	Deep North gap enabled False
+no-file/dump/008	Rivers enabled True
+no-file/dump/009	Fix water color True
+no-file/dump/010	Map edge dropoff True
+no-file/dump/011	Mountains allowed at center False
+no-file/dump/012	Heightmap file (300) fx/fine-none/heightmap.png
+no-file/dump/013	Heightmap amount 81, blend 1, add 0, mask 0
+no-file/dump/014	High terrain: the land can reach 16170 m, so the game's rules that hold a height are patched (what is inside a dungeon, the ground and the grass, altitude limits, the AI's tiles)
+no-file/dump/015	Heightmap made by a world export for Heightmap Amount 81, Sea Level Adjustment 0
+no-file/dump/016	Heightmap overrides ALL
+no-file/dump/017	Base height noise stack:
+no-file/dump/018	Roughmap disabled
+no-file/dump/019	Biomemap disabled
+no-file/dump/020	Biome precision 0: the ground takes its biomes from the 4 corners of each 64 m terrain zone (vanilla)
+no-file/dump/021	Terrainmap disabled
+no-file/dump/022	Forest scale 0.50000006
+no-file/dump/023	Forest amount 0.5
+no-file/dump/024	Forestmap disabled
+no-file/dump/025	Locationmap disabled
+no-file/dump/026	Paintmap disabled
+no-file/dump/027	Lavamap disabled
+no-file/dump/028	Mossmap disabled
+no-file/dump/029	Vegetationmap disabled
+no-file/dump/030	Heatmap disabled
+no-file/dump/031	Spawnmap disabled
+no-file/dump/032	Altbiomemap disabled
+no-file/dump/033	Alt biomes: mode Random, grid WorldEdge, placement seed world seed
+no-file/dump/034	Alt biomes: chance x1, amount x1, region size x1, distance x1
+no-file/dump/035	Alt biomes: neighbour fix off, mean sector height off, min sector thickness 0
+no-file/dump/count	35
+no-file/fine-bits	0
+no-file/compact	False
+no-file/v12/disk	len=21012 sha=81c79ece6c00aad32ae7baf9
+no-file/v12/network	len=20981 sha=ed4e7610bb4c5f13fc246301
+no-file/cache-id	0e557b51cb823d0fb2e7a7304659d385
+no-file/v12/disk-roundtrip	same
+no-file/v12/dump-after-load	n=33 sha=16528a74fe38675213fb6a3b
+no-file/v11/disk	len=21012 sha=6d2bdeee62ef859259f45285
+no-file/v11/log/count	0
+no-file/heightmap	n=4010 min=0.24966812 max=2.3590856 sha=ad939d5a8444ed0bf2622057
+no-file/roughmap	n=4010 min=0.5 max=0.6 sha=e83d4a6b0db80ddf69cc1644
+no-file/flatmap	n=4010 min=0.25 max=0.25 sha=44a7f8f6bd2426271a9e8ded
+no-file/forest	n=4010 min=0.145071 max=1.850145 sha=eeb3281d59709601259340cd
+no-file/heat	n=4010 min=0 max=0 sha=6ef9465fabb1f843e42bc313
+no-file/biome	n=4010 min=0 max=0 sha=6ef9465fabb1f843e42bc313
+no-file/paint-AshLands	n=16040 min=0.1 max=0.4 sha=cea63d3346deec2efc1bc59f
+no-file/paint-Mistlands	n=16040 min=0.1 max=0.4 sha=cea63d3346deec2efc1bc59f
+no-file/paint-Meadows	n=16040 min=0.1 max=0.4 sha=cea63d3346deec2efc1bc59f
+no-file/terrain	n=20050 min=0 max=0.5 sha=8a15252b13aae7d655289dcf
+no-file/VegetationMap	none
+no-file/SpawnMap	none
+no-file/locations/StartTemple	
+no-file/locations/Eikthyrnir	
+no-file/locations/Vendor_BlackForest	
+no-file/locations/Runestone_Meadows:alias	
+no-file/locations/Hildir_camp	
+no-file/locations/Runestone_Meadows	
+no-file/base-height-v3	n=4010 min=-2 max=2.2090855 sha=eabf0b73ebbbc98a0fc3e43d
+no-file/getbiome-prefix	n=8020 min=1 max=2 sha=4b91b98a3662c926f503b199
+no-file/isashlands	n=16040 min=0 max=1 sha=6c2b4abae9de0cfc037071f7
+no-file/isdeepnorth	n=16040 min=-1 max=1 sha=ce25cc9acce7422ac350c37e
+no-file/ashlands-gradient	n=4010 min=-1E-05 max=-1E-05 sha=5f926809bfe151a0bcec709a
+no-file/forest-factor	n=12030 min=-10499.999 max=10499.999 sha=fafdc5f1acb832f1477d612f
+no-file/precision	0
+no-file/override-all	True
+no-file/altbiome-map	none
+no-file/altbiome-settings	len=37 sha=9096fc807cffab9346cccab0
+no-file/after-load	same
+compact-off/build-log/001	[Warning] [BetterContinents] Fine heights: heightmap-fine.png is not read: Compact Maps is Off, and a world with fine heights keeps its maps as compressed tiles (Auto or On reads it).
+compact-off/build-log/002	[Warning] [BetterContinents] fx/fine8/heightmap.png was made by a world export for Heightmap Amount 81 and Sea Level Adjustment 0, but this new world reads it at Heightmap Amount 81 and Sea Level Adjustment 0.5, so its land is not at the heights it was made for. The export's export.cfg has the settings it needs.
+compact-off/build-log/count	2
+compact-off/dump/001	Version 12
+compact-off/dump/002	Continent size 0.50000006
+compact-off/dump/003	Mountains amount 0
+compact-off/dump/004	Sea level adjustment 0.5
+compact-off/dump/005	Ocean channels enabled True
+compact-off/dump/006	Ashlands gap enabled False
+compact-off/dump/007	Deep North gap enabled False
+compact-off/dump/008	Rivers enabled True
+compact-off/dump/009	Fix water color True
+compact-off/dump/010	Map edge dropoff True
+compact-off/dump/011	Mountains allowed at center False
+compact-off/dump/012	Heightmap file (300) fx/fine8/heightmap.png
+compact-off/dump/013	Fine heights: heightmap-fine.png is not read: Compact Maps is Off, and a world with fine heights keeps its maps as compressed tiles (Auto or On reads it).
+compact-off/dump/014	Heightmap amount 81, blend 1, add 0, mask 0
+compact-off/dump/015	High terrain: the land can reach 16170 m, so the game's rules that hold a height are patched (what is inside a dungeon, the ground and the grass, altitude limits, the AI's tiles)
+compact-off/dump/016	Heightmap made by a world export for Heightmap Amount 81, Sea Level Adjustment 0
+compact-off/dump/017	Heightmap overrides ALL
+compact-off/dump/018	Base height noise stack:
+compact-off/dump/019	Roughmap disabled
+compact-off/dump/020	Biomemap disabled
+compact-off/dump/021	Biome precision 0: the ground takes its biomes from the 4 corners of each 64 m terrain zone (vanilla)
+compact-off/dump/022	Terrainmap disabled
+compact-off/dump/023	Forest scale 0.50000006
+compact-off/dump/024	Forest amount 0.5
+compact-off/dump/025	Forestmap disabled
+compact-off/dump/026	Locationmap disabled
+compact-off/dump/027	Paintmap disabled
+compact-off/dump/028	Lavamap disabled
+compact-off/dump/029	Mossmap disabled
+compact-off/dump/030	Vegetationmap disabled
+compact-off/dump/031	Heatmap disabled
+compact-off/dump/032	Spawnmap disabled
+compact-off/dump/033	Altbiomemap disabled
+compact-off/dump/034	Alt biomes: mode Random, grid WorldEdge, placement seed world seed
+compact-off/dump/035	Alt biomes: chance x1, amount x1, region size x1, distance x1
+compact-off/dump/036	Alt biomes: neighbour fix off, mean sector height off, min sector thickness 0
+compact-off/dump/count	36
+compact-off/fine-bits	0
+compact-off/compact	False
+compact-off/v12/disk	len=21008 sha=bc6e3933bbacd8de771e56ee
+compact-off/v12/network	len=20981 sha=ed4e7610bb4c5f13fc246301
+compact-off/cache-id	0e557b51cb823d0fb2e7a7304659d385
+compact-off/v12/disk-roundtrip	same
+compact-off/v12/dump-after-load	n=33 sha=4e7330bcdb0e2691c279bb40
+compact-off/v11/disk	len=21008 sha=4e4b2c13769a8b485e90f600
+compact-off/v11/log/count	0
+compact-off/heightmap	n=4010 min=0.24966812 max=2.3590856 sha=ad939d5a8444ed0bf2622057
+compact-off/roughmap	n=4010 min=0.5 max=0.6 sha=e83d4a6b0db80ddf69cc1644
+compact-off/flatmap	n=4010 min=0.25 max=0.25 sha=44a7f8f6bd2426271a9e8ded
+compact-off/forest	n=4010 min=0.145071 max=1.850145 sha=eeb3281d59709601259340cd
+compact-off/heat	n=4010 min=0 max=0 sha=6ef9465fabb1f843e42bc313
+compact-off/biome	n=4010 min=0 max=0 sha=6ef9465fabb1f843e42bc313
+compact-off/paint-AshLands	n=16040 min=0.1 max=0.4 sha=cea63d3346deec2efc1bc59f
+compact-off/paint-Mistlands	n=16040 min=0.1 max=0.4 sha=cea63d3346deec2efc1bc59f
+compact-off/paint-Meadows	n=16040 min=0.1 max=0.4 sha=cea63d3346deec2efc1bc59f
+compact-off/terrain	n=20050 min=0 max=0.5 sha=8a15252b13aae7d655289dcf
+compact-off/VegetationMap	none
+compact-off/SpawnMap	none
+compact-off/locations/StartTemple	
+compact-off/locations/Eikthyrnir	
+compact-off/locations/Vendor_BlackForest	
+compact-off/locations/Runestone_Meadows:alias	
+compact-off/locations/Hildir_camp	
+compact-off/locations/Runestone_Meadows	
+compact-off/base-height-v3	n=4010 min=-2 max=2.2090855 sha=eabf0b73ebbbc98a0fc3e43d
+compact-off/getbiome-prefix	n=8020 min=1 max=2 sha=4b91b98a3662c926f503b199
+compact-off/isashlands	n=16040 min=0 max=1 sha=6c2b4abae9de0cfc037071f7
+compact-off/isdeepnorth	n=16040 min=-1 max=1 sha=ce25cc9acce7422ac350c37e
+compact-off/ashlands-gradient	n=4010 min=-1E-05 max=-1E-05 sha=5f926809bfe151a0bcec709a
+compact-off/forest-factor	n=12030 min=-10499.999 max=10499.999 sha=fafdc5f1acb832f1477d612f
+compact-off/precision	0
+compact-off/override-all	True
+compact-off/altbiome-map	none
+compact-off/altbiome-settings	len=37 sha=9096fc807cffab9346cccab0
+compact-off/after-load	same
+compact-on/build-log/001	[Warning] [BetterContinents] fx/fine-none/heightmap.png was made by a world export for Heightmap Amount 81 and Sea Level Adjustment 0, but this new world reads it at Heightmap Amount 81 and Sea Level Adjustment 0.5, so its land is not at the heights it was made for. The export's export.cfg has the settings it needs.
+compact-on/build-log/count	1
+compact-on/dump/001	Version 12
+compact-on/dump/002	Continent size 0.50000006
+compact-on/dump/003	Mountains amount 0
+compact-on/dump/004	Sea level adjustment 0.5
+compact-on/dump/005	Ocean channels enabled True
+compact-on/dump/006	Ashlands gap enabled False
+compact-on/dump/007	Deep North gap enabled False
+compact-on/dump/008	Rivers enabled True
+compact-on/dump/009	Fix water color True
+compact-on/dump/010	Map edge dropoff True
+compact-on/dump/011	Mountains allowed at center False
+compact-on/dump/012	Compact Maps: the maps are held and saved as compressed tiles, each decoded when the world reads it
+compact-on/dump/013	Heightmap file (300) fx/fine-none/heightmap.png
+compact-on/dump/014	Heightmap amount 81, blend 1, add 0, mask 0
+compact-on/dump/015	High terrain: the land can reach 16170 m, so the game's rules that hold a height are patched (what is inside a dungeon, the ground and the grass, altitude limits, the AI's tiles)
+compact-on/dump/016	Heightmap made by a world export for Heightmap Amount 81, Sea Level Adjustment 0
+compact-on/dump/017	Heightmap overrides ALL
+compact-on/dump/018	Base height noise stack:
+compact-on/dump/019	Roughmap disabled
+compact-on/dump/020	Biomemap disabled
+compact-on/dump/021	Biome precision 0: the ground takes its biomes from the 4 corners of each 64 m terrain zone (vanilla)
+compact-on/dump/022	Terrainmap disabled
+compact-on/dump/023	Forest scale 0.50000006
+compact-on/dump/024	Forest amount 0.5
+compact-on/dump/025	Forestmap disabled
+compact-on/dump/026	Locationmap disabled
+compact-on/dump/027	Paintmap disabled
+compact-on/dump/028	Lavamap disabled
+compact-on/dump/029	Mossmap disabled
+compact-on/dump/030	Vegetationmap disabled
+compact-on/dump/031	Heatmap disabled
+compact-on/dump/032	Spawnmap disabled
+compact-on/dump/033	Altbiomemap disabled
+compact-on/dump/034	Alt biomes: mode Random, grid WorldEdge, placement seed world seed
+compact-on/dump/035	Alt biomes: chance x1, amount x1, region size x1, distance x1
+compact-on/dump/036	Alt biomes: neighbour fix off, mean sector height off, min sector thickness 0
+compact-on/dump/count	36
+compact-on/fine-bits	0
+compact-on/compact	True
+compact-on/v12/disk	len=12226 sha=d868aa7ecd976a3ec0c96a88
+compact-on/v12/network	len=12195 sha=a701e0c3c42a58404cdca773
+compact-on/cache-id	bea8b051144a80552836a440a77905f0
+compact-on/v12/disk-roundtrip	same
+compact-on/v12/dump-after-load	n=34 sha=18bf769f11e675d73397278e
+compact-on/v11/disk	len=14979 sha=65bf94e5ffbb07c82af16d5c
+compact-on/v11/log/count	0
+compact-on/heightmap	n=4010 min=0.24966812 max=2.3590856 sha=ad939d5a8444ed0bf2622057
+compact-on/roughmap	n=4010 min=0.5 max=0.6 sha=e83d4a6b0db80ddf69cc1644
+compact-on/flatmap	n=4010 min=0.25 max=0.25 sha=44a7f8f6bd2426271a9e8ded
+compact-on/forest	n=4010 min=0.145071 max=1.850145 sha=eeb3281d59709601259340cd
+compact-on/heat	n=4010 min=0 max=0 sha=6ef9465fabb1f843e42bc313
+compact-on/biome	n=4010 min=0 max=0 sha=6ef9465fabb1f843e42bc313
+compact-on/paint-AshLands	n=16040 min=0.1 max=0.4 sha=cea63d3346deec2efc1bc59f
+compact-on/paint-Mistlands	n=16040 min=0.1 max=0.4 sha=cea63d3346deec2efc1bc59f
+compact-on/paint-Meadows	n=16040 min=0.1 max=0.4 sha=cea63d3346deec2efc1bc59f
+compact-on/terrain	n=20050 min=0 max=0.5 sha=8a15252b13aae7d655289dcf
+compact-on/VegetationMap	none
+compact-on/SpawnMap	none
+compact-on/locations/StartTemple	
+compact-on/locations/Eikthyrnir	
+compact-on/locations/Vendor_BlackForest	
+compact-on/locations/Runestone_Meadows:alias	
+compact-on/locations/Hildir_camp	
+compact-on/locations/Runestone_Meadows	
+compact-on/base-height-v3	n=4010 min=-2 max=2.2090855 sha=eabf0b73ebbbc98a0fc3e43d
+compact-on/getbiome-prefix	n=8020 min=1 max=2 sha=4b91b98a3662c926f503b199
+compact-on/isashlands	n=16040 min=0 max=1 sha=6c2b4abae9de0cfc037071f7
+compact-on/isdeepnorth	n=16040 min=-1 max=1 sha=ce25cc9acce7422ac350c37e
+compact-on/ashlands-gradient	n=4010 min=-1E-05 max=-1E-05 sha=5f926809bfe151a0bcec709a
+compact-on/forest-factor	n=12030 min=-10499.999 max=10499.999 sha=fafdc5f1acb832f1477d612f
+compact-on/precision	0
+compact-on/override-all	True
+compact-on/altbiome-map	none
+compact-on/altbiome-settings	len=37 sha=9096fc807cffab9346cccab0
+compact-on/after-load	same
+version-11/build-log/001	[Warning] [BetterContinents] Fine heights: heightmap-fine.png is not read: the world is saved in settings version 11, which has no fine heights.
+version-11/build-log/002	[Warning] [BetterContinents] fx/fine8/heightmap.png was made by a world export for Heightmap Amount 81 and Sea Level Adjustment 0, but this new world reads it at Heightmap Amount 81 and Sea Level Adjustment 0.5, so its land is not at the heights it was made for. The export's export.cfg has the settings it needs.
+version-11/build-log/count	2
+version-11/dump/001	Version 11
+version-11/dump/002	Continent size 0.50000006
+version-11/dump/003	Mountains amount 0
+version-11/dump/004	Sea level adjustment 0.5
+version-11/dump/005	Ocean channels enabled True
+version-11/dump/006	Ashlands gap enabled False
+version-11/dump/007	Deep North gap enabled False
+version-11/dump/008	Rivers enabled True
+version-11/dump/009	Fix water color True
+version-11/dump/010	Map edge dropoff True
+version-11/dump/011	Mountains allowed at center False
+version-11/dump/012	Heightmap file (300) fx/fine8/heightmap.png
+version-11/dump/013	Fine heights: heightmap-fine.png is not read: the world is saved in settings version 11, which has no fine heights.
+version-11/dump/014	Heightmap amount 81, blend 1, add 0, mask 0
+version-11/dump/015	High terrain: the land can reach 16170 m, so the game's rules that hold a height are patched (what is inside a dungeon, the ground and the grass, altitude limits, the AI's tiles)
+version-11/dump/016	Heightmap made by a world export for Heightmap Amount 81, Sea Level Adjustment 0
+version-11/dump/017	Heightmap overrides ALL
+version-11/dump/018	Base height noise stack:
+version-11/dump/019	Roughmap disabled
+version-11/dump/020	Biomemap disabled
+version-11/dump/021	Biome precision 0: the ground takes its biomes from the 4 corners of each 64 m terrain zone (vanilla)
+version-11/dump/022	Terrainmap disabled
+version-11/dump/023	Forest scale 0.50000006
+version-11/dump/024	Forest amount 0.5
+version-11/dump/025	Forestmap disabled
+version-11/dump/026	Locationmap disabled
+version-11/dump/027	Paintmap disabled
+version-11/dump/028	Lavamap disabled
+version-11/dump/029	Mossmap disabled
+version-11/dump/030	Vegetationmap disabled
+version-11/dump/031	Heatmap disabled
+version-11/dump/032	Spawnmap disabled
+version-11/dump/033	Altbiomemap disabled
+version-11/dump/034	Alt biomes: mode Random, grid WorldEdge, placement seed world seed
+version-11/dump/035	Alt biomes: chance x1, amount x1, region size x1, distance x1
+version-11/dump/036	Alt biomes: neighbour fix off, mean sector height off, min sector thickness 0
+version-11/dump/count	36
+version-11/fine-bits	0
+version-11/compact	False
+version-11/v12/disk	len=21008 sha=bc6e3933bbacd8de771e56ee
+version-11/v12/network	len=20981 sha=ed4e7610bb4c5f13fc246301
+version-11/cache-id	0e557b51cb823d0fb2e7a7304659d385
+version-11/v12/disk-roundtrip	same
+version-11/v12/dump-after-load	n=33 sha=4e7330bcdb0e2691c279bb40
+version-11/v11/disk	len=21008 sha=4e4b2c13769a8b485e90f600
+version-11/v11/log/count	0
+version-11/heightmap	n=4010 min=0.24966812 max=2.3590856 sha=ad939d5a8444ed0bf2622057
+version-11/roughmap	n=4010 min=0.5 max=0.6 sha=e83d4a6b0db80ddf69cc1644
+version-11/flatmap	n=4010 min=0.25 max=0.25 sha=44a7f8f6bd2426271a9e8ded
+version-11/forest	n=4010 min=0.145071 max=1.850145 sha=eeb3281d59709601259340cd
+version-11/heat	n=4010 min=0 max=0 sha=6ef9465fabb1f843e42bc313
+version-11/biome	n=4010 min=0 max=0 sha=6ef9465fabb1f843e42bc313
+version-11/paint-AshLands	n=16040 min=0.1 max=0.4 sha=cea63d3346deec2efc1bc59f
+version-11/paint-Mistlands	n=16040 min=0.1 max=0.4 sha=cea63d3346deec2efc1bc59f
+version-11/paint-Meadows	n=16040 min=0.1 max=0.4 sha=cea63d3346deec2efc1bc59f
+version-11/terrain	n=20050 min=0 max=0.5 sha=8a15252b13aae7d655289dcf
+version-11/VegetationMap	none
+version-11/SpawnMap	none
+version-11/locations/StartTemple	
+version-11/locations/Eikthyrnir	
+version-11/locations/Vendor_BlackForest	
+version-11/locations/Runestone_Meadows:alias	
+version-11/locations/Hildir_camp	
+version-11/locations/Runestone_Meadows	
+version-11/base-height-v3	n=4010 min=-2 max=2.2090855 sha=eabf0b73ebbbc98a0fc3e43d
+version-11/getbiome-prefix	n=8020 min=1 max=2 sha=4b91b98a3662c926f503b199
+version-11/isashlands	n=16040 min=0 max=1 sha=6c2b4abae9de0cfc037071f7
+version-11/isdeepnorth	n=16040 min=-1 max=1 sha=ce25cc9acce7422ac350c37e
+version-11/ashlands-gradient	n=4010 min=-1E-05 max=-1E-05 sha=5f926809bfe151a0bcec709a
+version-11/forest-factor	n=12030 min=-10499.999 max=10499.999 sha=fafdc5f1acb832f1477d612f
+version-11/precision	0
+version-11/override-all	True
+version-11/altbiome-map	none
+version-11/altbiome-settings	len=37 sha=9096fc807cffab9346cccab0
+version-11/after-load	same

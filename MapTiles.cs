@@ -16,7 +16,8 @@ namespace BetterContinents;
 // RGBA). Each map converts them exactly as it did when it held its whole picture decoded, so every sample is the same.
 //
 // By default every tile is decoded when the map is read and stays (MapRows, TileGrid<T>.Fill), and a world saves its
-// maps' pictures as it always did. With Compact Maps (experimental; a world made since 0.10 with it on), each tile is
+// maps' pictures as it always did. With Compact Maps (a world made since 0.10 with it on, or on Auto with a map of more than 8192
+// pixels across or a heightmap with fine heights), each tile is
 // kept compressed and decoded only when something reads it, the decoded tiles of every map under one memory budget
 // (TileCache): a world's maps stream in and out of memory the way its zones do. The compressed tiles (TileBlock) are
 // then what the world saves and sends. Each tile is compressed with Deflate, which the game has natively, after
@@ -486,10 +487,13 @@ internal static class Crc32
     return table;
   }
 
-  internal static uint Compute(byte[] data, int offset, int count)
+  internal static uint Compute(byte[] data, int offset, int count) => Continue(0, data, offset, count);
+
+  // The CRC-32 of what came before (0 for nothing) followed by data[offset .. offset + count): a file's, a block at a time.
+  internal static uint Continue(uint before, byte[] data, int offset, int count)
   {
     var t = Table;
-    uint crc = 0xFFFFFFFFu;
+    uint crc = ~before;
     int i = offset, end = offset + count;
     for (int fast = end - 8; i <= fast; i += 8)
     {

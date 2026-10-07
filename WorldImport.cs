@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-09-24 for world export and import (0.9.0), and modified on 2026-10-02 for export folders used as the Directory (0.9.4), and modified on 2026-10-04 for the unifying refactor (0.10.0).
+// Added by Wubarrk on 2026-09-24 for world export and import (0.9.0), and modified on 2026-10-02 for export folders used as the Directory (0.9.4), and modified on 2026-10-04 for the unifying refactor (0.10.0), and on 2026-10-06 for 16k worlds (0.10.3).
 
 using System;
 using System.Collections;
@@ -646,6 +646,9 @@ public static class WorldImport
       foreach (var file in FolderMaps(plan.Folder))
         if (!loaded.Contains(file))
           o.Warnings.Add($"{file} is in the folder but could not be loaded, so the preset has none of it. The log says why (every map must be a square image Better Continents can read).");
+      // A heightmap-fine.png beside the folder's heightmap that the preset does not use (the log says why, and so does this).
+      if (settings.FineNote is { } fineNote)
+        o.Warnings.Add(fineNote);
       if (loaded.Count == 0)
         throw new InvalidOperationException("no map in the folder could be loaded (the log says why)");
       if (cancelled?.Invoke() == true)
@@ -678,7 +681,8 @@ public static class WorldImport
         DeleteQuietly(plan.ThumbnailPath);
       o.Summary = $"{loaded.Count} map(s): {string.Join(", ", loaded.Select(f => Path.GetFileNameWithoutExtension(f)))}; "
                   + $"Heightmap Amount {Inv(settings.HeightmapAmount)}, sea level {Inv(settings.SeaLevel)}, Biome precision {settings.BiomePrecision}, "
-                  + $"world {Inv(settings.WorldSize)} m + {Inv(settings.EdgeSize)} m edge";
+                  + $"world {Inv(settings.WorldSize)} m + {Inv(settings.EdgeSize)} m edge"
+                  + (settings.FineBits > 0 ? $", fine heights {settings.FineBits} bits" : "");
       plan.Progress = 100f;
     }
     catch (Exception e)

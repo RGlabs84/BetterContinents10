@@ -92,6 +92,10 @@ public partial class BetterContinents
     private byte[]? AltBiomeMapBlockAsRead;
 
     public bool HasHeightMap => HeightMap != null;
+    // The heightmap's fine heights (heightmap-fine.png): how many bits its bytes use, 0 for none; and why a file beside the heightmap
+    // was not used, null when it was or there is none (bc info, a world import's warnings).
+    internal int FineBits => HeightMap?.FineBits ?? 0;
+    internal string? FineNote => HeightMap?.FineNote;
     public bool HasAltBiomeMap => AltBiomeMap != null;
     internal ImageMapAltBiome? AltBiomeMapData => AltBiomeMap;
     public bool HasBiomeMap => BiomeMap != null;
@@ -209,11 +213,19 @@ public partial class BetterContinents
       AltBiomes = AltBiomeSettings.FromConfig(c);
     }
 
-    // A picture of more pixels than this across (8192: 67 million pixels) makes a world with Compact Maps on, whatever the
-    // setting says. Saved as pictures, a map of 16384 pixels across takes 268 MB for each biome, spawn and vegetation map (a
-    // byte a pixel, uncompressed), which the world file holds and every joining player is sent, and every decoded map takes
-    // 0.5 to 1 GB of memory for as long as the world runs; as tiles they take a few megabytes (the biome map) to a hundred
-    // (a noisy heightmap), and a few tiles at a time are decoded as the world reads them. int.MaxValue switches this off.
+    // Compact Maps as a new world reads it (SettingsSchema.CompactMaps): On makes the world compact now, in the newest settings version only
+    // (tiles are saved by no other); Auto and Off leave it to the maps (CompactForLargeMaps, NoteFine), and Off to none.
+    internal void SetCompactMaps(CompactMapsMode mode)
+    {
+      CompactMapsChoice = mode;
+      CompactMaps = mode == CompactMapsMode.On && Version >= UnifiedVersion;
+    }
+
+    // A picture of more pixels than this across (8192: 67 million pixels) makes a world with Compact Maps on Auto compact. Saved as
+    // pictures, a map of 16384 pixels across takes 268 MB for each biome, spawn and vegetation map (a byte a pixel, uncompressed),
+    // which the world file holds and every joining player is sent, and every decoded map takes 0.5 to 1 GB of memory for as long as
+    // the world runs; as tiles they take a few megabytes (the biome map) to a hundred (a noisy heightmap), and a few tiles at a time
+    // are decoded as the world reads them. int.MaxValue switches this off.
     internal static int CompactAbove = 8192;
 
     private void CompactForLargeMaps(ConfigValues c, string dir)
@@ -229,11 +241,29 @@ public partial class BetterContinents
         var path = GetPath(dir, kind.FileName, c.Get(kind.FileSetting.Entry));
         if (path == "" || !File.Exists(path) || ImageMapBase.PictureSize(path) is not { } size || Math.Max(size.Width, size.Height) <= CompactAbove)
           continue;
+        if (CompactMapsChoice == CompactMapsMode.Off)
+        {
+          LogWarning($"Compact Maps is Off, so this world keeps its maps as pictures although {kind.Name} {path} is {size.Width} x {size.Height} pixels (more than {CompactAbove} across). " +
+            "As pictures such maps take gigabytes of memory, and the world file and what every joining player is sent come to hundreds of megabytes.");
+          return;
+        }
         CompactMaps = true;
-        Log($"Compact Maps is on for this world, whatever the setting: {kind.Name} {path} is {size.Width} x {size.Height} pixels (more than {CompactAbove} across). " +
+        Log($"Compact Maps is Auto and {kind.Name} {path} is {size.Width} x {size.Height} pixels (more than {CompactAbove} across), so this world is compact. " +
           "A map that large is kept, saved and sent to joining players as compressed tiles: as pictures it would take gigabytes of memory and a world file of hundreds of megabytes.");
         return;
       }
+    }
+
+    // The heightmap just made (a new world's, bc h fn, bc reload): a heightmap with fine heights is held as tiles, and so are the other
+    // maps of its world (read after it, or made from now on). Returns the map.
+    private ImageMapFloat? NoteFine(ImageMapFloat? map)
+    {
+      if (map is { HasFine: true } && !CompactMaps)
+      {
+        CompactMaps = true;
+        Log($"Compact Maps is on for this world: its heightmap has fine heights ({map.FineName}), which a world keeps as compressed tiles, and so it does its maps.");
+      }
+      return map;
     }
 
     #region Setters
@@ -377,11 +407,16 @@ public partial class BetterContinents
         output($"Map edge dropoff {MapEdgeDropoff}");
         output($"Mountains allowed at center {MountainsAllowedAtCenter}");
         if (CompactMaps)
-          output("Compact Maps (experimental): the maps are held and saved as compressed tiles, each decoded when the world reads it");
+          output("Compact Maps: the maps are held and saved as compressed tiles, each decoded when the world reads it");
 
         if (HeightMap != null)
         {
           output($"Heightmap file ({HeightMap.Size}) {HeightMap.FilePath}");
+          if (HeightMap.HasFine)
+            output($"Fine heights: {HeightMap.FineBits} bits a pixel on top of the heightmap's 16: ground in steps of {FineHeights.Length(FineHeights.Resolution(HeightmapAmount, HeightMap.FineBits))} "
+              + $"at Heightmap Amount {HeightmapAmount} (the heightmap alone: {FineHeights.Length(FineHeights.Step(HeightmapAmount))})");
+          else if (HeightMap.FineNote != null)
+            output(HeightMap.FineNote);
           output($"Heightmap amount {HeightmapAmount}, blend {HeightmapBlend}, add {HeightmapAdd}, mask {HeightmapMask}");
           if (HighTerrain.Wanted(this))
             output($"High terrain: the land can reach {HighTerrain.MaxMetres(this):0} m, so the game's rules that hold a height are patched (what is inside a dungeon, the ground and the grass, altitude limits, the AI's tiles)");

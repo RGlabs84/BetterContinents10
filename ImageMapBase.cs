@@ -23,6 +23,11 @@ internal abstract class ImageMapBase()
 
   public byte[] SourceData = [];
 
+  // Whether SourceData is a file's bytes (LoadSourceImage) rather than a world's stored picture. A map decoded again (bc h alpha)
+  // looks for what lives beside its file (a heightmap's fine heights) only when it came from one, so a stored world is never mixed
+  // with a file that happens to be there.
+  internal bool SourceIsFromFile;
+
   public int Size;
 
   // Compact Maps (BetterContinentsSettings.CompactMaps): the map keeps its tiles compressed, decodes each when it is
@@ -54,6 +59,7 @@ internal abstract class ImageMapBase()
         return false;
       }
       SourceData = File.ReadAllBytes(FilePath);
+      SourceIsFromFile = true;
       return true;
     }
     catch (Exception ex)
@@ -93,8 +99,6 @@ internal abstract class ImageMapBase()
 
   protected static Color32 Convert(Rgba32 pixel) => new(pixel.R, pixel.G, pixel.B, pixel.A);
 
-  protected Image<T> LoadImage<T>() where T : unmanaged, IPixel<T> => Image.Load<T>(Configuration.Default, SourceData);
-
   // Reads the picture's rows and builds the map from them (picture: map row 0 is the south).
   protected abstract bool LoadTextureToMap<T>(MapPicture<T> picture) where T : unmanaged, IPixel<T>;
 
@@ -118,54 +122,53 @@ internal abstract class ImageMapBase()
     {
       var sw = new Stopwatch();
       sw.Start();
-
-      // A PNG of a kind PngRows reads is decoded a band of rows at a time, as the map's tiles are made from it, and never
-      // whole in memory; any other picture (and a PNG that turns out damaged) is decoded whole by ImageSharp, as always.
-      if (PngRows<T>.TryOpen(SourceData) is { } streamed)
+      return OpenPicture<T>(SourceData, FilePath, (picture, whole) =>
       {
-        try
-        {
-          using (streamed)
-          {
-            if (!ValidateDimensions(streamed.Width, streamed.Height))
-              return false;
-            Size = streamed.Width;
-            BetterContinents.Log($"Time to load {FilePath}: {sw.ElapsedMilliseconds} ms");
-            return Made(LoadTextureToMap(streamed));
-          }
-        }
-        catch (PngRowsException e)
-        {
-          BetterContinents.Log($"{FilePath}: {e.Message}; reading it whole instead.");
-        }
-      }
-
-      using var image = LoadImage<T>();
-      if (!ValidateDimensions(image.Width, image.Height))
-      {
-        return false;
-      }
-      Size = image.Width;
-
-      BetterContinents.Log($"Time to load {FilePath}: {sw.ElapsedMilliseconds} ms");
-      if (Size >= 4096)
-        BetterContinents.Log($"{FilePath} is a picture of a kind that is read whole ({Size} x {Size}: {(long)Size * Size * System.Runtime.CompilerServices.Unsafe.SizeOf<T>() >> 20} MB at once) " +
-          "rather than a few rows at a time; 8-bit and 16-bit grey, RGB, RGBA and palette PNGs without interlacing are the kinds read by rows.");
-
-      try
-      {
-        return Made(LoadTextureToMap(new ImagePicture<T>(image)));
-      }
-      finally
-      {
-        // ImageSharp keeps the buffers it rented for the next picture; this process has no next picture soon.
-        ReleaseImageMemory();
-      }
+        if (!ValidateDimensions(picture.Width, picture.Height))
+          return false;
+        Size = picture.Width;
+        BetterContinents.Log($"Time to load {FilePath}: {sw.ElapsedMilliseconds} ms");
+        if (whole && Size >= 4096)
+          BetterContinents.Log($"{FilePath} is a picture of a kind that is read whole ({Size} x {Size}: {(long)Size * Size * System.Runtime.CompilerServices.Unsafe.SizeOf<T>() >> 20} MB at once) " +
+            "rather than a few rows at a time; 8-bit and 16-bit grey, RGB, RGBA and palette PNGs without interlacing are the kinds read by rows.");
+        return Made(LoadTextureToMap(picture));
+      });
     }
     catch (Exception ex)
     {
       BetterContinents.LogError($"Cannot load texture {FilePath}: {ex.Message}");
       return false;
+    }
+  }
+
+  // A picture's bytes as rows of T for `use` (whole: it was decoded whole): a PNG of a kind PngRows reads is decoded a band of rows at
+  // a time, as the map's tiles are made from it, and never whole in memory; any other picture (and a PNG that turns out damaged, which
+  // is then asked for again from the start) is decoded whole by ImageSharp, as always. What `use` returns is returned. name is the
+  // picture's file, for the log.
+  protected static bool OpenPicture<T>(byte[] data, string name, Func<MapPicture<T>, bool, bool> use) where T : unmanaged, IPixel<T>
+  {
+    if (PngRows<T>.TryOpen(data) is { } streamed)
+    {
+      try
+      {
+        using (streamed)
+          return use(streamed, false);
+      }
+      catch (PngRowsException e)
+      {
+        BetterContinents.Log($"{name}: {e.Message}; reading it whole instead.");
+      }
+    }
+
+    using var image = Image.Load<T>(Configuration.Default, data);
+    try
+    {
+      return use(new ImagePicture<T>(image), true);
+    }
+    finally
+    {
+      // ImageSharp keeps the buffers it rented for the next picture; this process has no next picture soon.
+      ReleaseImageMemory();
     }
   }
 

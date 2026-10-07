@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-10-04 for the unifying refactor (0.10.0), and modified on 2026-10-06 for the Forest Scale default (0.10.2).
+// Added by Wubarrk on 2026-10-04 for the unifying refactor (0.10.0), and modified on 2026-10-06 for the Forest Scale default (0.10.2), and on 2026-10-06 for 16k worlds (0.10.3).
 
 using System;
 using System.Collections.Generic;
@@ -38,6 +38,7 @@ internal static class Sections
     Scenarios();
     Presets();
     Export();
+    Fine();
     // Last: it binds other config files, which takes the plugin's config entries away from cfg.
     Migration();
   }
@@ -535,6 +536,80 @@ internal static class Sections
     finally
     {
       BC.Settings = saved;
+    }
+  }
+
+  // ---- fine heights: a heightmap.png and the heightmap-fine.png beside it (tools/fine_ref.py's pairs) ------------------------------
+
+  static void Fine()
+  {
+    const string S = "fine";
+    // The pairs tools/tile-tests/fine-fixtures holds (8-bit, 4-bit with the recommended policy, 8-bit under a grey and alpha
+    // heightmap), copied where the other fixtures are, so every path is relative.
+    var fixtures = Path.GetFullPath(Path.Combine(Golden.Dir, "..", "..", "tile-tests", "fine-fixtures"));
+    void Copy(string fixture, string name, bool fineToo = true)
+    {
+      var dir = Path.Combine("fx", name);
+      Directory.CreateDirectory(dir);
+      File.Copy(Path.Combine(fixtures, fixture, "heightmap.png"), Path.Combine(dir, "heightmap.png"), true);
+      if (fineToo)
+        File.Copy(Path.Combine(fixtures, fixture, "heightmap-fine.png"), Path.Combine(dir, "heightmap-fine.png"), true);
+    }
+    Copy("f8", "fine8");
+    Copy("f4-policy", "fine4");
+    Copy("f8-alpha", "fine8-alpha");
+    Copy("f8", "fine-none", fineToo: false);
+    Dictionary<ConfigEntryBase, object?> Overrides(string name, params (ConfigEntryBase Entry, object? Value)[] more)
+    {
+      var o = new Dictionary<ConfigEntryBase, object?>
+      {
+        [BC.ConfigEnabled] = true, [BC.ConfigMapSourceDir] = $"fx/{name}", [BC.ConfigHeightmapAmount] = 81f, [BC.ConfigHeightmapOverrideAll] = true,
+      };
+      foreach (var (entry, value) in more)
+        o[entry] = value;
+      return o;
+    }
+    var scenarios = new (string Name, string Folder, Dictionary<ConfigEntryBase, object?> Overrides, int? Version)[]
+    {
+      ("8-bit", "fine8", Overrides("fine8"), null),
+      ("4-bit", "fine4", Overrides("fine4"), null),
+      ("blend", "fine8-alpha", Overrides("fine8-alpha", (BC.ConfigHeightmapAlpha, true)), null),
+      ("no-file", "fine-none", Overrides("fine-none"), null),
+      ("compact-off", "fine8", Overrides("fine8", (BC.ConfigCompactMaps, CompactMapsMode.Off)), null),
+      ("compact-on", "fine-none", Overrides("fine-none", (BC.ConfigCompactMaps, CompactMapsMode.On)), null),
+      ("version-11", "fine8", Overrides("fine8"), BC.BetterContinentsSettings.KeyedVersion),
+    };
+    foreach (var (name, _, overrides, version) in scenarios)
+    {
+      BC.BetterContinentsSettings s = null!;
+      var log = LogHandler.During(() =>
+      {
+        var values = ConfigValues.Snapshot(cfg, overrides);
+        s = BC.BetterContinentsSettings.CreateForImport(version == null ? values : values.ForExport(version), lean: false);
+      });
+      // The tiles' size depends on the deflate of the runtime the suite runs on: it is said, not recorded.
+      log = [.. log.Select(l => System.Text.RegularExpressions.Regex.Replace(l, @", [0-9.]+ (KB|MB) of tiles, [0-9.]+ bits a pixel\.", ", <size> of tiles, <n> bits a pixel."))];
+      Golden.Lines(S, $"{name}/build-log", log.Where(l => !l.Contains("Found #") && !l.Contains("Selected ")));
+      Golden.Lines(S, $"{name}/dump", DumpOf(s));
+      Golden.Add(S, $"{name}/fine-bits", s.FineBits.ToString());
+      Golden.Add(S, $"{name}/compact", s.CompactMaps.ToString());
+      var disk = Save(s, false, true, 12);
+      var net = Save(s, true, true, 12);
+      Golden.Add(S, $"{name}/v12/disk", Hash.Bytes(disk));
+      Golden.Add(S, $"{name}/v12/network", Hash.Bytes(net));
+      Golden.Add(S, $"{name}/cache-id", BC.ZNetPatch.WorldCache.PackageID(new ZPackage(net)));
+      var back = BC.BetterContinentsSettings.Load(new ZPackage(disk));
+      Golden.Add(S, $"{name}/v12/disk-roundtrip", Save(back, false, true, 12).SequenceEqual(disk) ? "same" : "DIFFERENT");
+      Golden.Add(S, $"{name}/v12/dump-after-load", Hash.Strings(DumpOf(back)));
+      // The same world saved by the format that has no room for fine heights (Override version 11): the pictures.
+      var dropLog = LogHandler.During(() => Golden.Add(S, $"{name}/v11/disk", Hash.Bytes(Save(s, false, true, 11))));
+      Golden.Lines(S, $"{name}/v11/log", dropLog);
+      Sample(S, name, s);
+      var after = SampleMap(back);
+      var before = SampleMap(s);
+      // The alt-biome settings of a world that holds the defaults are not saved (as in every scenario above): the rest reads the same.
+      var differ = before.Keys.Where(k => k != "altbiome-settings" && (!after.TryGetValue(k, out var v) || v != before[k])).ToList();
+      Golden.Add(S, $"{name}/after-load", differ.Count == 0 ? "same" : "DIFFERENT: " + string.Join(", ", differ));
     }
   }
 

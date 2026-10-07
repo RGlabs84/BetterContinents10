@@ -103,7 +103,7 @@ public partial class BetterContinents
     // map follows when Expand World Data numbers them differently (in the alt-biome blob: AltBiomeSettings.Serialize,
     // ImageMapBiome.FollowNames); its biome precision goes up to 31 (FinerBiomePrecision); and its location map's pins
     // land exactly on their pixels, with the start position placed before them (ExactLocationPins,
-    // StartBeforeLocationPins). Made with Compact Maps (experimental), it saves and sends its maps in compressed tiles
+    // StartBeforeLocationPins). Made compact (Compact Maps), it saves and sends its maps in compressed tiles
     // (DataKey.TiledMap, MapTiles.cs) instead of the pictures' bytes. A world keeps its version unless Override version holds
     // a number: one read as 12 is saved as 12, any older one as 11, as always; with a number there, that number is the
     // version every world is saved in and sent in (Serialize). Better Continents 0.9 reads a version 12 world as a version 11
@@ -131,6 +131,16 @@ public partial class BetterContinents
       !HeightMapAlpha ? ImageMapFloat.HeightAlpha.None
       : Version >= UnifiedVersion ? ImageMapFloat.HeightAlpha.Blend
       : ImageMapFloat.HeightAlpha.Legacy;
+
+    // What this world does with a heightmap-fine.png beside its heightmap (fine heights: 8 more bits for every pixel, FineHeights.cs):
+    // it reads it when it is made in the newest settings version (older ones save pictures, which have no room for it), reads the
+    // heightmap at full precision (Heightmap Alpha as it was reads 8-bit grey) and Compact Maps is not Off. The world then holds its
+    // maps as tiles (NoteFine), and saves the heightmap's block in the format that carries them.
+    internal ImageMapFloat.FineRule FineHeightsRule =>
+      Version < UnifiedVersion ? new(ImageMapFloat.FineUse.OldVersion, Version, HeightmapAmount)
+      : HeightmapAlphaMode == ImageMapFloat.HeightAlpha.Legacy ? new(ImageMapFloat.FineUse.LegacyAlpha, Version, HeightmapAmount)
+      : CompactMapsChoice == CompactMapsMode.Off ? new(ImageMapFloat.FineUse.CompactOff, Version, HeightmapAmount)
+      : new(ImageMapFloat.FineUse.Read, Version, HeightmapAmount);
 
     // Whether Expand World Data's altitude rules (its GetBiomeHeight postfix: a biome's or a territory's altitude multiplier
     // and delta, water depth, height limits and lava dip) apply over the heights the maps give, as they do over the game's
@@ -173,11 +183,16 @@ public partial class BetterContinents
     // (ZoneSystemPatch.PlaceLocations).
     internal bool StartBeforeLocationPins => Version >= UnifiedVersion;
 
-    // Compact Maps (experimental, off by default; [07 BetterContinents.Misc]): the world's maps keep their tiles compressed
-    // and decode each when it is read, under Map Memory's budget, and the world saves and sends those tiles
-    // (DataKey.TiledMap) instead of the pictures. Set when a world made since 0.10 is created with the setting on, or when
-    // a world's settings hold tiles; a world keeps it for good. Better Continents 0.9 cannot read such a world.
+    // Compact Maps ([07 BetterContinents.Misc]): the world's maps keep their tiles compressed and decode each when it is read,
+    // under Map Memory's budget, and the world saves and sends those tiles (DataKey.TiledMap) instead of the pictures. Set when a
+    // world made since 0.10 is created with the setting On, or with Auto and a map of more than 8192 pixels across
+    // (CompactForLargeMaps) or a heightmap with fine heights (NoteFine), or when a world's settings hold tiles; a world keeps it for
+    // good. Better Continents 0.9 cannot read such a world.
     internal bool CompactMaps;
+
+    // What the Compact Maps setting said when this world was made (SetCompactMaps); not saved. Off keeps it from being compact whatever
+    // its maps, and from reading a heightmap-fine.png (FineHeightsRule).
+    internal CompactMapsMode CompactMapsChoice;
 
     // This world's World Size and Edge Size as a size; null when they make no world (no size at all, or not a number).
     internal WorldGeometry? OwnGeometry
@@ -274,6 +289,13 @@ public partial class BetterContinents
           WriteTiled(pkg, DataKey.HeightMap, HeightMap.WriteBlock, "the heightmap");
         else
         {
+          // A picture holds no fine heights: the world is saved in a settings version older than the one that made it.
+          if (HeightMap.HasFine && !fineDropped)
+          {
+            fineDropped = true;
+            LogWarning($"Fine heights: the world is saved in settings version {version} (Override version), which has no room for them, so its heightmap is saved without them. "
+              + "The world reads them until it is loaded again.");
+          }
           pkg.Write((int)DataKey.HeightMap);
           WriteBytes(pkg, HeightMap.SourceBytes(), "the heightmap");
         }
@@ -628,6 +650,9 @@ public partial class BetterContinents
 
     // How long the last package of each kind was (Serialize): the room it starts with.
     private long savedLength, sentLength;
+
+    // Whether the loss of the heightmap's fine heights, in a settings version without room for them, has been said (Serialize).
+    private bool fineDropped;
 
     // A map in tiles (a world made since 0.10): DataKey.TiledMap, the map's own key, its block. The block is written straight
     // into the package (0.10.3: it was an array of its own first, and the package copied that); the package is checked
