@@ -28,6 +28,7 @@ internal static partial class Program
     BakedRulesTests();
     BakedKindTests();
     BakedRegenerationTests();
+    BakedProtectTests();
   }
 
   private static void BakedRulesTests()
