@@ -1,11 +1,14 @@
-// Added by Wubarrk on 2026-09-22 for alt-biome planting (0.8.1), and on 2026-09-25 for version-agnostic wording (0.9.1), and on 2026-09-29 for Expand World Data biomes (0.9.3), and modified on 2026-10-04 for the unifying refactor (0.10.0), and on 2026-10-06 for 16k worlds (0.10.3).
+// Added by Wubarrk on 2026-09-22 for alt-biome planting (0.8.1), and on 2026-09-25 for version-agnostic wording (0.9.1), and on 2026-09-29 for Expand World Data biomes (0.9.3), and modified on 2026-10-04 for the unifying refactor (0.10.0), and on 2026-10-06 and 2026-10-07 for 16k worlds (0.10.3).
 
 using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using System.Runtime.ExceptionServices;
+using System.Threading;
 using System.Threading.Tasks;
+using HarmonyLib;
 using UnityEngine;
 
 // The offline test program in tools/altbiome-harness checks these internals directly.
@@ -161,6 +164,121 @@ public partial class BetterContinents
     }
 
     internal static void AfterVerifyBiomeData(World world) => OnBiomeDataReady(world, "world load");
+
+    // ---------------------------------------------------------------------------------------------------
+    // The point grid on every core. GenerateBiomePoints asks the generator for the biome and the height of every point of
+    // the grid, one point after another, on the thread that loads the world: as a server or a host loads it, and as each
+    // player joins (the client's RPC_PeerInfo), with the game drawing nothing meanwhile. That is 2048 x 2048 points on a
+    // world of vanilla's size, and 6392 x 6392 on a world laid out to 32764 m: 21 s on one core. GeneratePoints asks the same
+    // generator the same questions for the same points and writes the same arrays, a band of rows at a time on every core.
+    // Each point depends on its place alone (the generator and the maps are only read, and the grid being made reaches the
+    // world only when it is done, as in the game), so the grid is the one the game would make. Only while no other mod changes
+    // GenerateBiomePoints, whose size and sampled radius are then the game's, or the world's own layout's (WorldSizeHelper's
+    // transpiler); Expand World Size transpiles the method itself, and the game's own loop runs then.
+    // ---------------------------------------------------------------------------------------------------
+    private const string LayoutTranspiler = "GenerateBiomePointsTranspiler";
+
+    internal static bool TryGeneratePoints(World world)
+    {
+      if (!WorldEnabled || world == null || WorldGenerator.instance == null)
+        return false;
+      var patches = OursAlone(nameof(AltBiomeWorldData.GenerateBiomePoints));
+      if (patches == null)
+        return false;
+      bool laidOut = patches.Transpilers.Any(t => t.PatchMethod.DeclaringType == typeof(WorldSizeHelper) && t.PatchMethod.Name == LayoutTranspiler);
+      if (patches.Transpilers.Count != (laidOut ? 1 : 0))
+        return false;
+      // The game's constants: 2048 points, sampled within 10500 m (its square, 110250000); the layout's replace them.
+      float radius = WorldSizeHelper.Layout.Size.TotalRadius;
+      GeneratePoints(world, laidOut ? WorldSizeHelper.LayoutGrid.Size : VanillaGridSize, laidOut ? radius * radius : 110250000f);
+      return true;
+    }
+
+    // An AltBiomeWorldData method's patches, when no other mod changes it: another mod's transpiler changes the method, and a
+    // prefix of its own that can skip it may replace it, and the game's own code runs then. Another mod's postfix, or a prefix
+    // that cannot skip the method, meets the same result either way. Null when another mod changes it.
+    private static Patches? OursAlone(string method)
+    {
+      var target = AccessTools.Method(typeof(AltBiomeWorldData), method);
+      var patches = target == null ? null : Harmony.GetPatchInfo(target);
+      var ours = BetterContinents.HarmonyInstance?.Id;
+      if (patches == null || ours == null)
+        return null;
+      return patches.Transpilers.Any(t => t.owner != ours) || patches.Prefixes.Any(p => p.owner != ours && p.PatchMethod.ReturnType != typeof(void))
+        ? null
+        : patches;
+    }
+
+    // The cores a grid's work is spread over: all of them, and a band of at least 16 rows each.
+    private static int Workers(int rows) => Math.Max(1, Math.Min(Environment.ProcessorCount, rows / 16));
+
+    // AltBiomeWorldData.GenerateBiomePoints (AltBiomeWorldData.cs:103), for a grid of this size sampled within this radius.
+    internal static void GeneratePoints(World world, int size, float radiusSq, int workers = 0)
+    {
+      var data = new AltBiomeWorldData(size);
+      data.dt = DateTime.Now;
+      var generator = WorldGenerator.instance;
+      var place = new float[size];
+      for (int k = 0; k < size; k++)
+        place[k] = AltBiomeWorldData.MapSpaceToWorldSpace(k);
+      var ocean = Heightmap.Biome.Ocean.ToBiomeIndex();
+      var biomes = data.PointBiomes;
+      var heights = data.PointHeights;
+      // A band is 16 rows: a point's 16 rows sit side by side in the arrays ([x, y], y fastest), one cache line of heights.
+      const int Band = 16;
+      int bands = (size + Band - 1) / Band, next = -1;
+      void Work()
+      {
+        for (int band; (band = Interlocked.Increment(ref next)) < bands;)
+        {
+          int first = band * Band, end = Math.Min(size, first + Band);
+          for (int j = 0; j < size; j++)
+            for (int i = first; i < end; i++)
+            {
+              var vector = new Vector2(place[j], place[i]);
+              if (vector.sqrMagnitude > radiusSq)
+              {
+                biomes[j, i] = ocean;
+                heights[j, i] = -1000f;
+              }
+              else
+              {
+                var biome = generator.GetBiome(vector.x, vector.y);
+                biomes[j, i] = biome.ToBiomeIndex();
+                heights[j, i] = generator.GetBiomeHeight(biome, vector.x, vector.y, out _);
+              }
+            }
+        }
+      }
+      if (workers <= 0)
+        workers = Environment.ProcessorCount;
+      var helpers = new Task[Math.Max(0, Math.Min(workers, bands) - 1)];
+      for (int t = 0; t < helpers.Length; t++)
+        helpers[t] = Task.Run(Work);
+      Exception? failed = null;
+      try
+      {
+        Work();
+      }
+      catch (Exception e)
+      {
+        failed = e;
+        Interlocked.Exchange(ref next, bands);
+      }
+      try
+      {
+        Task.WaitAll(helpers);
+      }
+      catch (AggregateException e)
+      {
+        failed ??= e.InnerExceptions[0];
+      }
+      if (failed != null)
+        ExceptionDispatchInfo.Capture(failed).Throw();
+      data.PointsGenerated = true;
+      world.m_biomeData = data;
+      data.m_world = world;
+    }
 
     // ---------------------------------------------------------------------------------------------------
     // WorldEdge cut-off: applied after GenerateBiomePoints, exactly as vanilla marks points outside its disc.
@@ -408,85 +526,178 @@ public partial class BetterContinents
       return keys;
     }
 
-    private static void AddPoint(AltBiomeWorldData data, BiomeSector sector, short x, short y)
-    {
-      var type = data.Biomes[sector.Biome];
-      type.AllPoints.Add(new BiomePointCoordinate(x, y));
-      if (data.PointHeights[x, y] >= 30f)
-        type.AllPointsAboveSeaLevel.Add(new BiomePointCoordinate(x, y));
-    }
-
-    private static void TryFill(AltBiomeWorldData data, bool[,] visited, Stack<BiomePointCoordinate> open,
-      Heightmap.BiomeIndex biome, BiomeSector sector, short x, short y)
-    {
-      int size = data.Size;
-      if (x >= 0 && y >= 0 && x < size && y < size && !visited[x, y] && data.PointBiomes[x, y] == biome)
-      {
-        visited[x, y] = true;
-        data.PointSectors[x, y] = sector;
-        AddPoint(data, sector, x, y);
-        open.Push(new BiomePointCoordinate(x, y));
-      }
-    }
-
     // Everything GenerateSectors does before its final GenerateAltBiomes() call, with planted regions split out.
     internal static void BuildSectors(AltBiomeWorldData data, int[] keys)
     {
-      int size = data.Size;
-
       // 1. Vanilla's flood fill (AltBiomeWorldData.cs:150-200), keys ignored.
-      var open = new Stack<BiomePointCoordinate>(1024);
-      var visited = new bool[size, size];
-      var global = new Dictionary<Heightmap.BiomeIndex, BiomeSector>(3);
-      // Global sectors first, as in vanilla: EnvMan reads Biomes[AshLands / DeepNorth].Sectors[0] (EnvMan.cs:705).
-      data.Sectors.Add(new BiomeSector(data, Heightmap.Biome.AshLands));
-      global.Add(Heightmap.BiomeIndex.AshLands, data.Sectors[data.Sectors.Count - 1]);
-      data.Sectors.Add(new BiomeSector(data, Heightmap.Biome.DeepNorth));
-      global.Add(Heightmap.BiomeIndex.DeepNorth, data.Sectors[data.Sectors.Count - 1]);
-      data.Sectors.Add(new BiomeSector(data, Heightmap.Biome.Ocean));
-      global.Add(Heightmap.BiomeIndex.Ocean, data.Sectors[data.Sectors.Count - 1]);
-      for (short y = 0; y < size; y++)
-      {
-        for (short x = 0; x < size; x++)
-        {
-          if (global.TryGetValue(data.PointBiomes[x, y], out var g))
-          {
-            data.PointSectors[x, y] = g;
-            visited[x, y] = true;
-            AddPoint(data, g, x, y);
-          }
-        }
-      }
-      for (short y = 0; y < size; y++)
-      {
-        for (short x = 0; x < size; x++)
-        {
-          if (visited[x, y])
-            continue;
-          visited[x, y] = true;
-          var sector = new BiomeSector(data, data.PointBiomes[x, y].ToBiome());
-          data.Sectors.Add(sector);
-          data.PointSectors[x, y] = sector;
-          // Vanilla does not add a sector's seed point to AllPoints either; kept for parity.
-          open.Push(new BiomePointCoordinate(x, y));
-          while (open.Count > 0)
-          {
-            var p = open.Pop();
-            var pBiome = data.PointBiomes[p.x, p.y];
-            var pSector = data.PointSectors[p.x, p.y];
-            TryFill(data, visited, open, pBiome, pSector, (short)(p.x + 1), p.y);
-            TryFill(data, visited, open, pBiome, pSector, (short)(p.x - 1), p.y);
-            TryFill(data, visited, open, pBiome, pSector, p.x, (short)(p.y + 1));
-            TryFill(data, visited, open, pBiome, pSector, p.x, (short)(p.y - 1));
-          }
-        }
-      }
+      FloodFill(data);
 
       // 2. Split the planted patches out of the vanilla regions they fell in.
       SplitPlanted(data, keys);
 
       // 3. Vanilla's statistics pass (AltBiomeWorldData.cs:202-293).
       ComputeStats(data);
+    }
+
+    // ---------------------------------------------------------------------------------------------------
+    // The regions, sooner. GenerateSectors (AltBiomeWorldData.cs:150-297) floods the grid into regions one point at a time,
+    // with a dictionary look-up per point and a scan of a region's neighbour list per edge point: 6.5 s for the 6392 x 6392
+    // grid of a world laid out to 32764 m, as a server loads it and as each player joins. FloodFill and ComputeStats make the
+    // same regions, the same lists in the same order and the same statistics. What does not depend on order (the world-wide
+    // regions' points, where the edges are) is found on every core and joined in vanilla's order; what does (the flood, each
+    // region's sums) runs in vanilla's order, on flat arrays. With nothing planted they replace vanilla's GenerateSectors,
+    // unless another mod changes it (TryGenerateSectors); with planting, BuildSectors uses them.
+    // ---------------------------------------------------------------------------------------------------
+    internal static bool TryGenerateSectors(AltBiomeWorldData data)
+    {
+      if (!WorldEnabled || OursAlone(nameof(AltBiomeWorldData.GenerateSectors)) == null)
+        return false;
+      FloodFill(data);
+      ComputeStats(data);
+      // As vanilla's GenerateSectors ends.
+      data.GenerateAltBiomes();
+      return true;
+    }
+
+    // The neighbours vanilla's tryFill tries, in its order: x + 1, x - 1, y + 1, y - 1.
+    private static readonly int[] FillX = [1, -1, 0, 0];
+    private static readonly int[] FillY = [0, 0, 1, -1];
+
+    // GenerateSectors' flood (AltBiomeWorldData.cs:150-196): the world-wide AshLands, DeepNorth and Ocean regions, then every
+    // other region from its first point in reading order (rows, then columns), filled depth first from a stack as tryFill
+    // does. As in vanilla, a region's first point is not added to its biome's point lists.
+    internal static void FloodFill(AltBiomeWorldData data)
+    {
+      int size = data.Size, n = size * size;
+      var pointBiomes = data.PointBiomes;
+      var heights = data.PointHeights;
+      var pointSectors = data.PointSectors;
+      // In reading order (y * size + x): each point's biome, and whether it counts as above the sea (AddPoint's 30 m).
+      var biome = new byte[n];
+      var above = new bool[n];
+      var visited = new bool[n];
+      int workers = Workers(size);
+      GameUtils.SimpleParallelFor(workers, 0, size, y =>
+      {
+        for (int x = 0, k = y * size; x < size; x++, k++)
+        {
+          biome[k] = (byte)pointBiomes[x, y];
+          above[k] = heights[x, y] >= 30f;
+        }
+      });
+
+      // The world-wide regions first, as in vanilla: EnvMan reads Biomes[AshLands / DeepNorth].Sectors[0] (EnvMan.cs:705).
+      var globals = new[] { Heightmap.Biome.AshLands, Heightmap.Biome.DeepNorth, Heightmap.Biome.Ocean };
+      var global = new BiomeSector[globals.Length];
+      var slot = new int[256];
+      for (int b = 0; b < slot.Length; b++)
+        slot[b] = -1;
+      for (int g = 0; g < globals.Length; g++)
+      {
+        global[g] = new BiomeSector(data, globals[g]);
+        data.Sectors.Add(global[g]);
+        slot[(int)globals[g].ToBiomeIndex()] = g;
+      }
+      // Their points, a band of rows per core: counted, then written at each band's place in the lists, so the lists are in
+      // reading order as vanilla's are.
+      int G = globals.Length;
+      var counts = new int[workers, G, 2];
+      int First(int band) => (int)((long)band * size / workers);
+      GameUtils.SimpleParallelFor(workers, 0, workers, band =>
+      {
+        for (int k = First(band) * size, end = First(band + 1) * size; k < end; k++)
+          if (slot[biome[k]] is var g and >= 0)
+          {
+            counts[band, g, 0]++;
+            if (above[k])
+              counts[band, g, 1]++;
+          }
+      });
+      var all = new BiomePointCoordinate[G][];
+      var high = new BiomePointCoordinate[G][];
+      var at = new int[workers, G, 2];
+      for (int g = 0; g < G; g++)
+      {
+        int sumAll = 0, sumHigh = 0;
+        for (int band = 0; band < workers; band++)
+        {
+          at[band, g, 0] = sumAll;
+          at[band, g, 1] = sumHigh;
+          sumAll += counts[band, g, 0];
+          sumHigh += counts[band, g, 1];
+        }
+        all[g] = new BiomePointCoordinate[sumAll];
+        high[g] = new BiomePointCoordinate[sumHigh];
+      }
+      GameUtils.SimpleParallelFor(workers, 0, workers, band =>
+      {
+        var nextAll = new int[G];
+        var nextHigh = new int[G];
+        for (int g = 0; g < G; g++)
+        {
+          nextAll[g] = at[band, g, 0];
+          nextHigh[g] = at[band, g, 1];
+        }
+        for (int y = First(band), end = First(band + 1); y < end; y++)
+          for (int x = 0, k = y * size; x < size; x++, k++)
+            if (slot[biome[k]] is var g and >= 0)
+            {
+              pointSectors[x, y] = global[g];
+              visited[k] = true;
+              var point = new BiomePointCoordinate((short)x, (short)y);
+              all[g][nextAll[g]++] = point;
+              if (above[k])
+                high[g][nextHigh[g]++] = point;
+            }
+      });
+      for (int g = 0; g < G; g++)
+      {
+        global[g].BiomeType.AllPoints.AddRange(all[g]);
+        global[g].BiomeType.AllPointsAboveSeaLevel.AddRange(high[g]);
+      }
+
+      // Every other region, in reading order of its first point.
+      var open = new int[1024];
+      for (int y = 0, k = 0; y < size; y++)
+      {
+        for (int x = 0; x < size; x++, k++)
+        {
+          if (visited[k])
+            continue;
+          visited[k] = true;
+          byte own = biome[k];
+          var sector = new BiomeSector(data, ((Heightmap.BiomeIndex)own).ToBiome());
+          data.Sectors.Add(sector);
+          pointSectors[x, y] = sector;
+          var points = sector.BiomeType.AllPoints;
+          var highPoints = sector.BiomeType.AllPointsAboveSeaLevel;
+          int top = 0;
+          open[top++] = k;
+          while (top > 0)
+          {
+            int p = open[--top];
+            int px = p % size, py = p / size;
+            for (int d = 0; d < 4; d++)
+            {
+              int qx = px + FillX[d], qy = py + FillY[d];
+              if (qx < 0 || qy < 0 || qx >= size || qy >= size)
+                continue;
+              int q = qy * size + qx;
+              if (visited[q] || biome[q] != own)
+                continue;
+              visited[q] = true;
+              pointSectors[qx, qy] = sector;
+              var point = new BiomePointCoordinate((short)qx, (short)qy);
+              points.Add(point);
+              if (above[q])
+                highPoints.Add(point);
+              if (top == open.Length)
+                Array.Resize(ref open, open.Length * 2);
+              open[top++] = q;
+            }
+          }
+        }
+      }
     }
 
     internal static void SplitPlanted(AltBiomeWorldData data, int[] keys)
@@ -578,17 +789,37 @@ public partial class BetterContinents
 
     // Vanilla's statistics, line for line, including its quirks: Min starts at (0,0) and so never moves, both
     // zones are computed from Min, only the first differing neighbour of an edge point is recorded.
+    // GenerateSectors' statistics (AltBiomeWorldData.cs:198-259): each region's edge points (those with a neighbour in another
+    // region), their count, mean and extent, the regions they touch and the heights at them. The edge points are found on every
+    // core, then taken in vanilla's order (rows, then columns), so the sums and the neighbour lists come out as vanilla's; a set
+    // beside each region's neighbour list answers what vanilla's List.Contains scan did (Ocean touches thousands of regions).
     internal static void ComputeStats(AltBiomeWorldData data)
     {
       int size = data.Size;
-      for (int i = 1; i < size - 1; i++)
+      var pointSectors = data.PointSectors;
+      var edges = new List<int>?[size];
+      GameUtils.SimpleParallelFor(Workers(size), 1, size - 1, i =>
       {
+        List<int>? row = null;
         for (int j = 1; j < size - 1; j++)
         {
+          var c = pointSectors[j, i];
+          if (pointSectors[j - 1, i] != c || pointSectors[j + 1, i] != c || pointSectors[j, i - 1] != c || pointSectors[j, i + 1] != c)
+            (row ??= []).Add(j);
+        }
+        edges[i] = row;
+      });
+      var touched = new Dictionary<BiomeSector, HashSet<BiomeSector>>();
+      for (int i = 1; i < size - 1; i++)
+      {
+        if (edges[i] is not { } row)
+          continue;
+        foreach (int j in row)
+        {
           float h = data.PointHeights[j, i];
-          var s = data.PointSectors[j, i];
+          var s = pointSectors[j, i];
           BiomeSector item;
-          if ((item = data.PointSectors[j - 1, i]) != s || (item = data.PointSectors[j + 1, i]) != s || (item = data.PointSectors[j, i - 1]) != s || (item = data.PointSectors[j, i + 1]) != s)
+          if ((item = pointSectors[j - 1, i]) != s || (item = pointSectors[j + 1, i]) != s || (item = pointSectors[j, i - 1]) != s || (item = pointSectors[j, i + 1]) != s)
           {
             s.EdgeCount++;
             s.Center += new Vector2(j, i);
@@ -596,7 +827,9 @@ public partial class BetterContinents
             if (j > s.Max.x) s.Max.x = j;
             if (i < s.Min.y) s.Min.y = i;
             if (i > s.Max.y) s.Max.y = i;
-            if (!s.Neighbors.Contains(item))
+            if (!touched.TryGetValue(s, out var known))
+              touched[s] = known = new HashSet<BiomeSector>(s.Neighbors);
+            if (known.Add(item))
               s.Neighbors.Add(item);
             if (h < s.HeightMin) s.HeightMin = h;
             if (h > s.HeightMax) s.HeightMax = h;

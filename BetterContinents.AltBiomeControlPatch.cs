@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-09-22 for alt-biome planting (0.8.1), and on 2026-09-25 for version-agnostic wording (0.9.1).
+// Added by Wubarrk on 2026-09-22 for alt-biome planting (0.8.1), and on 2026-09-25 for version-agnostic wording (0.9.1), and on 2026-10-07 for 16k worlds (0.10.3).
 
 using System;
 using System.Collections.Generic;
@@ -25,8 +25,13 @@ public partial class BetterContinents
     [HarmonyPostfix, HarmonyPatch(nameof(AltBiomeWorldData.VerifyBiomeData))]
     private static void VerifyBiomeDataPostfix(World world) => AltBiomeControl.AfterVerifyBiomeData(world);
 
-    // AltBiomeWorldData.GenerateBiomePoints(World world) - AltBiomeWorldData.cs:103. A postfix, not a
-    // transpiler: Expand World Size transpiles this method's constants, and editing the same IL would race it.
+    // AltBiomeWorldData.GenerateBiomePoints(World world) - AltBiomeWorldData.cs:103. The same points sampled on every
+    // core (AltBiomeControl.TryGeneratePoints), unless another mod patches the method.
+    [HarmonyPrefix, HarmonyPatch(nameof(AltBiomeWorldData.GenerateBiomePoints))]
+    private static bool GenerateBiomePointsPrefix(World world) => !AltBiomeControl.TryGeneratePoints(world);
+
+    // A postfix, not a transpiler: Expand World Size transpiles this method's constants, and editing the same IL would
+    // race it.
     [HarmonyPostfix, HarmonyPatch(nameof(AltBiomeWorldData.GenerateBiomePoints))]
     private static void GenerateBiomePointsPostfix(World world)
     {
@@ -34,11 +39,12 @@ public partial class BetterContinents
         AltBiomeControl.ApplyCutoff(world.m_biomeData);
     }
 
-    // AltBiomeWorldData.GenerateSectors() - AltBiomeWorldData.cs:150. Replaced only while the planting layer
-    // has painted points; the replacement ends by calling GenerateAltBiomes, like vanilla.
+    // AltBiomeWorldData.GenerateSectors() - AltBiomeWorldData.cs:150. Replaced by the planted build while the planting
+    // layer has painted points, and otherwise by the same regions made sooner (AltBiomeControl.TryGenerateSectors) unless
+    // another mod patches the method; each replacement ends by calling GenerateAltBiomes, like vanilla.
     [HarmonyPrefix, HarmonyPatch(nameof(AltBiomeWorldData.GenerateSectors))]
     private static bool GenerateSectorsPrefix(AltBiomeWorldData __instance) =>
-      !AltBiomeControl.TryGeneratePlantedSectors(__instance);
+      !AltBiomeControl.TryGeneratePlantedSectors(__instance) && !AltBiomeControl.TryGenerateSectors(__instance);
 
     // AltBiomeWorldData.GenerateAltBiomes() - AltBiomeWorldData.cs:301. Called at the end of GenerateSectors
     // (:297) and by vanilla's "genloc alt" command (Terminal.cs:519).

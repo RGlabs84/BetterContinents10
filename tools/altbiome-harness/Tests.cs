@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-09-22 for alt-biome planting (0.8.1), and on 2026-09-24 for world export and import (0.9.0), and on 2026-09-25 for version-agnostic wording (0.9.1), and modified on 2026-10-04 for the unifying refactor (0.10.0).
+// Added by Wubarrk on 2026-09-22 for alt-biome planting (0.8.1), and on 2026-09-24 for world export and import (0.9.0), and on 2026-09-25 for version-agnostic wording (0.9.1), and modified on 2026-10-04 for the unifying refactor (0.10.0), and on 2026-10-07 for 16k worlds (0.10.3).
 
 using System;
 using System.Collections;
@@ -38,6 +38,9 @@ internal static partial class Tests
     InfoTest(a);
     Evidence(a, alts);
     CanAddModifierParity(a, alts);
+    Section("the grid at world load, made sooner: points on every core, regions on flat arrays");
+    PointsParityTest();
+    NoisySectorsParityTest();
     Section("placement control around vanilla GenerateAltBiomes");
     ControlRunTests(a, alts);
     Section("planting foundation (a test provider that claims every biome)");
