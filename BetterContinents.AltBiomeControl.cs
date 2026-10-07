@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-09-22 for alt-biome planting (0.8.1), and on 2026-09-25 for version-agnostic wording (0.9.1), and on 2026-09-29 for Expand World Data biomes (0.9.3), and modified on 2026-10-04 for the unifying refactor (0.10.0).
+// Added by Wubarrk on 2026-09-22 for alt-biome planting (0.8.1), and on 2026-09-25 for version-agnostic wording (0.9.1), and on 2026-09-29 for Expand World Data biomes (0.9.3), and modified on 2026-10-04 for the unifying refactor (0.10.0), and on 2026-10-06 for 16k worlds (0.10.3).
 
 using System;
 using System.Collections;
@@ -952,7 +952,8 @@ public partial class BetterContinents
         eff.MinEdge = o?.MinEdgeSize ?? Mathf.RoundToInt(orig.MinEdge * s.EdgeScale);
         eff.MaxEdge = o?.MaxEdgeSize ?? Mathf.RoundToInt(orig.MaxEdge * s.EdgeScale);
         eff.MinH = o?.MinAvgHeight ?? orig.MinH;
-        eff.MaxH = o?.MaxAvgHeight ?? orig.MaxH;
+        // A sector of terrain over 10000 m (a world whose land reaches 16 km) would pass the game's own 10000 m limit.
+        eff.MaxH = o?.MaxAvgHeight ?? HighTerrain.MaxAverageHeight(orig.MaxH);
         if (o?.IgnoreWorldBounds ?? false)
         {
           eff.BelowX = eff.AboveX = eff.BelowY = eff.AboveY = 0f;

@@ -1,0 +1,37 @@
+<!-- Added by Wubarrk on 2026-10-06 for 16k worlds (0.10.3). -->
+<!-- Offline checks of the high-terrain patches (HighTerrain.cs, BetterContinents.HighTerrainPatch.cs): when a world is a high world,
+     the height of the land at Heightmap Amount 81, the rule for what is inside a dungeon, the helpers the patched game code calls,
+     and every transpiler on the IL of both the client's and the dedicated server's game assemblies, with an inventory of the game's
+     methods that hold the numbers they replace (a game update that adds one fails it). Build BetterContinents.csproj (Release)
+     first: this references its pre-ILRepack DLL in obj/. Run from this folder with "dotnet run -c Release". -->
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <!-- Same name as the repo's harness so BetterContinents' InternalsVisibleTo("AltBiomeHarness") applies. -->
+    <AssemblyName>AltBiomeHarness</AssemblyName>
+    <RootNamespace>HighTests</RootNamespace>
+    <Nullable>disable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <NoWarn>$(NoWarn);MSB3277;CS8632;NU1701;MSB3243;CS1701;CS1702;CS0618</NoWarn>
+    <LibsTools>$(MSBuildThisFileDirectory)../../../libs-Tools/</LibsTools>
+    <BcDll>$(MSBuildThisFileDirectory)../../obj/Release/net4.8/BetterContinents.dll</BcDll>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- BetterContinents.dll is built against BepInEx's HarmonyX 0Harmony, which cannot initialise on .NET 8;
+         Lib.Harmony has the same assembly name and the API surface Better Continents touches here. -->
+    <PackageReference Include="Lib.Harmony" Version="2.3.6" />
+    <PackageReference Include="SixLabors.ImageSharp" Version="2.1.13" />
+    <!-- The inventory reads every method of both game assemblies without loading what they refer to. -->
+    <PackageReference Include="Mono.Cecil" Version="0.11.6" />
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="BetterContinents"><HintPath>$(BcDll)</HintPath></Reference>
+    <Reference Include="assembly_valheim"><HintPath>$(LibsTools)1.0/client/assembly_valheim.dll</HintPath></Reference>
+    <Reference Include="assembly_utils"><HintPath>$(LibsTools)1.0/client/assembly_utils.dll</HintPath></Reference>
+    <Reference Include="UnityEngine"><HintPath>$(LibsTools)1.0/client/UnityEngine.dll</HintPath></Reference>
+    <Reference Include="UnityEngine.CoreModule"><HintPath>$(LibsTools)1.0/client/UnityEngine.CoreModule.dll</HintPath></Reference>
+    <Reference Include="BepInEx"><HintPath>$(LibsTools)BepInEx.dll</HintPath></Reference>
+  </ItemGroup>
+</Project>

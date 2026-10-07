@@ -197,9 +197,9 @@ public static class WorldExport
 {
   public const int MinSize = 128;
   public const int MaxSize = 16384;
-  /// <summary>The most a Heightmap Amount can be (the world's setting and an export's): at Sea Level 0.5 it spans -30 m to
-  /// 16,170 m, a mountain 16 km tall.</summary>
-  public const float MaxHeightmapAmount = 81f;
+  /// <summary>The most a Heightmap Amount can be (the world's setting and an export's, SettingsSchema.MaxHeightmapAmount): at Sea
+  /// Level 0.5 it spans -30 m to 16,170 m, a mountain 16 km tall.</summary>
+  public const float MaxHeightmapAmount = SettingsSchema.MaxHeightmapAmount;
   /// <summary>The largest export that makes its New World preset itself. The preset builder decodes the maps (about 26 bytes a
   /// pixel at its peak: 1.5 GB at 8192 px, and 2 GB for the heightmap alone at 16384), so past this size the export leaves it to
   /// bc_import, which the player runs where the memory is.</summary>

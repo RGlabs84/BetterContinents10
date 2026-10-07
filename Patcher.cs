@@ -1,4 +1,4 @@
-﻿// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and alt-biome planting (0.8.1), and on 2026-09-24 for world export and import (0.9.0), and on 2026-09-25 for version-agnostic wording (0.9.1), and on 2026-09-29 for Expand World Data biomes (0.9.3), and on 2026-10-04 for the vegetation twin guard and the unifying refactor (0.10.0).
+﻿// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and alt-biome planting (0.8.1), and on 2026-09-24 for world export and import (0.9.0), and on 2026-09-25 for version-agnostic wording (0.9.1), and on 2026-09-29 for Expand World Data biomes (0.9.3), and on 2026-10-04 for the vegetation twin guard and the unifying refactor (0.10.0), and on 2026-10-06 for 16k worlds (0.10.3).
 
 using System;
 using System.Collections;
@@ -27,17 +27,21 @@ public partial class BetterContinents
     PatchWorldSize();
     foreach (var toggle in TogglesAfterWorldSize)
       toggle.Update(Settings);
+    // A world whose heightmap is read at an amount above 5, the most before 0.10.3: the game's rules that hold a height (HighTerrain.cs).
+    PatchHighTerrain();
     // WorldGenerator caches GetBiome/GetBiomeArea results per grid cell for the lifetime of the
     // WorldGenerator instance (only cleared in its constructor). Any biome-affecting patch toggled
     // above (GetBiome, IsAshlands, IsAshlands without a heat map) can leave already-queried cells
     // returning their pre-patch answer for the rest of the session unless we clear the caches here.
     ClearWorldGeneratorBiomeCaches();
     // EnvMan's Deep North weather test reads the biome map at the camera's x and z exactly when IsDeepnorth
-    // reads the biome map at all (the IsDeepnorth toggle); every other world keeps vanilla's (x, height) call.
-    var deepNorthUsesZ = Settings.EnabledForThisWorld && Settings.HasBiomeMap;
+    // reads the biome map at all (the IsDeepnorth toggle); every other world keeps vanilla's (x, height) call. A
+    // high world asks at x and z too: the game's (x, height) is inside the Deep North's circle once the camera is
+    // higher than about 8000 m, wherever it is.
+    var deepNorthUsesZ = DeepNorthWeatherUsesZ(Settings);
     if (deepNorthUsesZ != DeepNorthWeather.UseZ)
       Log(deepNorthUsesZ
-        ? "Deep North weather: EnvMan asks IsDeepnorth at the camera's x and z (this world has a biome map)"
+        ? "Deep North weather: EnvMan asks IsDeepnorth at the camera's x and z (this world has a biome map or high terrain)"
         : "Deep North weather: EnvMan asks IsDeepnorth as vanilla does, at (x, camera height)");
     DeepNorthWeather.UseZ = deepNorthUsesZ;
     // Alt-biome grid, placement and planting state follows the settings (see AltBiomeControl.Configure).
@@ -349,7 +353,7 @@ public partial class BetterContinents
   // The toggles these settings want on, by name (the offline tests compare it with the rules as they were written
   // out one by one before the unifying refactor).
   internal static IEnumerable<string> WantedToggles(BetterContinentsSettings settings) =>
-    new[] { BiomeColor, BiomeColorAfterTerritories }.Concat(TogglesBeforeWorldSize).Concat(TogglesAfterWorldSize).Where(t => t.Wanted(settings)).Select(t => t.Name);
+    new[] { BiomeColor, BiomeColorAfterTerritories }.Concat(TogglesBeforeWorldSize).Concat(TogglesAfterWorldSize).Concat(HighTerrainToggles).Where(t => t.Wanted(settings)).Select(t => t.Name);
 
   // ---- the three that are more than on or off -------------------------------------------------------------------------
 

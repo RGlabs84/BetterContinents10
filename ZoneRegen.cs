@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-10-04 for the unifying refactor (0.10.0).
+// Added by Wubarrk on 2026-10-04 for the unifying refactor (0.10.0), and modified on 2026-10-06 for 16k worlds (0.10.3).
 
 using System;
 using System.Collections;
@@ -502,7 +502,9 @@ internal static class ZoneRegen
       kind |= ZoneReset.Kind.Player;
       if (zdo.m_uid == local)
         kind |= ZoneReset.Kind.Local;
-      if (zdo.GetPosition().y > ZoneReset.Rules.InteriorHeight)
+      // Character.InInterior's rule, which a world of high terrain changes (HighTerrain.Interior: above 3000 m AND well above the
+      // ground below); anywhere else it is "above 3000 m" (ZoneReset.Rules.InteriorHeight).
+      if (HighTerrain.Interior(zdo.GetPosition()))
         kind |= ZoneReset.Kind.Interior;
     }
     else if (prefab == TombstonePrefab)
