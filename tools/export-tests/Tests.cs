@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-09-24 for world export and import (0.9.0), and modified on 2026-10-04 for the unifying refactor (0.10.0).
+// Added by Wubarrk on 2026-09-24 for world export and import (0.9.0), and modified on 2026-10-04 for the unifying refactor (0.10.0), and on 2026-10-06 for 16k worlds (0.10.3).
 
 using System;
 using System.Collections;
@@ -241,6 +241,58 @@ internal static class Tests
     }
   }
 
+  // Heightmap Amount 81, the largest (0.10.3): at Sea Level 0.5 the grey spans -30 m to 16,170 m, a step of a quarter of a metre.
+  public static void Amount81(string work)
+  {
+    Section("heightmap at Heightmap Amount 81 (a mountain 16 km tall) through the streaming writer and ImageMapFloat");
+    const float amount = 81f, sea = 0.5f;
+    float floor = M.ValueToMetres(0f, amount, sea), ceiling = M.ValueToMetres(1f, amount, sea), step = (ceiling - floor) / 65535f;
+    C(Mathf.Abs(floor - -30f) < 1e-3f && Mathf.Abs(ceiling - 16170f) < 0.05f && Mathf.Abs(step - 0.2472f) < 1e-3f,
+      $"the grey spans {floor} m to {ceiling} m in steps of {step:0.####} m");
+    C(Mathf.Abs(M.WaterlineValue(amount, sea) - 0.30f / 81f) < 1e-6f && M.ValueToUShort(M.MetresToValue(30f, amount, sea), out _) == 243,
+      "the sea (30 m) is at 0.0037, grey 243");
+    C(M.ValueToUShort(M.MetresToValue(17000f, amount, sea), out int up) == 65535 && up == 1 && M.ValueToUShort(M.MetresToValue(-100f, amount, sea), out int down) == 0 && down == -1,
+      "ground above 16,170 m or below -30 m is clipped, and says so");
+    foreach (int n in new[] { 257, 1024 })
+    {
+      // 0 to 16,000 m, with fine detail a step can hold: a ripple of 3 m on a slope.
+      float Metres(int col, int row) => -20f + 16000f * col / (n - 1) * (1f - 0.5f * row / (n - 1)) / 1.0f + 3f * Mathf.Sin(col * 0.4f) * Mathf.Cos(row * 0.3f);
+      var path = Path.Combine(work, $"heightmap81-{n}.png");
+      WorldExportPng.SaveRows(path, n, 1, 16, (fileRow, row) =>
+      {
+        for (int c = 0; c < n; c++)
+        {
+          var v = M.ValueToUShort(M.MetresToValue(Metres(c, fileRow), amount, sea), out _);
+          row[2 * c] = (byte)(v >> 8);
+          row[2 * c + 1] = (byte)v;
+        }
+      }, new HeightmapRecord(amount, sea));
+      var bytes = File.ReadAllBytes(path);
+      var map = ImageMapFloat.Create(bytes, false)!;
+      var mapA = ImageMapFloat.Create(bytes, true)!;
+      C(map.Record is { } r && r.Amount == amount && r.SeaLevel == sea, $"{n}: the heightmap records Heightmap Amount 81 ({map.Record?.Amount})");
+      float worst = 0f, worstA = 0f;
+      for (int r2 = 0; r2 < n; r2 += 3)
+        for (int c = 0; c < n; c += 2)
+        {
+          float x = M.PixelToWorld(c, n, T) / T + 0.5f;
+          float z = M.FileRowToWorldZ(r2, n, T) / T + 0.5f;
+          worst = Mathf.Max(worst, Mathf.Abs(M.ValueToMetres(map.GetValue(x, z), amount, sea) - Metres(c, r2)));
+          worstA = Mathf.Max(worstA, Mathf.Abs(M.ValueToMetres(mapA.GetValue(x, z), amount, sea) - Metres(c, r2)));
+        }
+      C(worst <= step * 0.5f + 0.01f, $"{n}: every sampled height reads back within half a grey step of {step:0.###} m (worst {worst:0.###} m)");
+      System.Console.WriteLine($"    note: with Heightmap Alpha on (La16 decode) the worst is {worstA:0.###} m");
+    }
+    // The Job's own encoding of a height (TerrainRow): v = (h / 200 + 0.15 - sea adjustment) / amount.
+    var o = WorldExport.Options.Default();
+    o.HeightmapAmount = 81f;
+    o.Size = 16384;
+    C(o.Validate() == null, "the export accepts 16384 px at Heightmap Amount 81");
+    o.Size = 8192;
+    o.HeightmapAmount = 82f;
+    C(o.Validate() != null, "and not Heightmap Amount 82");
+  }
+
   public static void EightBitRoundTrip(string work)
   {
     Section("8-bit masks through ImageMapFloat");
@@ -424,6 +476,35 @@ internal static class Tests
     var bad = WorldExport.Options.Default();
     bad.Size = 100000;
     C(typeof(WorldExport.Options).GetMethod("Validate", BindingFlags.NonPublic | BindingFlags.Instance)!.Invoke(bad, null) is string, "an out-of-range size is refused");
+    // 0.10.3: 16384 px and Heightmap Amount up to 81.
+    var validate = typeof(WorldExport.Options).GetMethod("Validate", BindingFlags.NonPublic | BindingFlags.Instance)!;
+    C(WorldExportCommands.TryParse("16384 amount=81 sealevel=0.5", out var big, out _) && big.Size == 16384 && big.HeightmapAmount == 81f && validate.Invoke(big, null) == null,
+      "16384 amount=81 parses and is valid (the largest size and amount)");
+    C(WorldExportCommands.TryParse("size=16384 amount=0.01", out var small, out _) && small.HeightmapAmount == 0.01f && validate.Invoke(small, null) == null, "amount 0.01 (the smallest the config takes) is valid");
+    C(WorldExportCommands.TryParse("16385", out var over, out _) && validate.Invoke(over, null) is string sizeError && sizeError.Contains("16384"), "16385 px is refused, and the message names the limit");
+    C(WorldExportCommands.TryParse("amount=81.01", out var overAmount, out _) && validate.Invoke(overAmount, null) is string amountError && amountError.Contains("81"), "amount 81.01 is refused, and the message names the limit");
+    C(WorldExport.MaxSize == 16384 && WorldExport.MaxHeightmapAmount == 81f && WorldExport.PresetMaxSize == 8192, "the limits: 16384 px, amount 81, the preset made by the export up to 8192 px");
+  }
+
+  // The export window's estimate and notes (ExportHud.Estimate and Notes, private and pure: no GUI call) for the sizes it offers.
+  public static void HudText()
+  {
+    Section("the export window's estimate and notes");
+    var hud = typeof(ExportHud);
+    string Call(string name, WorldExport.Options o) => (string)hud.GetMethod(name, BindingFlags.NonPublic | BindingFlags.Static)!.Invoke(null, [o])!;
+    WorldExport.Options At(int size, bool preset = true) { var o = WorldExport.Options.Default(); o.Size = size; o.Preset = preset; return o; }
+    int MemoryMb(string estimate) => int.Parse(System.Text.RegularExpressions.Regex.Match(estimate, @"About (\d+) MB of memory while it runs").Groups[1].Value);
+    var e4 = Call("Estimate", At(4096)); var e8 = Call("Estimate", At(8192)); var e16 = Call("Estimate", At(16384));
+    C(e16.StartsWith("16384 x 16384 px = 268.4 million pixels a map"), $"16384 px: {e16.Substring(0, 60)}");
+    C(MemoryMb(e4) == MemoryMb(e8) && MemoryMb(e8) == MemoryMb(e16) && MemoryMb(e16) <= 150,
+      $"the memory it says holds no matter the size, as the maps are written band by band ({MemoryMb(e4)}, {MemoryMb(e8)}, {MemoryMb(e16)} MB)");
+    C(e8.Contains("MB while the preset is made") && e16.Contains("and no preset") && !e16.Contains("while the preset is made"), "the preset's memory is said up to 8192 px, and at 16384 px that there is none");
+    C(e16.Contains("a quarter of an hour") && e8.Contains("several minutes"), "and the time");
+    var n8 = Call("Notes", At(8192)); var n16 = Call("Notes", At(16384)); var n16off = Call("Notes", At(16384, preset: false));
+    C(n8.Contains("needs about 1.7 GB") && n8.Contains("bc_import") && !n8.Contains("is not made"), $"8192 px: the preset's memory ({n8.Split('\n')[1]})");
+    C(n16.Contains("The New World preset is not made at 16384 px") && n16.Contains("about 6.8 GB") && n16.Contains("bc_import") && n16.Contains("over 100 MB"),
+      $"16384 px: the preset is left to bc_import, and the maps are a download for every player");
+    C(!n16off.Contains("preset"), "16384 px with the preset switched off: nothing about it");
   }
 
   public static void Json()

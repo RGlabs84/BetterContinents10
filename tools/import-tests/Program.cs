@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-09-24 for world export and import (0.9.0), and modified on 2026-10-02 for export folders used as the Directory (0.9.4), and modified on 2026-10-04 for the unifying refactor (0.10.0).
+// Added by Wubarrk on 2026-09-24 for world export and import (0.9.0), and modified on 2026-10-02 for export folders used as the Directory (0.9.4), and modified on 2026-10-04 for the unifying refactor (0.10.0), and on 2026-10-06 for 16k worlds (0.10.3).
 
 // Offline checks of Better Continents 0.9.0's world import (WorldImport). A synthetic export folder is written with
 // ImageSharp and made into a New World preset by the real builder, on a worker thread as in the game, then read back with
@@ -40,7 +40,7 @@ internal sealed class LogHandler : ILogHandler
   public static bool Has(string part) { lock (Lines) return Lines.Any(l => l.Contains(part)); }
 }
 
-internal static class Program
+internal static partial class Program
 {
   static int checks, failures;
   static void C(bool ok, string what)
@@ -104,6 +104,14 @@ internal static class Program
       ExportStep();
       WorldSizeVersions();
       NewWorlds();
+      Amount81();
+      // Past the usual sizes: BCIMPORT_BIG=<size> makes an export folder of that size into a preset (the heightmap alone, or with
+      // every map when BCIMPORT_ALL=1), with its memory measured.
+      if (int.TryParse(Environment.GetEnvironmentVariable("BCIMPORT_BIG"), out var big) && big > 0)
+        BigImport(big, Environment.GetEnvironmentVariable("BCIMPORT_ALL") == "1");
+      // BCIMPORT_FOLDER=<an export folder>: its heightmap read back (a real 16384 px export from a dedicated server).
+      if (Environment.GetEnvironmentVariable("BCIMPORT_FOLDER") is { Length: > 0 } realFolder)
+        RealImport(realFolder);
     }
     catch (Exception e)
     {
@@ -789,6 +797,14 @@ internal static class Program
     var plain = Export("0.9 export of a vanilla-size world", 10000f, 500f, "21000");
     var unfinished = Export("unfinished export of a World Size 20000 world", 20000f, 500f, null);
     var ews = Export("export of an Expand World Size world", 10000f, 500f, "61000");
+    // 16k worlds (0.10.3): the largest world the game takes today (World Size 15850 + Edge Size 500 = 16350 m), one past it, and worlds well past 16 km.
+    var f = (Func<float, string>)(v => v.ToString("R", System.Globalization.CultureInfo.InvariantCulture));
+    var edgeOfLimit = Export("0.10.3 export of a 16350 m world", 15850f, 500f, f(2f * (15850f + 500f)));
+    var pastLimit = Export("0.10.3 export of a 16351 m world", 15851f, 500f, f(2f * (15851f + 500f)));
+    var farPast = Export("0.10.3 export of a 40000 m world", 39500f, 500f, f(2f * (39500f + 500f)));
+    var oddPast = Export("0.10.3 export of a 22222.5 m world", 21700.25f, 522.25f, f(2f * (21700.25f + 522.25f)));
+    var older16k = Export("0.9 export of a World Size 15850 world", 15850f, 500f, "21000");
+    var resizedPast = Export("0.10.2 export of a world later resized", 15850f, 500f, f(2f * (10000f + 500f)));
     C(VersionOf(old) == 11, "an export whose maps span 21000 m while its World Size gives 41000 m (made before 0.10): version 11, as the world it came from");
     C(VersionOf(fresh) == null, "an export whose maps span the 41000 m its World Size gives (a version 12 world's): a new world's version");
     C(VersionOf(odd) == null, "the same for an odd size, float for float");
@@ -796,6 +812,12 @@ internal static class Program
     C(VersionOf(unfinished) == 11, "an export with no manifest.json (it did not finish), World Size 20000: taken to span 21000 m, version 11");
     C(VersionOf(unfinished, exportTotal: 41000f) == null, "unless the export itself says its span (its own preset, made before manifest.json is written)");
     C(VersionOf(ews) == 11, "an Expand World Size world's (maps 61000 m, World Size 10000): version 11, as before; Expand World Size sets the size where it is installed");
+    C(VersionOf(edgeOfLimit) == null && VersionOf(pastLimit) == null && VersionOf(farPast) == null && VersionOf(oddPast) == null,
+      "16k exports of worlds at, just past and far past 16 km (maps spanning 2 x (World Size + Edge Size)): a new world's version 12, float for float");
+    C(VersionOf(older16k) == 11 && VersionOf(resizedPast) == 11,
+      "a World Size 15850 world whose maps span 21000 m (a 0.9.x world, or one resized since): version 11, as the world it came from");
+    C(VersionOf(edgeOfLimit, exportTotal: 32700f) == null && VersionOf(older16k, exportTotal: 21000f) == 11 && VersionOf(Export("16k, no manifest", 15850f, 500f, null), exportTotal: 32700f) == null,
+      "the version the export's own preset gets, before manifest.json is written (the export passes the span it sampled): the same");
     var plan = WorldImport.MakePlan(old);
     C(plan.Notes.Any(n => n.Contains("span 21000 m, not the 41000 m")), "the plan says why");
 

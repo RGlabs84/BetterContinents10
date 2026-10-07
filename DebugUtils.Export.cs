@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-09-24 for world export and import (0.9.0), and modified on 2026-10-04 for the unifying refactor (0.10.0).
+// Added by Wubarrk on 2026-09-24 for world export and import (0.9.0), and modified on 2026-10-04 for the unifying refactor (0.10.0), and on 2026-10-06 for 16k worlds (0.10.3).
 
 using System;
 using System.Collections.Generic;
@@ -58,7 +58,7 @@ public static class WorldExportCommands
             "[status | cancel | server ... | size and options] - Better Continents: export the loaded world as a map set that rebuilds it (bc_export help)",
             args => Run(args),
             isCheat: false, isNetwork: false, onlyServer: false,
-            optionsFetcher: () => ["status", "cancel", "server", "help", "1024", "2048", "4096", "8192"]);
+            optionsFetcher: () => ["status", "cancel", "server", "help", "1024", "2048", "4096", "8192", "16384"]);
     }
 
     private static void Run(Terminal.ConsoleEventArgs args)
@@ -73,6 +73,7 @@ public static class WorldExportCommands
                 output(Usage);
                 output("Writes heightmap, biome, location, forest, heat, alt-biome, lava, moss and paint maps, export.cfg, README.txt and manifest.json,");
                 output("and a New World preset \"<world> <time>\": pick it in the New World screen to make a world from the export.");
+                output($"size: {WorldExport.MinSize} to {WorldExport.MaxSize} pixels a side (1024, 2048, 4096, 8192 and 16384 are the usual ones); amount: the Heightmap Amount the heights are encoded for, above 0 and up to {WorldExport.MaxHeightmapAmount:0}.");
                 output("After editing the PNGs, bc_import makes the preset again (bc_import help).");
                 output($"Defaults, from [09 BetterContinents.Export] in BetterContinents.cfg: {WorldExport.Options.Default()}");
                 output("The same section's Hud turns on the export HUD: a status box (Hud Hotkey, F9) and an export window (Window Hotkey, F7).");

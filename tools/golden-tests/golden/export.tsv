@@ -164,10 +164,11 @@ amount2/README.txt/060	  - Only the generated world is exported: buildings, terr
 amount2/README.txt/061	
 amount2/README.txt/062	THE NUMBERS
 amount2/README.txt/063	  Heights: metres = (v x 2 - 0.15 + 0) x 200, v = pixel / 65535.
-amount2/README.txt/064	  Past 10000 m the heightmap holds the ground before Better Continents' edge drop-off, which rebuilds the edge.
-amount2/README.txt/065	  Pixel (column c, row r) is world x = (c / 2047 - 0.5) x 21000, z = (0.5 - r / 2047) x 21000.
-amount2/README.txt/066	  The location map alone uses c / 2048 and r / 2048 (Better Continents' location loader): up to a pixel off the rest.
-amount2/README.txt/count	66
+amount2/README.txt/064	  One step of the 16-bit grey is 0.006 m, so no height is stored finer than that.
+amount2/README.txt/065	  Past 10000 m the heightmap holds the ground before Better Continents' edge drop-off, which rebuilds the edge.
+amount2/README.txt/066	  Pixel (column c, row r) is world x = (c / 2047 - 0.5) x 21000, z = (0.5 - r / 2047) x 21000.
+amount2/README.txt/067	  The location map alone uses c / 2048 and r / 2048 (Better Continents' location loader): up to a pixel off the rest.
+amount2/README.txt/count	67
 amount1-exact-edgeoff/export.cfg/001	
 amount1-exact-edgeoff/export.cfg/002	[00 BetterContinents.Debug]
 amount1-exact-edgeoff/export.cfg/003	
@@ -331,6 +332,7 @@ amount1-exact-edgeoff/README.txt/060	  - Only the generated world is exported: b
 amount1-exact-edgeoff/README.txt/061	
 amount1-exact-edgeoff/README.txt/062	THE NUMBERS
 amount1-exact-edgeoff/README.txt/063	  Heights: metres = (v x 1 - 0.15 + 0) x 200, v = pixel / 65535.
-amount1-exact-edgeoff/README.txt/064	  Pixel (column c, row r) is world x = (c / 2047 - 0.5) x 21000, z = (0.5 - r / 2047) x 21000.
-amount1-exact-edgeoff/README.txt/065	  The location map alone uses c / 2048 and r / 2048 (Better Continents' location loader): up to a pixel off the rest.
-amount1-exact-edgeoff/README.txt/count	65
+amount1-exact-edgeoff/README.txt/064	  One step of the 16-bit grey is 0.003 m, so no height is stored finer than that.
+amount1-exact-edgeoff/README.txt/065	  Pixel (column c, row r) is world x = (c / 2047 - 0.5) x 21000, z = (0.5 - r / 2047) x 21000.
+amount1-exact-edgeoff/README.txt/066	  The location map alone uses c / 2048 and r / 2048 (Better Continents' location loader): up to a pixel off the rest.
+amount1-exact-edgeoff/README.txt/count	66

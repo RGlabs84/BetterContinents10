@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-09-24 for world export and import (0.9.0), and on 2026-09-29 for Expand World Data biomes (0.9.3), and on 2026-10-02 for export folders used as the Directory (0.9.4), and modified on 2026-10-04 for the unifying refactor (0.10.0).
+// Added by Wubarrk on 2026-09-24 for world export and import (0.9.0), and on 2026-09-29 for Expand World Data biomes (0.9.3), and on 2026-10-02 for export folders used as the Directory (0.9.4), and modified on 2026-10-04 for the unifying refactor (0.10.0), and on 2026-10-06 for 16k worlds (0.10.3).
 
 using System;
 using System.Collections;
@@ -196,17 +196,29 @@ public static class WorldExportMath
 public static class WorldExport
 {
   public const int MinSize = 128;
-  public const int MaxSize = 8192;
+  public const int MaxSize = 16384;
+  /// <summary>The most a Heightmap Amount can be (the world's setting and an export's): at Sea Level 0.5 it spans -30 m to
+  /// 16,170 m, a mountain 16 km tall.</summary>
+  public const float MaxHeightmapAmount = 81f;
+  /// <summary>The largest export that makes its New World preset itself. The preset builder decodes the maps (about 26 bytes a
+  /// pixel at its peak: 1.5 GB at 8192 px, and 2 GB for the heightmap alone at 16384), so past this size the export leaves it to
+  /// bc_import, which the player runs where the memory is.</summary>
+  public const int PresetMaxSize = 8192;
+
+  /// <summary>About how many MB the preset builder holds at its peak for an export of this size: the heightmap and biome map
+  /// stay decoded while the others decode one at a time, some 26 bytes a pixel (440 MB at 4096 px, 1.5 GB at 8192 px with nine
+  /// maps, measured offline), 20 without the paint map.</summary>
+  public static double PresetMemoryMb(int size, bool paint) => (double)size * size / 1e6 * (paint ? 26 : 20) + 30;
   public const string Format = "bc-export/1";
 
   public sealed class Options
   {
-    /// <summary>Pixels per side of every image (1024, 2048, 4096 or 8192 in the HUD). 2048 and up keep the alt-biome map
-    /// exact on the game's 12 m grid; 8192 holds about half a gigabyte while it runs, and every client that joins a
-    /// world built from it downloads the maps.</summary>
+    /// <summary>Pixels per side of every image (1024, 2048, 4096, 8192 or 16384 in the HUD). 2048 and up keep the alt-biome map
+    /// exact on the game's 12 m grid; and every client that joins a world built from it downloads the maps.</summary>
     public int Size = 4096;
-    /// <summary>The Heightmap Amount the heights are encoded for (0-5), recorded in export.cfg. 1, Better Continents' default
-    /// everywhere, spans -30 m to 170 m at Sea Level 0.5 and clips higher ground; 2 spans -30 m to 370 m.</summary>
+    /// <summary>The Heightmap Amount the heights are encoded for (above 0, at most <see cref="MaxHeightmapAmount"/>), recorded in
+    /// export.cfg. 1, Better Continents' default everywhere, spans -30 m to 170 m at Sea Level 0.5 and clips higher ground; 2
+    /// spans -30 m to 370 m; 81 spans -30 m to 16,170 m, in steps of a quarter of a metre.</summary>
     public float HeightmapAmount = 1f;
     /// <summary>The Sea Level Adjustment (0-1) the heights are encoded for.</summary>
     public float SeaLevel = 0.5f;
@@ -274,8 +286,8 @@ public static class WorldExport
     {
       if (Size < MinSize || Size > MaxSize)
         return $"the size must be {MinSize} to {MaxSize} pixels (got {Size})";
-      if (!(HeightmapAmount > 0f && HeightmapAmount <= 5f))
-        return $"the heightmap amount must be above 0 and at most 5, the config's range (got {Inv(HeightmapAmount)})";
+      if (!(HeightmapAmount > 0f && HeightmapAmount <= MaxHeightmapAmount))
+        return $"the heightmap amount must be above 0 and at most {Inv(MaxHeightmapAmount)}, the config's range (got {Inv(HeightmapAmount)})";
       if (!(SeaLevel >= 0f && SeaLevel <= 1f))
         return $"the sea level must be 0 to 1 (got {Inv(SeaLevel)})";
       if (!(HeatScale > 0f && HeatScale <= 100f))
@@ -625,6 +637,36 @@ public static class WorldExport
     public readonly int ZoneY = zoneY;
   }
 
+  // The location map as it is made: a few thousand dots in a black picture, kept by position (file row and column) instead
+  // of as the whole picture, which at 16384 px would be 0.8 GB for them.
+  internal sealed class SparsePixels(int size)
+  {
+    private readonly Dictionary<long, Rgb24> pixels = [];
+
+    public int Size => size;
+
+    public int Count => pixels.Count;
+
+    /// <summary>The pixel at column <paramref name="x"/> of file row <paramref name="fileRow"/>; black where nothing is.</summary>
+    public Rgb24 At(int x, int fileRow) => pixels.TryGetValue((long)fileRow * size + x, out var colour) ? colour : default;
+
+    public void Set(int x, int fileRow, Rgb24 colour) => pixels[(long)fileRow * size + x] = colour;
+
+    /// <summary>The dots of each file row that has any.</summary>
+    public Dictionary<int, List<(int X, Rgb24 Colour)>> ByRow()
+    {
+      var rows = new Dictionary<int, List<(int X, Rgb24 Colour)>>();
+      foreach (var kv in pixels)
+      {
+        int row = (int)(kv.Key / size), x = (int)(kv.Key % size);
+        if (!rows.TryGetValue(row, out var list))
+          rows[row] = list = [];
+        list.Add((x, kv.Value));
+      }
+      return rows;
+    }
+  }
+
   private sealed class AltClass(string key, List<string> names)
   {
     public readonly string Key = key;
@@ -680,6 +722,8 @@ public static class WorldExport
     // The New World preset (PresetPass): what the builder did, or why it did not run.
     private WorldImport.Outcome? PresetOutcome;
     private string? PresetSkipped;
+    // The preset was asked for but left to bc_import because of the size (not a failure).
+    private bool PresetTooBig;
     private string? presetName;
     private string PresetName => presetName ??= WorldImport.PresetNameFor(Dir, World?.m_name);
     private bool PresetMade => PresetOutcome != null && PresetOutcome.Error == null;
@@ -688,7 +732,9 @@ public static class WorldExport
     private double totalWeight, doneWeight, curWeight;
     private int rowsDone;
     private int cornerMin, cornerCount;
-    private static double encodeBytesPerSecond = 40e6;
+    // Every PNG this job has opened; Finish closes (and so deletes) the ones that never completed.
+    private List<PngRowWriter>? writers;
+    private List<PngRowWriter> Writers => writers ??= [];
 
     private double Mpx => (double)Size * Size / 1e6;
 
@@ -804,7 +850,7 @@ public static class WorldExport
         t += W(0.05, 0.1) + W(0.2);
       if (O.Sources)
         t += 0.5;
-      if (O.Preset)
+      if (MakesPreset)
         t += W(0.8, 0.2);
       totalWeight = t;
     }
@@ -889,25 +935,129 @@ public static class WorldExport
       }));
     }
 
-    // Writes one output on a task. The encoder reports no progress, so the phase advances on an estimate from the
-    // speed of the files written so far.
-    private IEnumerable Write(string relative, double weight, long rawBytes, Action<string> write, string? companion = null)
+    // ---- bands: sampling and writing at once ----------------------------------------------------------------------
+
+    // One PNG, written while it is sampled. RowBytes is a row of the finished image; 16-bit samples go in big endian.
+    private sealed class Output(string relative, PngRowWriter writer)
+    {
+      public readonly string Relative = relative;
+      public readonly PngRowWriter Writer = writer;
+      public int RowBytes => Writer.RowBytes;
+    }
+
+    private Output Open(string relative, int channels, int bits, HeightmapRecord? record = null)
     {
       var path = Path.Combine(Dir, relative);
       Tracked.Add(path);
-      if (companion != null)
-        Tracked.Add(Path.Combine(Dir, companion));
-      Begin($"Writing {relative}", weight);
-      var sw = Stopwatch.StartNew();
-      var expected = Math.Max(0.25, rawBytes / encodeBytesPerSecond);
-      var task = Task.Run(() => write(path));
-      foreach (var step in Await(task, () => (float)Math.Min(95.0, 100.0 * sw.Elapsed.TotalSeconds / expected)))
+      var writer = new PngRowWriter(path, Size, Size, channels, bits, record != null ? HeightmapRecord.Keyword : null, record?.Text);
+      Writers.Add(writer);
+      return new Output(relative, writer);
+    }
+
+    // Rows of a band: about two million pixels, so the bands of every map at once come to some 14 MB (a colour map has 3
+    // bytes a pixel) whatever the size, and an export of up to 1024 px is one band. A whole 16384 px map is 0.27 to 0.81 GB.
+    private int BandRows => Math.Max(1, Math.Min(Size, (1 << 21) / Size));
+
+    private static void Put16(byte[] buffer, int at, ushort value)
+    {
+      buffer[at] = (byte)(value >> 8);
+      buffer[at + 1] = (byte)value;
+    }
+
+    private static void PutRgb(byte[] buffer, int at, Rgb24 colour)
+    {
+      buffer[at] = colour.R;
+      buffer[at + 1] = colour.G;
+      buffer[at + 2] = colour.B;
+    }
+
+    // A task on a thread of its own, not the pool's: these wait for each other (a band waits for the workers, and for the band
+    // before it), and a pool of a few threads on a small machine would otherwise starve them for a thread at a time.
+    private static Task OwnThread(Action work) =>
+      Task.Factory.StartNew(work, CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default);
+
+    // Samples file rows 0..rows-1 band by band on the workers (each worker takes every n-th row of a band, so the costly rows
+    // spread) while the previous band is written, one task per output so the maps compress side by side. sample(row, buffers,
+    // rowInBand) fills that row of every output's band buffer; a pixel it does not set must be cleared, because the buffers
+    // are reused. Done when every row is written; the outputs are left open for the caller to complete, unless the run failed
+    // or was cancelled, which closes and deletes them. A cancel stops within a row per worker.
+    private Task RunBands(int rows, Output[] outputs, Action<int, byte[][], int> sample)
+    {
+      rowsDone = 0;
+      return OwnThread(() =>
+      {
+        int bandRows = Math.Min(BandRows, rows);
+        int workers = Math.Max(1, Math.Min(Workers, bandRows));
+        var sets = new byte[2][][];
+        for (int s = 0; s < 2; s++)
+          sets[s] = [.. outputs.Select(o => new byte[bandRows * o.RowBytes])];
+        Task? writing = null;
+        bool finished = false;
+        try
+        {
+          for (int start = 0, set = 0; start < rows && !cancelRequested; start += bandRows, set ^= 1)
+          {
+            int first = start, count = Math.Min(bandRows, rows - start);
+            var buffers = sets[set];
+            GameUtils.SimpleParallelFor(workers, 0, workers, w =>
+            {
+              for (int r = w; r < count; r += workers)
+              {
+                if (cancelRequested)
+                  return;
+                sample(first + r, buffers, r);
+                Interlocked.Increment(ref rowsDone);
+              }
+            });
+            // The band before this one is written (in order, and its buffers free) before this one goes out.
+            writing?.Wait();
+            if (cancelRequested)
+              break;
+            writing = OwnThread(() =>
+            {
+              if (outputs.Length == 1)
+                outputs[0].Writer.WriteRows(buffers[0], 0, count);
+              else
+                Task.WaitAll(outputs.Select((o, k) => OwnThread(() => o.Writer.WriteRows(buffers[k], 0, count))).ToArray());
+            });
+          }
+          writing?.Wait();
+          finished = !cancelRequested;
+        }
+        finally
+        {
+          if (!finished)
+          {
+            try { writing?.Wait(); } catch { /* the failure that matters is the one being thrown */ }
+            foreach (var o in outputs)
+              o.Writer.Dispose();
+          }
+        }
+      });
+    }
+
+    // Samples and writes the outputs as one phase: Begin, the bands, Await. (Not for outputs that nothing samples.)
+    private IEnumerable Stream(string phase, double weight, int rows, Output[] outputs, Action<int, byte[][], int> sample)
+    {
+      Begin(phase, weight);
+      foreach (var step in Await(RunBands(rows, outputs, sample), RowProgress(rows)))
         yield return step;
-      if (rawBytes > 1_000_000 && sw.Elapsed.TotalSeconds > 0.05)
-        encodeBytesPerSecond = 0.5 * encodeBytesPerSecond + 0.5 * rawBytes / sw.Elapsed.TotalSeconds;
-      Written.Add(relative.Replace('\\', '/'));
-      if (companion != null)
-        Written.Add(companion);
+    }
+
+    // The map is whole: its file gets its name, and the manifest lists it.
+    private void Complete(Output output)
+    {
+      output.Writer.Complete();
+      Written.Add(output.Relative.Replace('\\', '/'));
+    }
+
+    // A text file beside the maps (legends, notes), small enough to write on the main thread.
+    private void WriteTextFile(string relative, IEnumerable<string> lines)
+    {
+      var path = Path.Combine(Dir, relative);
+      Tracked.Add(path);
+      WorldExportPng.WriteText(path, lines);
+      Written.Add(relative);
     }
 
     // ---- terrain: heights, lava, moss, paint ---------------------------------------------------------------------
@@ -915,10 +1065,14 @@ public static class WorldExport
     private IEnumerable TerrainPass()
     {
       int n = Size;
-      L16[]? heights = O.Heightmap ? new L16[n * n] : null;
-      L8[]? lava = O.Lava ? new L8[n * n] : null;
-      L8[]? moss = O.Moss ? new L8[n * n] : null;
-      Rgb24[]? paint = O.Paint ? new Rgb24[n * n] : null;
+      // One output per map, in this order; the band buffers come in the same order.
+      var outputs = new List<Output>();
+      int hi = -1, li = -1, mi = -1, pi = -1;
+      Output? heights = null, lava = null, moss = null, paint = null;
+      if (O.Heightmap) { heights = Open("heightmap.png", 1, 16, new HeightmapRecord(O.HeightmapAmount, O.SeaLevel)); hi = outputs.Count; outputs.Add(heights); }
+      if (O.Lava) { lava = Open("lavamap.png", 1, 8); li = outputs.Count; outputs.Add(lava); }
+      if (O.Moss) { moss = Open("mossmap.png", 1, 8); mi = outputs.Count; outputs.Add(moss); }
+      if (O.Paint) { paint = Open("paintmap.png", 3, 8); pi = outputs.Count; outputs.Add(paint); }
       var stats = new TerrainRowStats[n];
 
       Heightmap.Biome[]? corners = null;
@@ -933,8 +1087,12 @@ public static class WorldExport
           yield return step;
       }
 
-      Begin(O.Heightmap ? "Sampling heights" : "Sampling terrain masks", W(3.0));
-      foreach (var step in Await(RunRows(n, row => TerrainRow(row, corners, heights, lava, moss, paint, stats)), RowProgress(n)))
+      // Sampling and writing in one pass: the weight is both, as they were when the maps were written after it.
+      var grids = corners;
+      foreach (var step in Stream(O.Heightmap ? "Sampling heights" : "Sampling terrain masks",
+                 W(3.0) + (O.Heightmap ? W(0.5) : 0) + (O.Lava ? W(0.15) : 0) + (O.Moss ? W(0.15) : 0) + (O.Paint ? W(0.3) : 0), n, [.. outputs],
+                 (row, buffers, r) => TerrainRow(row, r, grids, hi < 0 ? null : buffers[hi], li < 0 ? null : buffers[li], mi < 0 ? null : buffers[mi],
+                   pi < 0 ? null : buffers[pi], stats)))
         yield return step;
       corners = null;
 
@@ -954,9 +1112,7 @@ public static class WorldExport
 
       if (heights != null)
       {
-        foreach (var step in Write("heightmap.png", W(0.5), 2L * n * n, p => WorldExportPng.SaveHeightmap(p, heights!, n, new HeightmapRecord(O.HeightmapAmount, O.SeaLevel))))
-          yield return step;
-        heights = null;
+        Complete(heights);
         HeightsWritten = true;
         var floor = WorldExportMath.ValueToMetres(0f, O.HeightmapAmount, O.SeaLevel);
         var ceiling = WorldExportMath.ValueToMetres(1f, O.HeightmapAmount, O.SeaLevel);
@@ -969,46 +1125,34 @@ public static class WorldExport
       if (lava != null)
       {
         if (LavaCells > 0)
-        {
-          foreach (var step in Write("lavamap.png", W(0.15), (long)n * n, p => WorldExportPng.SaveL8(p, lava!, n)))
-            yield return step;
-        }
+          Complete(lava);
         else
         {
-          Skip(W(0.15));
+          // Written as it was sampled, all black: not a map worth keeping.
+          lava.Writer.Dispose();
           Notes.Add("No Ashlands terrain on this map, so there is no lava map.");
         }
-        lava = null;
       }
       if (moss != null)
       {
         if (MossCells > 0)
-        {
-          foreach (var step in Write("mossmap.png", W(0.15), (long)n * n, p => WorldExportPng.SaveL8(p, moss!, n)))
-            yield return step;
-        }
+          Complete(moss);
         else
         {
-          Skip(W(0.15));
+          moss.Writer.Dispose();
           Notes.Add("No Mistlands terrain on this map, so there is no moss map.");
         }
-        moss = null;
       }
       if (paint != null)
       {
-        foreach (var step in Write("paintmap.png", W(0.3), 3L * n * n, p =>
-                 {
-                   WorldExportPng.SaveRgb24(p, paint!, n);
-                   // No colour mappings: every pixel is its own mask colour, alpha untouched (paint.a = 1). The comment has
-                   // no colon, because ImageMapPaint reads any line with one as a "from: to" mapping.
-                   WorldExportPng.WriteText(Path.Combine(Dir, "paintmap.txt"),
-                   [
-                     "# The paint map needs no colour list. Every pixel of paintmap.png is used as the ground paint as it is",
-                     "# (red, green and blue of the terrain mask), and the game keeps its own alpha (lava and moss).",
-                   ]);
-                 }, "paintmap.txt"))
-          yield return step;
-        paint = null;
+        Complete(paint);
+        // No colour mappings: every pixel is its own mask colour, alpha untouched (paint.a = 1). The comment has
+        // no colon, because ImageMapPaint reads any line with one as a "from: to" mapping.
+        WriteTextFile("paintmap.txt",
+        [
+          "# The paint map needs no colour list. Every pixel of paintmap.png is used as the ground paint as it is",
+          "# (red, green and blue of the terrain mask), and the game keeps its own alpha (lava and moss).",
+        ]);
       }
     }
 
@@ -1027,7 +1171,8 @@ public static class WorldExport
     private static bool AshlandsGround(Heightmap.Biome b) => b == Heightmap.Biome.AshLands || EWD.Terrain(b) == Heightmap.Biome.AshLands;
     private static bool MistlandsGround(Heightmap.Biome b) => b == Heightmap.Biome.Mistlands || EWD.Terrain(b) == Heightmap.Biome.Mistlands;
 
-    private void TerrainRow(int fileRow, Heightmap.Biome[]? corners, L16[]? heights, L8[]? lava, L8[]? moss, Rgb24[]? paint, TerrainRowStats[] stats)
+    // The maps' bytes go to rowInBand of the band buffers: 16-bit grey (heights) big endian, 8-bit grey (lava, moss), RGB (paint).
+    private void TerrainRow(int fileRow, int rowInBand, Heightmap.Biome[]? corners, byte[]? heights, byte[]? lava, byte[]? moss, byte[]? paint, TerrainRowStats[] stats)
     {
       int n = Size;
       float wz = WorldExportMath.FileRowToWorldZ(fileRow, n, Total);
@@ -1096,7 +1241,7 @@ public static class WorldExport
           ashA = mistA = mask.a;
         }
 
-        int i = fileRow * n + col;
+        int i = rowInBand * n + col;
         if (heights != null)
         {
           float fh = h / WorldExportMath.HeightScale;
@@ -1107,7 +1252,7 @@ public static class WorldExport
           if (EdgeDropoff && !inside)
             WorldExportMath.TryUndoEdgeDropoff(fh, d, WorldR, TotalR, out fh);
           float v = (fh + WorldExportMath.BaseOffset - Sla) / O.HeightmapAmount;
-          heights[i] = new L16(WorldExportMath.ValueToUShort(v, out int clip));
+          Put16(heights, 2 * i, WorldExportMath.ValueToUShort(v, out int clip));
           if (inside)
           {
             if (clip < 0) st.Low++;
@@ -1118,18 +1263,24 @@ public static class WorldExport
           else if (d <= TotalR && clip != 0)
             st.Ring++;
         }
-        if (lava != null && hasAsh)
+        if (lava != null)
         {
-          lava[i] = new L8(WorldExportMath.ValueToByte(ashA));
-          st.LavaCells++;
+          lava[i] = hasAsh ? WorldExportMath.ValueToByte(ashA) : (byte)0;
+          if (hasAsh)
+            st.LavaCells++;
         }
-        if (moss != null && hasMist)
+        if (moss != null)
         {
-          moss[i] = new L8(WorldExportMath.ValueToByte(mistA));
-          st.MossCells++;
+          moss[i] = hasMist ? WorldExportMath.ValueToByte(mistA) : (byte)0;
+          if (hasMist)
+            st.MossCells++;
         }
         if (paint != null)
-          paint[i] = new Rgb24(WorldExportMath.ValueToByte(mask.r), WorldExportMath.ValueToByte(mask.g), WorldExportMath.ValueToByte(mask.b));
+        {
+          paint[3 * i] = WorldExportMath.ValueToByte(mask.r);
+          paint[3 * i + 1] = WorldExportMath.ValueToByte(mask.g);
+          paint[3 * i + 2] = WorldExportMath.ValueToByte(mask.b);
+        }
       }
       stats[fileRow] = st;
     }
@@ -1144,10 +1295,10 @@ public static class WorldExport
       var colours = new Rgb24[BiomeRegistry.IndexCount];
       foreach (var kv in table)
         colours[BiomeRegistry.ToSafeIndex(kv.Key)] = new Rgb24(kv.Value.r, kv.Value.g, kv.Value.b);
-      Rgb24[]? pixels = new Rgb24[n * n];
-      Begin("Sampling biomes", W(1.0));
-      foreach (var step in Await(RunRows(n, row =>
+      var output = Open("biomemap.png", 3, 8);
+      foreach (var step in Stream("Sampling biomes", W(1.0) + W(0.3), n, [output], (row, buffers, r) =>
                {
+                 var buffer = buffers[0];
                  var local = new long[colours.Length];
                  long unknown = 0;
                  float wz = WorldExportMath.FileRowToWorldZ(row, n, Total);
@@ -1157,26 +1308,21 @@ public static class WorldExport
                    int k = BiomeRegistry.ToSafeIndex(biome);
                    if (k == 0 && biome != Heightmap.Biome.None)
                      unknown++;
-                   pixels![row * n + col] = colours[k];
+                   PutRgb(buffer, 3 * (r * n + col), colours[k]);
                    local[k]++;
                  }
                  for (int k = 0; k < local.Length; k++)
                    Interlocked.Add(ref BiomePixels[k], local[k]);
                  Interlocked.Add(ref UnknownBiomePixels, unknown);
-               }), RowProgress(n)))
+               }))
         yield return step;
       if (UnknownBiomePixels > 0)
         Notes.Add($"Biomes: {UnknownBiomePixels} pixel(s) had a biome Better Continents' biome map cannot hold (another mod?) and were left black (None: the game decides there).");
-      foreach (var step in Write("biomemap.png", W(0.3), 3L * n * n, p =>
-               {
-                 WorldExportPng.SaveRgb24(p, pixels!, n);
-                 // The default legend, plus the added biomes this world has, by the names Expand World Data reads.
-                 var legend = table.Where(kv => BiomeRegistry.IsVanilla(kv.Key) || BiomePixels[BiomeRegistry.ToSafeIndex(kv.Key)] > 0)
-                   .ToDictionary(kv => kv.Key, kv => kv.Value);
-                 WorldExportPng.WriteText(Path.Combine(Dir, "biomemap.txt"), ImageMapBiome.LegendLines(legend));
-               }, "biomemap.txt"))
-        yield return step;
-      pixels = null;
+      Complete(output);
+      // The default legend, plus the added biomes this world has, by the names Expand World Data reads.
+      var legend = table.Where(kv => BiomeRegistry.IsVanilla(kv.Key) || BiomePixels[BiomeRegistry.ToSafeIndex(kv.Key)] > 0)
+        .ToDictionary(kv => kv.Key, kv => kv.Value);
+      WriteTextFile("biomemap.txt", ImageMapBiome.LegendLines(legend));
     }
 
     // ---- forest ------------------------------------------------------------------------------------------------
@@ -1184,11 +1330,11 @@ public static class WorldExport
     private IEnumerable ForestPass()
     {
       int n = Size;
-      L16[]? pixels = new L16[n * n];
       long low = 0, high = 0;
-      Begin("Sampling forest", W(0.6));
-      foreach (var step in Await(RunRows(n, row =>
+      var output = Open("forestmap.png", 1, 16);
+      foreach (var step in Stream("Sampling forest", W(0.6) + W(0.5), n, [output], (row, buffers, r) =>
                {
+                 var buffer = buffers[0];
                  long rowLow = 0, rowHigh = 0;
                  float wz = WorldExportMath.FileRowToWorldZ(row, n, Total);
                  for (int col = 0; col < n; col++)
@@ -1201,7 +1347,7 @@ public static class WorldExport
                    var scaled = ImportForestScale != 1f ? pos * ImportForestScale : pos;
                    float vanilla = DUtils.Fbm(scaled * 0.01f * 0.4f, 3, 1.6f, 0.7f);
                    float f = O.ForestExact ? WorldExportMath.ForestMapExact(target, vanilla) : WorldExportMath.ForestMapAdditive(target, vanilla);
-                   pixels![row * n + col] = new L16(WorldExportMath.ValueToUShort(f, out _));
+                   Put16(buffer, 2 * (r * n + col), WorldExportMath.ValueToUShort(f, out _));
                    // Counted only past a real difference: the new world's scale is a float step off this one's, so a
                    // vanilla map lands a hair either side of 0 everywhere.
                    if (f < -ForestTolerance) rowLow++;
@@ -1209,16 +1355,14 @@ public static class WorldExport
                  }
                  Interlocked.Add(ref low, rowLow);
                  Interlocked.Add(ref high, rowHigh);
-               }), RowProgress(n)))
+               }))
         yield return step;
       ForestClippedLow = low;
       ForestClippedHigh = high;
       if (low > 0)
         Notes.Add($"Forest: {low} pixel(s) have less forest than the game's own noise gives there, which the additive encoding cannot store; "
                   + "they come back at the game's density. Export with the exact forest encoding to keep them.");
-      foreach (var step in Write("forestmap.png", W(0.5), 2L * n * n, p => WorldExportPng.SaveL16(p, pixels!, n)))
-        yield return step;
-      pixels = null;
+      Complete(output);
       ForestWritten = true;
     }
 
@@ -1230,11 +1374,11 @@ public static class WorldExport
     private IEnumerable HeatPass()
     {
       int n = Size;
-      L16[]? pixels = new L16[n * n];
       long hot = 0, clipped = 0;
-      Begin("Sampling heat", W(0.2));
-      foreach (var step in Await(RunRows(n, row =>
+      var output = Open("heatmap.png", 1, 16);
+      foreach (var step in Stream("Sampling heat", W(0.2) + W(0.3), n, [output], (row, buffers, r) =>
                {
+                 var buffer = buffers[0];
                  long rowHot = 0, rowClipped = 0;
                  float wz = WorldExportMath.FileRowToWorldZ(row, n, Total);
                  for (int col = 0; col < n; col++)
@@ -1242,14 +1386,14 @@ public static class WorldExport
                    float wx = WorldExportMath.PixelToWorld(col, n, Total);
                    float g = WorldGenerator.GetAshlandsOceanGradient(wx, wz);
                    var p = WorldExportMath.ValueToUShort(WorldExportMath.HeatToValue(g, O.HeatScale), out int clip);
-                   pixels![row * n + col] = new L16(p);
+                   Put16(buffer, 2 * (r * n + col), p);
                    if (p > 0) rowHot++;
                    // The map square's corners lie past the world, where the gradient keeps climbing (about 20).
                    if (clip > 0 && wx * wx + wz * wz <= TotalR * TotalR) rowClipped++;
                  }
                  Interlocked.Add(ref hot, rowHot);
                  Interlocked.Add(ref clipped, rowClipped);
-               }), RowProgress(n)))
+               }))
         yield return step;
       HeatPixels = hot;
       HeatClipped = clipped;
@@ -1259,9 +1403,7 @@ public static class WorldExport
                   + "move in that strip; the biome map keeps the Ashlands ground itself where it was.");
       if (clipped > 0)
         Notes.Add($"Heat: {clipped} pixel(s) inside the world were hotter than the heat scale ({Inv(O.HeatScale)}) and were clipped to it; export with a larger heat scale to keep them.");
-      foreach (var step in Write("heatmap.png", W(0.3), 2L * n * n, p => WorldExportPng.SaveL16(p, pixels!, n)))
-        yield return step;
-      pixels = null;
+      Complete(output);
       HeatWritten = true;
     }
 
@@ -1285,10 +1427,10 @@ public static class WorldExport
       int gw = sectors.GetLength(0), gh = sectors.GetLength(1);
       var classOf = new Dictionary<BiomeSector, int>();
       var classes = new List<AltClass>();
-      Rgb24[]? pixels = new Rgb24[n * n];
       Rgb24[] palette = [];
+      var output = Open("altbiomemap.png", 3, 8);
 
-      Begin("Sampling alt biomes", W(0.2, 0.05));
+      Begin("Sampling alt biomes", W(0.2, 0.05) + W(0.3));
 
       // Main thread, NOT the background task below: BiomeSector.AltBiomes is a plain List<AltBiome> that a live
       // rebuild (the "bc ab mode"/"bc ab fn"/"bc reload ab" commands, AltBiomeControl.RequestRebuild's Assignment
@@ -1331,45 +1473,36 @@ public static class WorldExport
       // classOf/palette are touched, on worker threads: none of that is BiomeSector.AltBiomes, so a live rebuild
       // running at the same time no longer races with it (a Sectors/Points-level rebuild also replaces
       // World.m_biomeData wholesale rather than mutating this data/sectors/heights snapshot in place).
-      rowsDone = 0;
-      var task = Task.Run(() =>
-      {
-        var counts = new long[classes.Count];
-        GameUtils.SimpleParallelFor(Math.Max(1, Math.Min(Workers, n)), 0, Math.Max(1, Math.Min(Workers, n)), w =>
-        {
-          int step = Math.Max(1, Math.Min(Workers, n));
-          var local = new long[counts.Length];
-          for (int row = w; row < n; row += step)
-          {
-            if (cancelRequested)
-              return;
-            // The class of the grid point nearest each pixel: the import samples the nearest pixel at every grid
-            // point, and with pixels closer than 12 m that pixel's nearest grid point is that same point.
-            float wz = WorldExportMath.FileRowToWorldZ(row, n, Total);
-            int gy = Mathf.Clamp(Mathf.RoundToInt((wz - g0) / cell), 0, gh - 1);
-            for (int col = 0; col < n; col++)
-            {
-              int gx = Mathf.Clamp(Mathf.RoundToInt((WorldExportMath.PixelToWorld(col, n, Total) - g0) / cell), 0, gw - 1);
-              var s = sectors[gx, gy];
-              // Points past the sampled disc (height -1000) are never planted.
-              if (s == null || heights[gx, gy] == -1000f || !classOf.TryGetValue(s, out var k) || k < 0)
-                continue;
-              pixels![row * n + col] = palette[k];
-              local[k]++;
-            }
-            Interlocked.Increment(ref rowsDone);
-          }
-          lock (counts)
-          {
-            for (int k = 0; k < local.Length; k++)
-              counts[k] += local[k];
-          }
-        });
-        for (int k = 0; k < classes.Count; k++)
-          classes[k].Pixels = counts[k];
-      });
-      foreach (var step in Await(task, RowProgress(n)))
+      var counts = new long[classes.Count];
+      foreach (var step in Await(RunBands(n, [output], (row, buffers, r) =>
+               {
+                 var buffer = buffers[0];
+                 var local = new long[counts.Length];
+                 // The buffers are reused: a pixel nothing is planted at is cleared to black.
+                 Array.Clear(buffer, 3 * r * n, 3 * n);
+                 // The class of the grid point nearest each pixel: the import samples the nearest pixel at every grid
+                 // point, and with pixels closer than 12 m that pixel's nearest grid point is that same point.
+                 float wz = WorldExportMath.FileRowToWorldZ(row, n, Total);
+                 int gy = Mathf.Clamp(Mathf.RoundToInt((wz - g0) / cell), 0, gh - 1);
+                 for (int col = 0; col < n; col++)
+                 {
+                   int gx = Mathf.Clamp(Mathf.RoundToInt((WorldExportMath.PixelToWorld(col, n, Total) - g0) / cell), 0, gw - 1);
+                   var s = sectors[gx, gy];
+                   // Points past the sampled disc (height -1000) are never planted.
+                   if (s == null || heights[gx, gy] == -1000f || !classOf.TryGetValue(s, out var k) || k < 0)
+                     continue;
+                   PutRgb(buffer, 3 * (r * n + col), palette[k]);
+                   local[k]++;
+                 }
+                 lock (counts)
+                 {
+                   for (int k = 0; k < local.Length; k++)
+                     counts[k] += local[k];
+                 }
+               }), RowProgress(n)))
         yield return step;
+      for (int k = 0; k < classes.Count; k++)
+        classes[k].Pixels = counts[k];
 
       AltClassCount = classes.Count;
       AltRegions = classes.Sum(c => c.Regions);
@@ -1381,14 +1514,8 @@ public static class WorldExport
         Notes.Add(g0 == -12282f && cell == 12f
           ? "Alt biomes: below 2048 pixels a pixel is wider than the game's 12 m alt-biome grid, so region borders move by up to a pixel."
           : $"Alt biomes: a pixel ({Inv(Total / Size)} m) is wider than the game's {Inv(cell)} m alt-biome grid, so region borders move by up to a pixel.");
-      var legend = AltLegend(classes);
-      foreach (var step in Write("altbiomemap.png", W(0.3), 3L * n * n, p =>
-               {
-                 WorldExportPng.SaveRgb24(p, pixels!, n);
-                 WorldExportPng.WriteText(Path.Combine(Dir, "altbiomemap.txt"), legend);
-               }, "altbiomemap.txt"))
-        yield return step;
-      pixels = null;
+      Complete(output);
+      WriteTextFile("altbiomemap.txt", AltLegend(classes));
       AltBiomesWritten = true;
     }
 
@@ -1518,23 +1645,30 @@ public static class WorldExport
         yield break;
       }
 
-      Rgb24[]? pixels = new Rgb24[n * n];
+      var pixels = new SparsePixels(n);
       var legend = new List<string>();
       Begin("Placing locations", W(0.05, 0.1));
-      var task = Task.Run(() => PlaceLocations(records, pixels!, legend));
+      var task = Task.Run(() => PlaceLocations(records, pixels, legend));
       foreach (var step in Await(task, () => 50f))
         yield return step;
       if (LocationOutside > 0)
         Notes.Add($"Locations: {LocationOutside} instance(s) lie outside the map square and were skipped.");
       if (LocationNudged > 0 || LocationDropped > 0)
         Notes.Add($"Locations: {LocationNudged} moved by a pixel or two to stay apart from a neighbour of the same kind, {LocationDropped} dropped (no free pixel nearby).");
-      foreach (var step in Write("locationmap.png", W(0.2), 3L * n * n, p =>
+      // A few thousand dots in a black picture: written from the dots, row by row, never as a picture in memory.
+      var byRow = pixels.ByRow();
+      var output = Open("locationmap.png", 3, 8);
+      foreach (var step in Stream("Writing locationmap.png", W(0.2), n, [output], (row, buffers, r) =>
                {
-                 WorldExportPng.SaveRgb24(p, pixels!, n);
-                 WorldExportPng.WriteText(Path.Combine(Dir, "locationmap.txt"), legend);
-               }, "locationmap.txt"))
+                 var buffer = buffers[0];
+                 Array.Clear(buffer, 3 * r * n, 3 * n);
+                 if (byRow.TryGetValue(row, out var dots))
+                   foreach (var (x, colour) in dots)
+                     PutRgb(buffer, 3 * (r * n + x), colour);
+               }))
         yield return step;
-      pixels = null;
+      Complete(output);
+      WriteTextFile("locationmap.txt", legend);
       LocationsWritten = true;
     }
 
@@ -1542,7 +1676,7 @@ public static class WorldExport
     // at a random pixel of the blob, and the game keeps one location per 64 m zone, so a pixel must not touch another
     // of its colour and should import into the zone its location is in. The nearest pixel almost always qualifies;
     // otherwise the nearest one within two pixels that does, else it is dropped.
-    private void PlaceLocations(List<LocationRecord> records, Rgb24[] pixels, List<string> legend)
+    private void PlaceLocations(List<LocationRecord> records, SparsePixels pixels, List<string> legend)
     {
       int n = Size;
       records.Sort((a, b) =>
@@ -1600,18 +1734,18 @@ public static class WorldExport
       return [.. list.OrderBy(t => t.Item1 * t.Item1 + t.Item2 * t.Item2).ThenBy(t => Math.Abs(t.Item2)).ThenBy(t => t.Item2).ThenBy(t => t.Item1)];
     }
 
-    private bool TryPlace(Rgb24[] pixels, int px, int my, Rgb24 colour, LocationRecord r, HashSet<long> occupiedZones, out bool moved)
+    private bool TryPlace(SparsePixels pixels, int px, int my, Rgb24 colour, LocationRecord r, HashSet<long> occupiedZones, out bool moved)
     {
       int n = Size;
       bool Free(int x, int y)
       {
         if (x < 0 || y < 0 || x >= n || y >= n)
           return false;
-        if (!IsBlack(pixels[WorldExportMath.FlipRow(y, n) * n + x]))
+        if (!IsBlack(pixels.At(x, WorldExportMath.FlipRow(y, n))))
           return false;
         return !Same(x + 1, y) && !Same(x - 1, y) && !Same(x, y + 1) && !Same(x, y - 1);
       }
-      bool Same(int x, int y) => x >= 0 && y >= 0 && x < n && y < n && pixels[WorldExportMath.FlipRow(y, n) * n + x].Equals(colour);
+      bool Same(int x, int y) => x >= 0 && y >= 0 && x < n && y < n && pixels.At(x, WorldExportMath.FlipRow(y, n)).Equals(colour);
       Vector2s ImportZone(int x, int y) => ZoneSystem.GetZone(new Vector3(WorldExportMath.LocationPixelToWorld(x, n, Total), 0f, WorldExportMath.LocationPixelToWorld(y, n, Total)));
       // First choice: a free pixel that imports into the location's own zone; second: any free pixel whose zone no
       // other location uses.
@@ -1626,7 +1760,7 @@ public static class WorldExport
           bool own = zone.x == r.ZoneX && zone.y == r.ZoneY;
           if (pass == 0 ? !own : occupiedZones.Contains(ZoneKey(zone.x, zone.y)))
             continue;
-          pixels[WorldExportMath.FlipRow(y, n) * n + x] = colour;
+          pixels.Set(x, WorldExportMath.FlipRow(y, n), colour);
           occupiedZones.Add(ZoneKey(zone.x, zone.y));
           moved = dx != 0 || dy != 0 || !own;
           return true;
@@ -1837,15 +1971,21 @@ public static class WorldExport
             if (size <= 0 || alt.Map.Length != size * size)
               break;
             var classColours = alt.Classes.Select(c => new Rgb24(c.Color.r, c.Color.g, c.Color.b)).ToArray();
-            var pixels = new Rgb24[size * size];
-            for (int y = 0; y < size; y++)
+            // Row by row, never as a picture in memory: this map can be 16384 px.
+            output(stem + ".png", p => WorldExportPng.SaveRows(p, size, 3, 8, (fileRow, row) =>
+            {
+              int y = WorldExportMath.FlipRow(fileRow, size);
               for (int x = 0; x < size; x++)
               {
                 var cls = alt.Map[y * size + x];
                 if (cls != 0 && cls < classColours.Length)
-                  pixels[WorldExportMath.FlipRow(y, size) * size + x] = classColours[cls];
+                {
+                  row[3 * x] = classColours[cls].R;
+                  row[3 * x + 1] = classColours[cls].G;
+                  row[3 * x + 2] = classColours[cls].B;
+                }
               }
-            output(stem + ".png", p => WorldExportPng.SaveRgb24(p, pixels, size));
+            }));
             Legend(alt.Legend.Replace("\r\n", "\n").Split('\n'));
             break;
           }
@@ -1865,15 +2005,19 @@ public static class WorldExport
               int size = biome.Size;
               if (size <= 0 || biome.HasTail)
                 break;
-              var pixels = new Rgba32[size * size];
-              for (int y = 0; y < size; y++)
+              output(stem + ".png", p => WorldExportPng.SaveRows(p, size, 4, 8, (fileRow, row) =>
+              {
+                int y = WorldExportMath.FlipRow(fileRow, size);
                 for (int x = 0; x < size; x++)
                 {
                   var b = biome.BiomeAt(x, y);
                   var c = colours.TryGetValue(b, out var found) ? found : new Color32(0, 0, 0, 255);
-                  pixels[WorldExportMath.FlipRow(y, size) * size + x] = new Rgba32(c.r, c.g, c.b, c.a);
+                  row[4 * x] = c.r;
+                  row[4 * x + 1] = c.g;
+                  row[4 * x + 2] = c.b;
+                  row[4 * x + 3] = c.a;
                 }
-              output(stem + ".png", p => WorldExportPng.SaveRgba32(p, pixels, size));
+              }));
             }
             Legend(legend);
             break;
@@ -1913,15 +2057,19 @@ public static class WorldExport
               int size = spawn.Size;
               if (size <= 0 || indices.Length != size * size)
                 break;
-              var pixels = new Rgba32[size * size];
-              for (int y = 0; y < size; y++)
+              output(stem + ".png", p => WorldExportPng.SaveRows(p, size, 4, 8, (fileRow, row) =>
+              {
+                int y = WorldExportMath.FlipRow(fileRow, size);
                 for (int x = 0; x < size; x++)
                 {
                   int k = indices[y * size + x];
                   var c = k < spawn.LegendColors.Count ? spawn.LegendColors[k] : new Color32(0, 0, 0, 255);
-                  pixels[WorldExportMath.FlipRow(y, size) * size + x] = new Rgba32(c.r, c.g, c.b, c.a);
+                  row[4 * x] = c.r;
+                  row[4 * x + 1] = c.g;
+                  row[4 * x + 2] = c.b;
+                  row[4 * x + 3] = c.a;
                 }
-              output(stem + ".png", p => WorldExportPng.SaveRgba32(p, pixels, size));
+              }));
             }
             Legend(legend);
             break;
@@ -1969,13 +2117,20 @@ public static class WorldExport
 
     // bc_import's builder, on this folder and these settings lines (export.cfg is written after it, and says how it went).
     // A preset that cannot be made never fails the export: every map is written by now.
+    // Whether the export builds the preset itself: asked for, and not so big that the builder's memory (every map decoded) is more
+    // than an export should take (WorldExport.PresetMaxSize).
+    private bool MakesPreset => O.Preset && Size <= PresetMaxSize;
+
     private IEnumerable PresetPass(List<string> config)
     {
-      if (!O.Preset)
+      if (!MakesPreset)
       {
-        PresetSkipped = OnDedicatedServer()
-          ? "a dedicated server has no New World screen: copy the folder to a game and run bc_import there"
-          : "switched off for this export";
+        PresetSkipped = !O.Preset
+          ? OnDedicatedServer()
+            ? "a dedicated server has no New World screen: copy the folder to a game and run bc_import there"
+            : "switched off for this export"
+          : $"at {Size} px the preset builder decodes every map and needs about {PresetMemoryMb(Size, O.Paint) / 1024:0.#} GB, more than an export takes by itself: bc_import makes it where the memory is";
+        PresetTooBig = O.Preset;
         yield break;
       }
       Begin("Making the New World preset", W(0.8, 0.2));
@@ -2263,6 +2418,7 @@ public static class WorldExport
       if (HeightsWritten)
       {
         l.Add($"  Heights: metres = (v x {Inv(O.HeightmapAmount)} - 0.15 + {Inv(Sla)}) x 200, v = pixel / 65535.");
+        l.Add($"  One step of the 16-bit grey is {Inv((ceiling - floor) / 65535f, "0.###")} m, so no height is stored finer than that.");
         if (EdgeDropoff)
           l.Add($"  Past {Inv(WorldR)} m the heightmap holds the ground before Better Continents' edge drop-off, which rebuilds the edge.");
       }
@@ -2382,6 +2538,9 @@ public static class WorldExport
         Echo = null;
         return;
       }
+      // Files still open (a map the failure or the cancel came before the end of) close, and so go, before the rest are deleted.
+      foreach (var writer in Writers)
+        writer.Dispose();
       DeletePartial();
       if (failure == null)
       {
@@ -2427,6 +2586,8 @@ public static class WorldExport
         lines.Add($"forest: {ForestClippedLow} pixel(s) had less forest than the game makes there and come back at its density (the exact forest encoding keeps them).");
       if (PresetMade)
         lines.Add($"New World preset \"{PresetName}\" is ready: pick it under Better Continents when you create a world.");
+      else if (PresetTooBig)
+        lines.Add($"no New World preset at this size ({PresetSkipped}); 'bc_import {ImportArg}' makes it.");
       else if (O.Preset)
         lines.Add($"WARNING: the New World preset was not made ({PresetOutcome?.Error ?? PresetSkipped}); 'bc_import {ImportArg}' makes it.");
       int notes = Notes.Count(x => !x.StartsWith("Only the generated world"));
@@ -2540,6 +2701,30 @@ internal static class WorldExportPng
   public static void SaveRgb24(string path, Rgb24[] pixels, int size) => Save(path, pixels, size, Encoder(PngColorType.Rgb, PngBitDepth.Bit8));
 
   public static void SaveRgba32(string path, Rgba32[] pixels, int size) => Save(path, pixels, size, Encoder(PngColorType.RgbWithAlpha, PngBitDepth.Bit8));
+
+  /// <summary>A size x size picture written row by row (PngRowWriter), so that only a band of rows is ever in memory:
+  /// <paramref name="fillRow"/>(fileRow, row) sets the bytes of file row <paramref name="fileRow"/> (0 = the top), which
+  /// arrive cleared; <paramref name="channels"/> 1, 3 or 4 samples a pixel, 16-bit samples big endian.</summary>
+  public static void SaveRows(string path, int size, int channels, int bitDepth, Action<int, byte[]> fillRow, HeightmapRecord? record = null)
+  {
+    using var writer = new PngRowWriter(path, size, size, channels, bitDepth, record != null ? HeightmapRecord.Keyword : null, record?.Text);
+    int rowBytes = writer.RowBytes, bandRows = Math.Max(1, Math.Min(size, (1 << 20) / rowBytes));
+    var band = new byte[bandRows * rowBytes];
+    var row = new byte[rowBytes];
+    for (int y = 0; y < size;)
+    {
+      int rows = Math.Min(bandRows, size - y);
+      for (int r = 0; r < rows; r++)
+      {
+        Array.Clear(row, 0, rowBytes);
+        fillRow(y + r, row);
+        Buffer.BlockCopy(row, 0, band, r * rowBytes, rowBytes);
+      }
+      writer.WriteRows(band, 0, rows);
+      y += rows;
+    }
+    writer.Complete();
+  }
 
   private static void Save<T>(string path, T[] pixels, int size, PngEncoder encoder, HeightmapRecord? record = null) where T : unmanaged, IPixel<T>
   {

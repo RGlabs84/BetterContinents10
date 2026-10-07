@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-10-04 for the unifying refactor (0.10.0), and modified on 2026-10-06 for the Forest Scale default (0.10.2).
+// Added by Wubarrk on 2026-10-04 for the unifying refactor (0.10.0), and modified on 2026-10-06 for the Forest Scale default (0.10.2), and on 2026-10-06 for 16k worlds (0.10.3).
 
 using System;
 using System.Collections.Generic;
@@ -154,7 +154,7 @@ internal static class SettingsSchema
   // ---- 02 Heightmap ---------------------------------------------------------------------------------------------------
   public static readonly SettingDef<string> HeightmapFile = S("Heightmap File", "Path to a heightmap: a square image, 16-bit grey for smooth slopes, white highest (see Heightmap Amount). Not used when Directory is set: its heightmap.png is used.", SettingScope.World, "", e => ConfigHeightFile = e);
   public static readonly SettingDef<float> HeightmapAmount = new("Heightmap Amount", "Multiplier of the heightmap's values. With Sea Level Adjustment 0.5, Heightmap Amount 1 (the default) gives heights of -30 m to 170 m (the sea is at 30 m) and clips vanilla's highest mountains; 2 gives -30 m to 370 m and keeps them all. A world export records the amount its heightmap was made for.", SettingScope.World, 1f, e => ConfigHeightmapAmount = e)
-  { Range = R(0f, 5f), Get = s => s.HeightmapAmount, Set = (s, v) => s.HeightmapAmount = v, ConsoleGroup = "h", ConsoleName = "am", ConsoleLabel = "Heightmap Amount" };
+  { Range = R(0f, 81f), Get = s => s.HeightmapAmount, Set = (s, v) => s.HeightmapAmount = v, ConsoleGroup = "h", ConsoleName = "am", ConsoleLabel = "Heightmap Amount" };
   public static readonly SettingDef<float> HeightmapBlend = new("Heightmap Blend", "How strongly to blend the heightmap file into the final result", SettingScope.World, 1f, e => ConfigHeightmapBlend = e)
   { Range = R(0f, 1f), Get = s => s.HeightmapBlend, Set = (s, v) => s.HeightmapBlend = v, ConsoleGroup = "h", ConsoleName = "bl", ConsoleLabel = "Heightmap Blend" };
   public static readonly SettingDef<float> HeightmapAdd = new("Heightmap Add", "How strongly to add the heightmap file to the final result (usually you want to blend it instead)", SettingScope.World, 0f, e => ConfigHeightmapAdd = e)
@@ -243,10 +243,10 @@ internal static class SettingsSchema
   public static readonly SettingDef<bool> ExportAllowed = S("Allow Export", "Whether players connected to this server may export the world (bc_export, and Start in the export HUD). The machine that runs the world always may: single player, the host, and a dedicated server's own console (where an admin's 'bc_export server' runs). Applies at once, also to connected players. On a client, the server's value is used instead of this one", SettingScope.Live, true, e => ConfigExportAllowed = e);
   public static readonly SettingDef<KeyCode> ExportHudKey = S("Hud Hotkey", "Shows or hides the export HUD's status box (with no Shift, Ctrl or Alt held). None = no key", SettingScope.Live, KeyCode.F9, e => ConfigExportHudKey = e);
   public static readonly SettingDef<KeyCode> ExportWindowKey = S("Window Hotkey", "Opens or closes the export and import window, which frees the mouse while it is open (with no Shift, Ctrl or Alt held). None = no key", SettingScope.Live, KeyCode.F7, e => ConfigExportWindowKey = e);
-  public static readonly SettingDef<int> ExportSize = new("Default Size", "Pixels per side of an export when bc_export is given no size, and the export window's first choice. 2048 and up keep the alt-biome map exact; 8192 holds about half a gigabyte while it runs", SettingScope.Live, 4096, e => ConfigExportSize = e)
+  public static readonly SettingDef<int> ExportSize = new("Default Size", "Pixels per side of an export when bc_export is given no size, and the export window's first choice. 2048 and up keep the alt-biome map exact; 16384 is the largest, and every player joining a world built from the maps downloads them", SettingScope.Live, 4096, e => ConfigExportSize = e)
   { Range = R(WorldExport.MinSize, WorldExport.MaxSize) };
-  public static readonly SettingDef<float> ExportHeightmapAmount = new("Default Heightmap Amount", "The Heightmap Amount an export encodes its heights for, unless bc_export or the window says otherwise; export.cfg records it, so the import always reads the heights at the amount they were written for. 1 is Better Continents' default everywhere: with Sea Level 0.5 it spans -30 m to 170 m and clips higher ground (the export says how many pixels); 2 spans -30 m to 370 m and keeps every vanilla mountain", SettingScope.Live, 1f, e => ConfigExportHeightmapAmount = e)
-  { Range = R(0.01f, 5f) };
+  public static readonly SettingDef<float> ExportHeightmapAmount = new("Default Heightmap Amount", "The Heightmap Amount an export encodes its heights for, unless bc_export or the window says otherwise; export.cfg records it, so the import always reads the heights at the amount they were written for. 1 is Better Continents' default everywhere: with Sea Level 0.5 it spans -30 m to 170 m and clips higher ground (the export says how many pixels); 2 spans -30 m to 370 m and keeps every vanilla mountain; the largest, 81, spans -30 m to 16,170 m in steps of a quarter of a metre", SettingScope.Live, 1f, e => ConfigExportHeightmapAmount = e)
+  { Range = R(0.01f, WorldExport.MaxHeightmapAmount) };
   public static readonly SettingDef<float> ExportSeaLevel = new("Default Sea Level", "The Sea Level Adjustment an export encodes its heights for, unless bc_export or the window says otherwise", SettingScope.Live, 0.5f, e => ConfigExportSeaLevel = e)
   { Range = R(0f, 1f) };
 

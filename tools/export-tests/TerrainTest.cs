@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-09-24 for world export and import (0.9.0), and modified on 2026-10-04 for the unifying refactor (0.10.0).
+// Added by Wubarrk on 2026-09-24 for world export and import (0.9.0), and modified on 2026-10-04 for the unifying refactor (0.10.0), and on 2026-10-06 for 16k worlds (0.10.3).
 
 using System;
 using System.Collections;
@@ -88,15 +88,16 @@ internal static class TerrainTest
       var cornerRow = jobType.GetMethod("CornerRow", BindingFlags.NonPublic | BindingFlags.Instance)!;
       for (int r = 0; r < cornerCount; r++)
         cornerRow.Invoke(job, [r, corners]);
-      var heights = new L16[n * n];
-      var lava = new L8[n * n];
-      var moss = new L8[n * n];
-      var paint = new Rgb24[n * n];
+      // The band buffers of the export, here one band holding every row: 16-bit big endian, 8-bit, 8-bit, RGB.
+      var heights = new byte[2 * n * n];
+      var lava = new byte[n * n];
+      var moss = new byte[n * n];
+      var paint = new byte[3 * n * n];
       var statsType = typeof(WorldExport).GetNestedType("TerrainRowStats", BindingFlags.NonPublic)!;
       var stats = Array.CreateInstance(statsType, n);
       var terrainRow = jobType.GetMethod("TerrainRow", BindingFlags.NonPublic | BindingFlags.Instance)!;
       for (int r = 0; r < n; r++)
-        terrainRow.Invoke(job, [r, corners, heights, lava, moss, paint, stats]);
+        terrainRow.Invoke(job, [r, r, corners, heights, lava, moss, paint, stats]);
 
       int bad = 0, blended = 0, lavaBad = 0, mossBad = 0, paintBad = 0;
       for (int r = 0; r < n; r++)
@@ -130,17 +131,17 @@ internal static class TerrainTest
             M.TryUndoEdgeDropoff(fh, d, 10000f, 10500f, out fh);
           var want = M.ValueToUShort((fh + 0.15f) / o.HeightmapAmount, out _);
           int i = r * n + c;
-          if (heights[i].PackedValue != want) bad++;
+          if ((heights[2 * i] << 8 | heights[2 * i + 1]) != want) bad++;
           var corners4 = new[] { b0, b1, b2, b3 };
           int ai = Array.IndexOf(corners4, Heightmap.Biome.AshLands);
           byte wantLava = 0;
           if (ai >= 0) { Height(Heightmap.Biome.AshLands, wx, wz, out var am); wantLava = M.ValueToByte(am.a); }
-          if (lava[i].PackedValue != wantLava) lavaBad++;
+          if (lava[i] != wantLava) lavaBad++;
           int mi = Array.IndexOf(corners4, Heightmap.Biome.Mistlands);
           byte wantMoss = 0;
           if (mi >= 0) { Height(Heightmap.Biome.Mistlands, wx, wz, out var mm); wantMoss = M.ValueToByte(mm.a); }
-          if (moss[i].PackedValue != wantMoss) mossBad++;
-          if (paint[i].G != M.ValueToByte(mask.g)) paintBad++;
+          if (moss[i] != wantMoss) mossBad++;
+          if (paint[3 * i] != M.ValueToByte(mask.r) || paint[3 * i + 1] != M.ValueToByte(mask.g) || paint[3 * i + 2] != M.ValueToByte(mask.b)) paintBad++;
         }
       Program.C(bad == 0, $"every height pixel equals HeightmapBuilder's blend at that point ({bad} differ, {blended} of {n * n} pixels in mixed zones)");
       Program.C(blended > n * n / 20, "the synthetic map exercises the mixed-corner blend");

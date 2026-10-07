@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-09-24 for world export and import (0.9.0).
+// Added by Wubarrk on 2026-09-24 for world export and import (0.9.0), and modified on 2026-10-06 for 16k worlds (0.10.3).
 
 using System;
 using System.Collections;
@@ -58,7 +58,7 @@ internal static class LocationTest
     // Off the map square.
     records.Add(Activator.CreateInstance(recType, "Crypt2", 12000f, 0f, 188, 0));
 
-    var pixels = new Rgb24[n * n];
+    var pixels = new WorldExport.SparsePixels(n);
     var legend = new List<string>();
     jobType.GetMethod("PlaceLocations", BindingFlags.NonPublic | BindingFlags.Instance)!.Invoke(job, [records, pixels, legend]);
     int written = Get("LocationWritten"), nudged = Get("LocationNudged"), dropped = Get("LocationDropped"), outside = Get("LocationOutside");
@@ -74,7 +74,7 @@ internal static class LocationTest
     for (int y = 0; y < n; y++)
       for (int x = 0; x < n; x++)
       {
-        var p = pixels[(n - 1 - y) * n + x];
+        var p = pixels.At(x, n - 1 - y);
         if (p.R == 0 && p.G == 0 && p.B == 0 || seen[y * n + x]) continue;
         var queue = new Queue<(int, int)>();
         queue.Enqueue((x, y));
@@ -88,7 +88,7 @@ internal static class LocationTest
           {
             int ax = qx + dx, ay = qy + dy;
             if (ax < 0 || ay < 0 || ax >= n || ay >= n || seen[ay * n + ax]) continue;
-            var q = pixels[(n - 1 - ay) * n + ax];
+            var q = pixels.At(ax, n - 1 - ay);
             if (q.R == p.R && q.G == p.G && q.B == p.B) { seen[ay * n + ax] = true; queue.Enqueue((ax, ay)); }
           }
         }

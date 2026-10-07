@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-09-24 for world export and import (0.9.0).
+// Added by Wubarrk on 2026-09-24 for world export and import (0.9.0), and modified on 2026-10-06 for 16k worlds (0.10.3).
 
 using System;
 using System.Collections.Generic;
@@ -32,7 +32,7 @@ namespace BetterContinents;
 public static class ExportHud
 {
   private const string CallbackKey = "ExportHud";
-  private static readonly int[] Sizes = [1024, 2048, 4096, 8192];
+  private static readonly int[] Sizes = [1024, 2048, 4096, 8192, 16384];
 
   // Below Wubarrk's Eye's own status box (20, 20, 320 x 110), so both fit on screen at once.
   private const float BoxX = 20f, BoxY = 140f, BoxWidth = 340f, Pad = 8f;
@@ -364,7 +364,8 @@ public static class ExportHud
     startProblem = !can ? $"Cannot start: {reason}." : problem != null ? $"Cannot start: {problem}." : "";
     fieldInfo = problem == null
       ? $"Waterline at {Inv(WorldExportMath.WaterlineValue(o.HeightmapAmount, o.SeaLevel))}; heights from "
-        + $"{WorldExportMath.ValueToMetres(0f, o.HeightmapAmount, o.SeaLevel):0} m to {WorldExportMath.ValueToMetres(1f, o.HeightmapAmount, o.SeaLevel):0} m."
+        + $"{WorldExportMath.ValueToMetres(0f, o.HeightmapAmount, o.SeaLevel):0} m to {WorldExportMath.ValueToMetres(1f, o.HeightmapAmount, o.SeaLevel):0} m, "
+        + $"in steps of {(WorldExportMath.ValueToMetres(1f, o.HeightmapAmount, o.SeaLevel) - WorldExportMath.ValueToMetres(0f, o.HeightmapAmount, o.SeaLevel)) / 65535f:0.###} m."
       : "";
     notes = Notes(o);
   }
@@ -373,9 +374,11 @@ public static class ExportHud
   {
     var list = new List<string>();
     if (o.Size >= 8192)
-      list.Add("8192 px holds about half a gigabyte while it runs"
-               + (o.Preset ? " and nearly 2 GB while the New World preset is made (switch the preset off here and run bc_import in the main menu if memory is short)" : "")
-               + ", and every player joining a world built from it downloads the maps.");
+      list.Add($"{o.Size} px: every player joining a world built from these maps downloads them{(o.Size >= 16384 ? " (over 100 MB at this size, and more for noisy maps)" : "")}.");
+    if (o.Size > 4096 && o.Preset)
+      list.Add(o.Size > WorldExport.PresetMaxSize
+        ? $"The New World preset is not made at {o.Size} px: building it decodes every map and would need about {PresetMemory(o) / 1024.0:0.#} GB. Run bc_import on the folder (the Import tab, or in the main menu) when the memory is there."
+        : $"The New World preset needs about {PresetMemory(o) / 1024.0:0.#} GB while it is made; switch it off here and run bc_import in the main menu if memory is short.");
     if (o.AltBiomes && o.Size < 2048)
       list.Add("Below 2048 px the alt-biome map is only approximate.");
     if (o.Locations && LiveConfig.IsClient)
@@ -394,19 +397,22 @@ public static class ExportHud
     int colour = (o.Biomes ? 1 : 0) + (o.AltBiomes ? 1 : 0) + (o.Locations ? 1 : 0) + (o.Paint ? 1 : 0);
     int grey8 = (o.Lava ? 1 : 0) + (o.Moss ? 1 : 0);
     double raw = mpx * (2 * grey16 + 3 * colour + grey8);
-    // The terrain pass holds heights, lava, moss and paint at once (up to 7 bytes a pixel), every other pass one map at
-    // a time (3 bytes a pixel at most).
-    double memory = mpx * Math.Max((o.Heightmap ? 2 : 0) + (o.Lava ? 1 : 0) + (o.Moss ? 1 : 0) + (o.Paint ? 3 : 0), 3) + 30;
-    // The preset build keeps the heightmap and biome map decoded while the others decode one at a time: about 26 bytes a
-    // pixel at its peak (440 MB at 4096 px, measured offline), 20 without paint.
-    double preset = mpx * (o.Paint ? 26 : 20) + 30;
-    var time = o.Size <= 1024 ? "well under a minute" : o.Size <= 2048 ? "about a minute" : o.Size <= 4096 ? "a few minutes" : "ten minutes or more";
+    // The maps are written as they are sampled, a band of rows (about two million pixels) at a time: two bands of every map
+    // being written (up to 7 bytes a pixel for the terrain pass), the encoders' buffers and the zone corners, whatever the size
+    // (measured: 32 MB over the process offline and 80 MB over an idle dedicated server, at 16384 px; 0.9 and 4.4 GB before
+    // 0.10.3, which held a whole map a pass).
+    double memory = Math.Min(mpx, 2.1) * 2 * 7 + 70;
+    double preset = PresetMemory(o);
+    var time = o.Size <= 1024 ? "well under a minute" : o.Size <= 2048 ? "about a minute" : o.Size <= 4096 ? "a few minutes"
+      : o.Size <= 8192 ? "several minutes" : "a quarter of an hour or more";
     var text = $"{o.Size} x {o.Size} px = {mpx:0.#} million pixels a map. Before compression a 16-bit map is {2 * mpx:0} MB and a colour map "
                + $"{3 * mpx:0} MB ({raw:0} MB for these maps; the PNGs are usually much smaller). About {memory:0} MB of memory while it runs";
     if (o.Preset)
-      text += $", {preset:0} MB while the preset is made";
+      text += o.Size > WorldExport.PresetMaxSize ? ", and no preset (see below)" : $", {preset:0} MB while the preset is made";
     return text + $"; {time} (a rough guess).";
   }
+
+  private static double PresetMemory(WorldExport.Options o) => WorldExport.PresetMemoryMb(o.Size, o.Paint);
 
   private static void Window(int id)
   {

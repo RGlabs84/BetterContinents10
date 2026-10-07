@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-09-24 for world export and import (0.9.0), and modified on 2026-10-04 for the unifying refactor (0.10.0).
+// Added by Wubarrk on 2026-09-24 for world export and import (0.9.0), and modified on 2026-10-04 for the unifying refactor (0.10.0), and on 2026-10-06 for 16k worlds (0.10.3).
 
 using System;
 using System.Collections;
@@ -21,8 +21,8 @@ namespace ExportTest;
 // manifest and the config, then read back through Better Continents' own loaders.
 internal static class EndToEnd
 {
-  static float Target(Vector3 p) => Vanilla(p * 0.004f) - (p.x > 0f ? 0.3f : 0f);
-  static float Vanilla(Vector3 q) => 1.0f + 0.6f * Mathf.Sin(q.x * 3f) * Mathf.Cos(q.z * 2f);
+  internal static float Target(Vector3 p) => Vanilla(p * 0.004f) - (p.x > 0f ? 0.3f : 0f);
+  internal static float Vanilla(Vector3 q) => 1.0f + 0.6f * Mathf.Sin(q.x * 3f) * Mathf.Cos(q.z * 2f);
 
   static bool ForestPrefix(Vector3 pos, ref float __result) { __result = Target(pos); return false; }
   static bool FbmPrefix(Vector3 p, ref float __result) { __result = Vanilla(p); return false; }
@@ -30,7 +30,7 @@ internal static class EndToEnd
   static void SetStatic(Type t, string field, object value) =>
     t.GetField(field, BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Public)!.SetValue(null, value);
 
-  static object MakeJob(WorldExport.Options o, string dir, WorldGenerator wg)
+  internal static object MakeJob(WorldExport.Options o, string dir, WorldGenerator wg)
   {
     // What Job's constructor sets, minus its ZNet / ZoneSystem reads (Unity objects cannot exist offline).
     var jobType = typeof(WorldExport).GetNestedType("Job", BindingFlags.NonPublic)!;
@@ -76,7 +76,7 @@ internal static class EndToEnd
 
   // A 2048 x 2048 sector grid of 128-cell blocks, biomes in a pattern, some blocks carrying alt biomes. Returns the
   // legend key each sector should come back with.
-  static Func<BiomeSector, string> BuildAltBiomes(World world)
+  internal static Func<BiomeSector, string> BuildAltBiomes(World world)
   {
     AltBiome Alt(string name, Heightmap.Biome biomes, params string[] incompatible)
     {
@@ -130,20 +130,31 @@ internal static class EndToEnd
     return false;
   }
 
-  static IEnumerator Drive(object job) =>
+  internal static IEnumerator Drive(object job) =>
     (IEnumerator)typeof(WorldExport).GetMethod("Drive", BindingFlags.NonPublic | BindingFlags.Static)!.Invoke(null, [job])!;
 
-  static void SetRunning(bool running) =>
+  internal static void SetRunning(bool running) =>
     typeof(WorldExport).GetProperty("IsRunning")!.GetSetMethod(true)!.Invoke(null, [running]);
 
-  public static void Run(string work)
+  static bool patched;
+
+  // The generator's forest and noise, and the job's world check, replaced by the fake world's (once per process).
+  internal static void PatchOnce()
   {
-    System.Console.WriteLine("== end to end: the export coroutine on a fake world");
+    if (patched)
+      return;
+    patched = true;
     var harmony = new Harmony("export-e2e");
     harmony.Patch(AccessTools.Method(typeof(WorldGenerator), nameof(WorldGenerator.GetForestFactor)), prefix: new HarmonyMethod(typeof(EndToEnd), nameof(ForestPrefix)));
     harmony.Patch(AccessTools.Method(typeof(DUtils), nameof(DUtils.Fbm), [typeof(Vector3), typeof(int), typeof(float), typeof(float)]), prefix: new HarmonyMethod(typeof(EndToEnd), nameof(FbmPrefix)));
     var jobT = typeof(WorldExport).GetNestedType("Job", BindingFlags.NonPublic)!;
     harmony.Patch(AccessTools.Method(jobT, "CheckWorld"), prefix: new HarmonyMethod(typeof(EndToEnd), nameof(CheckWorldPrefix)));
+  }
+
+  public static void Run(string work)
+  {
+    System.Console.WriteLine("== end to end: the export coroutine on a fake world");
+    PatchOnce();
 
     var world = new World { m_name = "E2E World", m_seedName = "E2ESeed", m_seed = 42 };
     var wg = (WorldGenerator)RuntimeHelpers.GetUninitializedObject(typeof(WorldGenerator));
@@ -305,6 +316,24 @@ internal static class EndToEnd
     Program.C(sawFile, "the cancelled export had written files before the cancel");
     Program.C(WorldExport.Phase == "Cancelled" && !WorldExport.IsRunning, $"cancel ends in 'Cancelled' ({WorldExport.Phase})");
     Program.C(!Directory.Exists(dir2), "a cancelled export leaves no folder behind");
+
+    // Past WorldExport.PresetMaxSize the export leaves the preset to bc_import (the builder decodes every map), and says so without calling it a failure.
+    var big = WorldExport.Options.Default();
+    big.Size = 16384;
+    big.Preset = true;
+    var jobBig = MakeJob(big, Path.Combine(work, "e2e-big-preset"), wg);
+    var jobTypeBig = jobBig.GetType();
+    foreach (var _ in (IEnumerable)jobTypeBig.GetMethod("PresetPass", BindingFlags.NonPublic | BindingFlags.Instance)!.Invoke(jobBig, [new List<string>()])!) { }
+    string? skipped = (string?)jobTypeBig.GetField("PresetSkipped", BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(jobBig);
+    bool tooBig = (bool)jobTypeBig.GetField("PresetTooBig", BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(jobBig)!;
+    var summaryBig = (List<string>)jobTypeBig.GetMethod("Summary", BindingFlags.NonPublic | BindingFlags.Instance)!.Invoke(jobBig, null)!;
+    Program.C(tooBig && skipped != null && skipped.Contains("16384 px") && skipped.Contains("about 6.8 GB") && skipped.Contains("bc_import makes it") && !summaryBig.Any(l => l.StartsWith("WARNING"))
+      && summaryBig.Any(l => l.StartsWith("no New World preset at this size")), $"at 16384 px the preset is left to bc_import, as a note and not a warning ({skipped})");
+    var atLimit = WorldExport.Options.Default();
+    atLimit.Size = WorldExport.PresetMaxSize;
+    atLimit.Preset = true;
+    var jobLimit = MakeJob(atLimit, Path.Combine(work, "e2e-limit-preset"), wg);
+    Program.C((bool)jobLimit.GetType().GetProperty("MakesPreset", BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(jobLimit)!, "at 8192 px the export still makes the preset itself");
 
     // A world that goes away mid-export fails cleanly.
     var dir3 = Path.Combine(work, "e2e-unload");
