@@ -41,14 +41,21 @@
     written as it is sampled. `Largest Size` in [09 BetterContinents.Export] (4096, 8192 or 16384; 16384 by
     default) sets the largest export offered. Above 8,192 px the export leaves the New World preset to
     `bc_import`.
-  - A world with a very large World Size loads in about a minute. At World Size 32,264 the game's lake
-    search took minutes on every machine at every load; it now takes seconds and finds the same lakes.
+  - A world with a very large World Size loads in seconds: 16 s for World Size 32,264 on a 32-core server
+    (measured on one machine). The game's lake search took minutes there on every machine at every load; it
+    now takes seconds and finds the same lakes.
   - Making a new world no longer stops the game. The New World screen read a new world's maps and wrote its
     settings inside Done, on the game's main thread: with five 16,384 px maps the game stood still for about
     30 s, drawing nothing and answering nothing (measured on one machine). They are now made in the background
     behind the game's "Please wait", and the world is made when they are ready; its settings are the same, byte
     for byte. A dedicated server makes a new world's settings as before. Lines Better Continents logs from work
     in the background (a new world's settings, a world import) now reach the log; Unity used to drop them.
+  - Loading a big world, or joining one, no longer stops the game for half a minute. Whenever a world loads,
+    and as each player joins, the game builds its alt-biome grid on its main thread: 6,392 x 6,392 points for a
+    world of World Size 32,264, which took 29 s (measured on one machine). Better Continents now samples the grid
+    on every core and builds its regions on flat arrays: 5 s on the same machine (32 cores; fewer cores take
+    longer). The grid and its regions are the game's own, point for point. Where another mod changes those
+    steps, the game's own way runs.
   - Joining a big world: the server's log says how long the download will take. A world's settings
     package and the `.bcworld` file can be up to 1.5 GB (the file was limited to 512 MB).
   - The sea's colour and waves in a big world. The game's water shader colours the Ashlands sea red by its
