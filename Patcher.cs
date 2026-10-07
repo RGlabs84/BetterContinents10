@@ -1,4 +1,4 @@
-﻿// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and alt-biome planting (0.8.1), and on 2026-09-24 for world export and import (0.9.0), and on 2026-09-25 for version-agnostic wording (0.9.1), and on 2026-09-29 for Expand World Data biomes (0.9.3), and on 2026-10-04 for the vegetation twin guard and the unifying refactor (0.10.0), and on 2026-10-06 for 16k worlds (0.10.3).
+﻿// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and alt-biome planting (0.8.1), and on 2026-09-24 for world export and import (0.9.0), and on 2026-09-25 for version-agnostic wording (0.9.1), and on 2026-09-29 for Expand World Data biomes (0.9.3), and on 2026-10-04 for the vegetation twin guard and the unifying refactor (0.10.0), and on 2026-10-06 for 16k worlds (0.10.3), and on 2026-10-07 for baked placements (0.10.4).
 
 using System;
 using System.Collections;
@@ -32,6 +32,7 @@ public partial class BetterContinents
     PatchWorldSize();
     foreach (var toggle in TogglesAfterWorldSize)
       toggle.Update(Settings);
+    UpdateLayerToggles();
     // The sectors a world past the game's 16 km gets: its own, out to 65 km (WorldSectors).
     WorldSectors.Update(HarmonyInstance, Settings, ExpandWorldSizeGeometry);
     // WorldGenerator caches GetBiome/GetBiomeArea results per grid cell for the lifetime of the
@@ -355,10 +356,48 @@ public partial class BetterContinents
         typeof(SpawnSystemPatch), nameof(SpawnSystemPatch.UpdateSpawnListDisable), HookKind.Postfix)),
   ];
 
+  // The layer's two toggles (spec 4.2, 7.4, 8.1): they follow the world's baked layer, not its maps, so a GameTerrain world has them too.
+  // The postfixes are slice B's (BakedVegetation, BakedGround).
+  private static readonly Toggle[] LayerToggles =
+  [
+    // The vegetation mask: on for every world with a layer.
+    new("ZoneSystem.InsideClearArea, baked vegetation mask",
+      s => s.HasLayer,
+      new Hook(() => AccessTools.Method(typeof(ZoneSystem), "InsideClearArea"), "ZoneSystem.InsideClearArea",
+        typeof(BakedVegetation), nameof(BakedVegetation.InsideClearAreaPostfix), HookKind.Postfix)),
+    // The 1 m ground: only while the layer has ground; the lowest priority, after Expand World Data's postfix and Better Continents' own.
+    new("WorldGenerator.GetBiomeHeight, baked ground",
+      s => s.Layer is { Ground.Any: true },
+      new Hook(() => AccessTools.Method(typeof(WorldGenerator), nameof(WorldGenerator.GetBiomeHeight)), "WorldGenerator.GetBiomeHeight",
+        typeof(BakedGround), nameof(BakedGround.GetBiomeHeightPostfix), HookKind.Postfix, Priority.Last, after: [EWD.GUID])),
+  ];
+
+  // The toggles that follow the layer, switched to what the settings want now (DynamicPatch, and the layer being replaced).
+  internal static void UpdateLayerToggles()
+  {
+    foreach (var toggle in LayerToggles)
+      toggle.Update(Settings);
+  }
+
+  // The layer changed (BakedLayerStore.Changed): the rest of DynamicPatch has no reason to run. A patch that fails is logged, and does
+  // not stop whoever replaced the layer.
+  internal static void PatchLayerToggles()
+  {
+    try
+    {
+      UpdateLayerToggles();
+    }
+    catch (Exception e)
+    {
+      LogError("Could not switch the patches that follow the baked layer: " + e);
+    }
+  }
+
   // The toggles these settings want on, by name (the offline tests compare it with the rules as they were written
   // out one by one before the unifying refactor).
   internal static IEnumerable<string> WantedToggles(BetterContinentsSettings settings) =>
-    new[] { BiomeColor, BiomeColorAfterTerritories }.Concat(TogglesBeforeWorldSize).Concat(TogglesAfterWorldSize).Concat(HighTerrainToggles).Where(t => t.Wanted(settings)).Select(t => t.Name);
+    new[] { BiomeColor, BiomeColorAfterTerritories }.Concat(TogglesBeforeWorldSize).Concat(TogglesAfterWorldSize).Concat(LayerToggles).Concat(HighTerrainToggles)
+      .Where(t => t.Wanted(settings)).Select(t => t.Name);
 
   // ---- the three that are more than on or off -------------------------------------------------------------------------
 

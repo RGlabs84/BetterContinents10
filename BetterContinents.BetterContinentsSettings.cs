@@ -1,4 +1,4 @@
-﻿// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and alt-biome planting (0.8.1), and on 2026-09-24 for world export and import (0.9.0), and on 2026-09-29 for Expand World Data biomes (0.9.3), and on 2026-10-02 for export folders used as the Directory (0.9.4), and on 2026-10-04 for the unifying refactor (0.10.0), and on 2026-10-06 for 16k worlds (0.10.3).
+﻿// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and alt-biome planting (0.8.1), and on 2026-09-24 for world export and import (0.9.0), and on 2026-09-29 for Expand World Data biomes (0.9.3), and on 2026-10-02 for export folders used as the Directory (0.9.4), and on 2026-10-04 for the unifying refactor (0.10.0), and on 2026-10-06 for 16k worlds (0.10.3), and on 2026-10-07 for baked placements (0.10.4).
 
 using System;
 using System.Collections.Generic;
@@ -64,6 +64,25 @@ public partial class BetterContinents
     private byte[]? AltBiomesBlobAsRead;
 
     public AltBiomeSettings EffectiveAltBiomes => AltBiomes ?? AltBiomeSettings.Legacy;
+
+    // ---- baked placements (0.10.4) --------------------------------------------------------------------------------------------
+    // The world's layer (BakedLayer, placements.bcp): saved under DataKey.Placements, and never sent in the settings package (it goes in a
+    // transfer of its own: BakedTransfer). The active settings' layer is the one that is current (BakedLayerStore.Current), so a change of
+    // the layer is a swap of this reference and the world saves the layer it has. Null in a world without one.
+    internal volatile BakedLayer? Layer;
+    public bool HasLayer => Layer != null;
+    // Set when the settings package of a world with a layer was read: the layer is sent apart, and has not come yet when Layer is null.
+    internal bool LayerSentApart;
+    // Set when the layer in the world's settings could not be read: the world load then stops (BakedLayerStore), as it does for an alt-biome
+    // map that cannot be read.
+    internal string? LayerError;
+    // The world's terrain is the game's own (spec 4): a world made without Better Continents' maps, or with Better Continents off for it,
+    // that carries a layer. Its settings hold nothing but this, a wide-sectors flag and the layer.
+    public bool GameTerrain;
+    // Whether Better Continents shapes this world's terrain, biomes, vegetation, locations and water (every toggle, every map, every
+    // size): it is on for the world and the world's terrain is not the game's own. EnabledForThisWorld stays the test of whether the world
+    // is a Better Continents world at all (saved, sent, versions matched).
+    public bool ShapesWorld => EnabledForThisWorld && !GameTerrain;
 
     // For live edits (console): never mutate the shared Legacy instance.
     public AltBiomeSettings EditAltBiomes()

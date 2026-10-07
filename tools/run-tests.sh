@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Added by Wubarrk on 2026-10-04 for the unifying refactor and the vegetation twin guard (0.10.0), and modified on 2026-10-06 for the Forest Scale default (0.10.2) and for 16k worlds (0.10.3).
+# Added by Wubarrk on 2026-10-04 for the unifying refactor and the vegetation twin guard (0.10.0), and modified on 2026-10-06 for the Forest Scale default (0.10.2) and for 16k worlds (0.10.3), and on 2026-10-07 for baked placements (0.10.4).
 #
 # Builds the plugin (Release) and runs every offline suite against it, one after another, memory-capped and niced:
 #   golden-tests      the reference recordings (tools/golden-tests/golden): any difference fails
@@ -27,6 +27,10 @@
 #   high-tests        terrain up to 16 km: when a world is a high world (the High Terrain setting: Auto, On, Off), heights at Heightmap Amount 81,
 #                     what is inside a dungeon, the patches of the game's height rules on the client's and the dedicated server's IL, an
 #                     inventory of the game's numbers, what a world saves of the setting, DynamicPatch's patches on and off on the game's methods
+#   placement-tests   baked placements: format 1 read and written (the checks of the spec's 2.2 each by name), VALtima's real file, the layer in the
+#                     world's settings (DataKeys 70 and 71, a 0.10.3 reader's stop), edits, merges and patches, and the tests each slice adds
+#                     (Tests.<Slice>.cs: every static method named *Test of the partial class Tests runs). "dotnet run -c Release -- <part of a
+#                     test's name>" runs some
 # Usage: tools/run-tests.sh [suite ...]   (default: all). Exit code 1 when the build or any suite fails.
 set -u
 cd "$(dirname "$0")/.."
@@ -36,7 +40,7 @@ export DOTNET_ROOT="${DOTNET_ROOT:-$HOME/.dotnet}"
 export DOTNET_GCHeapHardLimit="${DOTNET_GCHeapHardLimit:-0xC0000000}"
 logs="$(mktemp -d "${TMPDIR:-/tmp}/bc-tests-XXXXXX")"
 suites=("$@")
-[ ${#suites[@]} -eq 0 ] && suites=(golden-tests altbiome-harness export-tests import-tests livecfg-tests ewd-tests twin-tests size-tests sector-tests tile-tests zone-tests high-tests)
+[ ${#suites[@]} -eq 0 ] && suites=(golden-tests altbiome-harness export-tests import-tests livecfg-tests ewd-tests twin-tests size-tests sector-tests tile-tests zone-tests high-tests placement-tests)
 
 echo "== building the plugin"
 if ! nice -n 10 dotnet build -c Release BetterContinents.csproj > "$logs/build.log" 2>&1; then

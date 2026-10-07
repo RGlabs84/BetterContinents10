@@ -1,0 +1,40 @@
+<!-- Added by Wubarrk on 2026-10-07 for baked placements (0.10.4). -->
+<!-- Offline checks of the baked layer (BakedFormat.cs, BakedLayer.cs, BakedLayerStore.cs, BakedPatch.cs, BakedApi.cs) and what the slices that use it
+     hold to: the format read and written, VALtima's real file, the layer in the world's settings, merges and patches, and each slice's own
+     files (Tests.<Slice>.cs: every static method named *Test of the partial class Tests runs, so a slice adds a file and no shared one).
+     Build BetterContinents.csproj (Release) first: this references its pre-ILRepack DLL in obj/. Run from this folder with
+     "dotnet run -c Release". -->
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <!-- Same name as the repo's harness so BetterContinents' InternalsVisibleTo("AltBiomeHarness") applies. -->
+    <AssemblyName>AltBiomeHarness</AssemblyName>
+    <RootNamespace>PlacementTests</RootNamespace>
+    <Nullable>disable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <NoWarn>$(NoWarn);MSB3277;CS8632;NU1701;MSB3243;CS1701;CS1702;CS0618</NoWarn>
+    <LibsTools>$(MSBuildThisFileDirectory)../../../libs-Tools/</LibsTools>
+    <BcDll>$(MSBuildThisFileDirectory)../../obj/Release/net4.8/BetterContinents.dll</BcDll>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- BetterContinents.dll is built against BepInEx's HarmonyX 0Harmony, which cannot initialise on .NET 8;
+         Lib.Harmony has the same assembly name and the API surface Better Continents touches here. -->
+    <PackageReference Include="Lib.Harmony" Version="2.3.6" />
+    <!-- The plugin's pre-ILRepack DLL refers to it (the maps are read with it); Better Continents' settings classes load it. -->
+    <PackageReference Include="SixLabors.ImageSharp" Version="2.1.13" />
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="BetterContinents"><HintPath>$(BcDll)</HintPath></Reference>
+    <Reference Include="assembly_valheim"><HintPath>$(LibsTools)1.0/client/assembly_valheim.dll</HintPath></Reference>
+    <Reference Include="assembly_utils"><HintPath>$(LibsTools)1.0/client/assembly_utils.dll</HintPath></Reference>
+    <Reference Include="UnityEngine"><HintPath>$(LibsTools)1.0/client/UnityEngine.dll</HintPath></Reference>
+    <Reference Include="UnityEngine.CoreModule"><HintPath>$(LibsTools)1.0/client/UnityEngine.CoreModule.dll</HintPath></Reference>
+    <Reference Include="UnityEngine.PhysicsModule"><HintPath>$(LibsTools)1.0/client/UnityEngine.PhysicsModule.dll</HintPath></Reference>
+    <Reference Include="BepInEx"><HintPath>$(LibsTools)BepInEx.dll</HintPath></Reference>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="fixtures/*" LinkBase="fixtures" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>
