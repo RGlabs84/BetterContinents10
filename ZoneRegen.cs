@@ -61,8 +61,6 @@ internal static class ZoneRegen
   private static readonly int PlayerPrefab = "Player".GetStableHashCode();
   private static readonly int TombstonePrefab = "Player_tombstone".GetStableHashCode();
   private static readonly int TerrainCompilerPrefab = "_TerrainCompiler".GetStableHashCode();
-  // The key BakedServer writes on every piece it seeds (and an in-game bake on every piece it adopts): the id of its record.
-  private static readonly int BakeIdKey = "bc_bake_id".GetStableHashCode();
 
   /// <summary>Whether the Debug Reset Command setting leaves the regeneration to Better Continents: when it is empty.</summary>
   internal static bool RunsOwn(string? command) => string.IsNullOrWhiteSpace(command);
@@ -523,8 +521,9 @@ internal static class ZoneRegen
       kind |= ZoneReset.Kind.Piece;
     if (zdo.GetBool(ZDOVars.s_tamed))
       kind |= ZoneReset.Kind.Tamed;
-    // A piece of a baked layer, whatever its id (a u32 that may be 0): the key being there is what says so.
-    if (zdo.GetInt(BakeIdKey, out _))
+    // A piece of a baked layer, whatever its id (a u32 that may be 0): the key being there is what says so. So is the mark of an orphan, a
+    // piece the layer left standing because it holds items (BakedReconcile): a reset does not empty it either.
+    if (zdo.GetInt(BakedKeys.Id, out _) || zdo.GetString(BakedKeys.Orphan, out var orphan) && orphan.Length > 0)
       kind |= ZoneReset.Kind.Baked;
     return kind;
   }

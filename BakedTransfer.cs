@@ -214,6 +214,9 @@ internal static class BakedTransfer
     localApplied = 0;
     downloads = installed = 0;
     BakedCache.SessionStarts();
+    BakedGround.Subscribe();
+    BakedServer.SessionStarts();
+    BakedVegetation.ForgetRadii();
     UI.Remove(DownloadUiKey);
     // A client has no layer until the server's arrives; a machine that runs the world has the one its settings load.
     if (!server)
