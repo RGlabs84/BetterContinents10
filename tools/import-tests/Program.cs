@@ -118,6 +118,7 @@ internal static partial class Program
       CompactValues();
       FineImport();
       FineWithEachValue();
+      Beforehand();
       // Past the usual sizes: BCIMPORT_BIG=<size> makes an export folder of that size into a preset (the heightmap alone, or with
       // every map when BCIMPORT_ALL=1, but the paint map when BCIMPORT_NOPAINT=1), with its memory measured.
       if (int.TryParse(Environment.GetEnvironmentVariable("BCIMPORT_BIG"), out var big) && big > 0)
@@ -921,6 +922,115 @@ internal static partial class Program
     C(!LogHandler.Has("was made by a world export"), "read at the Amount it was made for: nothing to say");
     BC.ConfigHeightmapAmount.Value = 1f;
     BC.ConfigMapSourceDir.Value = "";
+  }
+
+  // ---- a new world's settings made beforehand, on a worker (0.10.3) ------------------------------------------------------------
+
+  // A new world's settings as Better Continents made them when the world was first saved, on the game's main thread with the live
+  // config (Presets.LoadActivePreset and WorldPatch, as at 65bbc04). The New World screen now makes them beforehand on a worker
+  // (NewWorldBuild), and a dedicated server's new world by the same Build as it is saved: both must be these, byte for byte.
+  static BC.BetterContinentsSettings AsSaved()
+  {
+    BC.BetterContinentsSettings s;
+    var selected = BC.ConfigSelectedPreset.Value;
+    if (selected == "Disabled")
+      s = BC.BetterContinentsSettings.Disabled();
+    else if (selected == "From Config")
+      s = BC.BetterContinentsSettings.Create();
+    else if (!File.Exists(selected))
+      s = BC.BetterContinentsSettings.Disabled();
+    else
+      try
+      {
+        s = BC.BetterContinentsSettings.Load(selected);
+        if (s.EnabledForThisWorld && s.AltBiomes == null)
+          s.AltBiomes = BC.AltBiomeSettings.FromConfig();
+      }
+      catch (Exception)
+      {
+        s = BC.BetterContinentsSettings.Disabled();
+      }
+    WorldSectors.NewWorld(s, BC.ConfigWideSectors.Value, BC.ExpandWorldSizeGeometry);
+    return s;
+  }
+
+  static byte[] BytesOf(BC.BetterContinentsSettings s) => s.EnabledForThisWorld ? s.Bytes(out int length).AsSpan(0, length).ToArray() : null;
+
+  static void Beforehand()
+  {
+    Section("a new world's settings made beforehand on a worker (the New World screen) are the ones made as it is saved, byte for byte");
+    var dir = Path.Combine(root, "Beforehand");
+    var maps = Path.Combine(dir, "maps");
+    var export = Path.Combine(dir, "export-2026-10-07-09-00-00");
+    MakeFolder(maps, withConfig: false, manifest: null);
+    MakeFolder(export, withConfig: true, manifest: ("Beforehand", N, "2026-10-07T09:00:00"));
+    var state = ConfigState();
+    try
+    {
+      BC.ConfigEnabled.Value = true;
+      BC.ConfigSelectedPreset.Value = "From Config";
+      BC.ConfigMapSourceDir.Value = maps;
+      BC.ConfigCompactMaps.Value = CompactMapsMode.On;
+      // A preset of every map, compact; one of a 24.5 km world made where Wide Sectors is Off (its settings say it is not wide); and one
+      // saved without the alt-biome options (as before 0.8.1), which a new world takes from the config.
+      var preset = Path.Combine(dir, "every map.BetterContinents");
+      BC.BetterContinentsSettings.Create().Save(preset);
+      BC.ConfigWorldSize.Value = 24000f;
+      BC.ConfigWideSectors.Value = WideSectorsMode.Off;
+      var narrow = Path.Combine(dir, "narrow 24 km.BetterContinents");
+      var narrowSettings = BC.BetterContinentsSettings.Create();
+      narrowSettings.Save(narrow);
+      BC.ConfigWorldSize.Value = 10000f;
+      BC.ConfigWideSectors.Value = WideSectorsMode.Auto;
+      var noAlt = Path.Combine(dir, "no alt biomes.BetterContinents");
+      {
+        var pkg = new ZPackage();
+        BC.BetterContinentsSettings.Create().Serialize(pkg, false, includeAltBiomes: false);
+        var data = PackageBytes.Buffer(pkg, out int length);
+        using var writer = new BinaryWriter(File.Create(noAlt));
+        writer.Write(length);
+        writer.Write(data, 0, length);
+      }
+      C(!narrowSettings.WideSectors && BC.BetterContinentsSettings.Load(noAlt).AltBiomes == null,
+        "the presets for it: a 24.5 km one that is not wide, and one without the alt-biome options");
+
+      var cases = new (string What, Action Set)[]
+      {
+        ("From Config, no maps", () => BC.ConfigMapSourceDir.Value = ""),
+        ("From Config, Better Continents off", () => BC.ConfigEnabled.Value = false),
+        ("the preset Disabled", () => { BC.ConfigEnabled.Value = true; BC.ConfigSelectedPreset.Value = "Disabled"; }),
+        ("From Config, every map, as pictures", () => { BC.ConfigSelectedPreset.Value = "From Config"; BC.ConfigMapSourceDir.Value = maps; BC.ConfigCompactMaps.Value = CompactMapsMode.Off; }),
+        ("From Config, every map, compact", () => BC.ConfigCompactMaps.Value = CompactMapsMode.On),
+        ("From Config at settings version 11 (Override version)", () => BC.ConfigOverrideVersion.Value = "11"),
+        ("From Config, a world export as the Directory (its export.cfg over the config)", () => { BC.ConfigOverrideVersion.Value = ""; BC.ConfigMapSourceDir.Value = export; }),
+        ("From Config, 24.5 km, Wide Sectors Auto", () => { BC.ConfigMapSourceDir.Value = maps; BC.ConfigWorldSize.Value = 24000f; BC.ConfigWideSectors.Value = WideSectorsMode.Auto; }),
+        ("From Config, 24.5 km, Wide Sectors Off", () => BC.ConfigWideSectors.Value = WideSectorsMode.Off),
+        ("a preset file of every map", () => { BC.ConfigWorldSize.Value = 10000f; BC.ConfigWideSectors.Value = WideSectorsMode.Auto; BC.ConfigSelectedPreset.Value = preset; }),
+        ("a 24.5 km preset made where Wide Sectors was Off, here Auto (made wide)", () => BC.ConfigSelectedPreset.Value = narrow),
+        ("a preset without the alt-biome options (they come from the config)", () => BC.ConfigSelectedPreset.Value = noAlt),
+        ("a preset file that is gone", () => BC.ConfigSelectedPreset.Value = preset + ".gone"),
+      };
+      foreach (var (what, set) in cases)
+      {
+        set();
+        var asSaved = BytesOf(AsSaved());
+        // Done: the choice read on this thread, the settings made on a worker.
+        var choice = NewWorldBuild.Choose();
+        int here = Environment.CurrentManagedThreadId, there = here;
+        var made = Task.Run(() => { there = Environment.CurrentManagedThreadId; return NewWorldBuild.Make(choice); }).Result;
+        var beforehand = made.Bytes?.AsSpan(0, made.Length).ToArray();
+        // As saved now: a dedicated server's new world.
+        var now = BytesOf(NewWorldBuild.Build(NewWorldBuild.Choose()));
+        bool same = asSaved == null ? beforehand == null && now == null && !made.Settings.EnabledForThisWorld
+          : beforehand != null && now != null && asSaved.AsSpan().SequenceEqual(beforehand) && asSaved.AsSpan().SequenceEqual(now);
+        C(same && there != here, $"{what}: {(asSaved == null ? "Better Continents off, as before" : $"the same {asSaved.Length:N0} bytes")}, made on a worker and as saved");
+      }
+    }
+    finally
+    {
+      foreach (var kv in state)
+        kv.Key.BoxedValue = kv.Value;
+    }
   }
 
   // ---- a map over 8192 px across: Compact Maps on Auto (0.10.3) ------------------------------------------------------------------

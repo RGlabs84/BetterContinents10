@@ -1,4 +1,4 @@
-﻿// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and alt-biome planting (0.8.1), and on 2026-09-24 for world export and import (0.9.0), and on 2026-10-04 for the unifying refactor (0.10.0), and on 2026-10-06 for the New World panel's emblem (0.10.1).
+﻿// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and alt-biome planting (0.8.1), and on 2026-09-24 for world export and import (0.9.0), and on 2026-10-04 for the unifying refactor (0.10.0), and on 2026-10-06 for the New World panel's emblem (0.10.1), and on 2026-10-07 for 16k worlds (0.10.3).
 
 using System;
 using System.Collections.Generic;
@@ -271,37 +271,40 @@ public class Presets
 
   // A new world's settings, from the preset chosen in the New World screen. The rules for each choice are written out
   // once, above BetterContinentsSettings.Create.
-  public static BetterContinents.BetterContinentsSettings LoadActivePreset()
+  public static BetterContinents.BetterContinentsSettings LoadActivePreset() => Load(NewWorldBuild.Choose());
+
+  /// <summary>Any thread: the settings the choice gives a new world (read on the main thread, NewWorldBuild.Choose).</summary>
+  internal static BetterContinents.BetterContinentsSettings Load(NewWorldBuild.Choice choice)
   {
-    if (DisabledPreset)
+    if (choice.Disabled)
     {
       return BetterContinents.BetterContinentsSettings.Disabled();
     }
 
-    if (ConfigPreset)
+    if (choice.PresetPath == null)
     {
-      return BetterContinents.BetterContinentsSettings.Create();
+      return BetterContinents.BetterContinentsSettings.Create(choice.Enabled, choice.Values);
     }
 
-    if (!File.Exists(BetterContinents.ConfigSelectedPreset.Value))
+    if (!File.Exists(choice.PresetPath))
     {
-      BetterContinents.LogError($"Selected preset path {BetterContinents.ConfigSelectedPreset.Value} doesn't exist, BC is disabled for this world!");
+      BetterContinents.LogError($"Selected preset path {choice.PresetPath} doesn't exist, BC is disabled for this world!");
       return BetterContinents.BetterContinentsSettings.Disabled();
     }
 
     try
     {
-      var settings = BetterContinents.BetterContinentsSettings.Load(BetterContinents.ConfigSelectedPreset.Value);
+      var settings = BetterContinents.BetterContinentsSettings.Load(choice.PresetPath);
       // A preset saved before 0.8.1 (including the four shipped ones) has no alt-biome options. This is a NEW
       // world, so it gets the new-world defaults from the config rather than the legacy behaviour that an
       // existing world without the key keeps. A preset carries no alt-biome map unless it was saved with one.
       if (settings.EnabledForThisWorld && settings.AltBiomes == null)
-        settings.AltBiomes = BetterContinents.AltBiomeSettings.FromConfig();
+        settings.AltBiomes = BetterContinents.AltBiomeSettings.FromConfig(choice.Values);
       return settings;
     }
     catch (Exception ex)
     {
-      BetterContinents.Log($"Couldn't load preset {BetterContinents.ConfigSelectedPreset.Value} ({ex.Message}), BC is disabled for this world!");
+      BetterContinents.Log($"Couldn't load preset {choice.PresetPath} ({ex.Message}), BC is disabled for this world!");
       return BetterContinents.BetterContinentsSettings.Disabled();
     }
   }

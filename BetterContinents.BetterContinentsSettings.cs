@@ -136,10 +136,17 @@ public partial class BetterContinents
 
     public static BetterContinentsSettings Create()
     {
+      bool enabled = ConfigEnabled.Value;
+      return Create(enabled, enabled ? WorldImport.DirectoryValues() ?? ConfigValues.Live : ConfigValues.Live);
+    }
+
+    // From Config with the config read beforehand (NewWorldBuild.Choose, on the main thread), so that this runs on any thread.
+    internal static BetterContinentsSettings Create(bool enabled, ConfigValues values)
+    {
       Log($"Init settings for new world");
-      var settings = new BetterContinentsSettings { EnabledForThisWorld = ConfigEnabled.Value };
+      var settings = new BetterContinentsSettings { EnabledForThisWorld = enabled };
       if (settings.EnabledForThisWorld)
-        settings.FromConfig(WorldImport.DirectoryValues() ?? ConfigValues.Live, overridable: true, lean: false);
+        settings.FromConfig(values, overridable: true, lean: false);
       return settings;
     }
 
@@ -634,10 +641,21 @@ public partial class BetterContinents
 
     public void SaveToSource(string path, FileHelpers.FileSource fileSource)
     {
+      var binaryData = Bytes(out int length);
+      WriteToSource(path, fileSource, binaryData, length);
+    }
+
+    /// <summary>The bytes the settings are saved as: the first <paramref name="length"/> of the array. Any thread.</summary>
+    internal byte[] Bytes(out int length)
+    {
       var zpackage = new ZPackage();
       Serialize(zpackage, false);
+      return PackageBytes.Buffer(zpackage, out length);
+    }
 
-      var binaryData = PackageBytes.Buffer(zpackage, out int length);
+    /// <summary>Writes the bytes of settings (Bytes) to their file.</summary>
+    internal static void WriteToSource(string path, FileHelpers.FileSource fileSource, byte[] binaryData, int length)
+    {
       // 1.0.15: FileWriter gained a CloudStorageFileGrouping parameter, inserted before the existing
       // FileHelperType/FileSource ones (assembly_utils.decompiled.cs:4705). Our .BetterContinents
       // sidecar isn't one of the extensions SaveSystem.IsWorldSaveExtension recognises out of the box

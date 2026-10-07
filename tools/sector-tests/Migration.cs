@@ -655,7 +655,15 @@ internal static partial class Program
       "FejdStartup.Awake's prefix starts a session that nobody runs (WorldSectors.SessionStarts(false))");
     // A new world takes the choice: From Config (and so an import's preset and a Directory's export.cfg), and a preset file's world when it is made.
     Check(CallsInIl(settingsType.GetMethod("FromConfig", all)!, "WorldSectors", "NewWorld"), "BetterContinentsSettings.FromConfig calls WorldSectors.NewWorld");
-    Check(CallsInIl(worldPatch.GetMethod("SaveWorldFWLDataPostfix", all)!, "WorldSectors", "NewWorld"), "the postfix that saves a new world's settings calls WorldSectors.NewWorld for the preset it takes");
+    // A preset file's world gets it in NewWorldBuild.Build: the New World screen runs it beforehand on a worker (Make), and the postfix that saves
+    // a new world's settings runs it when nothing was made beforehand (a dedicated server's new world).
+    Check(CallsInIl(typeof(NewWorldBuild).GetMethod("Build", all)!, "WorldSectors", "NewWorld"), "NewWorldBuild.Build, which makes a new world's settings, calls WorldSectors.NewWorld for the preset it takes");
+    Check(CallsInIl(typeof(NewWorldBuild).GetMethod("Make", all)!, "NewWorldBuild", "Build"), "the settings made beforehand on a worker (NewWorldBuild.Make) are Build's");
+    var savePostfix = worldPatch.GetMethod("SaveWorldFWLDataPostfix", all)!;
+    Check(CallsInIl(savePostfix, "NewWorldBuild", "Take") && CallsInIl(savePostfix, "NewWorldBuild", "Build"),
+      "the postfix that saves a new world's settings takes those made beforehand (NewWorldBuild.Take), or Build's");
+    Check(CallsInIl(fejdPatch.GetMethod("OnNewWorldDonePrefix", all)!, "NewWorldBuild", "RunsNow"),
+      "FejdStartup.OnNewWorldDone's prefix has the settings made first, without stopping the game (NewWorldBuild.RunsNow)");
 
     // The two patches on the game's load: bound to the right methods, and doing what they are for.
     var mappingPatch = typeof(WorldSectors).GetNestedType("MappingLoadPatch", all)!;

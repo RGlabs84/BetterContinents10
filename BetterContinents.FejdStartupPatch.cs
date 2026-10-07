@@ -44,20 +44,25 @@ public partial class BetterContinents
             presets.InitUI(__instance);
         }
         [HarmonyPrefix, HarmonyPatch("OnNewWorldDone")]
-        static void OnNewWorldDonePrefix()
+        static bool OnNewWorldDonePrefix(FejdStartup __instance, bool forceLocal)
         {
+            // A preset to read is read first, without stopping the game, and this runs again when it is ready (NewWorldBuild).
+            if (!NewWorldBuild.RunsNow(__instance, forceLocal))
+                return false;
             // Indicator to SaveWorldMetaDataPostfix that it should save a new BC config file using the 
             // selected preset, rather than saving the active worlds settings.
             WorldPatch.bWorldBeingCreated = true;
             Log($"[Saving] Setting the bWorldBeingCreated flag");
+            return true;
         }
 
         [HarmonyPostfix, HarmonyPatch("OnNewWorldDone")]
-        private static void OnNewWorldDonePostfix()
+        private static void OnNewWorldDonePostfix(bool __runOriginal)
         {
             // Clear the flag again, ready for normal save operations 
             WorldPatch.bWorldBeingCreated = false;
-            Log($"[Saving] Clearing the bWorldBeingCreated flag again");
+            if (__runOriginal)
+                Log($"[Saving] Clearing the bWorldBeingCreated flag again");
         }
     }
 }

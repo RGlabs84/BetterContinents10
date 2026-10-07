@@ -85,16 +85,16 @@ public partial class BetterContinents
       Log($"[Saving][{__instance.m_name}] Saving settings for {__instance.m_name}");
 
       BetterContinentsSettings settingsToSave;
+      NewWorldBuild.Made? made = null;
 
       // This flag is set explicitly in the OnNewWorldDonePrefix function only
       if (bWorldBeingCreated)
       {
         // World is being created, so bake our settings from the preset
         Log($"[Saving][{__instance.m_name}] bWorldBeingCreated flag set, first time save of {__instance.m_name}, applying selected preset '{ConfigSelectedPreset.Value}'");
-        settingsToSave = Presets.LoadActivePreset();
-        // Wide Sectors: a world made from a preset file (one made before it, or on a machine that has it Off) that reaches past the game's sectors
-        // is made wide too, by this machine's choice; a world made From Config already is.
-        WorldSectors.NewWorld(settingsToSave, ConfigWideSectors.Value, ExpandWorldSizeGeometry);
+        // Made beforehand, on a worker, for a world from the New World screen (NewWorldBuild); made now for any other.
+        made = NewWorldBuild.Take();
+        settingsToSave = made?.Settings ?? NewWorldBuild.Build(NewWorldBuild.Choose());
         bWorldBeingCreated = false;
       }
       else
@@ -125,7 +125,10 @@ public partial class BetterContinents
         Directory.CreateDirectory(bcConfigDir);
       string newName = bcConfigFile + ".new";
       string oldName = bcConfigFile + ".old";
-      settingsToSave.SaveToSource(newName, __instance.m_fileSource);
+      if (made?.Bytes is { } bytes)
+        BetterContinentsSettings.WriteToSource(newName, __instance.m_fileSource, bytes, made.Length);
+      else
+        settingsToSave.SaveToSource(newName, __instance.m_fileSource);
       // 1.0.15: ReplaceOldFile gained a CloudStorageFileGrouping parameter (inserted before the FileSource
       // one). SameFolder is what World.SaveWorldFWLData() itself uses for the .fwl2, and it is what we want
       // here too so the settings stay in the same Steam Cloud bucket as the world files they configure.

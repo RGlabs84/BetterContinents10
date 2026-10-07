@@ -485,7 +485,7 @@ public static class WorldImport
     return result;
   }
 
-  private static ConfigFile PluginConfig() =>
+  internal static ConfigFile PluginConfig() =>
     ConfigEnabled?.ConfigFile ?? throw new InvalidOperationException("Better Continents' config is not loaded");
 
   // Directory as export.cfg writes it: forward slashes, which every system's Path.Combine takes.
