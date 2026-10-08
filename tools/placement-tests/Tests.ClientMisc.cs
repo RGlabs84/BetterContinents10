@@ -103,14 +103,16 @@ internal static partial class Tests
     C(group.Name == "BetterContinents.BakedPlacements" && groups.Length >= 11, "the baked placements group is the last one declared");
     C(groups.Take(10).Select(g => g.Name).Last() == "BetterContinents.Export", "the groups before it keep their places (Export is still the tenth, 09)");
     var keys = group.Settings.Select(s => s.Key).ToArray();
-    C(keys.SequenceEqual(["Draw Distance", "Draw Scale", "Detail Scale", "Shadows", "Light Distance", "Seat Distance", "Light Shadows", "Tints", "Diagnostics"]), "Draw Distance, Draw Scale, Detail Scale, Shadows, Light Distance, Seat Distance, Light Shadows, Tints and Diagnostics: " + string.Join(", ", keys));
+    C(keys.SequenceEqual(["Draw Distance", "Draw Scale", "Detail Scale", "Shadows", "Light Distance", "Seat Distance", "Light Count", "Light Shadows", "Tints", "Diagnostics"]), "Draw Distance, Draw Scale, Detail Scale, Shadows, Light Distance, Seat Distance, Light Count, Light Shadows, Tints and Diagnostics: " + string.Join(", ", keys));
     C(group.Settings.All(s => s.Scope == SettingScope.Live && s.Section == "10 BetterContinents.BakedPlacements"), "every one is read live, in section '10 BetterContinents.BakedPlacements'");
     C(SettingsSchema.BakedDrawDistance.Default == 4 && SettingsSchema.BakedDrawScale.Default == 1.5f && SettingsSchema.BakedDetailScale.Default == 1f
       && SettingsSchema.BakedShadowMode.Default == BakedShadows.All && SettingsSchema.BakedLightDistance.Default == 90f && SettingsSchema.BakedSeatDistance.Default == 12f
-      && SettingsSchema.BakedLightShadows.Default == 4 && SettingsSchema.BakedTints.Default == "" && SettingsSchema.BakedDiagnostics.Default == false, "the defaults: 4 zones, 1.5, 1, All (until the probe says), 90 m, 12 m, 4 lit copies with shadows, no tints, no diagnostics");
+      && SettingsSchema.BakedLightCount.Default == 24 && SettingsSchema.BakedLightShadows.Default == 4 && SettingsSchema.BakedTints.Default == "" && SettingsSchema.BakedDiagnostics.Default == false,
+      "the defaults: 4 zones, 1.5, 1, All (until the probe says), 90 m, 12 m, 24 lit copies, 4 with shadows, no tints, no diagnostics");
     C(SettingsSchema.BakedDrawDistance.Limits == (1, 8) && SettingsSchema.BakedDrawScale.Limits == (0.5f, 4f) && SettingsSchema.BakedDetailScale.Limits == (0.5f, 4f)
-      && SettingsSchema.BakedLightDistance.Limits == (0f, 200f) && SettingsSchema.BakedSeatDistance.Limits == (0f, 40f) && SettingsSchema.BakedLightShadows.Limits == (0, 32),
-      "the ranges: 1 to 8 zones, 0.5 to 4, 0.5 to 4, 0 to 200 m, 0 to 40 m, 0 to 32 copies");
+      && SettingsSchema.BakedLightDistance.Limits == (0f, 200f) && SettingsSchema.BakedSeatDistance.Limits == (0f, 40f) && SettingsSchema.BakedLightCount.Limits == (0, 128)
+      && SettingsSchema.BakedLightShadows.Limits == (0, 32),
+      "the ranges: 1 to 8 zones, 0.5 to 4, 0.5 to 4, 0 to 200 m, 0 to 40 m, 0 to 128 lit copies, 0 to 32 with shadows");
     C(group.Settings.All(s => !s.ReadsIntoSettings && s.ConsoleGroup == null), "none is a world setting or a bc command: having a layer is the world's");
     // bound into a config file of its own, in its place
     var path = Path.Combine(Work, "baked.cfg");
@@ -127,7 +129,7 @@ internal static partial class Tests
           s.Bind(g);
       });
       C(BakedSettings.DrawDistance is { Value: 4 } && BakedSettings.DrawScale!.Value == 1.5f && BakedSettings.Shadows!.Value == BakedShadows.All && BakedSettings.LightDistance!.Value == 90f
-        && BakedSettings.SeatDistance!.Value == 12f && BakedSettings.LightShadows!.Value == 4 && BakedSettings.Tints!.Value == "" && !BakedSettings.Diagnostics!.Value && BakedSettings.DetailScale!.Value == 1f, "bound, the settings read their defaults");
+        && BakedSettings.SeatDistance!.Value == 12f && BakedSettings.LightCount!.Value == 24 && BakedSettings.LightShadows!.Value == 4 && BakedSettings.Tints!.Value == "" && !BakedSettings.Diagnostics!.Value && BakedSettings.DetailScale!.Value == 1f, "bound, the settings read their defaults");
       C(BakedSettings.DrawDistance!.Definition.Section == "10 BetterContinents.BakedPlacements" && BakedSettings.Shadows!.Description.Description.Contains("Near"), "in section 10, with their descriptions");
       BakedSettings.Shadows!.Value = BakedShadows.Near;
       C(BakedSettings.Shadows.Value == BakedShadows.Near, "a value can be changed");
@@ -136,6 +138,7 @@ internal static partial class Tests
     {
       BakedSettings.DrawDistance = null;
       BakedSettings.LightShadows = null;
+      BakedSettings.LightCount = null;
       BakedSettings.DrawScale = BakedSettings.DetailScale = BakedSettings.LightDistance = BakedSettings.SeatDistance = null;
       BakedSettings.Shadows = null;
       BakedSettings.Tints = null;

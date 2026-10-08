@@ -286,8 +286,9 @@ internal sealed class BakedKind
   /// <summary>The entry's prefab is a consumable kind (BakedConsumables, spec 0.2): the server places its records as ordinary objects when a zone
   /// generates, so this client never draws one and gives it no collider, whatever its role.</summary>
   internal bool Consumable;
-  /// <summary>Instanced: a Static or Seat entry with a piece that has something to draw.</summary>
-  internal bool Draws => Piece != null && Piece.NearParts.Length > 0 && (Role == BakedRole.Static || Role == BakedRole.Seat);
+  /// <summary>Instanced: a Static, Seat or Copy entry with a piece that has something to draw. A Copy is drawn unlit (its prefab's intact look) wherever
+  /// no lit copy stands at it: beyond Light Distance, and within it beyond the Light Count nearest (BakedLightCount).</summary>
+  internal bool Draws => Piece != null && Piece.NearParts.Length > 0 && (Role == BakedRole.Static || Role == BakedRole.Seat || Role == BakedRole.Copy);
 
   /// <summary>Its place in BakedKinds.All (-1 until it joins): the cull-and-LOD job counts its instances by it.</summary>
   internal int Index = -1;
@@ -493,8 +494,8 @@ internal static class BakedKinds
     if (e.Role == BakedRole.Live || ZNetScene.instance == null)
       return k;
 
-    // the piece is read for what is drawn (Static, Seat) and for collision 3; a copy (Copy) only needs its prefab
-    bool needPiece = e.Role == BakedRole.Static || e.Role == BakedRole.Seat || e.Collision == BakedCollision.Prefab;
+    // the piece is read for what is drawn (Static, Seat, and Copy where no lit copy stands) and for collision 3
+    bool needPiece = e.Role == BakedRole.Static || e.Role == BakedRole.Seat || e.Role == BakedRole.Copy || e.Collision == BakedCollision.Prefab;
     bool found = false;
     for (int i = 0; i < e.Names.Length && !found; i++)
     {

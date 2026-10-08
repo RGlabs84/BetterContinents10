@@ -30,7 +30,7 @@ namespace BetterContinents;
 /// <summary>Where the client side reads its settings (section 11.2): bound by SettingsSchema, null where the config is not (the offline suite).</summary>
 internal static class BakedSettings
 {
-  internal static ConfigEntry<int>? DrawDistance, LightShadows;
+  internal static ConfigEntry<int>? DrawDistance, LightCount, LightShadows;
   internal static ConfigEntry<float>? DrawScale, DetailScale, LightDistance, SeatDistance;
   internal static ConfigEntry<BakedShadows>? Shadows;
   internal static ConfigEntry<string>? Tints;
@@ -114,6 +114,7 @@ internal static class BakedClient
   private static int integratedThisFrame;
   private static readonly HashSet<string> Reported = [];
   private static readonly List<ZDO> ZdoScratch = [];
+  private static readonly List<BakedCopies.Props> PropsNow = [];
 
   // ---- what the offline tests look at ----------------------------------------------------------------------------------------------
 
@@ -172,6 +173,14 @@ internal static class BakedClient
     if (consumables > 0 || BakedConsumables.Kinds.Count > 0)
       say($"Baked placements: {BakedConsumables.Kinds.Count} consumable kinds ({string.Join(", ", BakedConsumables.Kinds.Take(8))}{(BakedConsumables.Kinds.Count > 8 ? ", ..." : "")}) " +
           $"and {consumables:N0} of their records in the zones built here are placed as real objects, never drawn.");
+    int copyRecords = 0, lit = 0;
+    foreach (var s in Slots.Values)
+    {
+      copyRecords += s.Current?.Copies.Length ?? 0;
+      lit += s.Objects?.Props?.LitCount ?? 0;
+    }
+    if (copyRecords > 0)
+      say(BakedLightCount.StatsLine(copyRecords, lit, BakedSettings.LightCount?.Value ?? BakedLightCount.Default, BakedSettings.LightDistance?.Value ?? 90f, BakedDraw.Hidden));
     BakedDraw.Report(say, ring.Length);
   }
 
@@ -420,19 +429,26 @@ internal static class BakedClient
     CheckApplied(now);
     BakedPaint.Tick(layer, refZone);
 
-    // lit copies and seats
+    // lit copies and seats: of the Copy records within Light Distance the Light Count nearest burn (one ranking across the zones, a few times a
+    // second); every other Copy record is drawn unlit by the instancing, which skips the ones whose lit copy stands
     Vector3 eye = cam.transform.position;
     float light = BakedDraw.Hidden ? 0f : BakedSettings.LightDistance?.Value ?? 90f;
+    int lights = BakedDraw.Hidden ? 0 : BakedSettings.LightCount?.Value ?? BakedLightCount.Default;
     float seat = BakedSettings.SeatDistance?.Value ?? 12f;
     Vector3 at = Player.m_localPlayer != null ? Player.m_localPlayer.transform.position : eye;
+    PropsNow.Clear();
     foreach (var s in Slots.Values)
     {
       var props = s.Objects?.Props;
       if (props == null || s.Objects?.Root == null)
         continue;
-      props.UpdateLit(eye, light);
+      PropsNow.Add(props);
       props.UpdateSeats(at, seat);
     }
+    BakedLightCount.Update(PropsNow, eye, light, lights, Time.unscaledTime);
+    BakedLightCount.MakePending();
+    foreach (var props in PropsNow)
+      props.UpdateLit();
     // only the Light Shadows nearest lit copies keep their lights' shadows (one ranking across the zones, a few times a second)
     BakedLightShadows.Update(eye, BakedSettings.LightShadows?.Value ?? 4, Time.unscaledTime);
 
@@ -877,6 +893,7 @@ internal static class BakedClient
     BakedZoneHold.ReleaseAll();
     BakedPaint.Clear();
     BakedLightShadows.Clear();
+    BakedLightCount.Clear();
     BakedDraw.Reset();
     BakedKinds.ResetAll();
     ring = [];

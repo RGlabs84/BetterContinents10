@@ -9,8 +9,11 @@ namespace BetterContinents;
 
 // THE TWO ROLES THAT ARE REAL NEAR THE PLAYER (section 9.6).
 //
-// Copy: wall torches, braziers, fire pits and candles are not instanced. Within Light Distance of the camera each is a lit copy of its prefab,
-// made a few per frame and dropped again 20 m farther out, so their flames burn and their light falls on the street. A copy is made the way
+// Copy: wall torches, braziers, fire pits and candles. Of the Copy records within Light Distance of the camera the Light Count nearest (BakedLightCount)
+// are each a lit copy of the prefab, made a few per frame and dropped again 20 m farther out or when others are nearer, so their flames burn and their
+// light falls on the street; every other Copy record is drawn unlit by instancing, as the prefab's intact look (BakedDraw skips the records whose lit
+// copy stands, BuiltZone.Lit). A copy that is dropped stays until a drawing job that knows its record is drawn again has been adopted, so a record is
+// never neither. A copy is made the way
 // Valheim makes its building ghost (Player.SetupPlacementGhost): with ZNetView.m_forceDisableInit and TerrainOp.m_forceDisableTerrainOps, so
 // it has no ZDO, is nobody's network object and never edits the terrain. Every component but the visual ones (meshes, LODs, lights, particles,
 // sounds, animators) is removed before the fire is shown, so the flames' own heat, damage and smoke never wake: no fuel, no warmth, no damage,
@@ -45,11 +48,19 @@ internal static class BakedCopies
   private static readonly Dictionary<Type, RequireComponent[]> Requires = new();
   private static int lightsFrame = -1, lightsMade, seatsFrame = -1, seatsMade;
 
-  private static bool CanMakeLight()
+  // The game's side of the lit copies, as fields for the offline tests to stand in for: the frame, the clock, and how a copy is made and let go.
+  internal static Func<int> Frame = () => Time.frameCount;
+  internal static Func<float> Clock = () => Time.unscaledTime;
+  internal static Func<BakedKind, Matrix4x4, Transform, GameObject> Maker = MakeLit;
+  internal static Action<GameObject> Destroyer = go => UnityEngine.Object.Destroy(go);
+  /// <summary>How long (seconds) a dropped copy waits for the drawing to take its record over, at most (no job runs while drawing is hidden).</summary>
+  internal const float RetireCap = 1f;
+
+  internal static bool CanMakeLight()
   {
-    if (Time.frameCount != lightsFrame)
+    if (Frame() != lightsFrame)
     {
-      lightsFrame = Time.frameCount;
+      lightsFrame = Frame();
       lightsMade = 0;
     }
     return lightsMade < LightsPerFrame;
@@ -57,9 +68,9 @@ internal static class BakedCopies
 
   private static bool CanMakeSeat()
   {
-    if (Time.frameCount != seatsFrame)
+    if (Frame() != seatsFrame)
     {
-      seatsFrame = Time.frameCount;
+      seatsFrame = Frame();
       seatsMade = 0;
     }
     return seatsMade < SeatsPerFrame;
@@ -68,7 +79,6 @@ internal static class BakedCopies
   /// <summary>A lit, inert copy of the prefab placed by <paramref name="m"/> (the piece's world matrix), under <paramref name="parent"/>.</summary>
   internal static GameObject MakeLit(BakedKind kind, Matrix4x4 m, Transform parent)
   {
-    lightsMade++;
     var prefab = kind.Prefab!;
     GameObject go;
     ZNetView.m_forceDisableInit = true;
@@ -244,15 +254,19 @@ internal static class BakedCopies
     private readonly BuiltZone zone;
     private readonly Transform parent;
     private readonly GameObject?[] lit, seats;
-    private int litShown, seatsShown;
-    private bool litReported, seatReported;
+    private readonly bool[] wanted;
+    private int litShown, seatsShown, wantedCount;
+    private bool litReported, seatReported, dirty, released;
     private readonly bool[] litBroken, seatBroken;
+    // copies dropped, waiting for the drawing to take their records over: the copy, the LitVersion that published their going, and since when
+    private readonly List<(GameObject Copy, int Version, float Since)> retiring = [];
 
     internal Props(BuiltZone zone, Transform parent)
     {
       this.zone = zone;
       this.parent = parent;
       lit = new GameObject[zone.Copies.Length];
+      wanted = new bool[lit.Length];
       seats = new GameObject[zone.Seats.Length];
       litBroken = new bool[lit.Length];
       seatBroken = new bool[seats.Length];
@@ -260,15 +274,79 @@ internal static class BakedCopies
 
     internal bool Shown => litShown > 0 || seatsShown > 0;
 
-    /// <summary>Makes the lit copies within <paramref name="near"/> metres of the camera (0: none, and the ones made go) and drops those
-    /// <see cref="LightHysteresis"/> farther out.</summary>
-    internal void UpdateLit(Vector3 eye, float near)
+    /// <summary>How many lit copies stand now, and how many Copy records the zone has to light.</summary>
+    internal int LitCount => litShown;
+    internal int CopyCount => lit.Length;
+
+    /// <summary>Adds the records that could burn to <paramref name="into"/>: those within <paramref name="near"/> metres of the eye, and those that
+    /// burn now within <paramref name="far"/>; none that cannot be made (a copy that failed once is not tried again).</summary>
+    internal void AddCandidates(Vector3 eye, float near, float far, List<BakedLightCount.Candidate> into)
     {
-      if (lit.Length == 0)
+      if (lit.Length == 0 || litShown == 0 && SqrDistance(zone.CopyBox, eye) > near * near)
         return;
-      float far = near + LightHysteresis;
-      if (litShown == 0 && (near <= 0f || SqrDistance(zone.CopyBox, eye) > near * near))
+      for (int i = 0; i < lit.Length; i++)
+      {
+        if (litBroken[i])
+          continue;
+        var p = zone.Copies[i].Matrix;
+        float dx = p.m03 - eye.x, dy = p.m13 - eye.y, dz = p.m23 - eye.z;
+        float d2 = dx * dx + dy * dy + dz * dz;
+        bool burning = lit[i] != null;
+        if (d2 < near * near || burning && d2 <= far * far)
+          into.Add(new BakedLightCount.Candidate(this, i, d2, burning));
+      }
+    }
+
+    /// <summary>The ranking says no record of this zone is wanted lit; then it says which are.</summary>
+    internal void ClearWanted()
+    {
+      if (wantedCount > 0)
+        Array.Clear(wanted, 0, wanted.Length);
+      wantedCount = 0;
+    }
+
+    internal void Want(int index)
+    {
+      if (!wanted[index])
+      {
+        wanted[index] = true;
+        wantedCount++;
+      }
+    }
+
+    /// <summary>Makes the lit copy of one wanted record (BakedLightCount.MakePending asks for the nearest first, a few a frame). False when there is nothing
+    /// to make: not wanted any more, standing already, or one that failed before; true when it was tried, which uses up one of the frame's makes.</summary>
+    internal bool TryLight(int i)
+    {
+      if (released || !wanted[i] || lit[i] != null || litBroken[i])
+        return false;
+      try
+      {
+        lit[i] = Maker(zone.Copies[i].Kind, zone.Copies[i].Matrix, parent);
+        litShown++;
+        dirty = true;
+      }
+      catch (Exception e)
+      {
+        if (!litReported)
+          LogWarning($"baked placements: could not light \"{zone.Copies[i].Kind.Name}\": {e.Message}");
+        litReported = true;
+        litBroken[i] = true;
+      }
+      lightsMade++;
+      return true;
+    }
+
+    /// <summary>Every frame: lets go of the copies no longer wanted, publishes the records with a copy standing to the drawing (BuiltZone.Lit) so that it
+    /// does not draw them too, and destroys the dropped copies the drawing has taken over. A record that stops burning is drawn again before its copy
+    /// goes.</summary>
+    internal void UpdateLit()
+    {
+      if (lit.Length == 0 || litShown == 0 && !dirty && retiring.Count == 0)
         return;
+      bool changed = dirty;
+      dirty = false;
+      List<GameObject>? dropped = null;
       for (int i = 0; i < lit.Length; i++)
       {
         GameObject? copy = lit[i];
@@ -276,32 +354,54 @@ internal static class BakedCopies
         {
           lit[i] = null;
           litShown--;
+          changed = true;
         }
-        var p = zone.Copies[i].Matrix;
-        float dx = p.m03 - eye.x, dy = p.m13 - eye.y, dz = p.m23 - eye.z;
-        float d2 = dx * dx + dy * dy + dz * dz;
-        if (lit[i] == null)
+        else if (copy != null && !wanted[i])
         {
-          if (near <= 0f || d2 >= near * near || litBroken[i] || !CanMakeLight())
-            continue;
-          try
-          {
-            lit[i] = MakeLit(zone.Copies[i].Kind, p, parent);
-            litShown++;
-          }
-          catch (Exception e)
-          {
-            if (!litReported)
-              LogWarning($"baked placements: could not light \"{zone.Copies[i].Kind.Name}\": {e.Message}");
-            litReported = true;
-            litBroken[i] = true;
-          }
-        }
-        else if (near <= 0f || d2 > far * far)
-        {
-          UnityEngine.Object.Destroy(lit[i]);
+          (dropped ??= []).Add(copy);
           lit[i] = null;
           litShown--;
+          changed = true;
+        }
+      }
+      if (changed)
+      {
+        Publish();
+        if (dropped != null)
+          foreach (var go in dropped)
+            retiring.Add((go, BakedDraw.LitVersion, Clock()));
+      }
+      ReleaseRetired();
+    }
+
+    // The records with a copy standing, as one new array the cull-and-LOD worker can read whole (BuiltZone.Lit); a job is due for it.
+    private void Publish()
+    {
+      bool[]? bits = null;
+      if (litShown > 0)
+      {
+        bits = new bool[lit.Length];
+        for (int i = 0; i < bits.Length; i++)
+          bits[i] = lit[i] != null;
+      }
+      zone.Lit = bits;
+      BakedDraw.LitVersion++;
+    }
+
+    // A copy that was dropped goes once a drawing job made after its record was published as drawn has been adopted (or, with no job running, a
+    // second later), so there is no frame in which neither is there.
+    private void ReleaseRetired()
+    {
+      if (retiring.Count == 0)
+        return;
+      float now = Clock();
+      for (int k = retiring.Count - 1; k >= 0; k--)
+      {
+        var r = retiring[k];
+        if (r.Version <= BakedDraw.LitAdopted || now - r.Since > RetireCap || BakedDraw.Hidden)
+        {
+          Destroyer(r.Copy);
+          retiring.RemoveAt(k);
         }
       }
     }
@@ -369,9 +469,19 @@ internal static class BakedCopies
     /// <summary>The copies go with the zone's object; this lets go of them.</summary>
     internal void Release()
     {
+      released = true;
+      bool published = zone.Lit != null;
       Array.Clear(lit, 0, lit.Length);
       Array.Clear(seats, 0, seats.Length);
-      litShown = seatsShown = 0;
+      Array.Clear(wanted, 0, wanted.Length);
+      retiring.Clear();
+      litShown = seatsShown = wantedCount = 0;
+      // the zone's records are drawn unlit again, whatever draws it next
+      if (published)
+      {
+        zone.Lit = null;
+        BakedDraw.LitVersion++;
+      }
     }
   }
 }
