@@ -54,6 +54,21 @@ internal sealed class VegetationGrowth(ZoneKey zone, BakedVegetation.ZoneMask ce
 {
   public readonly ZoneKey Zone = zone;
   public readonly BakedVegetation.ZoneMask Cells = cells;
+  /// <summary>The next layer's own consumable records in this zone, by prefab (the stable hash of the resolved candidate's name): where each would
+  /// stand (PlacementOf's pivot). The clean-up leaves an object of that prefab within PositionTolerance of one alone: in a zone that is generated
+  /// already the layer's consumables are never placed again, so destroying one would lose the compiler's intent for good. Null: none.</summary>
+  public Dictionary<int, List<Vector3>>? Keep;
+
+  /// <summary>An object of this prefab at this place is one of the next layer's own consumables.</summary>
+  public bool Keeps(int prefab, Vector3 position)
+  {
+    if (Keep == null || !Keep.TryGetValue(prefab, out var pivots))
+      return false;
+    foreach (var pivot in pivots)
+      if (Vector3.Distance(position, pivot) <= BakedReconcile.PositionTolerance)
+        return true;
+    return false;
+  }
 }
 
 internal sealed class ReconcileInput
@@ -154,7 +169,11 @@ internal readonly struct OrphanInfo(ZDOID id, string prefab, Vector3 position, s
 // Vegetation: in generated zones where the compiler's clear cells grew (its mask or zone flag 16), the world-made vegetation in the new
 // cells is destroyed, as a zone reset destroys what the world made (the prefabs of ZoneSystem.m_vegetation, with no creator and no bake
 // id). The cells around in-game records never destroy anything: a player who kept a tree beside the house keeps it; those cells only keep
-// vegetation out of a zone that generates again (BakedVegetation).
+// vegetation out of a zone that generates again (BakedVegetation). The next layer's own consumables are kept as well (build spec 0.2): they are
+// placed once when a zone generates, so in a zone that is generated already a destroyed one would never come back. An object is one when it is
+// the prefab of one of the next layer's consumable records in that zone and stands within PositionTolerance of where the record puts it (Gather
+// reads them for the zones that grew, VegetationGrowth.Keep); the old layer's consumable that the next moved or dropped, and any other
+// mushroom or bush, is plain vegetation and goes.
 //
 // When: at world load on the machine that runs the world (after the zones and every object are loaded: a ZNet.LoadWorld postfix, after
 // BakeRunner's check of what a crash or a cut save left, which settles every bake, unbake and undo first), and after `bc_bake load`,
@@ -337,7 +356,7 @@ internal static class BakedReconcile
         {
           var grown = BakedVegetation.FileMask(next, row.Key).Grown(BakedVegetation.FileMask(old, row.Key));
           if (grown.Any)
-            input.Growth.Add(new VegetationGrowth(row.Key, grown));
+            input.Growth.Add(new VegetationGrowth(row.Key, grown) { Keep = ConsumablePlaces(next, row, context) });
         }
         if (clock.Elapsed.TotalMilliseconds > MillisecondsPerFrame)
         {
@@ -370,6 +389,29 @@ internal static class BakedReconcile
         Note(input, portal);
     }
     done(input);
+  }
+
+  /// <summary>Where the layer's own consumables stand in a zone: its records of consumable kinds, whatever their role, by the prefab each resolves
+  /// to (as SeedZone resolves it) and the pivot SeedZone would make it at. Null when the zone has none. Only the zones whose clear cells grew
+  /// are read, with the context the Live records use.</summary>
+  private static Dictionary<int, List<Vector3>>? ConsumablePlaces(BakedLayer layer, ZoneRow row, BakedServer.Context context)
+  {
+    Dictionary<int, List<Vector3>>? places = null;
+    var data = layer.Decode(row);
+    for (int k = 0; k < data.Count; k++)
+    {
+      int index = data.Palette[k];
+      var palette = layer.Palette[index];
+      if (!BakedServer.IsConsumable(context, index, palette, out var kind) || kind == null)
+        continue;
+      var pivot = BakedServer.PlacementOf(kind, palette, data.Record(k)).Pivot;
+      places ??= [];
+      int prefab = kind.Candidate.Name.GetStableHashCode();
+      if (!places.TryGetValue(prefab, out var list))
+        places[prefab] = list = [];
+      list.Add(pivot);
+    }
+    return places;
   }
 
   private static void AddRecords(ReconcileInput input, BakedLayer layer, ZoneRow row, BakedServer.Context context)
@@ -599,7 +641,9 @@ internal static class BakedReconcile
 
   // ---- vegetation ------------------------------------------------------------------------------------------------------------------------
 
-  // What the world made in the cells the file has cleared since: the prefabs of ZoneSystem.m_vegetation, with no creator and no bake id.
+  // What the world made in the cells the file has cleared since: the prefabs of ZoneSystem.m_vegetation, with no creator and no bake id, except the
+// next layer's own consumables (VegetationGrowth.Keep: the same prefab within 5 cm of a record's pivot). A consumable of the old layer that the next
+// moved or dropped, and any other mushroom or bush, is plain vegetation and goes.
   private static bool ClearVegetation(VegetationGrowth growth, Counts counts)
   {
     var man = Objects();
@@ -616,6 +660,9 @@ internal static class BakedReconcile
         continue;
       var position = zdo.GetPosition();
       if (!growth.Cells.Covers(position.x - ox, position.z - oz))
+        continue;
+      // One of the next layer's own consumables (placed when the zone generated, never again): it stays.
+      if (growth.Keeps(zdo.GetPrefab(), position))
         continue;
       if (Destroy(zdo))
       {
