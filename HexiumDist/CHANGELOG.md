@@ -26,8 +26,9 @@
     towns into a new world: drawn pieces, live pieces made real (doors, stations, chests) and protected,
     the ground under the towns, paint and cleared vegetation. `bc_bake load` brings a newer file into a
     running world; the live pieces follow, and a container that holds items is never taken away.
-    Consumables in the file are placed once as the game's own objects. `bc_bake export` writes the layer
-    out.
+    Consumables in the file are placed once as the game's own objects, unless the file marks a kind as
+    decor: then it is drawn like the rest of the town and cannot be picked. `bc_bake export` writes the
+    layer out.
   - Players download the layer when they join (a few MB for a whole town file, kept in the cache for the
     next time), and a change made during play reaches them as a small patch before any piece is taken
     away.
