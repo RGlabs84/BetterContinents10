@@ -203,9 +203,11 @@ internal static partial class Tests
     C(BakeCls(BakeLight("cosy_bed", false, 2, "Bed"), 7, BakeTown).Kind == BakeKind.Adopt, "comfort with a Bed stays");
     C(BakeCls(BakeLight("cosy_bench", false, 2, "CraftingStation"), 7, BakeTown).Kind == BakeKind.Adopt, "comfort with a station stays");
     C(BakeCls(BakeLight("cosy_sign", false, 1, "Sign"), 7, BakeTown).Kind == BakeKind.Adopt, "comfort with a Sign stays");
-    C(BakeCls(BakeLight("cosy_lamp", false, 1, "UnityEngine.Light", "LightLod"), 7, BakeTown).Kind == BakeKind.Adopt,
-      "comfort with a Light has two reasons: it stays real (the user's rule: only light and fire, or only comfort)");
-    C(BakeCls(BakeLight("cosy_fire", false, 1, "Fireplace"), 7, BakeTown).Kind == BakeKind.Adopt, "comfort with a Fireplace stays real");
+    C(BakeCls(BakeLight("cosy_lamp", false, 1, "UnityEngine.Light", "LightLod"), 7, BakeTown).Kind == BakeKind.Copy,
+      "comfort with a Light is a lit copy with 'town' (the user bakes both decor and lights: a dvergr lantern, a fairy-light garland)");
+    C(BakeCls(BakeLight("cosy_lamp", false, 1, "UnityEngine.Light", "LightLod"), 7, default).Kind == BakeKind.Stays, "... and without 'town' it stays real");
+    C(BakeCls(BakeLight("cosy_fire", false, 1, "Fireplace"), 7, BakeTown).Kind == BakeKind.Copy, "comfort with a Fireplace that has no Burning area is a lit copy with 'town'");
+    C(BakeCls(BakeLight("cosy_chair_lamp", false, 1, "UnityEngine.Light", "Chair"), 7, BakeTown).Kind == BakeKind.Adopt, "a chair with a Light stays real (a chair is sat on)");
     C(BakeCls(BakeLight("cosy_area", false, 1, "EffectArea"), 7, BakeTown).Kind == BakeKind.Adopt, "comfort with an EffectArea stays real");
     C(BakeCls(BakeLight("cosy_mod", false, 1, "MyMod.Thing"), 7, BakeTown).Kind == BakeKind.Adopt, "comfort with an active component this code has never heard of stays real");
     C(BakeCls(BakeLight("cosy_ps", false, 1, "UnityEngine.ParticleSystem"), 7, BakeTown).Kind == BakeKind.Adopt, "comfort with a ParticleSystem alone stays real (no light, no fire)");

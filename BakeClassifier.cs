@@ -180,14 +180,16 @@ internal static class BakeClassifier
   }
 
   // Whether a piece stays real only for its light and fire: it has a Fireplace or a Light, and none of the other reasons of rule 6 (a door, a
-  // container, a bed, a station, a sign, comfort, a chair, connection data) and no active component outside StaticSafe and LightAndFire. A
+  // container, a bed, a station, a sign, a chair, connection data) and no active component outside StaticSafe and LightAndFire. Comfort does
+  // not keep it real: with 'town' the user bakes both comfort decor and lights (2026-10-08), so a lantern that also gives comfort (a dvergr
+  // lantern, a fairy-light garland) is a lit copy and gives no comfort. A
   // fire with a Burning EffectArea anywhere in it (even in the part that is inactive until it is lit) is one a cooking station or a cauldron
   // looks for (CookingStation.IsFireLit, CraftingStation.m_haveFire), so it stays real.
   private static bool OnlyLightAndFire(PrefabFacts prefab, ObjectFacts obj)
   {
     if (!prefab.Has("Fireplace") && !prefab.Has("UnityEngine.Light"))
       return false;
-    if (prefab.BurningArea || prefab.Comfort > 0 || prefab.Has(Chair) || obj.HasConnection)
+    if (prefab.BurningArea || prefab.Has(Chair) || obj.HasConnection)
       return false;
     if (prefab.Has("Door") || prefab.Has("Container") || prefab.Has("Bed") || prefab.Has("Sign"))
       return false;
