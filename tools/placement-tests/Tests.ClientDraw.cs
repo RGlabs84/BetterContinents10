@@ -266,4 +266,68 @@ internal static partial class Tests
     var tn = Regex.Split(nearRow.Trim(), @"\s+");
     C(tn[4] == "2" && tn[9] == "0", $"under Near the last LOD's calls cast nothing ({nearRow.Trim()})");
   }
+  // A casting batch is drawn in segments with their own bounds (a zone each near the camera, four slabs beyond), so that Unity's shadow passes
+  // cull it; a batch that casts nothing stays one segment.
+  private static void ClientSegmentTest()
+  {
+    Section("client: casting batches drawn by zone near the camera and by slab beyond");
+    C(BakedDraw.SegmentKey(0, 0) != BakedDraw.SegmentKey(1, 0) && BakedDraw.SegmentKey(2, -2) != BakedDraw.SegmentKey(-2, 2), "each near zone is its own segment");
+    C(BakedDraw.SegmentKey(3, 0) == BakedDraw.SegmentKey(9, -9) && BakedDraw.SegmentKey(-3, 5) == BakedDraw.SegmentKey(-9, 0)
+      && BakedDraw.SegmentKey(0, 3) == BakedDraw.SegmentKey(2, 9) && BakedDraw.SegmentKey(-2, -3) == BakedDraw.SegmentKey(2, -9),
+      "the zones beyond fall in four slabs: east, west, north, south");
+    C(new[] { BakedDraw.SegmentKey(3, 0), BakedDraw.SegmentKey(-3, 0), BakedDraw.SegmentKey(0, 3), BakedDraw.SegmentKey(0, -3) }.Distinct().Count() == 4
+      && BakedDraw.SegmentKey(3, 0) > BakedDraw.SegmentKey(2, 2), "the four slabs are apart from each other and from every near zone");
+
+    var wall = ClientKit.Kind("wall", ClientKit.NoLods("wall", 1f));
+    var kinds = new BakedKind[] { wall };
+    (int Zx, int Zz)[] at = [(0, 0), (1, 0), (0, -2), (3, 0), (4, 1), (-5, 0), (1, 3), (2, -3)];
+    var zones = at.Select(z => BakedZoneBuild.Build(ClientKit.Zone(z.Zx, z.Zz,
+      Enumerable.Range(0, 10).Select(i => (0, z.Zx * 64.0 + i, 0.0, z.Zz * 64.0 + i * 0.5, 0.0, (Vector3?)null)).ToArray()), kinds, 1)).ToArray();
+    // the ring's order is not the segments': the zones come mixed
+    var mixed = new[] { zones[3], zones[0], zones[5], zones[4], zones[1], zones[7], zones[2], zones[6] };
+    var job = ClientKit.Job(mixed, kinds, 0f, 0f, 0f, 2f, drawScale: 1f);
+    BakedDraw.Fill(job);
+    var batch = ClientKit.BatchOf(wall, 0, 0);
+    var buf = batch.Buf[1 - batch.Front];
+    C(buf.Count == 80, $"all 80 instances are drawn ({buf.Count})");
+    C(buf.Segs == 7, $"3 near zones and 4 slabs make 7 segments ({buf.Segs})");
+    bool together = true, inside = true;
+    for (int s = 0; s < buf.Segs; s++)
+    {
+      int g = s * 6, n = buf.SegEnd(s) - buf.SegStart[s];
+      for (int i = buf.SegStart[s]; i < buf.SegEnd(s); i++)
+      {
+        var m = buf.M[i];
+        inside &= m.m03 >= buf.SegBox[g] && m.m13 >= buf.SegBox[g + 1] && m.m23 >= buf.SegBox[g + 2]
+          && m.m03 <= buf.SegBox[g + 3] && m.m13 <= buf.SegBox[g + 4] && m.m23 <= buf.SegBox[g + 5];
+      }
+      // a near segment holds one zone's 10; the east slab holds two zones' 20
+      together &= n == 10 || (n == 20 && buf.SegBox[g] > 2.5f * 64f - 20f);
+    }
+    C(inside, "every instance is inside its segment's bounds");
+    C(together, "each segment holds one zone, or one slab's zones, together");
+    bool clear = true;
+    for (int s = 0; s < buf.Segs; s++)
+    {
+      int g = s * 6;
+      float cx = (buf.SegBox[g] + buf.SegBox[g + 3]) * 0.5f, cz = (buf.SegBox[g + 2] + buf.SegBox[g + 5]) * 0.5f;
+      bool slab = Math.Abs(cx) > 2.5f * 64f || Math.Abs(cz) > 2.5f * 64f;
+      // outside the square of 128 m around the camera on x or on z
+      if (slab)
+        clear &= buf.SegBox[g] > 128f || buf.SegBox[g + 3] < -128f || buf.SegBox[g + 2] > 128f || buf.SegBox[g + 5] < -128f;
+    }
+    C(clear, "no slab's bounds come within 128 m of the camera");
+    BakedDraw.Adopt(job);
+    var lines = new List<string>();
+    BakedDraw.Report(lines.Add, 8);
+    var row = lines.First(l => l.StartsWith("wall"));
+    var t = Regex.Split(row.Trim(), @"\s+");
+    C(t[2] == "7" && t[4] == "7", $"bc_bake stats counts a call for each segment ({row.Trim()})");
+
+    // casting nothing: one segment, one call
+    var off = ClientKit.Job(mixed, kinds, 0f, 0f, 0f, 2f, drawScale: 1f, shadows: BakedShadows.Off);
+    BakedDraw.Fill(off);
+    var offBuf = batch.Buf[1 - batch.Front];
+    C(offBuf.Count == 80 && offBuf.Segs == 1 && offBuf.Calls(BakedDraw.MaxPerCall) == 1, $"with Shadows Off the batch is one segment in one call ({offBuf.Segs})");
+  }
 }
