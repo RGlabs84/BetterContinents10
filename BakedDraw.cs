@@ -28,6 +28,11 @@ internal enum BakedShadows
 // Every instance keeps its own object-to-world matrix: the game's piece shader brightens each piece by a hash of its origin, which
 // merged meshes would lose.
 //
+// A batch that casts is drawn in runs (segments), each with the bounds of what it holds: Unity culls every shadow pass (each cascade, each
+// face of each point light that casts) by a call's bounds, so a call whose bounds spanned the whole ring was drawn into every one of them
+// (VALtima's Britain d1 at U1: 4.8 M triangles submitted, 94.8 M drawn). Near the camera a segment is one zone; farther out, one of four
+// slabs (east, west, north, south) that stay clear of the near zones, so the lights and the near cascades never meet them.
+//
 // Unity 6's RenderParams start with shadows, received shadows, light probes and reflection probes all OFF. Every one is set: a piece drawn
 // without them is flat and unlit next to the game's own pieces.
 
@@ -37,12 +42,56 @@ internal sealed class BatchBuf
   internal Matrix4x4[] M = [];
   internal int Count;
   internal float MinX, MinY, MinZ, MaxX, MaxY, MaxZ;
+  /// <summary>The runs the list is drawn in: where each starts in M, and its bounds (six floats, minimum then maximum).</summary>
+  internal int[] SegStart = new int[4];
+  internal float[] SegBox = new float[24];
+  internal int Segs;
+  private int segKey;
 
   internal void Begin()
   {
     Count = 0;
+    Segs = 0;
     MinX = MinY = MinZ = float.MaxValue;
     MaxX = MaxY = MaxZ = float.MinValue;
+  }
+
+  /// <summary>Instances added from here on belong to the segment <paramref name="key"/>: a new one unless it is the last one's.</summary>
+  internal void Open(int key)
+  {
+    if (Segs > 0 && key == segKey)
+      return;
+    segKey = key;
+    if (Segs == SegStart.Length)
+    {
+      Array.Resize(ref SegStart, Segs * 2);
+      Array.Resize(ref SegBox, Segs * 12);
+    }
+    SegStart[Segs] = Count;
+    int at = Segs * 6;
+    SegBox[at] = SegBox[at + 1] = SegBox[at + 2] = float.MaxValue;
+    SegBox[at + 3] = SegBox[at + 4] = SegBox[at + 5] = float.MinValue;
+    Segs++;
+  }
+
+  /// <summary>Where segment <paramref name="s"/> ends in M.</summary>
+  internal int SegEnd(int s) => s + 1 < Segs ? SegStart[s + 1] : Count;
+
+  internal Bounds SegBounds(int s)
+  {
+    int at = s * 6;
+    var min = new Vector3(SegBox[at], SegBox[at + 1], SegBox[at + 2]);
+    var max = new Vector3(SegBox[at + 3], SegBox[at + 4], SegBox[at + 5]);
+    return new Bounds((min + max) * 0.5f, max - min);
+  }
+
+  /// <summary>The calls drawing this list takes, <paramref name="limit"/> instances a call at most.</summary>
+  internal int Calls(int limit)
+  {
+    int calls = 0;
+    for (int s = 0; s < Segs; s++)
+      calls += (SegEnd(s) - SegStart[s] + limit - 1) / limit;
+    return calls;
   }
 
   internal void Add(in Matrix4x4 m)
@@ -52,9 +101,19 @@ internal sealed class BatchBuf
     M[Count++] = m;
   }
 
-  /// <summary>Takes in a box: six floats from <paramref name="at"/>, minimum then maximum.</summary>
+  /// <summary>Takes in a box (six floats from <paramref name="at"/>, minimum then maximum), into the whole list's bounds and the open segment's.</summary>
   internal void Union(float[] box, int at)
   {
+    int g = (Segs - 1) * 6;
+    if (g >= 0)
+    {
+      if (box[at] < SegBox[g]) SegBox[g] = box[at];
+      if (box[at + 1] < SegBox[g + 1]) SegBox[g + 1] = box[at + 1];
+      if (box[at + 2] < SegBox[g + 2]) SegBox[g + 2] = box[at + 2];
+      if (box[at + 3] > SegBox[g + 3]) SegBox[g + 3] = box[at + 3];
+      if (box[at + 4] > SegBox[g + 4]) SegBox[g + 4] = box[at + 4];
+      if (box[at + 5] > SegBox[g + 5]) SegBox[g + 5] = box[at + 5];
+    }
     if (box[at] < MinX) MinX = box[at];
     if (box[at + 1] < MinY) MinY = box[at + 1];
     if (box[at + 2] < MinZ) MinZ = box[at + 2];
@@ -227,6 +286,8 @@ internal static class BakedDraw
   internal const float MoveMargin = 3f, AngleMargin = 8f;
   /// <summary>A piece one cell outside the view still casts into it.</summary>
   internal const float CasterReach = 16f;
+  /// <summary>A casting batch is drawn a zone at a time within this many zones of the camera's (Chebyshev), by slab beyond.</summary>
+  internal const int NearZones = 2;
   /// <summary>Cells of a zone: 4 x 4 of 16 m.</summary>
   internal const int CellsAcross = 4, Cells = 16;
   internal const float CellSize = 16f;
@@ -279,8 +340,20 @@ internal static class BakedDraw
     var state = new byte[Cells];
     int stamp = 0, zones = 0, cells = 0, drawn = 0;
     float margin = job.Shadows == BakedShadows.Off ? 0f : job.CasterMargin;
-    foreach (var zone in job.Zones)
+    // the zones in segment order, so that each segment's instances arrive together
+    int camZx = Mathf.RoundToInt(job.CamX / 64f), camZz = Mathf.RoundToInt(job.CamZ / 64f);
+    var keys = new int[job.Zones.Length];
+    var order = new int[job.Zones.Length];
+    for (int i = 0; i < order.Length; i++)
     {
+      keys[i] = SegmentKey(job.Zones[i].Zx - camZx, job.Zones[i].Zz - camZz);
+      order[i] = i;
+    }
+    Array.Sort((int[])keys.Clone(), order);
+    foreach (int zi in order)
+    {
+      var zone = job.Zones[zi];
+      int key = keys[zi];
       // 2 = in view, 1 = outside it by no more than the casters' reach, 0 = out
       bool any = false;
       for (int c = 0; c < Cells; c++)
@@ -313,13 +386,25 @@ internal static class BakedDraw
           if (state[c] == 0 || ki.CellStart[c + 1] == ki.CellStart[c])
             continue;
           stamp++;
-          drawn += FillCell(job, ki, c, state[c] == 2, stamp, lit);
+          drawn += FillCell(job, ki, c, state[c] == 2, stamp, key, lit);
         }
       }
     }
     job.ZonesSeen = zones;
     job.CellsSeen = cells;
     job.InstancesDrawn = drawn;
+  }
+
+  /// <summary>
+  /// The segment a zone's instances go to in a casting batch, by where the zone is from the camera's (in zones): within NearZones, its own;
+  /// beyond, the slab it lies in (east or west past NearZones on x, else north or south). A slab never comes nearer than NearZones zones.
+  /// </summary>
+  internal static int SegmentKey(int dx, int dz)
+  {
+    if (Math.Abs(dx) <= NearZones && Math.Abs(dz) <= NearZones)
+      return (dx + NearZones) * (2 * NearZones + 1) + dz + NearZones;
+    const int slabs = (2 * NearZones + 1) * (2 * NearZones + 1);
+    return dx > NearZones ? slabs : dx < -NearZones ? slabs + 1 : dz > NearZones ? slabs + 2 : slabs + 3;
   }
 
   // the numbers an entry's instances are compared with, worked out once per job: past CullK2 times an instance's squared scale it is out;
@@ -339,7 +424,7 @@ internal static class BakedDraw
     kind.JobSingle = piece.SingleLod || near <= 0f || kind.Lod0Only;
   }
 
-  private static int FillCell(CullJob job, KindInstances ki, int cell, bool inView, int stamp, bool[]? litCopies)
+  private static int FillCell(CullJob job, KindInstances ki, int cell, bool inView, int stamp, int segment, bool[]? litCopies)
   {
     var kind = ki.Kind;
     var piece = kind.Piece!;
@@ -389,6 +474,8 @@ internal static class BakedDraw
         if (b.Stamp != stamp)
         {
           b.Stamp = stamp;
+          // a batch that does not cast is one segment: only the camera culls it, and fewer calls cost less
+          buf.Open(b.JobCasts ? segment : 0);
           buf.Union(ki.CellBox, cell * 6);
         }
         buf.Add(part.LocalIndex < 0 ? ki.Root[i] : ki.Locals[part.LocalIndex][i]);
@@ -603,14 +690,18 @@ internal static class BakedDraw
   private static int Draw(Batch b, BatchBuf buf)
   {
     var rp = b.Params;
-    rp.worldBounds = buf.Bounds;
     int calls = 0;
     try
     {
-      for (int start = 0; start < buf.Count; start += b.CallLimit)
+      for (int s = 0; s < buf.Segs; s++)
       {
-        Graphics.RenderMeshInstanced(rp, b.Mesh!, b.Part.Submesh, buf.M, Math.Min(b.CallLimit, buf.Count - start), start);
-        calls++;
+        rp.worldBounds = buf.SegBounds(s);
+        int end = buf.SegEnd(s);
+        for (int start = buf.SegStart[s]; start < end; start += b.CallLimit)
+        {
+          Graphics.RenderMeshInstanced(rp, b.Mesh!, b.Part.Submesh, buf.M, Math.Min(b.CallLimit, end - start), start);
+          calls++;
+        }
       }
     }
     catch (Exception e)
@@ -660,7 +751,7 @@ internal static class BakedDraw
         byKind[b.Kind] = row;
         rows.Add(row);
       }
-      int calls = (buf.Count + b.CallLimit - 1) / b.CallLimit;
+      int calls = buf.Calls(b.CallLimit);
       row.Calls[b.Lod] += calls;
       row.Triangles[b.Lod] += (long)buf.Count * b.Part.Triangles;
       if (b.Casts)
