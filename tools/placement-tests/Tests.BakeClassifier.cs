@@ -240,6 +240,8 @@ internal static partial class Tests
     C(BakeCls(BakeLight("brazier", true, 0, "EffectArea", "Fireplace"), 7, BakeTown).Kind == BakeKind.Adopt, "a brazier (Burning area) stays");
     C(BakeCls(BakeLight("pure_light_cooks", true, 0, "UnityEngine.Light"), 7, BakeTown) is { Kind: BakeKind.Adopt, Group: BakeClassifier.Lights }, "a light that carries a Burning area stays real too (any piece a cooking station could find)");
     C(BakeCls(BakeLight("fire_pit_unlit", false, 0, "EffectArea", "Fireplace"), 7, BakeTown).Kind == BakeKind.Copy, "the same fire without a Burning area is a Copy: the flag decides, not the name");
+    C(PrefabFacts.IsBurning((EffectArea.Type)8) && PrefabFacts.IsBurning((EffectArea.Type)(8 | 1)) && !PrefabFacts.IsBurning((EffectArea.Type)(1 | 2)) && !PrefabFacts.IsBurning(EffectArea.Type.PlayerBase) && !PrefabFacts.IsBurning(EffectArea.Type.None),
+      "the Burning flag is bit 8 (a fire pit's FireBurn is 8; Heat|Fire, Fire and PlayerBase are not)");
     var burningFacts = new PrefabFacts("x", [new ComponentFact("Fireplace")], false, 0, false, 0f, true);
     C(burningFacts.BurningArea && !new PrefabFacts("y", [new ComponentFact("Fireplace")]).BurningArea, "PrefabFacts carries the Burning flag, false by default");
 
@@ -282,6 +284,12 @@ internal static partial class Tests
       [new ComponentFact("Fireplace"), new ComponentFact("EffectArea"), new ComponentFact("UnityEngine.Light", false), new ComponentFact("MyMod.Flame", false)]));
     C(BakeCls(litPart, 7, BakeTown).Kind == BakeKind.Copy, "a Light and any component in the part that is inactive until lit do not keep a torch real");
     C(BakeCls(litPart).Kind == BakeKind.Stays, "... and without 'town' it stays");
+    // a door, a container, a bed, a sign, a station or a chair counts wherever it is, an inactive part too
+    foreach (var hidden in new[] { "Door", "Container", "Bed", "Sign", "CraftingStation", "Smelter", "Chair" })
+    {
+      var p = new PrefabFacts("hidden_" + hidden, BakeWallParts.Select(c => new ComponentFact(c)).Concat([new ComponentFact("Fireplace"), new ComponentFact(hidden, false)]));
+      C(BakeCls(p, 7, BakeTown).Kind == BakeKind.Adopt, $"a torch with a {hidden} in an inactive part still stays (it counts wherever it is)");
+    }
 
     Section("classifier: RandomPieceRotation");
     var block = BakePrefab("blackmarble_1x1", "RandomPieceRotation");

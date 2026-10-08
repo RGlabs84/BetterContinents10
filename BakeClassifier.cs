@@ -419,12 +419,16 @@ internal sealed class PrefabFacts
         body = true;
       if (component is Piece piece)
         comfort = Math.Max(comfort, piece.m_comfort);
-      if (component is EffectArea area && (area.m_type & EffectArea.Type.Burning) != 0)
+      if (component is EffectArea area && IsBurning(area.m_type))
         burning = true;
     }
     var view = prefab.GetComponent<ZNetView>();
     return new PrefabFacts(prefab.name, components, body, comfort, view != null && view.m_syncInitialScale, HeightOf(prefab), burning);
   }
+
+  // The area a cooking station and a cauldron look for at a fire (EffectArea.Type.Burning, 8; the game's fire pits, hearths, bonfires and braziers
+  // carry one named FireBurn, in the part that is switched on when the fire is lit; their torches carry only Fire).
+  internal static bool IsBurning(EffectArea.Type type) => (type & EffectArea.Type.Burning) != 0;
 
   // Whether a part is active in the prefab: it and every parent up to the prefab's root are (the root itself counts as active).
   private static bool ActiveIn(Transform part, Transform root)
