@@ -325,6 +325,75 @@ internal static partial class Tests
     }
   }
 
+  // What Install does when the manager did not take the layer on, whatever ClientReports says (it must not depend on a flag the manager sets when it
+  // runs, not when it takes a layer).
+  private static void ClientLayerClaimTest()
+  {
+    Section("client: a pushed layer the manager did not take on is answered Applied at once, whatever ClientReports says; one it took on waits for it");
+    var first = MakeSample(81).Layer;
+    var other = MakeSample(82).Layer;
+    C(first.Revision == other.Revision && first.Id != other.Id, "(two layers of one revision)");
+
+    // A manager that is up (the flag is set) but cannot take the layer on: a world that just ended, an error in its Adopt.
+    using (var world = new XferWorld())
+    {
+      var rig = new ClientLayerRig();
+      BakedLayerStore.Changed += BakedClient.OnLayerChanged;
+      try
+      {
+        BakedTransfer.ClientReports = true;
+        BakedClient.Active = () => false;
+        var pair = world.Joined("stale", null, scripted: false);
+        BakedPush(world, pair, first);
+        C(world.Until(() => BakedLayerStore.Current != null && BakedLayerStore.Current.Id == first.Id, 30f), "the layer is current");
+        C(world.Until(() => pair.ClientEnd.Count(BakedTransfer.RpcApplied) == 1 && pair.Client.AppliedRevision == first.Revision, 10f)
+          && BakedTransfer.ClaimedRevision == 0, "the manager claimed nothing, so the client said Applied itself, once");
+      }
+      finally
+      {
+        BakedLayerStore.Changed -= BakedClient.OnLayerChanged;
+        rig.Dispose();
+      }
+    }
+
+    // A claim of an earlier layer with the same revision number is not this layer's.
+    using (var world = new XferWorld())
+    {
+      BakedTransfer.Claim(other.Revision);
+      var pair = world.Joined("old claim", null, scripted: false);
+      BakedPush(world, pair, other);
+      C(world.Until(() => pair.ClientEnd.Count(BakedTransfer.RpcApplied) == 1 && pair.Client.AppliedRevision == other.Revision, 30f), "a claim left by an earlier layer of that revision does not keep the answer back");
+    }
+
+    // A manager that takes it on claims the revision in Adopt, and the answer is its own.
+    using (var world = new XferWorld())
+    {
+      var rig = new ClientLayerRig();
+      BakedLayerStore.Changed += BakedClient.OnLayerChanged;
+      try
+      {
+        using var scene = new ApiScene();
+        BakedClient.Now = () => world.Time;
+        var pair = world.Joined("taken", null, scripted: false);
+        BakedPush(world, pair, first);
+        C(world.Until(() => BakedLayerStore.Current != null && BakedLayerStore.Current.Id == first.Id, 30f), "(the layer is current)");
+        for (int n = 0; n < 10; n++)
+          world.Tick();
+        C(BakedTransfer.ClaimedRevision == first.Revision && pair.ClientEnd.Count(BakedTransfer.RpcApplied) == 0, "the manager's Adopt claimed the revision, and nothing was sent at once");
+        BakedClient.FillApplying(world.Time);
+        BakedClient.CheckApplied(world.Time);
+        world.Tick();
+        world.Tick();
+        C(pair.ClientEnd.Count(BakedTransfer.RpcApplied) == 1 && pair.Client.AppliedRevision == first.Revision, "and the manager's own report is the one answer");
+      }
+      finally
+      {
+        BakedLayerStore.Changed -= BakedClient.OnLayerChanged;
+        rig.Dispose();
+      }
+    }
+  }
+
   private static byte[] ClientLayerPatch(BakedLayer from, BakedLayer to, ZoneKey[] changed) => BakedPatch.Make(from, to, changed);
 
   // The order of a frame: the rings, then the first layer's zones taken in, then the checks of Applied (read from Step's IL).

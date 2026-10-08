@@ -785,20 +785,29 @@ internal static partial class Tests
       C(world.Until(() => ReferenceEquals(pair.Client.Held, next) || pair.Client.Held != null && pair.Client.Held.Id == next.Id, 5f), "and the server holds it for the client");
     }
 
-    // With a client side that reports (BakedClient), the answer waits for it.
+    // With a client side that takes the layer on (BakedClient's manager claims the revision while Set tells it), the answer waits for it.
     using (var world = new XferWorld())
     {
       BakedTransfer.ClientReports = true;
-      var pair = world.Joined("rebuilding", layer, scripted: false);
-      BakedPush(world, pair, next);
-      C(world.Until(() => BakedLayerStore.Current != null && BakedLayerStore.Current.Id == next.Id, 60f), "the layer is current");
-      for (int n = 0; n < 20; n++)
+      void Manager(BakedLayer old, BakedLayer now, ZoneKey[] zones) => BakedTransfer.Claim(now.Revision);
+      BakedLayerStore.Changed += Manager;
+      try
+      {
+        var pair = world.Joined("rebuilding", layer, scripted: false);
+        BakedPush(world, pair, next);
+        C(world.Until(() => BakedLayerStore.Current != null && BakedLayerStore.Current.Id == next.Id, 60f), "the layer is current");
+        for (int n = 0; n < 20; n++)
+          world.Tick();
+        C(pair.ClientEnd.Count(BakedTransfer.RpcApplied) == 0 && BakedTransfer.ClaimedRevision == 3, "but the client has not said Applied: its zones are not rebuilt");
+        BakedTransfer.ReportApplied(3);
         world.Tick();
-      C(pair.ClientEnd.Count(BakedTransfer.RpcApplied) == 0, "but the client has not said Applied: its zones are not rebuilt");
-      BakedTransfer.ReportApplied(3);
-      world.Tick();
-      world.Tick();
-      C(pair.ClientEnd.Count(BakedTransfer.RpcApplied) == 1 && pair.Client.AppliedRevision == 3, "BakedClient's report sends it");
+        world.Tick();
+        C(pair.ClientEnd.Count(BakedTransfer.RpcApplied) == 1 && pair.Client.AppliedRevision == 3, "BakedClient's report sends it");
+      }
+      finally
+      {
+        BakedLayerStore.Changed -= Manager;
+      }
     }
 
     // A transfer in a form this client does not know, a packet outside the transfer, a packet with nothing before it.
