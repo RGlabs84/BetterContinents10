@@ -15,6 +15,9 @@ namespace BetterContinents;
 //     (BakedServer.SeedZone), with no bake keys, no bc_protect and no creator; reconciliation neither seeds nor removes one (BakedReconcile);
 //   - the client never draws one and gives it no baked collider (BakedKinds, BakedZoneBuild);
 //   - the in-game bake (slice D) never bakes and never adopts one; it reads Components on its PrefabFacts.
+// One exception, and only the compiler can make it: a palette entry marked Decor (flag 32, role Static or Copy) says its consumable prefab is
+// scenery (meads on a shelf, flax in a window box). Its records are drawn like any Static or Copy and never placed as real objects, never
+// pickable; an entry without the flag is a consumable exactly as above. The in-game bake never writes the flag (it never bakes a consumable).
 // Trees and rocks (TreeBase, MineRock, Destructible) are not consumables: they stay decoration where a layer draws them. Stations that give items
 // and stay (Beehive, SapCollector, Fermenter, CookingStation, ...) are not either: they are Live or stay real, and HoldsItems keeps what is in them.
 internal static class BakedConsumables
@@ -92,37 +95,63 @@ internal static class BakedConsumables
     BetterContinents.Log($"Baked placements: {kind} is a consumable (a player picks it up or harvests it): its records are placed once as ordinary objects of the game when a zone generates, never baked, drawn or protected.");
   }
 
+  private static readonly HashSet<string> NamedDecor = [];
+  private static readonly List<string> NamedDecorInOrder = [];
+
+  /// <summary>The consumable prefabs this session met that the compiler marked decor (drawn as scenery), in the order they were met.</summary>
+  internal static IReadOnlyList<string> DecorKinds => NamedDecorInOrder;
+
+  /// <summary>Names a decor kind in the log, the first time it is met in a session.</summary>
+  internal static void NoteDecor(string kind)
+  {
+    if (!NamedDecor.Add(kind))
+      return;
+    NamedDecorInOrder.Add(kind);
+    BetterContinents.Log($"Baked placements: {kind} is a consumable that the file marks as decor: its records are drawn as scenery, never placed as objects of the game and never pickable.");
+  }
+
   /// <summary>A new session: nothing of the last one's counts or names stays.</summary>
   internal static void SessionStarts()
   {
     Named.Clear();
     NamedInOrder.Clear();
+    NamedDecor.Clear();
+    NamedDecorInOrder.Clear();
     Placed = Failed = 0;
     Forget();
   }
 
   /// <summary>What `bc_bake info` says about consumables (one line each): the consumable kinds this layer has in this game and how many records of
-  /// each, the Live ones among them (the file marks them Live, and they are placed once all the same), and what this session placed. Reads every
-  /// zone of the layer once, so it is for a command, not a frame.</summary>
+  /// each, the Live ones among them (the file marks them Live, and they are placed once all the same), and what this session placed; then, only
+  /// when the file marks some consumable kinds as decor, one line for those (drawn as scenery, not placed, not pickable). Reads every zone of the
+  /// layer once, so it is for a command, not a frame.</summary>
   internal static List<string> InfoLines(BakedLayer layer)
   {
     var context = new BakedServer.Context(layer);
     var names = new string?[layer.Palette.Count];
-    int kinds = 0;
+    var decorNames = new string?[layer.Palette.Count];
+    int kinds = 0, decorKinds = 0;
     for (int i = 0; i < names.Length; i++)
+    {
       if (BakedServer.IsConsumable(context, i, layer.Palette[i], out var kind))
       {
         names[i] = kind?.Candidate.Name ?? layer.Palette[i].Candidates[0].Name;
         kinds++;
       }
+      else if (context.Decor.TryGetValue(i, out var decor))
+      {
+        decorNames[i] = decor;
+        decorKinds++;
+      }
+    }
     var lines = new List<string>();
     if (kinds == 0)
-    {
       lines.Add("Consumables: none of this layer's pieces is something a player picks up or harvests (a Pickable, PickableItem, ItemDrop or Plant), in this game.");
+    if (kinds == 0 && decorKinds == 0)
       return lines;
-    }
     var perKind = new SortedDictionary<string, long>(StringComparer.Ordinal);
-    long records = 0, live = 0;
+    var perDecor = new SortedDictionary<string, long>(StringComparer.Ordinal);
+    long records = 0, live = 0, decorRecords = 0;
     foreach (var row in layer.Zones)
     {
       if (row.Placements == 0)
@@ -132,7 +161,16 @@ internal static class BakedConsumables
       {
         string? name = names[data.Palette[k]];
         if (name == null)
+        {
+          string? decor = decorNames[data.Palette[k]];
+          if (decor != null)
+          {
+            perDecor.TryGetValue(decor, out long drawn);
+            perDecor[decor] = drawn + 1;
+            decorRecords++;
+          }
           continue;
+        }
         perKind.TryGetValue(name, out long seen);
         perKind[name] = seen + 1;
         records++;
@@ -140,12 +178,22 @@ internal static class BakedConsumables
           live++;
       }
     }
-    var parts = new List<string>();
-    foreach (var kv in perKind)
-      parts.Add($"{kv.Key} {kv.Value:N0}");
-    lines.Add($"Consumables: {perKind.Count} kind{(perKind.Count == 1 ? "" : "s")}, {records:N0} records ({live:N0} of them marked Live in the file). They are never baked, drawn or protected: " +
-              "each is placed once as an ordinary object of the game when its zone generates, and the game owns it from then. " + string.Join(", ", parts) + ".");
-    lines.Add($"Consumables this session: {Placed:N0} placed, {Failed:N0} could not be placed.");
+    if (kinds > 0)
+    {
+      var parts = new List<string>();
+      foreach (var kv in perKind)
+        parts.Add($"{kv.Key} {kv.Value:N0}");
+      lines.Add($"Consumables: {perKind.Count} kind{(perKind.Count == 1 ? "" : "s")}, {records:N0} records ({live:N0} of them marked Live in the file). They are never baked, drawn or protected: " +
+                "each is placed once as an ordinary object of the game when its zone generates, and the game owns it from then. " + string.Join(", ", parts) + ".");
+      lines.Add($"Consumables this session: {Placed:N0} placed, {Failed:N0} could not be placed.");
+    }
+    if (perDecor.Count > 0)
+    {
+      var parts = new List<string>();
+      foreach (var kv in perDecor)
+        parts.Add($"{kv.Key} {kv.Value:N0}");
+      lines.Add($"Decor: {perDecor.Count} kind{(perDecor.Count == 1 ? "" : "s")} the file marks as decor, {decorRecords:N0} records, drawn as scenery, not placed as objects and not pickable. " + string.Join(", ", parts) + ".");
+    }
     return lines;
   }
 }

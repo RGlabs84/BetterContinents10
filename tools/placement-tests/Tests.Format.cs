@@ -226,7 +226,7 @@ internal static partial class Tests
     Refusal("role above 3", f => f.Palette[0].Role = 4, "role");
     Refusal("collision above 3", f => f.Palette[0].Collision = 4, "collision");
     Refusal("layer above 31", f => f.Palette[0].Layer = 32, "layer");
-    Refusal("a palette flag other than 1, 2, 4, 8, 16", f => f.Palette[0].Flags = 32, "palette flag bit 5");
+    Refusal("a palette flag other than 1, 2, 4, 8, 16, 32", f => f.Palette[0].Flags = 64, "palette flag bit 6");
     Refusal("a tag type above 3", f => f.Palette[1].Tags = [("k", 4, "")], "type");
     Refusal("a string running past the end", f =>
     {

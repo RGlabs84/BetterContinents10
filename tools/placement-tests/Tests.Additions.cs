@@ -87,9 +87,9 @@ internal static partial class Tests
     rawBytes = raw.Build(out rawLength);
     C(Refuses(() => BakedLayer.Read(rawBytes, rawLength), "zone bit 5", "newer"), "refused: zone bit 5 (flag 32)");
     raw = ValidRaw();
-    raw.Palette[0].Flags = 32;
+    raw.Palette[0].Flags = 64;
     rawBytes = raw.Build(out rawLength);
-    C(Refuses(() => BakedLayer.Read(rawBytes, rawLength), "palette flag bit 5", "newer"), "refused: palette flag bit 5 (flag 32)");
+    C(Refuses(() => BakedLayer.Read(rawBytes, rawLength), "palette flag bit 6", "newer"), "refused: palette flag bit 6 (flag 64; 32 is Decor)");
   }
 
   // A layer without the additions is laid out as VALtima's writer lays it out (R2): header, producer, palette, zone index, blocks, in order.
