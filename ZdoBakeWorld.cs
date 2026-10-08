@@ -224,6 +224,7 @@ internal sealed class ZdoBakeWorld : IBakeWorld
     zdo.Set(BakedKeys.Id, unchecked((int)bakeId));
     zdo.Set(BakedKeys.Rev, unchecked((int)revision));
     zdo.Set(BakedKeys.Protect, true);
+    BakedKeys.Changed(zdo);
   }
 
   // The four keys off a piece, and the creator on it when it has none (so that a zone reset keeps it, design 3.6). Removing a value does not
@@ -239,6 +240,7 @@ internal sealed class ZdoBakeWorld : IBakeWorld
     if (creatorIfNone != 0L && zdo.GetLong(ZDOVars.s_creator, 0L) == 0L)
       zdo.Set(ZDOVars.s_creator, creatorIfNone);
     zdo.IncreaseDataRevision();
+    BakedKeys.Changed(zdo);
   }
 
   public (float X, float Y, float Z) EulerOf(Quaternion rotation)

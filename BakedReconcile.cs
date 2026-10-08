@@ -548,6 +548,7 @@ internal static class BakedReconcile
         if (kept != null)
         {
           kept.Set(BakedKeys.Rev, unchecked((int)plan.Revision));
+          BakedKeys.Changed(kept);
           counts.Refreshed++;
         }
         return false;
@@ -637,6 +638,7 @@ internal static class BakedReconcile
     foreach (var key in BakedKeys.BakeKeys)
       zdo.RemoveInt(key);
     zdo.Set(BakedKeys.Orphan, BakedKeys.OrphanValue(source, id));
+    BakedKeys.Changed(zdo);
   }
 
   // ---- vegetation ------------------------------------------------------------------------------------------------------------------------

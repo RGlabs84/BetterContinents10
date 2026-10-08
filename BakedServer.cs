@@ -437,6 +437,8 @@ internal static class BakedServer
     if (record.HasSource && layer.Registry.TryGet(record.SourceNumber, out var operation) && operation.IsBake && record.ValueSet < operation.ValueSets.Length)
       foreach (var value in operation.ValueSets[record.ValueSet].Values)
         WriteValue(zdo, value);
+    // A new portal marks the portal file itself; this keeps a save that started in between from missing the keys.
+    BakedKeys.Changed(zdo);
   }
 
   // A tag's value, with the game's own setters: a bool is stored as an int and read back by GetBool (VALtimaOnline's IsTownPiece reads it so).

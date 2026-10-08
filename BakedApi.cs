@@ -33,6 +33,17 @@ internal static class BakedKeys
   // RandMatSeed (int, 0 to 12344): RandomMaterialValues' seed.
   public static readonly int Seed = SeedName.GetStableHashCode();
 
+  // Valheim saves its portals in a file of their own, which a save rewrites only when a portal was made, removed or relinked
+  // (ZDOMan.SetDirtyPortals); a value set on a portal that exists marks only its sector, which holds no portal, so the change is lost at the
+  // next save and the portal loads without it (a town portal adopted by a bake would load without its keys and be seeded a second time).
+  // Every place that changes a key on an object that exists already calls this after it. Nothing for any other object.
+  public static void Changed(ZDO zdo)
+  {
+    var game = Game.instance;
+    if (game != null && ZDOMan.instance != null && game.PortalPrefabHash.Contains(zdo.GetPrefab()))
+      ZDOMan.instance.SetDirtyPortals();
+  }
+
   // The key of MaterialVariation slot i ("MatVar" + i).
   public static int MatVar(int slot) => (MatVarName + slot).GetStableHashCode();
   public static string MatVarKey(int slot) => MatVarName + slot;

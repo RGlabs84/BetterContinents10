@@ -23,7 +23,7 @@ namespace BetterContinents;
 //                                                         adopted, with or without 'town' and 'any')
 //   4 no creator, and no 'any'                            not touched: not built by a player
 //   5 a loose body (a Rigidbody that moves, ZSyncTransform, ItemDrop, Ship, Vagon, Character, Tameable)   not touched: it moves
-//   6 any component outside StaticSafe, any Light or EffectArea, comfort, connection data in the ZDO       stays a real piece
+//   6 any component outside StaticSafe in an active part, any Light or EffectArea, comfort, connection data in the ZDO   stays a real piece
 //     (with 'town': adopted, a protected Live record of the bake)
 //   7 a Chair                                             a Seat record
 //   8 otherwise                                           a Static record
@@ -35,6 +35,8 @@ internal static class BakeClassifier
   [
     "Piece", "WearNTear", "ZNetView", "MaterialVariation", "RandomMaterialValues", "StaticPhysics", "LodFadeInOut", "HoverText",
     "DisableInPlacementGhost", "ImpactEffect",
+    // The game's editor-made mesh merge: it keeps the merged mesh and has no code that runs in the game (assembly_simplemeshcombine).
+    "SimpleMeshCombine",
     // Unity's own, the ones that only draw or collide.
     "UnityEngine.Transform", "UnityEngine.MeshFilter", "UnityEngine.MeshRenderer", "UnityEngine.SkinnedMeshRenderer",
     "UnityEngine.BoxCollider", "UnityEngine.SphereCollider", "UnityEngine.CapsuleCollider", "UnityEngine.MeshCollider",
@@ -126,8 +128,12 @@ internal static class BakeClassifier
     if (prefab.Has("UnityEngine.Light")) return (Lights, "lights its surroundings (Light)", "UnityEngine.Light");
     if (prefab.Has("EffectArea")) return (Lights, "makes an area (EffectArea)", "EffectArea");
     if (prefab.Has("Sign")) return (Signs, "holds a text (Sign)", "Sign");
+    // A part that is inactive in the prefab runs nothing until something switches it on, and in a piece whose active parts are all safe only
+    // WearNTear does: its worn, broken and wet looks (the drip of a wood floor in the rain is a ParticleSystem; a roof's worn mesh carries
+    // SimpleMeshCombine and RandomPieceRotation). A baked piece is drawn whole and dry, so what those parts carry does not keep it real.
+    // Doors, containers, fires, stations, lights, consumables and movers count wherever they are (above, and rules 3b and 5).
     foreach (var component in prefab.Components)
-      if (!StaticSafe.Contains(component.Name) && component.Name != Chair)
+      if (component.Active && !StaticSafe.Contains(component.Name) && component.Name != Chair)
         return (Other, $"has {component.Name}", component.Name);
     // The ZDO says what the prefab cannot: links to other objects (a portal's pair, a spawner's spawn).
     if (obj.HasConnection) return (Other, "is linked to other objects", "");
@@ -236,11 +242,19 @@ internal readonly struct ComponentFact
 {
   public string Name { get; }
   public string[] Bases { get; }
+  // In an active part of the prefab (some instance of the type is, when there are several); false only for parts that are inactive in the
+  // prefab, which run nothing until something switches them on (rule 6).
+  public bool Active { get; }
 
-  public ComponentFact(string name, params string[] bases)
+  public ComponentFact(string name, params string[] bases) : this(name, true, bases)
+  {
+  }
+
+  public ComponentFact(string name, bool active, params string[] bases)
   {
     Name = name;
     Bases = bases;
+    Active = active;
   }
 
   public bool Is(string type) => Name == type || Array.IndexOf(Bases, type) >= 0;
@@ -296,7 +310,7 @@ internal sealed class PrefabFacts
   internal static PrefabFacts Read(GameObject prefab)
   {
     var components = new List<ComponentFact>();
-    var seen = new HashSet<string>();
+    var seen = new Dictionary<string, int>();
     bool body = false;
     int comfort = 0;
     foreach (var component in prefab.GetComponentsInChildren<Component>(true))
@@ -304,18 +318,29 @@ internal sealed class PrefabFacts
       // A script the game cannot load (a mod that is gone) leaves a null; whatever it was, the piece stays real.
       if (component == null)
       {
-        if (seen.Add("(missing script)"))
+        if (!seen.ContainsKey("(missing script)"))
+        {
+          seen["(missing script)"] = components.Count;
           components.Add(new ComponentFact("(missing script)"));
+        }
         continue;
       }
       var type = component.GetType();
       var name = type.FullName ?? type.Name;
-      if (seen.Add(name))
+      bool active = ActiveIn(component.transform, prefab.transform);
+      if (seen.TryGetValue(name, out int at))
+      {
+        // Active wins: one active instance of the type is enough.
+        if (active && !components[at].Active)
+          components[at] = new ComponentFact(name, true, components[at].Bases);
+      }
+      else
       {
         var bases = new List<string>();
         for (var b = type.BaseType; b != null && b != typeof(MonoBehaviour) && b != typeof(Behaviour) && b != typeof(Component) && b != typeof(object); b = b.BaseType)
           bases.Add(b.FullName ?? b.Name);
-        components.Add(new ComponentFact(name, [.. bases]));
+        seen[name] = components.Count;
+        components.Add(new ComponentFact(name, active, [.. bases]));
       }
       if (component is Rigidbody rigidbody && !rigidbody.isKinematic)
         body = true;
@@ -324,6 +349,15 @@ internal sealed class PrefabFacts
     }
     var view = prefab.GetComponent<ZNetView>();
     return new PrefabFacts(prefab.name, components, body, comfort, view != null && view.m_syncInitialScale, HeightOf(prefab));
+  }
+
+  // Whether a part is active in the prefab: it and every parent up to the prefab's root are (the root itself counts as active).
+  private static bool ActiveIn(Transform part, Transform root)
+  {
+    for (var t = part; t != null && t != root; t = t.parent)
+      if (!t.gameObject.activeSelf)
+        return false;
+    return true;
   }
 
   // The highest corner of any mesh's bounds, in the prefab's own frame, rounded up to a whole metre with a margin (0 when it has no mesh).

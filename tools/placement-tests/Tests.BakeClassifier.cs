@@ -23,6 +23,36 @@ internal static partial class Tests
   private static BakeClass BakeCls(PrefabFacts prefab, long creator = 7, BakeWords words = default, ObjectFacts obj = default) =>
     BakeClassifier.Classify(prefab, creator, words, obj);
 
+  // A prefab with some components in a part that is inactive in the prefab (WearNTear's worn, broken and wet looks).
+  private static PrefabFacts BakePrefabInactive(string name, string[] active, string[] inactive) =>
+    new(name, BakeWallParts.Concat(active).Select(c => new ComponentFact(c)).Concat(inactive.Select(c => new ComponentFact(c, false))), false, 0, false);
+
+  // The census of phase Q (2026-10-07: the game's wood floors, walls and roofs stayed real): what a part that is inactive in the prefab
+  // carries does not keep a piece real, and SimpleMeshCombine is safe.
+  private static void BakeClassifierInactivePartsTest()
+  {
+    Section("classifier: inactive parts and SimpleMeshCombine");
+    var floor = BakePrefabInactive("wood_floor", [], ["UnityEngine.ParticleSystem", "UnityEngine.ParticleSystemRenderer"]);
+    C(BakeCls(floor).Kind == BakeKind.Static, "a wood floor whose rain drip (a ParticleSystem) is in an inactive part is a Static");
+    var lit = BakePrefab("sparkly_floor", "UnityEngine.ParticleSystem");
+    C(BakeCls(lit).Kind == BakeKind.Stays && BakeCls(lit).Component == "UnityEngine.ParticleSystem", "the same ParticleSystem in an active part keeps it real");
+    var roof = BakePrefabInactive("wood_roof", [], ["SimpleMeshCombine", "RandomPieceRotation"]);
+    C(BakeCls(roof).Kind == BakeKind.Static, "a roof whose worn look carries SimpleMeshCombine and RandomPieceRotation is a Static");
+    C(BakeCls(BakePrefab("woodwall", "SimpleMeshCombine")).Kind == BakeKind.Static, "SimpleMeshCombine in an active part is safe too (no code runs in the game)");
+    C(BakeCls(BakePrefab("rotated", "RandomPieceRotation")).Kind == BakeKind.Stays, "RandomPieceRotation in an active part still keeps a piece real");
+    var hiddenDoor = BakePrefabInactive("door_hidden", [], ["Door"]);
+    C(BakeCls(hiddenDoor).Kind == BakeKind.Stays && BakeCls(hiddenDoor).Group == BakeClassifier.Doors, "a Door counts wherever it is, an inactive part too");
+    var hiddenLight = BakePrefabInactive("lamp_hidden", [], ["UnityEngine.Light"]);
+    C(BakeCls(hiddenLight).Kind == BakeKind.Stays, "a Light counts wherever it is");
+    var hiddenPick = BakePrefabInactive("berry_hidden", [], ["Pickable"]);
+    C(BakeCls(hiddenPick).Kind == BakeKind.Consumable, "a consumable counts wherever it is (rule 3b)");
+    var hiddenCart = BakePrefabInactive("cart_hidden", [], ["Vagon"]);
+    C(BakeCls(hiddenCart).Kind == BakeKind.Moves, "a mover counts wherever it is (rule 5)");
+    var both = new PrefabFacts("both", BakeWallParts.Select(c => new ComponentFact(c)).Append(new ComponentFact("MyMod.Thing", true)), false, 0, false);
+    C(BakeCls(both).Kind == BakeKind.Stays && BakeCls(both).Component == "MyMod.Thing", "an unknown component in an active part keeps it real");
+    C(new ComponentFact("X").Active && !new ComponentFact("X", false).Active, "a component is active unless it is said not to be");
+  }
+
   private static void BakeClassifierRulesTest()
   {
     Section("classifier: rule 1 to 4, the not touched");
@@ -132,7 +162,7 @@ internal static partial class Tests
       C(BakeCls(new PrefabFacts("safe", [.. BakeWallParts, safe])).Kind == BakeKind.Static, $"StaticSafe: {safe} alone keeps a piece a Static");
     C(BakeCls(BakePrefab("rich", "MaterialVariation", "RandomMaterialValues", "StaticPhysics", "LodFadeInOut", "HoverText", "DisableInPlacementGhost", "ImpactEffect", "UnityEngine.LODGroup", "UnityEngine.SkinnedMeshRenderer")).Kind == BakeKind.Static,
       "every StaticSafe component together is still a Static");
-    C(BakeClassifier.StaticSafe.Count == 19, $"StaticSafe is the 10 game components and 9 of Unity's (it has {BakeClassifier.StaticSafe.Count})");
+    C(BakeClassifier.StaticSafe.Count == 20, $"StaticSafe is the 10 game components, SimpleMeshCombine and 9 of Unity's (it has {BakeClassifier.StaticSafe.Count})");
 
     Section("classifier: the new overload and the 3-argument form agree");
     C(BakeClassifier.Classify(wall, 7, default).Kind == BakeKind.Static && BakeClassifier.Classify(wall, 0, default).Kind == BakeKind.NotByPlayer,
