@@ -31,6 +31,8 @@ internal sealed class UnbakeGather
   // Records that stay: their prefab is not in this game, or it cannot be made as a piece.
   public int Stay { get; set; }
   public Dictionary<string, int> StayKinds { get; } = [];
+  // Records of a consumable kind (spec 0.2): the game placed them as its own vegetation when the zone generated, and they stay in the layer.
+  public int Consumables { get; set; }
   // Objects in the zones of an area (not asked for a whole world).
   public long Objects { get; set; }
   public List<WorldObject> ObjectsScratch { get; } = [];
@@ -39,6 +41,9 @@ internal sealed class UnbakeGather
 
 internal static partial class BakeRunner
 {
+  // An unbake that makes more real objects than this says so in its dry run.
+  internal const int UnbakeWarnObjects = 50_000;
+
   // The piece a record becomes (10.10): its prefab, its place (the record's point less the anchor, turned and scaled with the piece), its
   // turn and scale, and every value it had. A record of an in-game bake gets back what it held: the tags of its entry (MatVar), its value set,
   // its seed. A compiler's record has no value set: its creator is the admin who unbakes, so zone resets keep it, and its health is full. A look the
@@ -66,6 +71,11 @@ internal static partial class BakeRunner
       return null;
     }
     var facts = world.FactsOf(hash);
+    if (facts != null && BakeClassifier.ConsumableComponent(facts) != null)
+    {
+      problem = BakeClassifier.Consumables;
+      return null;
+    }
     if (facts == null || !facts.Has("ZNetView"))
     {
       problem = $"{candidateUsed.Name} has no ZNetView, so it cannot be an object";
@@ -241,7 +251,11 @@ internal static partial class BakeRunner
         Adopted = gather.Freed,
       };
       long undoBytes = BakeJournalFile.Encode(data).Length;
-      lines.Add((scope.World ? "" : $"Objects in these zones: {Num(gather.Objects)} now, {Num(gather.Objects + pieces)} after. ") + $"Undo file: {About(undoBytes)}.");
+      lines.Add($"This makes {Num(pieces)} real objects: each is a piece of the world, saved with it and sent to the players near it. " + (scope.World ? "" : $"Objects in these zones: {Num(gather.Objects)} now, {Num(gather.Objects + pieces)} after. ")
+        + $"Undo file: {About(undoBytes)}.");
+      if (pieces > UnbakeWarnObjects)
+        lines.Add($"WARNING: {Num(pieces)} objects is more than {Num(UnbakeWarnObjects)}. The world's save, its loading and what the players are sent all grow with them, and the game's own limits on a zone's objects are not the layer's. "
+          + "Unbake a smaller area at a time if this world should stay light.");
       if (!words.Confirm)
       {
         foreach (var line in lines)
@@ -300,8 +314,24 @@ internal static partial class BakeRunner
 
   private static void AddStay(UnbakeGather gather, List<string> lines)
   {
+    if (gather.Consumables > 0)
+      lines.Add($"Left alone: {Num(gather.Consumables)} records of kinds that give items when used. The game places them as its own vegetation when a zone generates, and they stay in the layer.");
     if (gather.Stay > 0)
       lines.Add($"Not unbaked: {Num(gather.Stay)} records stay in the layer ({KindsText(gather.StayKinds)}): this game cannot make them as pieces.");
+  }
+
+  // Whether the prefab a record would be made of is a consumable kind (the first of its candidates this game has).
+  private static bool IsConsumableRecord(BakeContext ctx, BakeRecord record)
+  {
+    foreach (var candidate in record.Entry.Candidates)
+    {
+      int hash = ctx.World.PrefabOf(candidate.Name);
+      if (hash == 0)
+        continue;
+      var facts = ctx.World.FactsOf(hash);
+      return facts != null && BakeClassifier.ConsumableComponent(facts) != null;
+    }
+    return false;
   }
 
   // Reads the layer for an unbake, a few zones a frame: each record in scope is turned into the piece it becomes, or counted.
@@ -336,6 +366,11 @@ internal static partial class BakeRunner
         }
         else
           into.InGame++;
+        if (IsConsumableRecord(ctx, record))
+        {
+          into.Consumables++;
+          continue;
+        }
         if (record.Role == BakedRole.Live)
         {
           live ??= [];

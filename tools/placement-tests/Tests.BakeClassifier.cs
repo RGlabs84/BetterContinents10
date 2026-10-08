@@ -53,7 +53,7 @@ internal static partial class Tests
     C(BakeCls(BakePrefab("door", "Door"), 0, new BakeWords { Any = true }).Kind == BakeKind.Stays, "... and with 'any' it is a door that stays");
 
     Section("classifier: rule 5, what moves");
-    foreach (var mover in new[] { "ZSyncTransform", "ItemDrop", "Ship", "Vagon", "Character", "Tameable" })
+    foreach (var mover in new[] { "ZSyncTransform", "Ship", "Vagon", "Character", "Tameable" })
     {
       var c = BakeCls(BakePrefab("piece_" + mover, mover));
       C(c.Kind == BakeKind.Moves && c.Component == mover && c.Group == BakeClassifier.Moves, $"rule 5: {mover} moves, not touched");
@@ -63,7 +63,7 @@ internal static partial class Tests
     C(BakeCls(new PrefabFacts("falls", [.. BakeWallParts, "UnityEngine.Rigidbody"], nonKinematicBody: true)).Kind == BakeKind.Moves, "a Rigidbody that is not kinematic moves");
     var pinned = BakeCls(new PrefabFacts("pinned", [.. BakeWallParts, "UnityEngine.Rigidbody"], nonKinematicBody: false));
     C(pinned.Kind == BakeKind.Stays && pinned.Component == "UnityEngine.Rigidbody", "a kinematic Rigidbody does not move it, but it is not StaticSafe: it stays");
-    C(BakeCls(BakePrefab("torch", "Fireplace", "ItemDrop")).Kind == BakeKind.Moves, "rule 5 comes before rule 6: a torch item moves");
+    C(BakeCls(BakePrefab("torch", "Fireplace", "ItemDrop")).Kind == BakeKind.Consumable, "an ItemDrop is a consumable (spec 0.2), before rules 5 and 6: a torch item is not touched");
     C(BakeCls(BakePrefab("cartdoor", "Door", "Vagon"), 0, new BakeWords { Any = true }).Kind == BakeKind.Moves, "'any' does not take what moves");
     C(BakeCls(BakePrefab("cartdoor", "Door", "Vagon"), 7, new BakeWords { Town = true }).Kind == BakeKind.Moves, "'town' does not adopt what moves");
 
@@ -91,8 +91,6 @@ internal static partial class Tests
       (["Chair", "UnityEngine.Light"], 0, BakeClassifier.Lights),
       (["Sign"], 0, BakeClassifier.Signs),
       (["MyMod.Lamp"], 0, BakeClassifier.Other),
-      (["Plant"], 0, BakeClassifier.Other),
-      (["Pickable"], 0, BakeClassifier.Other),
       (["Destructible"], 0, BakeClassifier.Other),
       (["ItemStand"], 0, BakeClassifier.Other),
       (["PrivateArea"], 0, BakeClassifier.Other),
@@ -303,7 +301,7 @@ internal static partial class Tests
     Is("raise", BakeKind.GroundWork);
     Is("Cart", BakeKind.Moves);
     Is("Karve", BakeKind.Moves);
-    Is("MeadHasty", BakeKind.Moves);
+    Is("MeadHasty", BakeKind.Consumable, BakeClassifier.Consumables, "an item that is placed is a consumable");
     // The hierarchy decides what the game's own hearth is; the dump has only root components.
     C(classes.Values.Count(c => c.Kind == BakeKind.Static) > 100, $"the game has many Static pieces (found {classes.Values.Count(c => c.Kind == BakeKind.Static)})");
   }

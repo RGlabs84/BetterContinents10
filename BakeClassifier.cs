@@ -19,6 +19,8 @@ namespace BetterContinents;
 //   1 no Piece                                            not touched: not a piece
 //   2 a TerrainModifier                                   not touched: its change to the ground lasts only while it is an object
 //   3 the ZDO has bc_bake_id                              not touched: already baked
+//   3b a Pickable, PickableItem, ItemDrop or Plant        not touched: gives items when used (spec 0.2: consumables are never baked, never
+//                                                         adopted, with or without 'town' and 'any')
 //   4 no creator, and no 'any'                            not touched: not built by a player
 //   5 a loose body (a Rigidbody that moves, ZSyncTransform, ItemDrop, Ship, Vagon, Character, Tameable)   not touched: it moves
 //   6 any component outside StaticSafe, any Light or EffectArea, comfort, connection data in the ZDO       stays a real piece
@@ -39,6 +41,19 @@ internal static class BakeClassifier
     "UnityEngine.LODGroup",
   ];
 
+  // What makes a prefab a consumable kind (spec 0.2): anything a player picks, picks up or harvests for items, anywhere in its hierarchy (a mod's
+  // subclass of one counts). The server and the client renderer test the same four names (BakedConsumables.Components); one list when they merge.
+  internal static readonly string[] ConsumableComponents = ["Pickable", "PickableItem", "ItemDrop", "Plant"];
+
+  // The component that makes a prefab a consumable kind, or null.
+  internal static string? ConsumableComponent(PrefabFacts prefab)
+  {
+    foreach (var component in ConsumableComponents)
+      if (prefab.Has(component))
+        return component;
+    return null;
+  }
+
   // A Chair is what makes a Seat; with nothing else against it, it is not a reason to keep a piece real.
   private const string Chair = "Chair";
 
@@ -52,7 +67,7 @@ internal static class BakeClassifier
 
   // The groups of rules 1 to 5, as the report words them.
   internal const string NotAPiece = "not a piece", GroundWork = "ground work", AlreadyBaked = "already baked",
-    NotByPlayer = "not built by a player", Moves = "carts and ships", UnknownPrefab = "not in this game";
+    NotByPlayer = "not built by a player", Moves = "carts and ships", UnknownPrefab = "not in this game", Consumables = "gives items when used";
 
   // The class of one piece. The object's own facts (rules 3 and 6) come in the overload; without them neither applies.
   internal static BakeClass Classify(PrefabFacts? prefab, long creator, BakeWords words) => Classify(prefab, creator, words, default);
@@ -70,6 +85,9 @@ internal static class BakeClassifier
     // 3
     if (obj.AlreadyBaked)
       return new BakeClass(BakeKind.AlreadyBaked, AlreadyBaked, "is owned by a bake or a compiler's town already");
+    // 3b: never baked and never adopted (an adopted one would be a Live record, seeded again at every load once picked).
+    if (ConsumableComponent(prefab) is { } consumable)
+      return new BakeClass(BakeKind.Consumable, Consumables, $"has {consumable}, which a player picks, picks up or harvests", consumable);
     // 4
     if (creator == 0 && !words.Any)
       return new BakeClass(BakeKind.NotByPlayer, NotByPlayer, "was not built by a player");
@@ -152,6 +170,8 @@ internal enum BakeKind
   NotByPlayer,
   Moves,
   UnknownPrefab,
+  // A consumable kind: not touched, whatever the words.
+  Consumable,
   // A real piece that stays real (rule 6); with 'town' it is adopted: a protected Live record of the bake, the same object.
   Stays,
   Adopt,
@@ -425,7 +445,7 @@ internal sealed class BakeTally
     if (UntouchedCount > 0)
     {
       var parts = new List<string>();
-      foreach (var group in new[] { BakeClassifier.NotByPlayer, BakeClassifier.Moves, BakeClassifier.AlreadyBaked, BakeClassifier.GroundWork, BakeClassifier.UnknownPrefab })
+      foreach (var group in new[] { BakeClassifier.NotByPlayer, BakeClassifier.Moves, BakeClassifier.Consumables, BakeClassifier.AlreadyBaked, BakeClassifier.GroundWork, BakeClassifier.UnknownPrefab })
         if (Untouched.TryGetValue(group, out var count))
           parts.Add($"{group} {Num(count)}" + (group == BakeClassifier.NotByPlayer ? ", add 'any' to take them" : ""));
       yield return $"Not touched: {Num(UntouchedCount)} ({string.Join("; ", parts)}).";
