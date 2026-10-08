@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-09-24 for world export and import (0.9.0), and on 2026-09-29 for Expand World Data biomes (0.9.3), and on 2026-10-02 for export folders used as the Directory (0.9.4), and modified on 2026-10-04 for the unifying refactor (0.10.0), and on 2026-10-06 for 16k worlds (0.10.3).
+// Added by Wubarrk on 2026-09-24 for world export and import (0.9.0), and on 2026-09-29 for Expand World Data biomes (0.9.3), and on 2026-10-02 for export folders used as the Directory (0.9.4), and modified on 2026-10-04 for the unifying refactor (0.10.0), and on 2026-10-06 for 16k worlds (0.10.3), and on 2026-10-07 for baked placements (0.10.4).
 
 using System;
 using System.Collections;
@@ -938,6 +938,8 @@ public static class WorldExport
     private bool LocationsFull, LocationsGenerated = true;
     private int LocationCount, LocationWritten, LocationNudged, LocationDropped, LocationOutside, LocationTypes, LocationUnnamed;
     private bool LocationsWritten, AltBiomesWritten, HeatWritten, ForestWritten, HeightsWritten;
+    // The loaded world's baked layer, written as placements.bcp (LayerPass).
+    private BakedLayer? LayerExported;
     // The fine heights file (heightmap-fine.png), when it was written: the bits its bytes use, and how many pixels have a fine byte
     // that is not 0.
     private int FineBitsWritten;
@@ -968,7 +970,8 @@ public static class WorldExport
       Wg = WorldGenerator.instance;
       World = Wg.m_world;
       Settings = BetterContinents.Settings;
-      BcWorld = Settings.EnabledForThisWorld;
+      // A world that keeps the game's own terrain (GameTerrain) is exported as the vanilla world it is, plus its baked layer.
+      BcWorld = Settings.ShapesWorld;
       Size = O.Size;
       var geometry = Geometry;
       Total = geometry.TotalSize;
@@ -1043,6 +1046,9 @@ public static class WorldExport
       if (O.Sources)
         foreach (var step in SourcesPass())
           yield return step;
+      // Before the preset, which is built from this folder: it takes the layer with the maps.
+      foreach (var step in LayerPass())
+        yield return step;
       // The settings lines first: the preset is built from them, and export.cfg, written after it, says how it went.
       var config = ConfigLines();
       foreach (var step in PresetPass(config))
@@ -1073,6 +1079,8 @@ public static class WorldExport
         t += W(0.05, 0.1) + W(0.2);
       if (O.Sources)
         t += 0.5;
+      if (Settings.Layer != null)
+        t += 0.05;
       if (MakesPreset)
         t += W(0.8, 0.2);
       totalWeight = t;
@@ -1148,6 +1156,8 @@ public static class WorldExport
       int workers = Math.Max(1, Math.Min(Workers, rows));
       return Task.Run(() => GameUtils.SimpleParallelFor(workers, 0, workers, w =>
       {
+        // The world's own heights, without the layer's ground: the export's world applies it again (BakedGround.Pause).
+        using var withoutGround = BakedGround.Pause();
         for (int r = w; r < rows; r += workers)
         {
           if (cancelRequested)
@@ -2389,6 +2399,30 @@ public static class WorldExport
       }
     }
 
+    // ---- placements.bcp ----------------------------------------------------------------------------------------
+
+    // The loaded world's baked layer as it is (every source, the registry, the ground and the paint) at the top of the folder, beside the maps:
+    // a world made from the folder, by any of the three ways, has the same layer (BetterContinentsSettings.ReadLayerFile reads it with the
+    // maps). The heights above were sampled without the layer's ground, so that it is applied once when the new world is made.
+    private IEnumerable LayerPass()
+    {
+      var layer = Settings.Layer;
+      if (layer == null)
+        yield break;
+      var path = Path.Combine(Dir, BetterContinentsSettings.LayerFileName);
+      Begin("Writing the baked layer", 0.05);
+      Tracked.Add(path);
+      var task = Task.Run(() =>
+      {
+        using var file = File.Create(path);
+        file.Write(layer.Bytes, 0, layer.Length);
+      });
+      foreach (var step in Await(task, () => 50f, needsWorld: false))
+        yield return step;
+      Written.Add(BetterContinentsSettings.LayerFileName);
+      LayerExported = layer;
+    }
+
     // ---- export.cfg, README.txt, manifest.json -----------------------------------------------------------------
 
     private IEnumerable TextPass(List<string> config)
@@ -2516,6 +2550,8 @@ public static class WorldExport
       l.Add("##     Or set only Directory to this folder: a new world made \"From Config\" then reads this file too, and its");
       l.Add("##     settings win over BetterContinents.cfg. The maps are only right with them (Heightmap Amount above all).");
       l.Add("## Only NEW worlds use these settings. A world that exists keeps the maps it was created with.");
+      if (LayerExported != null)
+        l.Add($"## {BetterContinentsSettings.LayerFileName} in this folder is the world's baked layer: a new world made from this folder, in any of these ways, has the same layer.");
       return l;
     }
 
@@ -2571,7 +2607,7 @@ public static class WorldExport
         Key(SettingsSchema.HeightmapAlpha, "false", "heightmap.png is plain 16-bit grey.");
       }
       // Only when the loaded world chose one: Auto is every world's own, and the new world follows the config's.
-      if (Settings.EnabledForThisWorld && Settings.HighTerrainMode != HighTerrainMode.Auto)
+      if (Settings.ShapesWorld && Settings.HighTerrainMode != HighTerrainMode.Auto)
         Key(SettingsSchema.HighTerrain, Settings.HighTerrainMode.ToString(), "As the loaded world: which worlds get Better Continents' patches of the game's height rules (Auto: those whose heightmap is read at an amount above 5).");
 
       var precision = EffectiveBiomePrecision(Settings);
@@ -2698,6 +2734,7 @@ public static class WorldExport
       Entry("terrainmap.png", "This world's own ground colour map, copied so the rebuilt world keeps it (terrainmap.txt).");
       Entry("vegetationmap.png", "This world's own vegetation map: which plants may grow where (vegetationmap.txt).");
       Entry("spawnmap.png", "This world's own spawn map: which creatures may appear where (spawnmap.txt).");
+      Entry("placements.bcp", "The loaded world's baked layer: the buildings baked into it, its ground and paint, and the record of who baked what. A world made from this folder has it too.");
       if (Written.Any(x => x.StartsWith("sources/")))
         l.Add($"  {"sources/".PadRight(w)} The loaded world's own Better Continents maps as its settings keep them (not loaded).");
       l.Add($"  {"export.cfg".PadRight(w)} The settings that load this folder (way C). It keeps the world's Biome precision ({EffectiveBiomePrecision(Settings)}):");
@@ -2833,6 +2870,15 @@ public static class WorldExport
             { "howToUse", PresetMade
               ? "New World screen: pick this preset in the Better Continents box. It is a copy of the folder as exported."
               : "bc_import makes it: see README.txt." },
+          } },
+        { "bakedLayer", LayerExported == null ? null : new WorldExportJson.Obj
+          {
+            { "file", BetterContinentsSettings.LayerFileName },
+            { "revision", LayerExported.Revision },
+            { "records", LayerExported.Placements },
+            { "zones", LayerExported.Zones.Count },
+            { "bytes", LayerExported.Length },
+            { "producer", LayerExported.Producer },
           } },
         { "import", $"bc_import {ImportArg}" },
         { "files", files },

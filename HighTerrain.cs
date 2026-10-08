@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-10-06 for 16k worlds (0.10.3).
+// Added by Wubarrk on 2026-10-06 for 16k worlds (0.10.3), and on 2026-10-07 for baked placements (0.10.4).
 
 using System;
 using UnityEngine;
@@ -156,7 +156,7 @@ public static class HighTerrain
   // (plus the sea shift), over the same formulas. 0 when Better Continents is off.
   internal static float MaxMetres(BetterContinents.BetterContinentsSettings s)
   {
-    if (!s.EnabledForThisWorld)
+    if (!s.ShapesWorld)
       return 0f;
     float sea = Mathf.Max(0f, Sane(s.SeaLevelAdjustment));
     bool overrides = s.HasHeightMap && s.HeightmapOverrideAll;
@@ -179,7 +179,7 @@ public static class HighTerrain
   // Whether the patches are wanted for these settings: Better Continents is on for the world and its High Terrain setting says so. Auto says so
   // for a heightmap read at an amount above the old most (HighByAmount), On for every world, Off for none.
   internal static bool Wanted(BetterContinents.BetterContinentsSettings s) =>
-    s.EnabledForThisWorld && (s.HighTerrainMode switch
+    s.ShapesWorld && (s.HighTerrainMode switch
     {
       HighTerrainMode.On => true,
       HighTerrainMode.Off => false,
@@ -207,7 +207,7 @@ public static class HighTerrain
       active = on;
     }
     // On says so; Off says what it costs a world whose heightmap Auto would have patched for; every other world that is not patched says nothing.
-    var note = on ? OnNote(s, reach) : s.EnabledForThisWorld && s.HighTerrainMode == HighTerrainMode.Off && HighByAmount(s) ? OffNote(s) : null;
+    var note = on ? OnNote(s, reach) : s.ShapesWorld && s.HighTerrainMode == HighTerrainMode.Off && HighByAmount(s) ? OffNote(s) : null;
     if (note != null)
     {
       if (note != said)

@@ -210,4 +210,62 @@ internal static partial class Tests
     }
     C(groundZones == 40, "forty ground zones compared with the raw bytes");
   }
+
+  // The file written back by BC's writer: the same content; the blocks as the same bytes where the order of tied records allows.
+  private static void ValtimaWriteBackTest()
+  {
+    Section("VALtima's file: written back by BC's writer");
+    if (!NeedValtima("ValtimaWriteBackTest"))
+      return;
+    var bytes = Valtima();
+    var layer = BakedLayer.Read(bytes, bytes.Length);
+
+    // Every block encoded again by BC's writer.
+    var watch = System.Diagnostics.Stopwatch.StartNew();
+    var edit = layer.Edit();
+    edit.ReencodeAll();
+    var (rebuilt, changed) = edit.Build();
+    System.Console.WriteLine($"   encoded all 1,365 zones again and checked the result in {watch.ElapsedMilliseconds} ms ({rebuilt.Length:N0} bytes, the file was {bytes.Length:N0})");
+    C(rebuilt.Revision == 2u, "the revision is the old one plus 1");
+    var difference = Differ(layer, rebuilt);
+    C(difference == null, "the decoded content is identical: " + difference);
+    C(rebuilt.Placements == 702_700 && rebuilt.Zones.Count == 1_365 && rebuilt.Ground.Count == 1_354, "702,700 records in 1,365 zones, ground in 1,354");
+
+    // The raw blocks: BC's order is (palette, z, x, y, yaw, then the run values), VALtima's (palette, z, x, y, yaw) with their input order for
+    // records tied on all of those (stacked pieces of the same place and yaw, which differ in scale). So a zone's block is VALtima's bytes unless
+    // such records are in it; its content is the same either way (Differ above).
+    int same = 0, different = 0;
+    var scratchA = new byte[1 << 16];
+    var scratchB = new byte[1 << 16];
+    for (int i = 0; i < layer.Zones.Count; i++)
+    {
+      var a = layer.Zones[i];
+      var b = rebuilt.Zones[i];
+      int na = BakedFormat.Inflate(layer.Bytes, a.Offset, a.Length, ref scratchA, BakedFormat.MaxInflated, "a");
+      int nb = BakedFormat.Inflate(rebuilt.Bytes, b.Offset, b.Length, ref scratchB, BakedFormat.MaxInflated, "b");
+      if (na == nb && scratchA.Take(na).SequenceEqual(scratchB.Take(nb)))
+        same++;
+      else
+      {
+        different++;
+        var x = layer.Decode(a);
+        var y = rebuilt.Decode(b);
+        // The first record that is not where it was is tied with its neighbour on every key but a run value.
+        int first = Enumerable.Range(0, x.Count).First(k => !x.Record(k).Equals(y.Record(k)));
+        var p = x.Record(first);
+        var q = y.Record(first);
+        C(p.Palette == q.Palette && p.Z == q.Z && p.X == q.X && p.Y == q.Y && p.Yaw == q.Yaw, $"zone {a.Key} differs only in the order of records tied on place and yaw");
+      }
+    }
+    C(same + different == 1_365 && same >= 1_300, $"{same} zones' inflated blocks are VALtima's bytes, {different} differ only in the order of tied records");
+    C(changed.Length == different, "the zones reported changed are the zones whose block bytes differ");
+
+    // `bc_bake load` of this file into a world that has no layer: the file again, byte for byte.
+    var load = LayerEdit.New();
+    int leftOut = load.ReplaceSource0(layer);
+    var (loaded, loadedChanged) = load.Build();
+    C(leftOut == 0, "no in-game record is left out of a compiler's file");
+    C(loaded.Length == bytes.Length && loaded.Bytes.Take(loaded.Length).SequenceEqual(bytes), "loading it into a world without a layer gives the file byte for byte");
+    C(loaded.Revision == 1u && loadedChanged.Length == 1_365, "revision 1, and every zone is new");
+  }
 }

@@ -1,4 +1,4 @@
-﻿// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and alt-biome planting (0.8.1), and on 2026-09-24 for world export and import (0.9.0), and on 2026-10-04 for the unifying refactor (0.10.0), and on 2026-10-06 for the New World panel's emblem (0.10.1), and on 2026-10-07 for 16k worlds (0.10.3).
+﻿// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and alt-biome planting (0.8.1), and on 2026-09-24 for world export and import (0.9.0), and on 2026-10-04 for the unifying refactor (0.10.0), and on 2026-10-06 for the New World panel's emblem (0.10.1), and on 2026-10-07 for 16k worlds (0.10.3), and on 2026-10-07 for baked placements (0.10.4).
 
 using System;
 using System.Collections.Generic;
@@ -298,7 +298,7 @@ public class Presets
       // A preset saved before 0.8.1 (including the four shipped ones) has no alt-biome options. This is a NEW
       // world, so it gets the new-world defaults from the config rather than the legacy behaviour that an
       // existing world without the key keeps. A preset carries no alt-biome map unless it was saved with one.
-      if (settings.EnabledForThisWorld && settings.AltBiomes == null)
+      if (settings.ShapesWorld && settings.AltBiomes == null)
         settings.AltBiomes = BetterContinents.AltBiomeSettings.FromConfig(choice.Values);
       return settings;
     }
@@ -314,7 +314,16 @@ public class Presets
     var path = Path.Combine(PresetsDir, BetterContinents.GetBCFile(name));
     if (File.Exists(path))
       File.Move(path, path + ".old-" + DateTime.Now.ToString("yyyy-dd-M-HH-mm-ss"));
-    settings.Save(path);
+    // A preset makes new worlds, whose ground can differ from this one's: it keeps the compiler's records (source 0, with the ground, the
+    // paint and the masks) and leaves out what was baked in game and the registry. An in-game bake fits only the world it was made in.
+    var toSave = settings;
+    if (settings.Layer is { } layer && (layer.HasRegistry || layer.RecordsOfSource(0) != layer.Placements))
+    {
+      var kept = layer.WithoutInGame(out int dropped);
+      BetterContinents.Log($"Preset {name}: the baked layer keeps the compiler's {kept.Placements:N0} records; the {dropped:N0} baked in game and the registry are left out, as they fit only this world.");
+      toSave = settings.WithLayer(kept);
+    }
+    toSave.Save(path);
     var pngPath = Path.Combine(PresetsDir, name + ".png");
     if (File.Exists(pngPath))
       File.Move(pngPath, pngPath + ".old-" + DateTime.Now.ToString("yyyy-dd-M-HH-mm-ss"));
