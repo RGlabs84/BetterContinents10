@@ -63,7 +63,6 @@ internal static partial class Tests
     // Scale and full rotation, on a record made here: the prefab that syncs a scale takes it; one that does not is placed at 1.
     var entry = layer.Palette[live[0]];
     var anchor = entry.Candidates[0].Anchor;
-    var tilted = Quaternion.AngleAxis(0f, Vector3.up);
     var rotation = new Quaternion(0.1f, 0.6f, -0.2f, 0.7f);
     float length = Mathf.Sqrt(rotation.x * rotation.x + rotation.y * rotation.y + rotation.z * rotation.z + rotation.w * rotation.w);
     rotation = new Quaternion(rotation.x / length, rotation.y / length, rotation.z / length, rotation.w / length);
@@ -76,7 +75,6 @@ internal static partial class Tests
     C(!ignores.Scaled && ignores.Scale == Vector3.one && (ignores.Pivot - (point - ignores.Rotation * anchor)).magnitude < 1e-4f,
       "one that does not is placed at scale 1: the anchor's offset is not scaled either");
     C(Quaternion.Angle(takes.Rotation, rotation) < 0.01f, "the full rotation comes back within 0.01 degrees");
-    C(tilted == tilted, "(placed)");
   }
 
   public static void ServerSeedVariantTest()

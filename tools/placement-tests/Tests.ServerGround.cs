@@ -123,17 +123,25 @@ internal static partial class Tests
     }
     C(wrong == 0, $"20,000 places inside the zones are within 2 mm of the bilinear height blended by the bilinear weight (worst {worst * 1000:F3} mm; {wrong} wrong; {between} between vertices)");
 
-    // No step: two places a millimetre apart, anywhere, differ by far less than a vertex's own step would.
+    // No step. Where the formula could break - across the edge between two cells, and across the edge between two rows of cells - a place a
+    // micrometre either side of the edge gives the same height to within the ground's own slope (a hard edge of the town's weight, 0 to 255 over
+    // 1 m, against ground 100 m off the world's, is 100 m per metre: 0.0002 over 2 micrometres).
     int steps = 0;
+    double steepest = 0;
     for (int n = 0; n < 5000; n++)
     {
       var zone = zones[random.Next(zones.Count)];
-      double x = zone.OriginX + 1 + random.NextDouble() * 62, z = zone.OriginZ + 1 + random.NextDouble() * 62;
-      double a = BakedGround.Apply(ground, x, z, 40f), b = BakedGround.Apply(ground, x + 0.001, z + 0.001, 40f);
-      if (Math.Abs(a - b) > 0.01)
+      int edge = 1 + random.Next(63);
+      double along = 0.5 + random.NextDouble() * 63;
+      bool acrossX = (n & 1) == 0;
+      double ex = zone.OriginX + (acrossX ? edge : along), ez = zone.OriginZ + (acrossX ? along : edge);
+      double a = BakedGround.Apply(ground, acrossX ? ex - 1e-6 : ex, acrossX ? ez : ez - 1e-6, 40f);
+      double b = BakedGround.Apply(ground, acrossX ? ex + 1e-6 : ex, acrossX ? ez : ez + 1e-6, 40f);
+      steepest = Math.Max(steepest, Math.Abs(a - b) / 2e-6);
+      if (Math.Abs(a - b) > 1e-3)
         steps++;
     }
-    C(steps == 0, $"the ground is continuous: two places a millimetre apart differ by under 1 cm ({steps} steps in 5,000)");
+    C(steps == 0, $"the ground is continuous across the edges of its cells: no step over 1 mm of height at 5,000 edges (steepest slope {steepest:F1} m per metre)");
   }
 
   public static void ServerGroundOutsideTest()

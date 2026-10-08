@@ -204,8 +204,9 @@ internal static class BakedVegetation
   {
     double reach = footprint.Radius + Margin;
     double lx = footprint.X - zone.OriginX, lz = footprint.Z - zone.OriginZ;
-    int col0 = Math.Max(0, (int)Math.Floor((lx - reach) / CellMetres)), col1 = Math.Min(Cells - 1, (int)Math.Floor((lx + reach) / CellMetres));
-    int row0 = Math.Max(0, (int)Math.Floor((lz - reach) / CellMetres)), row1 = Math.Min(Cells - 1, (int)Math.Floor((lz + reach) / CellMetres));
+    // Every cell the reach touches, a cell whose edge is exactly a reach away included on both sides (the test below is inclusive).
+    int col0 = Math.Max(0, (int)Math.Ceiling((lx - reach) / CellMetres) - 1), col1 = Math.Min(Cells - 1, (int)Math.Floor((lx + reach) / CellMetres));
+    int row0 = Math.Max(0, (int)Math.Ceiling((lz - reach) / CellMetres) - 1), row1 = Math.Min(Cells - 1, (int)Math.Floor((lz + reach) / CellMetres));
     for (int row = row0; row <= row1; row++)
       for (int col = col0; col <= col1; col++)
       {
