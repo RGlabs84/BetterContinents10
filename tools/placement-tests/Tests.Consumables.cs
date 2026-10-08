@@ -115,7 +115,7 @@ internal static partial class Tests
       var records = new[] { (0, 4.0, 5.0, 6.0, 0.0, (Vector3?)null), (0, 8.0, 5.0, 6.0, 20.0, null), (1, 10.0, 5.0, 6.0, 0.0, null), (2, 12.0, 5.0, 6.0, 0.0, null), (3, 14.0, 5.0, 6.0, 0.0, null) };
       var kinds = new[] { flax, copy, live, wall };
       var before = BakedZoneBuild.Build(ClientKit.Zone(0, 0, records), kinds, 1);
-      C(before.Drawn == 3 && before.Consumables == 0 && before.Colliders.Length == 1 && before.Colliders[0].Triangles.Length == 4 * 36, "(without the flag the flax is drawn, and all four boxes would be collided with)");
+      C(before.Drawn == 4 && before.Consumables == 0 && before.Colliders.Length == 1 && before.Colliders[0].Triangles.Length == 4 * 36, "(without the flag the flax and the copy (drawn unlit) are drawn, and all four boxes would be collided with)");
       foreach (var kind in new[] { flax, copy, live })
         kind.Consumable = true;
       var zone = BakedZoneBuild.Build(ClientKit.Zone(0, 0, records), kinds, 1);

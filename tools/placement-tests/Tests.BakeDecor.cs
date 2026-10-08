@@ -337,7 +337,7 @@ internal static partial class Tests
 
   private static void BakeDecorClientTest()
   {
-    Section("decor: a Copy record that a bake made reaches the client as a lit copy that is not drawn");
+    Section("decor: a Copy record that a bake made reaches the client as a lit copy, and is drawn unlit until one stands");
     BakeRunner.Reset();
     BakedKinds.ResetAll();
     var fx = BakeNewFx("decor-client", BakeDecorWorld, out _);
@@ -384,8 +384,9 @@ internal static partial class Tests
     C(seats.Count == 1 && seats[0].Kind.Role == BakedRole.Seat, "and the one Seat as a seat");
     C(builds.Any(b => b.HasProps), "a zone has props");
     int drawn = builds.Sum(b => b.Kinds.Sum(k => k.Count));
-    C(builds.Sum(b => b.Drawn) == 7 && drawn == 7, $"only the Statics and the Seat are drawn (7 of 15), no Copy and no Live (drawn {builds.Sum(b => b.Drawn)})");
-    C(builds.All(b => b.Kinds.All(k => k.Kind.Role != BakedRole.Copy && k.Kind.Role != BakedRole.Live)), "no Copy kind has instances");
+    C(builds.Sum(b => b.Drawn) == 12 && drawn == 12, $"the Statics, the Seat and the Copy records (drawn unlit until a lit copy stands) are drawn (12 of 15), no Live (drawn {builds.Sum(b => b.Drawn)})");
+    C(builds.All(b => b.Kinds.All(k => k.Kind.Role != BakedRole.Live)) && builds.SelectMany(b => b.Kinds).Where(k => k.Kind.Role == BakedRole.Copy).Sum(k => k.Count) == 5
+      && builds.SelectMany(b => b.Kinds).Where(k => k.Kind.Role == BakedRole.Copy).All(k => k.CopyIndex != null && k.CopyIndex.All(i => i >= 0)), "the five Copy kinds' instances each know their lit copy's place");
     C(builds.All(b => b.HasColliders) && builds.Sum(b => b.ColliderTriangles) == 12 * 12, $"the colliders of the twelve baked pieces are welded, a Copy's included (one box each: {builds.Sum(b => b.ColliderTriangles)} triangles)");
     var rotated = builds.SelectMany(b => b.Kinds).Single(k => k.Kind.Name == "blackmarble_1x1");
     C(rotated.Count == 2 && rotated.Locals.Length == 1, "the rotating blocks are drawn, each with a matrix of its own for the turned part");

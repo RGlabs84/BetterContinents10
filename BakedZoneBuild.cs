@@ -27,6 +27,9 @@ internal sealed class KindInstances
   internal Vector4[] Lod = [];
   /// <summary>Each instance's combination of look variants and seed bucket; null for a piece with none.</summary>
   internal byte[]? Combo, Bucket;
+  /// <summary>Each instance's place in the zone's Copies (BuiltZone.Copies) when its kind is a Copy and a lit copy can be made of it, else -1; null for
+  /// a kind that is not a Copy. The cull-and-LOD job skips an instance whose lit copy stands (BuiltZone.Lit).</summary>
+  internal int[]? CopyIndex;
   /// <summary>The instances of cell c (4 x 4 cells of 16 m, row 0 south) are [CellStart[c], CellStart[c + 1]).</summary>
   internal readonly int[] CellStart = new int[BakedDraw.Cells + 1];
   /// <summary>Per cell, the world box of its instances (a piece's radius around its origin): minimum x, y, z, then maximum.</summary>
@@ -69,6 +72,12 @@ internal sealed class BuiltZone
   internal ColliderMesh[] Colliders = [];
   internal ConvexCollider[] Convex = [];
   internal LocalProp[] Copies = [], Seats = [];
+  /// <summary>
+  /// Which of Copies have a lit copy standing now: one array the main thread makes and PUBLISHES by assigning this field, and never changes after (null: none
+  /// stands). The cull-and-LOD worker reads the field once for the zone and skips the instance of a record whose bit is set, so it sees a whole snapshot,
+  /// old or new, whatever the main thread does meanwhile. BakedDraw.LitVersion counts the publications, so that a job is started for each.
+  /// </summary>
+  internal volatile bool[]? Lit;
   /// <summary>The world box of the copies' and the seats' positions (minimum x, y, z, then maximum), for the early-out of the near test.</summary>
   internal readonly float[] CopyBox = new float[6], SeatBox = new float[6];
   internal int Records, Drawn, Skipped;
@@ -268,6 +277,7 @@ internal static class BakedZoneBuild
     var combo = new byte[n];
     var bucket = new byte[n];
     uint[]? looks = null;   // each record's look hash, for the pieces whose parts RandomPieceRotation turns
+    int[]? copyOf = null;   // each drawn Copy record's place in Copies
     var welds = new Dictionary<int, Weld>();
     var convex = new List<ConvexCollider>();
     var copies = new List<LocalProp>();
@@ -369,6 +379,16 @@ internal static class BakedZoneBuild
       {
         copies.Add(new LocalProp(kind, m));
         Grow(copyBox, 0, m.m03, m.m13, m.m23, 0f);
+        if (draws)
+        {
+          if (copyOf == null)
+          {
+            copyOf = new int[n];
+            for (int j = 0; j < n; j++)
+              copyOf[j] = -1;
+          }
+          copyOf[i] = copies.Count - 1;
+        }
       }
       else if (kind.Role == BakedRole.Seat && kind.Prefab != null && kind.Piece != null && kind.Piece.HasChair)
       {
@@ -392,6 +412,7 @@ internal static class BakedZoneBuild
         Locals = new Matrix4x4[piece.Locals.Length][],
         Combo = piece.Slots.Length > 0 ? new byte[gr.Count] : null,
         Bucket = piece.HasBuckets ? new byte[gr.Count] : null,
+        CopyIndex = gr.Kind.Role == BakedRole.Copy ? new int[gr.Count] : null,
       };
       for (int j = 0; j < piece.Locals.Length; j++)
         ki.Locals[j] = new Matrix4x4[gr.Count];
@@ -421,6 +442,7 @@ internal static class BakedZoneBuild
       ki.Lod[pos] = lod[i];
       if (ki.Combo != null) ki.Combo[pos] = combo[i];
       if (ki.Bucket != null) ki.Bucket[pos] = bucket[i];
+      if (ki.CopyIndex != null) ki.CopyIndex[pos] = copyOf != null ? copyOf[i] : -1;
       for (int j = 0; j < piece.Locals.Length; j++)
       {
         var turned = j < piece.LocalRotations.Length ? piece.LocalRotations[j] : null;

@@ -156,6 +156,8 @@ internal sealed class CullJob
   // the pose the job was made for, to decide when the next one is due
   internal Vector3 Eye, Forward;
   internal int RingVersion, BatchVersion;
+  /// <summary>BakedDraw.LitVersion when the job was made: the lit copies it knew of (BuiltZone.Lit) are the ones published up to it.</summary>
+  internal int LitVersion;
 }
 
 /// <summary>The camera's frustum as six planes, widened for how far the camera can move or turn before the next job.</summary>
@@ -298,6 +300,9 @@ internal static class BakedDraw
       for (int c = 0; c < Cells; c++)
         if (state[c] == 2)
           cells++;
+      // the lit copies standing in this zone, as the main thread published them (one whole snapshot, never changed after): a Copy record with a lit
+      // copy is not drawn here, or it would be drawn twice
+      var lit = zone.Lit;
       foreach (var ki in zone.Kinds)
       {
         var kind = ki.Kind;
@@ -308,7 +313,7 @@ internal static class BakedDraw
           if (state[c] == 0 || ki.CellStart[c + 1] == ki.CellStart[c])
             continue;
           stamp++;
-          drawn += FillCell(job, ki, c, state[c] == 2, stamp);
+          drawn += FillCell(job, ki, c, state[c] == 2, stamp, lit);
         }
       }
     }
@@ -334,7 +339,7 @@ internal static class BakedDraw
     kind.JobSingle = piece.SingleLod || near <= 0f || kind.Lod0Only;
   }
 
-  private static int FillCell(CullJob job, KindInstances ki, int cell, bool inView, int stamp)
+  private static int FillCell(CullJob job, KindInstances ki, int cell, bool inView, int stamp, bool[]? litCopies)
   {
     var kind = ki.Kind;
     var piece = kind.Piece!;
@@ -345,12 +350,20 @@ internal static class BakedDraw
     bool single = kind.JobSingle;
     var combo = ki.Combo;
     var bucket = ki.Bucket;
+    var copyIndex = litCopies != null ? ki.CopyIndex : null;
     bool plain = piece.Plain;
     var batches = kind.Batches;
     var parts = piece.Parts;
     int lod0 = 0, lod1 = 0;
     for (int i = from; i < to; i++)
     {
+      // a Copy record whose lit copy stands is that copy's to draw
+      if (copyIndex != null)
+      {
+        int ci = copyIndex[i];
+        if (ci >= 0 && ci < litCopies!.Length && litCopies[ci])
+          continue;
+      }
       var r = lod[i];
       float dx = r.x - cx, dy = r.y - cy, dz = r.z - cz;
       float d2 = dx * dx + dy * dy + dz * dz;
@@ -420,6 +433,13 @@ internal static class BakedDraw
   /// <summary>Drawing is switched off (bc_bake hide): no job, no submission.</summary>
   internal static bool Hidden;
 
+  /// <summary>
+  /// How many times the main thread has published a change of which Copy records have a lit copy standing (BuiltZone.Lit), and the last of them a
+  /// finished job knew of. A change starts a job (the record is drawn, or not, by the next one); a lit copy that stops standing is destroyed only after
+  /// a job that knows is adopted (LitAdopted reaches the version of its publication), so that no record is ever neither drawn nor lit.
+  /// </summary>
+  internal static int LitVersion, LitAdopted;
+
   /// <summary>Whether a job is running now.</summary>
   internal static bool Busy => running != null;
 
@@ -457,7 +477,7 @@ internal static class BakedDraw
     float k = QualitySettings.lodBias / (2f * Mathf.Tan(cam.fieldOfView * 0.5f * Mathf.Deg2Rad));
     Vector3 eye = cam.transform.position, forward = cam.transform.forward;
     bool due = frame == null || ringVersion != frame.RingVersion || BakedKinds.Version != frame.BatchVersion
-      || DetailScale != frame.DetailScale || DrawScale != frame.DrawScale || ShadowSetting != frame.Shadows
+      || LitVersion != frame.LitVersion || DetailScale != frame.DetailScale || DrawScale != frame.DrawScale || ShadowSetting != frame.Shadows
       || (eye - frame.Eye).sqrMagnitude >= RefreshDistance * RefreshDistance
       || Vector3.Angle(forward, frame.Forward) >= RefreshAngle
       || Mathf.Abs(k - frame.K) > frame.K * 0.02f;
@@ -492,7 +512,7 @@ internal static class BakedDraw
       DetailScale = DetailScale, DrawScale = DrawScale, Shadows = ShadowSetting,
       CasterMargin = CasterReach,
       Zones = ring, Batches = batchSnapshot, Kinds = kindSnapshot,
-      RingVersion = ringVersion, BatchVersion = batchVersion,
+      RingVersion = ringVersion, BatchVersion = batchVersion, LitVersion = LitVersion,
     };
     BakedFrustum.Make(job.Planes, t.position, t.forward, t.right, t.up, cam.fieldOfView, cam.aspect, cam.farClipPlane, AngleMargin, MoveMargin);
     running = job;
@@ -520,6 +540,7 @@ internal static class BakedDraw
       }
     }
     frame = job;
+    LitAdopted = Math.Max(LitAdopted, job.LitVersion);
     jobsRun++;
     jobMsAverage = jobsRun == 1 ? job.Ms : jobMsAverage * 0.95 + job.Ms * 0.05;
     jobMsMax = Math.Max(job.Ms, jobMsMax * 0.99);
