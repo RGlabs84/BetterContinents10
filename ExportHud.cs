@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-09-24 for world export and import (0.9.0), and modified on 2026-10-06 for 16k worlds (0.10.3).
+// Added by Wubarrk on 2026-09-24 for world export and import (0.9.0), and modified on 2026-10-06 for 16k worlds (0.10.3), and on 2026-10-07 for baked placements (0.10.4).
 
 using System;
 using System.Collections.Generic;
@@ -14,10 +14,10 @@ using static BetterContinents.BetterContinents;
 namespace BetterContinents;
 
 // The world export HUD, modelled on Wubarrk's Eye (EyeUIManager): a small status box that the Hud Hotkey (F9) shows
-// and hides, and a window that the Window Hotkey (F7) opens and closes. The window has two tabs: Export (the map
-// options, an estimate, Start and Cancel, and what the last export came to) and Import (the export folders, newest
-// first, each made into a New World preset or loaded through the config). The status box steps aside while the window
-// is open, as the Eye's does.
+// and hides, and a window that the Window Hotkey (F7) opens and closes. The window has three tabs: Export (the map
+// options, an estimate, Start and Cancel, and what the last export came to), Import (the export folders, newest
+// first, each made into a New World preset or loaded through the config) and Baking (bc_bake's buttons: ExportHud.Bake.cs).
+// The status box steps aside while the window is open, as the Eye's does.
 //
 // It draws through Better Continents' UI registry. UI.Init's scene-change handler calls Register(), which re-adds the
 // callback and drops the styles, because that handler has just destroyed the textures they used. The HUD shows only in
@@ -29,7 +29,7 @@ namespace BetterContinents;
 // never the Layout or Repaint passes. They are ignored while the player types in the chat, the console, a sign, a map
 // pin, the build search or the window's own fields, and they act after the drawing, so an event never changes what it
 // is drawing halfway through.
-public static class ExportHud
+public static partial class ExportHud
 {
   private const string CallbackKey = "ExportHud";
   private static readonly int[] Sizes = [1024, 2048, 4096, 8192, 16384];
@@ -55,7 +55,7 @@ public static class ExportHud
   private static string? exportRoot;
 
   private enum Mode { Options, Running, Blocked }
-  private enum Tab { Export, Import }
+  private enum Tab { Export, Import, Bake }
 
   // What the window shows, fixed at the start of every GUI event by Capture. IMGUI needs the same controls in an event
   // as in the Layout pass before it, so a click that starts an export, or a toggle that brings up a note, changes the
@@ -233,6 +233,8 @@ public static class ExportHud
     lines.Add((StatusLine(), s.Text));
     if (WorldImport.IsRunning)
       lines.Add(($"Importing: {WorldImport.Phase} {WorldImport.Progress:0}%", s.Text));
+    if (BakeRunner.Running is { } baking)
+      lines.Add(($"Baking: {baking}", s.Text));
     if (WorldExport.LastExportDir != null)
       lines.Add(($"Last: {WorldExport.LastExportDir}", s.Dim));
     if (WorldExport.LastError != null)
@@ -289,7 +291,7 @@ public static class ExportHud
     var hud = Key(ConfigExportHudKey);
     var parts = new List<string>();
     if (window != KeyCode.None)
-      parts.Add($"{window}: export and import window");
+      parts.Add($"{window}: export, import and baking window");
     if (hud != KeyCode.None)
       parts.Add($"{hud}: hide this box");
     return string.Join(", ", parts);
@@ -307,7 +309,7 @@ public static class ExportHud
       windowRect.height = 0f;
       shownView = (mode, tab);
     }
-    windowRect = GUILayout.Window(WindowId, windowRect, WindowFunction, $"{ModInfo.Name} {ModInfo.Version} - world export and import", s.Window, GUILayout.Width(WindowWidth));
+    windowRect = GUILayout.Window(WindowId, windowRect, WindowFunction, $"{ModInfo.Name} {ModInfo.Version} - world export, import and baking", s.Window, GUILayout.Width(WindowWidth));
     windowRect.x = Mathf.Clamp(windowRect.x, 0f, Mathf.Max(0f, Screen.width - windowRect.width));
     windowRect.y = Mathf.Clamp(windowRect.y, 0f, Mathf.Max(0f, Screen.height - 60f));
     windowDrawnFrame = Time.frameCount;
@@ -340,6 +342,8 @@ public static class ExportHud
       hint = hoverHint;
       if (tab == Tab.Import)
         RescanImportsIfNeeded();
+      if (tab == Tab.Bake)
+        CaptureBake();
     }
     estimate = Estimate(o);
     if (mode != Mode.Options)
@@ -446,6 +450,8 @@ public static class ExportHud
       requestedTab = Tab.Export;
     if (GUILayout.Toggle(tab == Tab.Import, "Import an export", GUI.skin.button) && tab != Tab.Import)
       requestedTab = Tab.Import;
+    if (GUILayout.Toggle(tab == Tab.Bake, "Bake buildings", GUI.skin.button) && tab != Tab.Bake)
+      requestedTab = Tab.Bake;
     GUILayout.EndHorizontal();
 
     // The body scrolls once it is taller than the screen below the window's top allows. Whether it scrolls is decided
@@ -462,6 +468,8 @@ public static class ExportHud
     GUILayout.BeginVertical(GUILayout.Width(bodyWidth));
     if (tab == Tab.Import)
       DrawImport(s);
+    else if (tab == Tab.Bake)
+      DrawBake(s);
     else
     {
       switch (mode)
