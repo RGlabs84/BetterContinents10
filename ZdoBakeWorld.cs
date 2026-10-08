@@ -97,6 +97,7 @@ internal sealed class ZdoBakeWorld : IBakeWorld
       foreach (var zdo in ZdosIn(zone))
       {
         var p = zdo.GetPosition();
+        var r = zdo.m_rotation;
         into.Add(new WorldObject
         {
           Id = zdo.m_uid,
@@ -104,6 +105,9 @@ internal sealed class ZdoBakeWorld : IBakeWorld
           X = p.x,
           Y = p.y,
           Z = p.z,
+          RotX = r.x,
+          RotY = r.y,
+          RotZ = r.z,
           Creator = zdo.GetLong(ZDOVars.s_creator, 0L),
           AlreadyBaked = ZDOExtraData.GetInt(zdo.m_uid, BakedKeys.Id, out _),
           HasConnection = ZDOExtraData.GetConnectionType(zdo.m_uid) != ZDOExtraData.ConnectionType.None,
@@ -132,7 +136,7 @@ internal sealed class ZdoBakeWorld : IBakeWorld
     return live;
   }
 
-  public ZDOID?[] FindStanding(IReadOnlyList<PieceCopy> pieces)
+  public ZDOID?[] FindStanding(IReadOnlyList<PieceCopy> pieces, float[]? heights = null)
   {
     var result = new ZDOID?[pieces.Count];
     // The zones the pieces are in, each looked at once: its objects, filed by the matching.
@@ -146,12 +150,44 @@ internal sealed class ZdoBakeWorld : IBakeWorld
         poses.Add(new ObjectPose { Id = zdo.m_uid, Prefab = zdo.GetPrefab(), X = p.x, Y = p.y, Z = p.z, RotX = r.x, RotY = r.y, RotZ = r.z });
       }
       var indices = group.ToList();
-      var found = BakeMatch.Find(poses, indices.Select(i => pieces[i]).ToList());
+      var found = BakeMatch.Find(poses, indices.Select(i => pieces[i]).ToList(), heights != null, heights != null ? GroundAt : null);
       for (int k = 0; k < indices.Count; k++)
         if (found[k] >= 0)
+        {
           result[indices[k]] = poses[found[k]].Id;
+          if (heights != null)
+            heights[indices[k]] = poses[found[k]].Y;
+        }
     }
     return result;
+  }
+
+  // The ground's height at a point (the game's terrain collider; null where the zone's terrain is not loaded), for a piece StaticPhysics lifted.
+  private static double? GroundAt(double x, double z)
+  {
+    var system = ZoneSystem.instance;
+    return system != null && system.GetGroundHeight(new Vector3((float)x, 0f, (float)z), out float height) ? height : null;
+  }
+
+  public string Whereabouts(PieceCopy piece)
+  {
+    var poses = new List<ObjectPose>();
+    // The piece's zone, and the zones next to it when it is within 3 m of an edge.
+    var seen = new HashSet<ZoneKey>();
+    foreach (double dx in new[] { -3.0, 0.0, 3.0 })
+      foreach (double dz in new[] { -3.0, 0.0, 3.0 })
+      {
+        var zone = ZoneKey.OfPoint(piece.X + dx, piece.Z + dz);
+        if (!seen.Add(zone))
+          continue;
+        foreach (var zdo in ZdosIn(zone))
+        {
+          var p = zdo.GetPosition();
+          var r = zdo.m_rotation;
+          poses.Add(new ObjectPose { Id = zdo.m_uid, Prefab = zdo.GetPrefab(), X = p.x, Y = p.y, Z = p.z, RotX = r.x, RotY = r.y, RotZ = r.z });
+        }
+      }
+    return BakeMatch.Whereabouts(piece, poses);
   }
 
   // ------------------------------------------------------------------------------------------------ changing

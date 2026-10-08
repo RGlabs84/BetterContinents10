@@ -122,6 +122,8 @@ internal static partial class BakeRunner
       case BakeState.Undone: result.Undone++; break;
     }
     say($"bc_bake: {word} {number} had stopped in the state {state}; {plan.Why}. {Report(work)}It is {plan.Final.ToString().ToLowerInvariant()}.");
+    foreach (var line in LostLines(ctx, work))
+      say(line);
   }
 
   // What a plan did, in a sentence that ends with a space, or nothing when it did nothing.
@@ -131,7 +133,7 @@ internal static partial class BakeRunner
     if (w.RecordsPut > 0) parts.Add($"{Num(w.RecordsPut)} records put into the layer");
     if (w.RecordsTaken > 0) parts.Add($"{Num(w.RecordsTaken)} records taken out of it");
     if (w.Made > 0) parts.Add($"{Num(w.Made)} pieces made");
-    if (w.Removed > 0) parts.Add($"{Num(w.Removed)} pieces removed");
+    if (w.Removed > 0) parts.Add($"{Num(w.Removed)} pieces removed" + (w.Fallen > 0 ? $" ({Num(w.Fallen)} had dropped or been lifted from where they were put)" : ""));
     if (w.Tagged > 0) parts.Add($"{Num(w.Tagged)} town pieces tagged");
     if (w.Released > 0) parts.Add($"{Num(w.Released)} town pieces freed");
     return parts.Count == 0 ? "" : string.Join(", ", parts) + ". ";

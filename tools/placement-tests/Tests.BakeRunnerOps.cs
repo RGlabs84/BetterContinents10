@@ -238,7 +238,11 @@ internal static partial class Tests
         fx.World.Objects.Remove(floor);
       }
     var text = string.Join("\n", fx.Said);
-    C(changed && text.Contains("2 pieces changed while the bake ran: their records stay"), "the two are counted and said: " + text);
+    C(changed && text.Contains("2 pieces changed while the bake ran (moved, changed or gone): they stay real pieces, and their records are drawn too. 'bc_bake check' lists the real pieces that stand on, under or close to a record (e.g. "),
+      "the two are counted and said: " + text);
+    C(text.Contains("stone_wall_2x1 at 7, 10, 5") && text.Contains("wood_floor at 42, 10, 5") && text.Contains("'bc_bake undo' puts the area back as it was."), "the first of them are named, with the way back: " + text);
+    C(fx.Logged.Count == 2 && fx.Logged.All(l => l.StartsWith("bc_bake: found ") && l.Contains(" at ")) && fx.Logged.Any(l => l.Contains("stone_wall_2x1") && l.Contains("the nearest of that kind is")),
+      "and the log names each with the nearest object of its kind: " + string.Join(" | ", fx.Logged));
     C(text.Contains("6 pieces baked"), "the other six are baked");
     C(fx.Layer.Placements == 8 && BakeCountObjects(fx, "wood_floor") == 0 && fx.World.Objects.Values.Any(o => o.PrefabName == "stone_wall_2x1" && o.X == 10f), "all eight records are in the layer, and the moved wall still stands where it was moved to");
     C(new BakeJournal(fx.Folder).GetState(1) == BakeState.Removed, "the bake ends as any other");

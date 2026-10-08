@@ -80,6 +80,7 @@ internal static class BakeRuntime
       Convert = BakeServices.Convert,
       Journal = journal,
       Say = say,
+      Log = BetterContinents.Log,
       Who = who,
       // An operation ends in a state a load settles; a complete save that began after it settles it without one (BakeSettle).
       Ended = ended ?? ((number, final) =>

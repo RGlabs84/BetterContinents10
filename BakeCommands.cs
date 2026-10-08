@@ -426,6 +426,15 @@ internal static class BakeCheck
     return lines;
   }
 
+  private const double OverlapCell = 0.25;
+
+  // The same turn about y, within 0.2 degree (or the given), either side of 360.
+  private static bool SameYaw(double a, double b, double within = 0.2)
+  {
+    double d = Math.Abs(a - b) % 360.0;
+    return Math.Min(d, 360.0 - d) <= within;
+  }
+
   internal static List<Finding> Run(BakeContext ctx, BakedLayer layer, IReadOnlyList<ZoneKey> zones, bool wideSectors, out long records)
   {
     var found = new List<Finding>();
@@ -475,22 +484,63 @@ internal static class BakeCheck
             }
           }
       }
-      // Real pieces standing where a record is.
+      // Real pieces standing where a record is, or straight under one.
       if (ctx.World.Ready)
       {
         var objects = new List<WorldObject>();
         ctx.World.Gather([zone], objects);
-        var byPrefab = objects.GroupBy(o => o.Prefab).ToDictionary(g => g.Key, g => g.ToList());
+        // Filed by prefab and a 25 cm cell, so that a zone with 30,000 pieces is not looked through for each record.
+        var filed = new Dictionary<(int Prefab, long X, long Z), List<int>>();
+        for (int j = 0; j < objects.Count; j++)
+        {
+          var key = (objects[j].Prefab, (long)Math.Floor(objects[j].X / OverlapCell), (long)Math.Floor(objects[j].Z / OverlapCell));
+          if (!filed.TryGetValue(key, out var list))
+            filed[key] = list = [];
+          list.Add(j);
+        }
         for (int k = 0; k < items.Count; k++)
         {
           var a = items[k];
           if (a.Role == BakedRole.Live)
             continue;
           int hash = ctx.World.PrefabOf(a.Name);
-          if (hash == 0 || !byPrefab.TryGetValue(hash, out var same))
+          if (hash == 0)
             continue;
-          if (same.Any(o => Math.Abs(o.X - a.X) <= 0.05 && Math.Abs(o.Y - a.Y) <= 0.05 && Math.Abs(o.Z - a.Z) <= 0.05))
-            found.Add(new Finding { Kind = "Records with a real piece of the same kind standing there (an unfinished bake, or a piece built into a baked spot)", Where = $"{a.Name} at {a.X:0.##}, {a.Y:0.##}, {a.Z:0.##}" });
+          bool onIt = false, below = false, close = false;
+          double belowBy = 0;
+          long cx = (long)Math.Floor(a.X / OverlapCell), cz = (long)Math.Floor(a.Z / OverlapCell);
+          for (long dx = -1; dx <= 1 && !onIt; dx++)
+            for (long dz = -1; dz <= 1 && !onIt; dz++)
+            {
+              if (!filed.TryGetValue((hash, cx + dx, cz + dz), out var near))
+                continue;
+              foreach (int j in near)
+              {
+                var o = objects[j];
+                if (Math.Abs(o.X - a.X) <= 0.05 && Math.Abs(o.Y - a.Y) <= 0.05 && Math.Abs(o.Z - a.Z) <= 0.05)
+                {
+                  onIt = true;
+                  break;
+                }
+                // Close by and turned about the same way: a piece that moved a little.
+                double dxm = o.X - a.X, dym = o.Y - a.Y, dzm = o.Z - a.Z;
+                if (!close && dxm * dxm + dym * dym + dzm * dzm <= 0.25 * 0.25 && SameYaw(o.RotY, a.Yaw, 5.0))
+                  close = true;
+                // Straight under the record, turned the same way: what a piece that dropped (StaticPhysics) looks like.
+                if (!below && Math.Abs(o.X - a.X) <= BakeMath.PlaceMetres && Math.Abs(o.Z - a.Z) <= BakeMath.PlaceMetres && o.Y < a.Y - 0.05 && SameYaw(o.RotY, a.Yaw))
+                {
+                  below = true;
+                  belowBy = a.Y - o.Y;
+                }
+              }
+            }
+          string at = $"{a.Name} at {a.X:0.##}, {a.Y:0.##}, {a.Z:0.##}";
+          if (onIt)
+            found.Add(new Finding { Kind = "Records with a real piece of the same kind standing there (an unfinished bake, a piece built into a baked spot, or a piece an unbake made that an undo did not find)", Where = at });
+          else if (below)
+            found.Add(new Finding { Kind = "Records with a real piece of the same kind straight under them (a piece that dropped, or one built under a baked piece)", Where = $"{at}, a real one {belowBy:0.##} m lower" });
+          else if (close)
+            found.Add(new Finding { Kind = "Records with a real piece of the same kind close by (within 25 cm: a piece that was moved a little)", Where = at });
         }
       }
     }

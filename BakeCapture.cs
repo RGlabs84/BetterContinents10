@@ -124,6 +124,13 @@ internal sealed class PieceCopy
 
   public ZdoValue? Find(int key, ZdoValueType type) => Values.Find(key, type);
 
+  // The same piece at another height (a piece that dropped or was pushed up where it stood); the values are shared.
+  public PieceCopy AtHeight(float y) => new()
+  {
+    Prefab = Prefab, PrefabName = PrefabName, X = X, Y = y, Z = Z, RotX = RotX, RotY = RotY, RotZ = RotZ, Persistent = Persistent, Distant = Distant,
+    Type = Type, Values = Values, UserId = UserId, Id = Id,
+  };
+
   public override string ToString() => $"{(PrefabName.Length > 0 ? PrefabName : Prefab.ToString())} at {X:0.###}, {Y:0.###}, {Z:0.###}";
 }
 
@@ -445,6 +452,15 @@ internal static class BakeMath
   }
 
   private static float Denoise(float degrees) => (float)(Math.Round(degrees * 100.0) / 100.0);
+
+  // Whether a ZDO of this prefab stands at the copy's x and z (within the same centimetre) turned the same way, at whatever height: what a piece
+  // that dropped or was pushed up by StaticPhysics looks like (it only changes its y).
+  internal static bool SameSpot(PieceCopy copy, int prefab, float x, float z, float rx, float ry, float rz) =>
+    SamePlace(copy, prefab, x, copy.Y, z, rx, ry, rz);
+
+  // How far StaticPhysics lets a piece stand above the ground before it falls (0.05), below it before it is pushed up (0.05), and the slack
+  // allowed in finding the height it was pushed to.
+  internal const double FallSlack = 0.05, GroundSlack = 0.1;
 }
 
 // One object of the world as the matching sees it: where it stands, turned as its ZDO stores it.
@@ -469,7 +485,15 @@ internal static class BakeMatch
   private const double Cell = 0.02;
 
   // For each piece, the index in `objects` of the object that is it now, or -1; each object answers for one piece at most.
-  internal static int[] Find(IReadOnlyList<ObjectPose> objects, IReadOnlyList<PieceCopy> pieces)
+  //
+  // `fallen` is for pieces that BC made itself (an unbake's): a piece that StaticPhysics moved is still that piece. After every piece has had its
+  // exact match, each one left over takes the nearest unclaimed object of its prefab at the same x and z (within a centimetre) and turn (within
+  // 0.1 degree) that is LOWER (it fell: StaticPhysics.CheckFall puts a piece on the ground, or on what is under it, when it stands more than 5 cm
+  // above), or HIGHER where the piece was in the ground and the object stands at the ground's height (PushUp: a piece more than 5 cm below the
+  // ground is lifted to it); `ground` gives the ground's height at a point, or null when it is not known (the lifted case is then not looked for).
+  // Never use it for pieces that players built. (Trees, bushes and rocks carry StaticPhysics, and an unbake of VALtima's Britain makes 14 such kinds;
+  // walls and floors carry none.)
+  internal static int[] Find(IReadOnlyList<ObjectPose> objects, IReadOnlyList<PieceCopy> pieces, bool fallen = false, Func<double, double, double?>? ground = null)
   {
     var found = new int[pieces.Count];
     for (int i = 0; i < found.Length; i++)
@@ -506,7 +530,81 @@ internal static class BakeMatch
           }
         }
     }
+    if (fallen)
+      for (int p = 0; p < pieces.Count; p++)
+      {
+        if (found[p] >= 0)
+          continue;
+        var piece = pieces[p];
+        long cx = CellOf(piece.X), cz = CellOf(piece.Z);
+        int best = -1;
+        double bestAway = double.MaxValue;
+        double? floor = null;
+        bool floorKnown = false;
+        for (long dx = -1; dx <= 1; dx++)
+          for (long dz = -1; dz <= 1; dz++)
+          {
+            if (!cells.TryGetValue((piece.Prefab, cx + dx, cz + dz), out var list))
+              continue;
+            foreach (int i in list)
+            {
+              var o = objects[i];
+              if (taken[i] || !BakeMath.SameSpot(piece, o.Prefab, o.X, o.Z, o.RotX, o.RotY, o.RotZ))
+                continue;
+              double drop = piece.Y - o.Y;
+              if (drop <= 0)
+              {
+                // Higher: only a piece that was in the ground, lifted to the ground's height.
+                if (ground == null)
+                  continue;
+                if (!floorKnown)
+                {
+                  floor = ground(piece.X, piece.Z);
+                  floorKnown = true;
+                }
+                if (floor is not { } g || piece.Y >= g - BakeMath.FallSlack || Math.Abs(o.Y - g) > BakeMath.GroundSlack)
+                  continue;
+              }
+              double away = Math.Abs(drop);
+              if (away < bestAway)
+              {
+                bestAway = away;
+                best = i;
+              }
+            }
+          }
+        if (best >= 0)
+        {
+          taken[best] = true;
+          found[p] = best;
+        }
+      }
     return found;
+  }
+
+  // Where the nearest object of the piece's prefab stands, in words, for the log: "none of that kind within 3 m", or its offset in x, y and z
+  // and its turn. `near` is every object in the zones around the piece.
+  internal static string Whereabouts(PieceCopy piece, IEnumerable<ObjectPose> near)
+  {
+    const double Radius = 3.0;
+    ObjectPose? best = null;
+    double bestDistance = double.MaxValue;
+    foreach (var o in near)
+    {
+      if (o.Prefab != piece.Prefab)
+        continue;
+      double dx = o.X - piece.X, dy = o.Y - piece.Y, dz = o.Z - piece.Z;
+      double distance = Math.Sqrt(dx * dx + dy * dy + dz * dz);
+      if (distance <= Radius && distance < bestDistance)
+      {
+        bestDistance = distance;
+        best = o;
+      }
+    }
+    if (best is not { } there)
+      return $"no {(piece.PrefabName.Length > 0 ? piece.PrefabName : "object of that kind")} within {Radius:0} m";
+    double degrees = BakeMath.AngleBetween(BakeMath.EulerToQuaternion(piece.RotX, piece.RotY, piece.RotZ), BakeMath.EulerToQuaternion(there.RotX, there.RotY, there.RotZ));
+    return FormattableString.Invariant($"the nearest of that kind is {there.X - piece.X:+0.##;-0.##;0} / {there.Y - piece.Y:+0.##;-0.##;0} / {there.Z - piece.Z:+0.##;-0.##;0} m away (x / y / z), turned {degrees:0.#} degrees");
   }
 
   private static long CellOf(double metres) => (long)Math.Floor(metres / Cell);
