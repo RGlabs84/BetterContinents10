@@ -13,6 +13,10 @@ namespace BetterContinents;
 // controller is: a ZoneSystem.PlaceZoneCtrl postfix (Full mode on a host or in single player, Ghost mode on a dedicated server), which VALtimaOnline's
 // TownSeeding did for its town chunks.
 //
+//  * Consumables (build spec 0.2, BakedConsumables): every record of a consumable kind, whatever its role, is placed ONCE here as an ordinary
+//    object of the game, with no bake keys, no bc_protect and no creator, so the game owns it from then on. Reconciliation never seeds or removes
+//    one. The kind is decided by the prefab the entry resolves to (its first candidate the game has), not by its name.
+//
 //  * Every Live record of the zone, of every source, is seeded unless its (source, id) already stands in the zone: after a zone reset the
 //    kept piece stays and is not seeded twice. The zone's objects are found the way ZoneRegen finds them, each by its own position.
 //  * The pivot is the record's point less the anchor turned and scaled (VALtima's TownBuild.Place), with the record's rotation. Scale is
@@ -57,6 +61,12 @@ internal static class BakedServer
   /// <summary>The game's own objects: the prefab of a name, the ZDOs of a zone, how a piece that cannot be finished is taken out.</summary>
   internal static Func<string, GameObject?> FindPrefab = name => ZNetScene.instance == null ? null : ZNetScene.instance.GetPrefab(name.GetStableHashCode());
   internal static Func<ZoneKey, IEnumerable<ZDO>> ZdosIn = zone => ZoneRegen.ZdosIn(ZDOMan.instance, zone.ToVector2s());
+  /// <summary>Whether a prefab has a ZNetView, and if so whether it syncs a scale (m_syncInitialScale); null: it has no ZNetView.</summary>
+  internal static Func<GameObject, bool?> ViewOf = prefab =>
+  {
+    var view = prefab.GetComponent<ZNetView>();
+    return view == null ? null : view.m_syncInitialScale;
+  };
   internal static Action<ZDO, GameObject?, bool> TakeOut = (zdo, go, ghost) =>
   {
     if (ghost || go == null)
@@ -72,6 +82,7 @@ internal static class BakedServer
   {
     said.Clear();
     looks.Clear();
+    BakedConsumables.SessionStarts();
   }
 
   private static void SayOnce(string kind, string what, string line)
@@ -82,35 +93,61 @@ internal static class BakedServer
 
   // ---- a zone's seeding -------------------------------------------------------------------------------------------------------------
 
-  /// <summary>The Live records of a zone, as real pieces; those whose (source, id) stands in the zone already are skipped. Ghost mode puts
-  /// the instances into <paramref name="spawned"/>, which the game destroys, and keeps ghost initialisation on while they are made. How
-  /// many were made.</summary>
-  internal static int SeedZone(ZoneKey zone, bool ghost, List<GameObject>? spawned)
+  /// <summary>The Live records of a zone, as real pieces; those whose (source, id) stands in the zone already are skipped. The records of
+  /// consumable kinds, whatever their role, are placed as ordinary objects (<see cref="PlaceConsumable"/>), unless one of that prefab stands
+  /// at the same place already. Ghost mode puts the instances into <paramref name="spawned"/>, which the game destroys, and keeps ghost
+  /// initialisation on while they are made. How many Live pieces were made.</summary>
+  internal static int SeedZone(ZoneKey zone, bool ghost, List<GameObject>? spawned) => SeedZone(zone, ghost, spawned, out _);
+
+  /// <summary>As above, and how many records of consumable kinds were placed.</summary>
+  internal static int SeedZone(ZoneKey zone, bool ghost, List<GameObject>? spawned, out int consumables)
   {
+    consumables = 0;
     var layer = BakedLayerStore.Current;
-    if (layer == null || !layer.TryGetZoneRow(zone, out var row) || row.Live == 0)
+    if (layer == null || !layer.TryGetZoneRow(zone, out var row) || row.Placements == 0)
       return 0;
-    int made = 0, failed = 0;
+    int made = 0, failed = 0, placed = 0, notPlaced = 0;
     bool ghostStarted = false;
     try
     {
       var data = layer.Decode(row);
-      var standing = StandingKeys(zone);
-      if (ghost)
-      {
-        ZNetView.StartGhostInit();
-        ghostStarted = true;
-      }
+      HashSet<ulong>? standing = null;
+      Dictionary<int, List<Vector3>>? there = null;
       var context = new Context(layer);
       for (int k = 0; k < data.Count; k++)
       {
-        var palette = layer.Palette[data.Palette[k]];
-        if (palette.Role != BakedRole.Live)
+        int index = data.Palette[k];
+        var palette = layer.Palette[index];
+        bool consumable = IsConsumable(context, index, palette, out var kind);
+        if (!consumable && palette.Role != BakedRole.Live)
           continue;
         var record = data.Record(k);
+        if (!ghostStarted && ghost)
+        {
+          ZNetView.StartGhostInit();
+          ghostStarted = true;
+        }
+        if (consumable)
+        {
+          // Placed once, when the zone generates. What stands at its place already (a second pass over the zone) is not placed again.
+          if (kind == null)
+          {
+            notPlaced++;
+            continue;
+          }
+          there ??= PrefabsStanding(zone);
+          if (Stands(there, kind, palette, record))
+            continue;
+          if (MakeConsumable(context, index, palette, record, ghost, spawned))
+            placed++;
+          else
+            notPlaced++;
+          continue;
+        }
+        standing ??= StandingKeys(zone);
         if (!record.HasId || standing.Contains(BakedFormat.LiveKey(record.SourceNumber, record.Id)))
           continue;
-        if (MakePiece(context, data.Palette[k], palette, record, ghost, spawned))
+        if (MakePiece(context, index, palette, record, ghost, spawned))
           made++;
         else
           failed++;
@@ -127,6 +164,11 @@ internal static class BakedServer
     }
     if (failed > 0)
       BetterContinents.Log($"Baked pieces: zone {zone}: {made} seeded, {failed} could not be (the log says why, once for each kind).");
+    if (notPlaced > 0)
+      BetterContinents.Log($"Baked pieces: zone {zone}: {placed} consumables placed, {notPlaced} could not be (the log says why, once for each kind).");
+    BakedConsumables.Placed += placed;
+    BakedConsumables.Failed += notPlaced;
+    consumables = placed;
     return made;
   }
 
@@ -158,6 +200,40 @@ internal static class BakedServer
     public readonly BakedLayer Layer = layer;
     // By palette index; null where the entry cannot be seeded (said once).
     public readonly Dictionary<int, Resolved?> Entries = [];
+    // The entries whose prefab is a consumable kind, by palette index: what to place (null: the prefab has no ZNetView, said once), and the
+    // entries that are not consumables.
+    public readonly Dictionary<int, Resolved?> Consumables = [];
+    public readonly HashSet<int> Plain = [];
+  }
+
+  /// <summary>Whether a palette entry is a consumable kind, decided by the prefab it resolves to: the first candidate the game has (the one the
+  /// client would draw), so an entry whose first candidate is missing is what its stand-in is. <paramref name="kind"/> is what to place, null
+  /// when the prefab cannot be placed (it has no ZNetView; said once). An entry the game has no prefab of is not one.</summary>
+  internal static bool IsConsumable(Context context, int index, PaletteEntry palette, out Resolved? kind)
+  {
+    if (context.Consumables.TryGetValue(index, out kind))
+      return true;
+    kind = null;
+    if (context.Plain.Contains(index))
+      return false;
+    foreach (var candidate in palette.Candidates)
+    {
+      var prefab = FindPrefab(candidate.Name);
+      if (prefab == null)
+        continue;
+      if (!BakedConsumables.Is(prefab))
+        break;
+      BakedConsumables.Note(candidate.Name);
+      var scale = ViewOf(prefab);
+      if (scale == null)
+        SayOnce(palette.Name, "nview", $"Baked pieces: {candidate.Name} has no ZNetView, so its records cannot be placed.");
+      else
+        kind = new Resolved(prefab, candidate, scale.Value);
+      context.Consumables[index] = kind;
+      return true;
+    }
+    context.Plain.Add(index);
+    return false;
   }
 
   /// <summary>The first prefab of an entry that the game has, and that has a ZNetView to seed. Null (and said once per kind) when none does.</summary>
@@ -171,13 +247,13 @@ internal static class BakedServer
       var prefab = FindPrefab(candidate.Name);
       if (prefab == null)
         continue;
-      var view = prefab.GetComponent<ZNetView>();
-      if (view == null)
+      var scale = ViewOf(prefab);
+      if (scale == null)
       {
         SayOnce(palette.Name, "nview", $"Baked pieces: {candidate.Name} has no ZNetView, so a Live record of it cannot be seeded.");
         continue;
       }
-      found = new Resolved(prefab, candidate, view.m_syncInitialScale);
+      found = new Resolved(prefab, candidate, scale.Value);
       break;
     }
     if (found == null)
@@ -211,7 +287,7 @@ internal static class BakedServer
         scaled = true;
       else
       {
-        SayOnce(palette.Name, "scale", $"Baked pieces: {resolved.Candidate.Name} does not take a scale (its ZNetView does not sync one), so its Live records are seeded at scale 1.");
+        SayOnce(palette.Name, "scale", $"Baked pieces: {resolved.Candidate.Name} does not take a scale (its ZNetView does not sync one), so its records are made at scale 1.");
         scale = Vector3.one;
       }
     }
@@ -227,28 +303,13 @@ internal static class BakedServer
     var resolved = Resolve(context, index, palette);
     if (resolved == null)
       return false;
-    GameObject? go = null;
-    ZDO? zdo = null;
+    var made = new Made();
     try
     {
       var place = PlacementOf(resolved, palette, record);
-      go = UnityEngine.Object.Instantiate(resolved.Prefab, place.Pivot, place.Rotation);
-      // Whatever happens next, the game destroys a ghost instance with the rest of the zone's.
-      if (ghost)
-        spawned?.Add(go);
-      var view = go.GetComponent<ZNetView>();
-      zdo = view == null ? null : view.GetZDO();
-      if (zdo == null)
-        throw new InvalidOperationException("the instance has no ZDO");
-      if (place.Scaled)
-      {
-        view!.SetLocalScale(place.Scale);
-        foreach (var collider in go.GetComponentsInChildren<Collider>())
-        {
-          collider.enabled = false;
-          collider.enabled = true;
-        }
-      }
+      Make(resolved, place, ghost, spawned, made);
+      var go = made.Go!;
+      var zdo = made.Zdo!;
       WriteKeys(context.Layer, palette, record, zdo);
       WriteLook(palette, record, zdo, resolved.Prefab);
       if (palette.Protected)
@@ -259,16 +320,107 @@ internal static class BakedServer
     catch (Exception e)
     {
       SayOnce(palette.Name, "failed", $"Baked pieces: a piece of {palette.Name} (source {record.SourceNumber}, id {record.Id}) could not be seeded: {e}");
-      try
-      {
-        if (zdo != null && zdo.IsValid())
-          TakeOut(zdo, go, ghost);
-      }
-      catch (Exception again)
-      {
-        BetterContinents.LogError($"Baked pieces: the half-made piece could not be taken out: {again.Message}");
-      }
+      TakeOutHalfMade(made, ghost);
       return false;
+    }
+  }
+
+  // ---- a consumable ----------------------------------------------------------------------------------------------------------------------
+
+  /// <summary>Places the record of a consumable kind (a field, for the offline tests, which have no prefabs to make).</summary>
+  internal static Func<Context, int, PaletteEntry, ZoneRecord, bool, List<GameObject>?, bool> MakeConsumable = PlaceConsumable;
+
+  /// <summary>Places one record of a consumable kind as an ordinary object of the game: the prefab at the record's pivot, rotation and scale
+  /// (<see cref="PlacementOf"/>, as for a Live record), and NOTHING else on it: no bake keys, no bc_protect, no look, no creator, no event.
+  /// The game owns it from here on. True when it stands; a failure costs this object only (said once per kind; a half-made object is taken out).</summary>
+  internal static bool PlaceConsumable(Context context, int index, PaletteEntry palette, ZoneRecord record, bool ghost, List<GameObject>? spawned)
+  {
+    if (!context.Consumables.TryGetValue(index, out var resolved) || resolved == null)
+      return false;
+    var made = new Made();
+    try
+    {
+      Make(resolved, PlacementOf(resolved, palette, record), ghost, spawned, made);
+      return true;
+    }
+    catch (Exception e)
+    {
+      SayOnce(palette.Name, "failed", $"Baked pieces: a record of {palette.Name} (a consumable, source {record.SourceNumber}) could not be placed: {e}");
+      TakeOutHalfMade(made, ghost);
+      return false;
+    }
+  }
+
+  /// <summary>The objects of a zone by prefab, with their places: what a second pass over the zone finds standing (consumables carry no key to
+  /// find them by).</summary>
+  internal static Dictionary<int, List<Vector3>> PrefabsStanding(ZoneKey zone)
+  {
+    var there = new Dictionary<int, List<Vector3>>();
+    foreach (var zdo in ZdosIn(zone))
+    {
+      if (zdo == null || !zdo.IsValid())
+        continue;
+      int prefab = zdo.GetPrefab();
+      if (!there.TryGetValue(prefab, out var list))
+        there[prefab] = list = [];
+      list.Add(zdo.GetPosition());
+    }
+    return there;
+  }
+
+  /// <summary>An object of the record's prefab stands where the record would put it (within 5 cm of its pivot, the reconciliation's tolerance).</summary>
+  internal static bool Stands(Dictionary<int, List<Vector3>> there, Resolved resolved, PaletteEntry palette, ZoneRecord record)
+  {
+    if (!there.TryGetValue(resolved.Candidate.Name.GetStableHashCode(), out var places))
+      return false;
+    var pivot = PlacementOf(resolved, palette, record).Pivot;
+    foreach (var place in places)
+      if (Vector3.Distance(place, pivot) <= BakedReconcile.PositionTolerance)
+        return true;
+    return false;
+  }
+
+  // What Make has made so far, so that a failure after the instance exists can take it out again.
+  private sealed class Made
+  {
+    public GameObject? Go;
+    public ZDO? Zdo;
+  }
+
+  private static void TakeOutHalfMade(Made made, bool ghost)
+  {
+    try
+    {
+      if (made.Zdo != null && made.Zdo.IsValid())
+        TakeOut(made.Zdo, made.Go, ghost);
+    }
+    catch (Exception again)
+    {
+      BetterContinents.LogError($"Baked pieces: the half-made piece could not be taken out: {again.Message}");
+    }
+  }
+
+  // The game object itself, as the game's own PlaceVegetation makes one: the prefab at the pivot, turned, and at the record's scale when its
+  // ZNetView takes one. Fills `made` as each part exists.
+  private static void Make(Resolved resolved, Placement place, bool ghost, List<GameObject>? spawned, Made made)
+  {
+    var go = made.Go = UnityEngine.Object.Instantiate(resolved.Prefab, place.Pivot, place.Rotation);
+    // Whatever happens next, the game destroys a ghost instance with the rest of the zone's.
+    if (ghost)
+      spawned?.Add(go);
+    var view = go.GetComponent<ZNetView>();
+    var zdo = view == null ? null : view.GetZDO();
+    if (zdo == null)
+      throw new InvalidOperationException("the instance has no ZDO");
+    made.Zdo = zdo;
+    if (place.Scaled)
+    {
+      view!.SetLocalScale(place.Scale);
+      foreach (var collider in go.GetComponentsInChildren<Collider>())
+      {
+        collider.enabled = false;
+        collider.enabled = true;
+      }
     }
   }
 

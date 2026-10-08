@@ -71,4 +71,37 @@ internal static class BakedConsumables
 
   /// <summary>A world ends: the prefabs of the next may not be the same ones.</summary>
   internal static void Forget() => Known.Clear();
+
+  // ---- what a session did with them (the log, and the counts bc_bake info and stats give) -----------------------------------------------
+
+  private static readonly HashSet<string> Named = [];
+  private static readonly List<string> NamedInOrder = [];
+
+  /// <summary>Records of consumable kinds the server placed as ordinary objects this session, and those it could not place.</summary>
+  internal static int Placed, Failed;
+
+  /// <summary>The consumable kinds this session met (the server placing them, the client leaving them out), in the order they were met.</summary>
+  internal static IReadOnlyList<string> Kinds => NamedInOrder;
+
+  /// <summary>Names a consumable kind in the log, the first time it is met in a session (not for every record).</summary>
+  internal static void Note(string kind)
+  {
+    if (!Named.Add(kind))
+      return;
+    NamedInOrder.Add(kind);
+    BetterContinents.Log($"Baked placements: {kind} is a consumable (a player picks it up or harvests it): its records are placed once as ordinary objects of the game when a zone generates, never baked, drawn or protected.");
+  }
+
+  /// <summary>A new session: nothing of the last one's counts or names stays.</summary>
+  internal static void SessionStarts()
+  {
+    Named.Clear();
+    NamedInOrder.Clear();
+    Placed = Failed = 0;
+    Forget();
+  }
+
+  /// <summary>The layer's own count of the records of a palette entry set that are consumable kinds, said for bc_bake info and stats.</summary>
+  internal static string Summary(int kinds, long records) =>
+    $"{kinds} consumable kind{(kinds == 1 ? "" : "s")} ({records:N0} records) placed as real objects, never drawn";
 }

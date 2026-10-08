@@ -67,6 +67,9 @@ internal sealed class ReconcileInput
   public List<WorldPiece> Pieces = [];
   public Func<ZoneKey, bool> IsGenerated = _ => true;
   public List<VegetationGrowth> Growth = [];
+  /// <summary>Whether the prefab (the stable hash of its name) is a consumable kind (build spec 0.2): such a record is never seeded and such a
+  /// piece is never removed, kept or orphaned: the game owns a consumable from the moment it is placed.</summary>
+  public Func<int, bool> IsConsumable = _ => false;
 }
 
 
@@ -144,6 +147,10 @@ internal readonly struct OrphanInfo(ZDOID id, string prefab, Vector3 position, s
 //  Records in zones the world has not generated are left to seeding (BakedServer), and a piece is never moved. A second run over the
 //  same layer changes nothing: it is all Keep, at the revision they have.
 //
+// Consumables (build spec 0.2, BakedConsumables): a record of a consumable kind is placed once by BakedServer when its zone generates and is never
+// the planner's business: it is not seeded (a Live consumable would otherwise come back at every load after a player picked it), and a piece of
+// such a prefab that carries bake keys (from a build that baked them) is neither kept, replaced, removed nor orphaned.
+//
 // Vegetation: in generated zones where the compiler's clear cells grew (its mask or zone flag 16), the world-made vegetation in the new
 // cells is destroyed, as a zone reset destroys what the world made (the prefabs of ZoneSystem.m_vegetation, with no creator and no bake
 // id). The cells around in-game records never destroy anything: a player who kept a tree beside the house keeps it; those cells only keep
@@ -172,9 +179,20 @@ internal static class BakedReconcile
   internal static ReconcilePlan Plan(ReconcileInput input)
   {
     var plan = new ReconcilePlan(input);
+    var kinds = new Dictionary<int, bool>();
+    bool Consumable(int prefab)
+    {
+      if (prefab == 0)
+        return false;
+      if (!kinds.TryGetValue(prefab, out bool known))
+        kinds[prefab] = known = input.IsConsumable(prefab);
+      return known;
+    }
     var byKey = new Dictionary<ulong, List<WorldPiece>>();
     foreach (var piece in input.Pieces)
     {
+      if (Consumable(piece.Prefab))
+        continue;
       if (!byKey.TryGetValue(piece.Key, out var list))
         byKey[piece.Key] = list = [];
       list.Add(piece);
@@ -183,6 +201,8 @@ internal static class BakedReconcile
 
     foreach (var record in input.Records)
     {
+      if (Consumable(record.Prefab))
+        continue;
       held.Add(record.Key);
       byKey.TryGetValue(record.Key, out var pieces);
       // A record whose prefab this game lacks cannot be seeded, and what stands under its key is not for this game to judge.
@@ -219,7 +239,7 @@ internal static class BakedReconcile
     }
 
     foreach (var piece in input.Pieces)
-      if (!held.Contains(piece.Key))
+      if (!held.Contains(piece.Key) && !Consumable(piece.Prefab))
         plan.Items.Add(Removal(piece, null));
     plan.Vegetation.AddRange(input.Growth.Where(g => g.Cells.Any && input.IsGenerated(g.Zone)));
     return plan;
@@ -292,6 +312,9 @@ internal static class BakedReconcile
   internal static Func<ZoneKey, bool> IsGenerated = zone => ZoneSystem.instance != null && ZoneSystem.instance.m_generatedZones.Contains(zone.ToVector2s());
   internal static Func<ZDOMan?> Objects = () => ZDOMan.instance;
   internal static Func<ZDO, Quaternion> RotationOf = zdo => zdo.GetRotation();
+  /// <summary>Whether a prefab (the stable hash of its name) is a consumable kind in this game.</summary>
+  internal static Func<int, bool> ConsumablePrefab = hash =>
+    ZNetScene.instance != null && BakedConsumables.Is(ZNetScene.instance.GetPrefab(hash));
   internal static Func<HashSet<int>> VegetationPrefabs = () =>
     ZoneSystem.instance == null ? [] : ZoneSystem.instance.m_vegetation.Where(v => v.m_prefab != null).Select(v => v.m_prefab.name.GetStableHashCode()).ToHashSet();
 
@@ -300,7 +323,7 @@ internal static class BakedReconcile
   /// the world and a decode of the zones, a frame's worth at a time.</summary>
   internal static IEnumerator Gather(BakedLayer? old, BakedLayer? next, Action<ReconcileInput> done)
   {
-    var input = new ReconcileInput { Layer = next, Revision = next?.Revision ?? 0, IsGenerated = IsGenerated };
+    var input = new ReconcileInput { Layer = next, Revision = next?.Revision ?? 0, IsGenerated = IsGenerated, IsConsumable = ConsumablePrefab };
     var clock = Stopwatch.StartNew();
     if (next != null)
     {
@@ -356,6 +379,9 @@ internal static class BakedReconcile
     {
       var palette = layer.Palette[data.Palette[k]];
       if (palette.Role != BakedRole.Live)
+        continue;
+      // A consumable kind is placed once, when its zone generates, and never again (spec 0.2), even when the file marks it Live with an id.
+      if (BakedServer.IsConsumable(context, data.Palette[k], palette, out _))
         continue;
       var record = data.Record(k);
       if (!record.HasId)
