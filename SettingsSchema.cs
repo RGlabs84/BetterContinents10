@@ -278,6 +278,8 @@ internal static class SettingsSchema
   { Range = R(0f, 200f) };
   public static readonly SettingDef<float> BakedSeatDistance = new("Seat Distance", "How far from you (metres) a baked world's chairs, benches, stools and thrones are real, so that you can sit on them: within it each has its seat made, a few per frame; farther out it is only drawn. 0 turns the seats off. Applies at once", SettingScope.Live, 12f, e => BakedSettings.SeatDistance = e)
   { Range = R(0f, 40f) };
+  public static readonly SettingDef<int> BakedLightShadows = new("Light Shadows", "How many of a baked world's lit copies (see Light Distance) cast shadows: the nearest to you, which keep their lights' shadows as the piece has them (the game's own point light shadow limit still applies to them); every other copy's light casts none. A shadow from a point light costs memory (12 to 48 MB each), and a graphics mod that allows every light shadows would otherwise give every torch near you one. 0 = no copy casts any. Applies at once", SettingScope.Live, 4, e => BakedSettings.LightShadows = e)
+  { Range = R(0, 32) };
   public static readonly SettingDef<string> BakedTints = S("Tints", "Override the colours that a baked layer tints its pieces with: name=r,g,b pairs separated by semicolons, by the tint's name in the layer (a town's clay walls may be plaster, brick, sandstone and marble), for example \"plaster=1.65,1.58,1.48; brick=1.25,0.72,0.56\". Each colour multiplies the clay's grey texture (1 keeps it). Empty: the layer's own colours. Applies at once", SettingScope.Live, "", e => BakedSettings.Tints = e);
   public static readonly SettingDef<bool> BakedDiagnostics = S("Diagnostics", "Writes, once for each kind of baked piece, the materials it is drawn with (shader, texture, colour) to the log", SettingScope.Live, false, e => BakedSettings.Diagnostics = e);
 
@@ -296,7 +298,7 @@ internal static class SettingsSchema
     new("BetterContinents.AltBiomes", AltBiomemapFile, AltBiomeMode, AltBiomeGrid, AltBiomeSeed, AltBiomeChance, AltBiomeAmount, AltBiomeEdgeScale, AltBiomeDistanceScale, AltBiomeMinThickness, AltBiomeMeanHeight, AltBiomeFixNeighbourCheck, AltBiomeOverrides),
     new("BetterContinents.Export", ExportHud, ExportAllowed, ExportHudKey, ExportWindowKey, ExportSize, ExportHeightmapAmount, ExportSeaLevel, ExportLargestSize),
     // The client's drawing of baked placements, all read live. The water work (U6) adds its own section after this one.
-    new("BetterContinents.BakedPlacements", BakedDrawDistance, BakedDrawScale, BakedDetailScale, BakedShadowMode, BakedLightDistance, BakedSeatDistance, BakedTints, BakedDiagnostics),
+    new("BetterContinents.BakedPlacements", BakedDrawDistance, BakedDrawScale, BakedDetailScale, BakedShadowMode, BakedLightDistance, BakedSeatDistance, BakedLightShadows, BakedTints, BakedDiagnostics),
   ];
 
   public static IEnumerable<SettingDef> All => Groups.SelectMany(g => g.Settings);

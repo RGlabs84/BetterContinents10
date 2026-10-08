@@ -14,7 +14,8 @@ namespace BetterContinents;
 // Valheim makes its building ghost (Player.SetupPlacementGhost): with ZNetView.m_forceDisableInit and TerrainOp.m_forceDisableTerrainOps, so
 // it has no ZDO, is nobody's network object and never edits the terrain. Every component but the visual ones (meshes, LODs, lights, particles,
 // sounds, animators) is removed before the fire is shown, so the flames' own heat, damage and smoke never wake: no fuel, no warmth, no damage,
-// no collider, nothing to interact with, and the fire never goes out. Palette flag 16 (NoCopyLight) takes the Light away too.
+// no collider, nothing to interact with, and the fire never goes out. Palette flag 16 (NoCopyLight) takes the Light away too. Its light casts no
+// shadow unless the copy is one of the Light Shadows nearest the camera (BakedLightShadows): a street of torches would otherwise give each a cube map.
 //
 // Seat: a chair, bench, stool or throne is drawn like any piece (the weld keeps it solid), and within Seat Distance of the player a real
 // seat stands over it: a copy of the prefab stripped to its colliders and its Chair, made the same way, a few per frame, dropped again 3 m
@@ -94,6 +95,8 @@ internal static class BakedCopies
     go.name = prefab.name + " (baked)";
     go.transform.SetParent(parent, true);
     go.transform.localScale = Vector3.Scale(prefab.transform.localScale, m.lossyScale);
+    // its lights cast no shadows until the ranking of Light Shadows (BakedLightShadows) says it is among the nearest
+    BakedLightShadows.Register(go, prefab, m.GetColumn(3));
     return go;
   }
 
