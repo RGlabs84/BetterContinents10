@@ -561,7 +561,9 @@ internal class BakeJournal
   internal string StatePath(int number) => Path.Combine(Folder, $"op-{number}.state");
   internal string LayerPath(uint revision) => Path.Combine(Folder, $"layer-r{revision}.bcp");
 
-  // To a .tmp file, flushed to the disk, then renamed: a stop in the middle leaves the old file or the new one, never half of one.
+  // To a .tmp file, flushed to the disk, then put in place: a stop in the middle leaves the old file or the new one, never half of one and
+  // never none (File.Replace swaps them in one step; deleting the old file first would leave a moment with no state file at all, which the
+  // check reads as "Prepared": the state that says no piece was taken out of the world).
   // A journal that cannot be written stops the operation before anything changes, so this throws.
   internal static void WriteAtomic(string path, byte[] bytes, int length = -1)
   {
@@ -573,8 +575,9 @@ internal class BakeJournal
       file.Flush(true);
     }
     if (File.Exists(path))
-      File.Delete(path);
-    File.Move(tmp, path);
+      File.Replace(tmp, path, null);
+    else
+      File.Move(tmp, path);
   }
 
   // Virtual so that the tests can stop the operation at every write (Tests.BakeRunner.cs): a write is one mutation of the undo file.
