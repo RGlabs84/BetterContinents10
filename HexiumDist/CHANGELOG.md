@@ -1,3 +1,45 @@
+- v0.10.4
+  - Baked buildings. A bake takes the pieces players built within a circle or a box and makes them part
+    of the world's layer: every player's game draws them, solid to walk on, and none of them is a game
+    object any more, so the world neither saves, sends nor updates them one by one. In a test village
+    the objects within 128 m went from 7,984 to 2,472 (5,512 pieces baked); in the densest block of a
+    700,000-piece town the frame rate went from 45 fps as real pieces to 81 fps baked (measured on one
+    machine). The export window (F7) has a third tab, Bake buildings, and the console has `bc_bake`.
+    Every change shows a dry run first and needs Confirm (or `confirm`).
+  - What stays real: doors, chests and other containers, stations, beds, cooking fires, portals, wards,
+    signs, anything that moves, and any part of a mod that Better Continents does not know. With the
+    Town option a bake also takes comfort decor (tables, banners, rugs, plants; chairs and benches
+    become seats you can still sit on) and torches and lanterns, which become lit copies that never need
+    fuel; the pieces that stay become protected parts of the layer that nobody can damage or remove. A
+    baked piece gives no comfort and a baked light no warmth.
+  - Nothing that gives items is baked: bushes, mushrooms, flax, saplings and items on the ground stay
+    the game's own. Black marble and the other pieces the game turns at random bake, each drawn with its
+    own turn.
+  - Undo and unbake. `bc_bake undo` puts back exactly what the last change took, from its undo file;
+    `bc_bake unbake` turns baked pieces in an area back into real pieces; `bc_bake unbake world` does it
+    for every baked piece, the way out before removing Better Continents from a world. Every change
+    writes its undo file before it changes anything, and a crash or a cut save is finished or taken back
+    at the next load: no piece is ever lost, and none is both a real piece and a baked one. An undo also
+    finds a piece that the game's physics dropped or lifted, and every change reports what it could not
+    find.
+  - Town files. A `placements.bcp` in the maps folder (format 1, written by a town compiler) builds its
+    towns into a new world: drawn pieces, live pieces made real (doors, stations, chests) and protected,
+    the ground under the towns, paint and cleared vegetation. `bc_bake load` brings a newer file into a
+    running world; the live pieces follow, and a container that holds items is never taken away.
+    Consumables in the file are placed once as the game's own objects. `bc_bake export` writes the layer
+    out.
+  - Players download the layer when they join (a few MB for a whole town file, kept in the cache for the
+    next time), and a change made during play reaches them as a small patch before any piece is taken
+    away.
+  - New settings in [10 BetterContinents.BakedPlacements], each player's own and applied at once: Draw
+    Distance, Draw Scale, Detail Scale, Shadows, Light Distance, Light Count (how many baked lights
+    burn: the nearest 24 by default; the rest are drawn unlit), Light Shadows (how many of them cast
+    shadows: 4), Seat Distance, Tints and Diagnostics.
+  - A world with baked pieces needs 0.10.4 or later: an older Better Continents, or the game alone,
+    opens it without its layer, and its baked pieces are neither drawn nor solid there until 0.10.4
+    opens it again.
+  - New guide: Baked buildings, the easy guide (BetterContinents-Baking-Guide.pdf, GPL-3.0), in this
+    package.
 - v0.10.3
   - Maps up to 16,384 x 16,384 pixels. Pictures are read a few rows at a time and kept as tiles: a
     server making a world from five 16,384 px maps peaked at 1.80 GB of memory, where 0.10.2 needed

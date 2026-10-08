@@ -14,17 +14,14 @@
 
 Whether you want to import a real-world map of Earth, recreate Middle-earth, sculpt realistic mountain ranges, or carve an unforgiving archipelago for a hardcore survival campaign, Better Continents makes it possible.
 
-## What's new in 0.10.3
+## What's new in 0.10.4
 
-* 🗺️ **Maps up to 16,384 × 16,384 pixels.** They are read a few rows at a time: a server making a world from five 16,384 px maps peaked at 1.80 GB of memory, where 0.10.2 needed 5.83 GB (measured on one machine). `Max Map Size` can set a lower limit.
-* 🌍 **Worlds past 16 km.** Valheim files objects by zone only out to about 16.4 km from the centre. Past that, far objects pile into one list that is sent whole to anyone out there, a patch about 22.1 km out shares its save file with every portal in the world, and past 32.7 km east, west, north or south the creature spawners are moved to the 20 km line when the world saves. `Wide Sectors` gives every zone out to 65.5 km its own place: every new world past 16,350 m gets it automatically, and an existing one when `Wide Sectors` is On. [Details](#worlds-of-any-size)
-* 🏔️ **Terrain up to 16 km high.** `Heightmap Amount` now goes up to 81 (it stopped at 5). Above 5, Better Continents also adjusts the game's height rules, which were made for land under about 400 m: what counts as inside a dungeon, where the ground is looked for, and how high plants, creatures and locations may stand. `High Terrain` (Auto by default) can switch them on or off. [Details](#precision-heightmap-layers)
-* 💎 **Fine heights.** An optional `heightmap-fine.png` beside the heightmap adds 8 bits to every height, so the gentle slopes of a tall world stay smooth instead of showing 25 cm stairs. The world export writes one from a Heightmap Amount of about 5 (`bc_export fine=`).
-* 🗜️ **Compact Maps is automatic for big maps.** A new world with a map over 8,192 px across (the location and alt-biome maps aside), or with fine heights, is made compact: five 16,384 px maps take 52.6 MB in the world file instead of 352.5 MB, and joining players download that much less. `Compact Maps` is now Auto / On / Off.
-* ⏱️ **Big worlds load in seconds.** At World Size 32,264 the game's lake search took minutes on every machine at every load. It now takes seconds, and that world starts in 16 s (measured on one machine, a 32-core server).
-* ⏳ **Making or loading a big world no longer freezes the game.** A new world's maps are read in the background while the game shows "Please wait", where the game used to stand still until they were read: about 30 s for five 16,384 px maps. Loading such a world, or joining it, builds the game's alt-biome grid on every core: 5 s where it took 29 s (both measured on one machine).
-* 📤 **Exports up to 16,384 px**, with Heightmap Amount up to 81, using about 100 MB of memory while they run (measured on one machine). `Largest Size` sets the largest export offered.
-* 🌊 **The sea.** Red Ashlands water follows the world's own hot sea (its heat map, or the Ashlands laid out to the world's size), not the ring of a vanilla-size world. Boats and fish float on the waves as they are drawn: the game draws the waves dying down past 12,000 m from (0, -4,000), in every direction, so a big world's far sea is calm, and now calm to sail too.
+* 🧱 **Baked buildings.** Better Continents can bake what players built into the world itself. Walls, floors, roofs and beams stop being game objects: every player's game draws them from the world's layer, and they stay solid to walk on. The objects a town costs go with them, and so does what the world saves and sends piece by piece. In a test village, the objects within 128 m went from 7,984 to 2,472 (5,512 pieces baked). Britain's densest block of a 700,000-piece town runs at 81 fps baked against 45 fps as real pieces (measured on one machine). Open the export window (F7) and its new **Bake buildings** tab, or use `bc_bake` in the console. Every bake shows a dry run first and can be undone; `bc_bake unbake world` turns every baked piece back into a real one. The *Baked buildings* guide (PDF) has the details.
+* 🚪 **What stays real.** Doors, chests, stations, beds, cooking fires, portals, and any mod part that Better Continents does not know, stay real objects. With the **Town** option the bake also takes the decor (tables, banners, rugs, plants; chairs and benches stay sit-able) and the torches and lanterns: the nearest 24 burn, never need fuel, and the rest are drawn unlit. The pieces that stay become protected.
+* 🍄 **Nothing that gives items is baked.** Bushes, mushrooms, flax and planted crops stay the game's own.
+* 🏘️ **Town files.** A `placements.bcp` that a town compiler wrote, put in the maps folder, builds its towns into a new world. `bc_bake load` brings a newer file into a running world and keeps what players put in chests and stations.
+* 🛡️ **Safe in a crash.** Every bake writes its undo file before it changes anything. A crash or a cut save is finished or taken back at the next load, and no piece is ever lost or doubled.
+* ⚙️ **New settings** in `[10 BetterContinents.BakedPlacements]`: how far baked pieces are drawn and in how much detail, their shadows, and how many baked lights burn and cast shadows. Each player sets their own.
 
 ## Before you update
 
@@ -35,12 +32,13 @@ Whether you want to import a real-world map of Earth, recreate Middle-earth, scu
   * a world made with **fine heights**: 0.10.0 to 0.10.2 can't read it and give it vanilla terrain.
   * a world read at a **Heightmap Amount above 5** opens in older versions without the high-terrain rules: on ground higher than 3,000 m, a player counts as being inside a dungeon. A world whose `High Terrain` is On or Off opens in them as a world without Better Continents.
   * a **compact** world can't be read by 0.9 (it gets vanilla terrain); every 0.10 version reads it.
+* 🧱 **A world with baked pieces needs 0.10.4 or later.** An older Better Continents, or the game alone, opens it without its layer: baked pieces are neither drawn nor solid there (they come back when 0.10.4 opens the world again). Before you remove Better Continents from a world, run `bc_bake unbake world confirm` in it.
 * ⬆️ **Coming from 0.9.x?** Worlds you already have keep generating as they did under 0.9.4; only worlds made with 0.10 get the new behaviour. [What changes and what does not](#upgrading-from-09).
 
 <details>
 <summary>📜 <b>Contents</b></summary>
 
-- [What's new in 0.10.3](#whats-new-in-0103)
+- [What's new in 0.10.4](#whats-new-in-0104)
 - [Before you update](#before-you-update)
 - [⬆️ Upgrading from 0.9: existing worlds and new worlds](#upgrading-from-09)
   - [Which version is my world?](#which-version-is-my-world)
@@ -342,7 +340,7 @@ Valheim 1.0 saves each world as a folder, `worlds_local/<WorldName>/`. Better Co
 <a id="configuration--console-commands"></a>
 ## ⚙️ Configuration & Console Commands
 
-Better Continents has six console commands (open the console with F5). `bc` is for building worlds: it is a cheat command, so it needs `devcommands`, and it is registered for the host only. The Server Devcommands mod lets any player with `devcommands` type it on their own machine, but on a joined player's machine a `bc` change alters only that player's copy of the settings and their own view of the ground, never the world or the other players, and the zone regeneration refuses there ("it runs on the machine that runs the world"). Make `bc` changes on the host or in single player. `bc info` on a joined player's machine shows the settings the server sent. `bc_altbiomes`, `bc_export`, `bc_import`, `bc_cache` and `bc_twins` work for every player, and `bc_import` and `bc_cache` work in the main menu too. `bc <group> help` lists a group, for example `bc h help`. When an admin sends a command to a dedicated server (`bc_export server ...`, `bc_twins server ...`), its answer comes back to the admin's own console as well as the server's log.
+Better Continents has seven console commands (open the console with F5). `bc` is for building worlds: it is a cheat command, so it needs `devcommands`, and it is registered for the host only. The Server Devcommands mod lets any player with `devcommands` type it on their own machine, but on a joined player's machine a `bc` change alters only that player's copy of the settings and their own view of the ground, never the world or the other players, and the zone regeneration refuses there ("it runs on the machine that runs the world"). Make `bc` changes on the host or in single player. `bc info` on a joined player's machine shows the settings the server sent. `bc_altbiomes`, `bc_export`, `bc_import`, `bc_cache` and `bc_twins` work for every player, and so do `bc_bake`'s read-only words, and `bc_import` and `bc_cache` work in the main menu too. `bc <group> help` lists a group, for example `bc h help`. When an admin sends a command to a dedicated server (`bc_export server ...`, `bc_twins server ...`), its answer comes back to the admin's own console as well as the server's log.
 
 * ⌨️ `bc info` — Prints the current world's settings, including whether its maps span World Size and the record in an export's heightmap.
 * ⌨️ `bc regen` — Regenerates the zones now, the way every change does: every generated zone is reset and generates again with the current settings when someone comes near, except the zones that hold something to keep: what players built or worked, a tombstone, other players, or you inside a dungeon. Players, what players built, tombstones and tamed animals are never removed, and the loaded terrain is left as it is (see [Debug Mode & Zone Regeneration](#debug-mode--zone-regeneration)).
@@ -354,6 +352,7 @@ Better Continents has six console commands (open the console with F5). `bc` is f
 * ⌨️ `bc import run [what] [config]`, `bc import list`, `bc import status` — The same as `bc_import`, in the `bc` tree.
 * ⌨️ `bc cache [export | import <file or folder> | list | help]`, `bc twins [radius | remove [confirm] [radius] | server ... | help]` — The same as `bc_cache` and `bc_twins`, in the `bc` tree.
 * ⌨️ `bc show [filter]`, `bc hide [filter]`, `bc bosses` — Pins locations on the map, or removes those pins (your own pins stay).
+* ⌨️ `bc_bake ...` — Bakes what players built into the world's layer (`area <radius>`, `box ...`, words `town`, `any`, `convert`), takes it back (`undo`, `unbake`), loads or exports a town file, and lists and checks the layer. Every change is a dry run until `confirm`. Any player can use `info`, `stats`, `hide` and `show`; on a server, admins put `server` first. `bc_bake help` lists it all.
 * ⌨️ `bc savepreset [name]` — Saves the current settings as a preset, named after the world if you give no name.
 * ⌨️ `bc ab info`, `bc ab list [filter]`, `bc ab here` — Shows what each alt biome did in this world, which regions have alt biomes, and the region you stand in.
 * ⌨️ `bc ab fn [path]`, `bc reload ab` — Sets the alt-biome map, or re-reads it and its legend from disk.
@@ -415,6 +414,7 @@ These settings apply at once. Better Continents reads `BetterContinents.cfg` aga
 For deep dives, tutorials, and configuration references:
 * 📕 **The Better Continents Guide for 0.10.x:** `BetterContinents-Guide.pdf`, included in this package, with a clickable table of contents.
 * 📗 **Export & Import, the easy guide, for 0.10.x:** `BetterContinents-Export-Guide.pdf`, included in this package: illustrated, step-by-step instructions written for first-timers: exporting a world, editing the pictures, cutting and pasting between worlds, Biome precision, and making new worlds from an export.
+* 🧱 **Baked buildings, the easy guide, for 0.10.x:** `BetterContinents-Baking-Guide.pdf`, included in this package: baking a base or a town, undo and unbake, town files, servers and the settings, step by step.
 * 🤖 **Map-making, a skill for AI agents, for 0.10.x:** `BetterContinents-AI-Skill.pdf`, included in this package: hand it to an AI agent (Claude, Gemini or another) and it learns the whole map-making craft for Valheim 1.0: what the game demands of a map, how to make one read as natural geography, the generator and checker toolkit (attached inside the PDF), world export and import, and the traps.
 * 🎨 **Colour scheme:** `BetterContinents.gpl` (a palette for Krita and GIMP with every biome and alt-biome colour) and `altbiome-palette.png` (a printable colour chart), included in this package.
 * 🚀 **Setup & Quick Start**, ❓ **FAQ**, and a chapter for every image map and every setting — all in the same guide, with a clickable table of contents. The older online docs by Jere Kuusela describe Better Continents 0.7.x (no Valheim 1.0 Deep North, no lava map, no alt-biome planting, no export); everything in them is in the PDF, updated for Valheim 1.0.

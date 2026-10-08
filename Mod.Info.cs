@@ -5,5 +5,5 @@ namespace BetterContinents;
 public static class ModInfo
 {
     public const string Name = "Better Continents";
-    public const string Version = "0.10.3";
+    public const string Version = "0.10.4";
 }
