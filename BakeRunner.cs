@@ -32,6 +32,10 @@ internal readonly struct WorldObject
   public float X { get; init; }
   public float Y { get; init; }
   public float Z { get; init; }
+  // How the ZDO stores its turn (Euler angles in degrees).
+  public float RotX { get; init; }
+  public float RotY { get; init; }
+  public float RotZ { get; init; }
   public long Creator { get; init; }
   // The ZDO has bc_bake_id.
   public bool AlreadyBaked { get; init; }
@@ -81,7 +85,11 @@ internal interface IBakeWorld
   // Makes an object, whole, as undo and unbake do.
   ZDOID Create(PieceCopy copy);
   // For each piece, the object that is it now (prefab, position within 1 cm, rotation within 0.1 degrees; each object once), or null.
-  ZDOID?[] FindStanding(IReadOnlyList<PieceCopy> pieces);
+  // With `heights` (as long as pieces) the pieces are BC's own, made by an unbake: one that dropped or was pushed up where it stood (StaticPhysics)
+  // is found too, and heights[i] is the y of the object found for piece i (BakeMatch.Find). Never pass it for pieces that players built.
+  ZDOID?[] FindStanding(IReadOnlyList<PieceCopy> pieces, float[]? heights = null);
+  // Where the nearest object of the piece's prefab stands, in words, for the log (BakeMatch.Whereabouts).
+  string Whereabouts(PieceCopy piece);
   // Every one of these objects has been sent to every client whose area holds it (ZDOMan keeps what it sent each peer).
   bool AllSent(IReadOnlyList<ZDOID> ids);
   // Town mode: this machine owns the piece, and it gets the four bake keys.
@@ -218,6 +226,8 @@ internal sealed class BakeContext
   public IBakeConvert? Convert { get; init; }
   public BakeJournal Journal { get; init; } = null!;
   public Action<string> Say { get; init; } = _ => { };
+  // The log (the console's lines reach it as well, but not the detail an operation adds for whoever reads the log).
+  public Action<string> Log { get; init; } = _ => { };
   // Seconds, always going forward.
   public Func<double> Clock { get; init; } = () => Time.realtimeSinceStartup;
   public BakeWho Who { get; init; } = new();
@@ -744,6 +754,7 @@ internal static partial class BakeRunner
       ctx.Journal.SetState(number, BakeState.Removing);
       say($"bc_bake: removing {Num(baked)} pieces, {Num(PiecesPerFrame)} a frame.");
       int removed = 0, changedMeanwhile = 0;
+      var changedFirst = new List<PieceCopy>();
       for (int i = 0; i < gather.Statics.Count; i++)
       {
         if (!world.Ready)
@@ -752,7 +763,11 @@ internal static partial class BakeRunner
         if (world.Remove(piece.Id, piece.Copy) == RemoveOutcome.Removed)
           removed++;
         else
+        {
           changedMeanwhile++;
+          if (changedFirst.Count < 5)
+            changedFirst.Add(piece.Copy);
+        }
         if ((i + 1) % PiecesPerFrame == 0)
           yield return null;
       }
@@ -765,7 +780,14 @@ internal static partial class BakeRunner
       say($"bc_bake: bake {number} done in {Seconds(took)}: {Num(removed)} pieces baked, {Num(stay)} left as pieces" + (words.Town && stay > 0 ? " (town pieces, protected parts of the layer)" : "")
         + $". Objects here: {Num(gather.Objects)} -> {Num(gather.Objects - removed)}.");
       if (changedMeanwhile > 0)
-        say($"bc_bake: {Num(changedMeanwhile)} piece{(changedMeanwhile == 1 ? "" : "s")} changed while the bake ran: their records stay; 'bc_bake undo' puts the area back as it was.");
+      {
+        say($"bc_bake: {Num(changedMeanwhile)} piece{(changedMeanwhile == 1 ? "" : "s")} changed while the bake ran (moved, changed or gone): {(changedMeanwhile == 1 ? "it stays a real piece" : "they stay real pieces")}, and "
+          + $"{(changedMeanwhile == 1 ? "its record is" : "their records are")} drawn too. 'bc_bake check' lists the real pieces that stand on, under or close to a record (e.g. "
+          + string.Join("; ", changedFirst.Take(3).Select(c => FormattableString.Invariant($"{c.PrefabName} at {c.X:0.##}, {c.Y:0.##}, {c.Z:0.##}"))) + (changedMeanwhile > 3 ? "; ..." : "")
+          + "); 'bc_bake undo' puts the area back as it was.");
+        foreach (var c in changedFirst)
+          ctx.Log(FormattableString.Invariant($"bc_bake: found {c.PrefabName} at {c.X:0.###}, {c.Y:0.###}, {c.Z:0.###} turned {c.RotY:0.#}: {world.Whereabouts(c)}."));
+      }
       say("'bc_bake undo' puts them back. The world saves as usual ('save' saves now).");
       ctx.Who.Notify?.Invoke($"Bake {number} done: {Num(removed)} pieces baked.");
     }

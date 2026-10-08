@@ -117,6 +117,9 @@ internal static partial class Tests
           X = piece.X,
           Y = piece.Y,
           Z = piece.Z,
+          RotX = piece.RotX,
+          RotY = piece.RotY,
+          RotZ = piece.RotZ,
           Creator = piece.Find(BakeKey("creator"), ZdoValueType.Long)?.Number ?? 0L,
           AlreadyBaked = piece.Find(BakedKeys.Id, ZdoValueType.Int) != null,
           HasConnection = false,
@@ -159,16 +162,30 @@ internal static partial class Tests
       return made;
     }
 
-    public ZDOID?[] FindStanding(IReadOnlyList<PieceCopy> pieces)
+    // The ground's height at a point, for pieces a push up lifts (null: not known).
+    public Func<double, double, double?> Ground;
+    // The asks of FindStanding, to tell a lenient search from an exact one.
+    public int LenientSearches;
+
+    private List<ObjectPose> PosesOf() => InOrder().Select(o => new ObjectPose
     {
-      var ordered = InOrder().ToList();
-      var poses = ordered.Select(o => new ObjectPose
-      {
-        Id = o.Key, Prefab = o.Value.Prefab, X = o.Value.X, Y = o.Value.Y, Z = o.Value.Z, RotX = o.Value.RotX, RotY = o.Value.RotY, RotZ = o.Value.RotZ,
-      }).ToList();
-      var found = BakeMatch.Find(poses, pieces);
+      Id = o.Key, Prefab = o.Value.Prefab, X = o.Value.X, Y = o.Value.Y, Z = o.Value.Z, RotX = o.Value.RotX, RotY = o.Value.RotY, RotZ = o.Value.RotZ,
+    }).ToList();
+
+    public ZDOID?[] FindStanding(IReadOnlyList<PieceCopy> pieces, float[] heights = null)
+    {
+      var poses = PosesOf();
+      if (heights != null)
+        LenientSearches++;
+      var found = BakeMatch.Find(poses, pieces, heights != null, heights != null ? Ground : null);
+      if (heights != null)
+        for (int i = 0; i < found.Length; i++)
+          if (found[i] >= 0)
+            heights[i] = poses[found[i]].Y;
       return found.Select(i => i < 0 ? (ZDOID?)null : poses[i].Id).ToArray();
     }
+
+    public string Whereabouts(PieceCopy piece) => BakeMatch.Whereabouts(piece, PosesOf());
 
     public bool AllSent(IReadOnlyList<ZDOID> ids) => ++polls >= PollsToSend;
 
@@ -305,6 +322,7 @@ internal static partial class Tests
     public BakeCrashJournal Journal;
     public BakeContext Ctx;
     public readonly List<string> Said = [];
+    public readonly List<string> Logged = [];
     public readonly List<BakeMoment> Moments = [];
     public double Time;
     public bool Recording;
@@ -414,6 +432,7 @@ internal static partial class Tests
       Convert = fx.Convert,
       Journal = fx.Journal,
       Say = line => fx.Said.Add(line),
+      Log = line => fx.Logged.Add(line),
       Clock = () => fx.Time += 0.05,
       Who = new BakeWho { Name = "Tester", PlatformId = "Steam_1", Creator = fx.Creator },
       Version = "0.10.4",

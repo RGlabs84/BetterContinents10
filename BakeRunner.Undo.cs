@@ -79,6 +79,7 @@ internal static partial class BakeRunner
       };
       if (data.Adopted.Count > 0)
         lines.Add($"{Num(data.Adopted.Count)} town pieces " + (plan.ReleaseAdopted ? "lose their bake keys." : "get their bake keys back."));
+      lines.AddRange(LostLines(ctx, work, would: true, toLog: false));
       if (!words.Confirm)
       {
         foreach (var line in lines)
@@ -102,8 +103,11 @@ internal static partial class BakeRunner
       ctx.Ended?.Invoke(number, BakeState.Undone);
       if (data.Kind != OperationKind.Drop)
         BakedApi.RaiseUnbaked(data.ToOperation());
-      say($"bc_bake: undo of {word} {number} done in {Seconds(ctx.Clock() - began)}:" + (work.Made > 0 ? $" {Num(work.Made)} pieces made," : "") + (work.Removed > 0 ? $" {Num(work.Removed)} pieces removed," : "")
+      say($"bc_bake: undo of {word} {number} done in {Seconds(ctx.Clock() - began)}:" + (work.Made > 0 ? $" {Num(work.Made)} pieces made," : "")
+        + (work.Removed > 0 ? $" {Num(work.Removed)} pieces removed" + (work.Fallen > 0 ? $" ({Num(work.Fallen)} of them had dropped or been lifted from where they were put)" : "") + "," : "")
         + $" {Num(work.RecordsPut)} records put back, {Num(work.RecordsTaken)} taken out. The world saves as usual ('save' saves now).");
+      foreach (var line in LostLines(ctx, work))
+        say(line);
       ctx.Who.Notify?.Invoke($"Undo of {word} {number} done.");
     }
     finally

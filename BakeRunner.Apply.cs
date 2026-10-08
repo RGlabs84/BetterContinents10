@@ -18,6 +18,11 @@ internal sealed class BakeWork
   // A command, which spreads the work over frames, waits for the players and pushes each change of the layer; or the check at world load,
   // which does it all at once because nobody is connected yet.
   public bool Live { get; init; }
+  // The state the plan was made for.
+  public BakeState State { get; init; }
+  // For an unbake's pieces (BC made them): the y of the object found for each piece, which is not the piece's own when StaticPhysics dropped it
+  // or lifted it; null for pieces that players built (they are found only where they were).
+  public float[]? StandingY { get; init; }
 
   // What was done, for the report.
   public int RecordsPut { get; set; }
@@ -25,6 +30,10 @@ internal sealed class BakeWork
   public int Made { get; set; }
   public int Removed { get; set; }
   public int Gone { get; set; }
+  // Found at another height than they were put at (dropped or lifted), and removed all the same.
+  public int Fallen { get; set; }
+  // Pieces (indices into Data.Pieces) the removal found changed since the plan was made, in the order met.
+  public List<int> GoneIndices { get; } = [];
   public int Tagged { get; set; }
   public int Released { get; set; }
 }
@@ -95,10 +104,21 @@ internal static partial class BakeRunner
     {
       if (!world.Ready)
         throw new BakeStopException($"the world closed after {Num(w.Removed)} pieces were removed. The next world load settles the rest.");
-      if (w.Standing[i] is { } target && world.Remove(target, pieces[i]) == RemoveOutcome.Removed)
+      var expected = pieces[i];
+      bool moved = w.StandingY is { } heights && Math.Abs(heights[i] - expected.Y) > BakeMath.PlaceMetres;
+      if (moved)
+        expected = expected.AtHeight(w.StandingY![i]);
+      if (w.Standing[i] is { } target && world.Remove(target, expected) == RemoveOutcome.Removed)
+      {
         w.Removed++;
+        if (moved)
+          w.Fallen++;
+      }
       else
+      {
         w.Gone++;
+        w.GoneIndices.Add(i);
+      }
       if (live && ++count % PiecesPerFrame == 0)
         yield return null;
     }
@@ -153,12 +173,72 @@ internal static partial class BakeRunner
   internal static BakeWork Prepare(BakeContext ctx, BakeJournalData data, BakeState state, bool live, bool freshPieces = false)
   {
     var pieces = data.Pieces;
-    var standing = freshPieces || pieces.Count == 0 ? new ZDOID?[pieces.Count] : ctx.World.FindStanding(pieces);
-    var adopted = data.Adopted.Count == 0 ? [] : ctx.World.FindStanding(data.Adopted.Select(a => a.Place).ToList());
+    // An unbake's pieces are BC's own: one that StaticPhysics dropped or lifted where it stood is still that piece (BakeMatch.Find). The pieces of
+    // a bake are the players': they are found where they were put and nowhere else.
+    bool ours = data.Kind == OperationKind.Unbake;
+    float[]? heights = ours && !freshPieces && pieces.Count > 0 ? new float[pieces.Count] : null;
+    var standing = freshPieces || pieces.Count == 0 ? new ZDOID?[pieces.Count] : ctx.World.FindStanding(pieces, heights);
+    var adopted = data.Adopted.Count == 0 ? [] : ctx.World.FindStanding(data.Adopted.Select(a => a.Place).ToList(), ours ? new float[data.Adopted.Count] : null);
     bool present = RecordsPresent(ctx.Layer, data)
       ?? throw new InvalidOperationException($"the layer lists operation {data.Number} as another kind of operation than the undo file does: they are not of one world's history");
     var plan = BakeCrash.Plan(data.Kind, state, present, standing.Select(s => s != null).ToArray(), data.Adopted.Count > 0);
-    return new BakeWork { Data = data, Plan = plan, Standing = standing, AdoptedStanding = adopted, Live = live };
+    return new BakeWork { Data = data, Plan = plan, Standing = standing, AdoptedStanding = adopted, Live = live, State = state, StandingY = heights };
+  }
+
+  // The journal's pieces that cannot be dealt with because they are no longer where the operation put them or found them: for an undo of an
+  // unbake (and the check that finishes one), the pieces it made that no object answers for (moved sideways, turned, or gone), and in any removal the
+  // pieces that changed between the plan and the removal. Indices into Data.Pieces, in order.
+  internal static List<int> LostPieces(BakeWork w)
+  {
+    var lost = new List<int>();
+    if (w.Data.Kind == OperationKind.Unbake && w.State == BakeState.Undoing)
+      for (int i = 0; i < w.Standing.Length; i++)
+        if (w.Standing[i] == null)
+          lost.Add(i);
+    lost.AddRange(w.GoneIndices);
+    return lost;
+  }
+
+  // Town pieces the operation looks for by their place and does not find (moved or gone). Only where it would act on them.
+  internal static int LostTownPieces(BakeWork w) =>
+    w.Plan.CompleteAdoption || w.Plan.ReleaseAdopted ? w.AdoptedStanding.Count(a => a == null) : 0;
+
+  private static string FirstOf(BakeWork w, IReadOnlyList<int> lost, int show = 3) =>
+    string.Join("; ", lost.Take(show).Select(i =>
+    {
+      var piece = w.Data.Pieces[i];
+      return FormattableString.Invariant($"{(piece.PrefabName.Length > 0 ? piece.PrefabName : piece.Prefab.ToString())} at {piece.X:0.##}, {piece.Y:0.##}, {piece.Z:0.##}");
+    })) + (lost.Count > show ? "; ..." : "");
+
+  // What an operation says of the pieces it could not deal with, as sentences: the done line's addition. It also writes the first few to the log, each
+  // with where the nearest object of its kind stands now. Empty when there is none. `would` is the dry run's tense.
+  internal static List<string> LostLines(BakeContext ctx, BakeWork w, bool would = false, bool toLog = true)
+  {
+    var lines = new List<string>();
+    var lost = LostPieces(w);
+    var data = w.Data;
+    if (lost.Count > 0)
+    {
+      bool ours = data.Kind == OperationKind.Unbake;
+      int n = lost.Count;
+      string them = n == 1 ? "it" : "them";
+      string subject = ours
+        ? $"{Num(n)} piece{(n == 1 ? "" : "s")} it made {(would ? (n == 1 ? "is" : "are") : (n == 1 ? "was" : "were"))} no longer where it put {them} (moved or gone)"
+        : $"{Num(n)} piece{(n == 1 ? "" : "s")} {(would ? (n == 1 ? "is" : "are") : (n == 1 ? "was" : "were"))} no longer where the {KindWord(data.Kind)} found {them} (changed since)";
+      lines.Add($"bc_bake: {subject}: {(n == 1 ? "it stays a real piece" : "they stay real pieces")}, and {(n == 1 ? "its record is" : "their records are")} drawn too. "
+        + $"'bc_bake check' lists the real pieces that stand on, under or close to a record (e.g. {FirstOf(w, lost)}).");
+      if (toLog)
+        foreach (int i in lost.Take(5))
+        {
+          var piece = data.Pieces[i];
+          ctx.Log(FormattableString.Invariant($"bc_bake: {(ours ? "made" : "found")} {piece.PrefabName} at {piece.X:0.###}, {piece.Y:0.###}, {piece.Z:0.###} turned {piece.RotY:0.#}: {ctx.World.Whereabouts(piece)}."));
+        }
+    }
+    int town = LostTownPieces(w);
+    if (town > 0)
+      lines.Add($"bc_bake: {Num(town)} town piece{(town == 1 ? "" : "s")} {(town == 1 ? "is" : "are")} no longer where the {KindWord(data.Kind)} left {(town == 1 ? "it" : "them")} (moved or gone): "
+        + (w.Plan.CompleteAdoption ? $"{(town == 1 ? "it gets" : "they get")} no bake keys back, so the layer seeds {(town == 1 ? "a second piece" : "second pieces")} for {(town == 1 ? "its" : "their")} Live record{(town == 1 ? "" : "s")}." : "nothing to free there."));
+    return lines;
   }
 
   // Whether the layer holds the records the operation's undo file lists: a bake's are in once its entry is in the registry (an edit enters the
