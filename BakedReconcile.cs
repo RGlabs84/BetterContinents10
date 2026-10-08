@@ -684,9 +684,9 @@ internal static class BakedReconcile
 
   // ---- when ------------------------------------------------------------------------------------------------------------------------------
 
-  /// <summary>Set to BakeRunner.AfterWorldLoad when the in-game bake merges: the check of what a crash or a cut save left (build spec
-  /// 10.8), which runs before the reconciliation, and ends before it starts.</summary>
-  internal static Action AfterWorldLoadCheck = () => { };
+  /// <summary>The check of what a crash or a cut save left (build spec 10.8), which runs before the reconciliation, and ends before it starts.
+  /// The settings are the world's by then (ZNet.SetServer's prefix loads them, before Start loads the world).</summary>
+  internal static Action AfterWorldLoadCheck = BakeRunner.AfterWorldLoad;
 
   // After the world's zones and every object are loaded, on the machine that runs the world. (LoadWorld is the chunked save's; a world
   // saved before Valheim 1.0 comes through LoadOldWorld.)
