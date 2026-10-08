@@ -42,8 +42,8 @@ internal static class BakeClassifier
   ];
 
   // What makes a prefab a consumable kind (spec 0.2): anything a player picks, picks up or harvests for items, anywhere in its hierarchy (a mod's
-  // subclass of one counts). The server and the client renderer test the same four names (BakedConsumables.Components); one list when they merge.
-  internal static readonly string[] ConsumableComponents = ["Pickable", "PickableItem", "ItemDrop", "Plant"];
+  // subclass of one counts). The one list the server and the client renderer test too.
+  internal static readonly string[] ConsumableComponents = BakedConsumables.Components;
 
   // The component that makes a prefab a consumable kind, or null.
   internal static string? ConsumableComponent(PrefabFacts prefab)

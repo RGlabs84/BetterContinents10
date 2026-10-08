@@ -285,6 +285,10 @@ internal static class BakeCommands
       live = ZDOMan.instance.m_objectsByID.Values.Count(z => z.IsValid() && ZDOExtraData.GetInt(z.m_uid, BakedKeys.Id, out _));
     foreach (var line in BakeReport.InfoLines(BakedLayerStore.Current, settings.GameTerrain, live, BakeServices.Client.MissingKinds()))
       output(line);
+    // What is a consumable is the game's prefabs' to say: only where a world is up.
+    if (BakedLayerStore.Current is { } layer && ZNetScene.instance != null)
+      foreach (var line in BakedConsumables.InfoLines(layer))
+        output(line);
   }
 
   private static void Orphans(BakeCommand command, Action<string> output)
