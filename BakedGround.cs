@@ -30,7 +30,8 @@ internal static class BakedGround
   // postfix that returns a value after every void one, whatever their priorities say, which is what puts this one last.
   public static float GetBiomeHeightPostfix(float __result, float wx, float wy)
   {
-    if (paused != 0)
+    var pause = pauseOfThread;
+    if (pause != null && Volatile.Read(ref pause.Depth) != 0)
       return __result;
     var ground = BakedLayerStore.Current?.Ground;
     return ground == null || !ground.Any ? __result : Apply(ground, wx, wy, __result);
@@ -46,29 +47,39 @@ internal static class BakedGround
 
   // ---- the postfix steps aside --------------------------------------------------------------------------------------------------------
 
-  private static int paused;
-
-  /// <summary>The postfix gives the world's own height until what this returns is disposed. A world export samples heights without the
-  /// layer's ground (build spec 3.3): a world made from the export would otherwise blend the ground twice in its 8 m band. They nest.</summary>
-  public static IDisposable Pause()
+  // A pause belongs to the thread that made it. A world export pauses on each of the threads that sample its heights; the terrain builder, the
+  // minimap and every other thread of the running game keep the layer's ground meanwhile (a pause for all threads would take the towns' ground
+  // out of the game for as long as an export runs).
+  private sealed class PauseOfThread
   {
-    Interlocked.Increment(ref paused);
-    return new PauseScope();
+    public int Depth;
   }
 
-  private sealed class PauseScope : IDisposable
+  [ThreadStatic] private static PauseOfThread? pauseOfThread;
+
+  /// <summary>The postfix gives the world's own height, on the calling thread, until what this returns is disposed. A world export samples
+  /// heights without the layer's ground (build spec 3.3): a world made from the export would otherwise blend the ground twice in its 8 m
+  /// band. They nest. Dispose from any thread ends the pause of the thread that made it, once.</summary>
+  public static IDisposable Pause()
+  {
+    var pause = pauseOfThread ??= new PauseOfThread();
+    Interlocked.Increment(ref pause.Depth);
+    return new PauseScope(pause);
+  }
+
+  private sealed class PauseScope(PauseOfThread pause) : IDisposable
   {
     private int disposed;
 
     public void Dispose()
     {
       if (Interlocked.Exchange(ref disposed, 1) == 0)
-        Interlocked.Decrement(ref paused);
+        Interlocked.Decrement(ref pause.Depth);
     }
   }
 
-  /// <summary>Whether the postfix is stepping aside (for the offline tests).</summary>
-  internal static bool IsPaused => Volatile.Read(ref paused) != 0;
+  /// <summary>Whether the postfix is stepping aside on the calling thread (for the offline tests).</summary>
+  internal static bool IsPaused => pauseOfThread is { } pause && Volatile.Read(ref pause.Depth) != 0;
 
   // ---- the ground changes in a running world (build spec 8.3) ------------------------------------------------------------------------
 

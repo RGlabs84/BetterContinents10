@@ -226,6 +226,142 @@ internal static partial class Tests
       C(BakedGround.GetBiomeHeightPostfix(10f, x, z) == 10f, "with no layer current it gives the height it was given");
   }
 
+  // A place with ground: a vertex of weight 255 in a ground zone (not on its last row or column), and the town's height there.
+  private static (float X, float Z, float Town) ServerGroundSpot(BakedLayer layer)
+  {
+    var zone = layer.Ground.Zones.OrderBy(z => z.Z).ThenBy(z => z.X).First(z => { layer.Ground.TryGet(z, out var g); return g.Weights.Contains((byte)255); });
+    layer.Ground.TryGet(zone, out var zg);
+    int v = Array.FindIndex(zg.Weights, w => w == 255);
+    while (v % 65 == 64 || v / 65 == 64)
+      v = Array.FindIndex(zg.Weights, v + 1, w => w == 255);
+    return ((float)(zone.OriginX + v % 65), (float)(zone.OriginZ + v / 65), (float)VertexHeight(zg, v));
+  }
+
+  public static void ServerGroundPauseTest()
+  {
+    Section("ground: a pause belongs to the thread that made it (an export pausing must not take the towns' ground out of the running game)");
+    var layer = ServerValtima(nameof(ServerGroundPauseTest));
+    if (layer == null)
+      return;
+    var (x, z, town) = ServerGroundSpot(layer);
+    using var store = ServerStore(layer);
+    bool Town(float height) => Math.Abs(height - town) < 0.001f;
+    C(Town(BakedGround.GetBiomeHeightPostfix(10f, x, z)) && !BakedGround.IsPaused, "(the spot has the town's height, and nothing is paused)");
+
+    // 1. A thread pauses and stays paused; this thread and a third one still get the ground, and the pausing thread gets the world's height.
+    using (var entered = new ManualResetEventSlim())
+    using (var release = new ManualResetEventSlim())
+    {
+      bool workerPaused = false, workerAfter = true;
+      float workerGot = float.NaN;
+      var worker = new Thread(() =>
+      {
+        using (BakedGround.Pause())
+        {
+          workerPaused = BakedGround.IsPaused;
+          workerGot = BakedGround.GetBiomeHeightPostfix(10f, x, z);
+          entered.Set();
+          release.Wait();
+        }
+        workerAfter = BakedGround.IsPaused;
+      });
+      worker.Start();
+      entered.Wait();
+      float mine = BakedGround.GetBiomeHeightPostfix(10f, x, z);
+      bool minePaused = BakedGround.IsPaused;
+      float third = float.NaN;
+      var other = new Thread(() => third = BakedGround.GetBiomeHeightPostfix(10f, x, z));
+      other.Start();
+      other.Join();
+      release.Set();
+      worker.Join();
+      C(workerPaused && workerGot == 10f, "the thread that paused is paused and gets the height it was given");
+      C(!minePaused && Town(mine), "this thread, while that one is paused, still gets the town's height");
+      C(Town(third), "and so does a third thread");
+      C(!workerAfter, "when the pause ends, that thread is back to normal");
+    }
+
+    // 2. Dispose from another thread ends the pause of the thread that made it, not the disposing thread's own.
+    using (var made = new ManualResetEventSlim())
+    using (var ended = new ManualResetEventSlim())
+    {
+      IDisposable pause = null;
+      bool pausedBefore = false, pausedAfter = true;
+      float gotBefore = float.NaN, gotAfter = float.NaN;
+      var maker = new Thread(() =>
+      {
+        pause = BakedGround.Pause();
+        pausedBefore = BakedGround.IsPaused;
+        gotBefore = BakedGround.GetBiomeHeightPostfix(10f, x, z);
+        made.Set();
+        ended.Wait();
+        pausedAfter = BakedGround.IsPaused;
+        gotAfter = BakedGround.GetBiomeHeightPostfix(10f, x, z);
+      });
+      maker.Start();
+      made.Wait();
+      using (BakedGround.Pause())
+      {
+        pause.Dispose();
+        pause.Dispose();
+        C(BakedGround.IsPaused && BakedGround.GetBiomeHeightPostfix(10f, x, z) == 10f, "the disposing thread's own pause is still on after it ends another thread's, twice");
+      }
+      ended.Set();
+      maker.Join();
+      C(pausedBefore && gotBefore == 10f && !pausedAfter && Town(gotAfter), "the pause of the thread that made it ended once, from here");
+      C(!BakedGround.IsPaused && Town(BakedGround.GetBiomeHeightPostfix(10f, x, z)), "and this thread is back to normal");
+    }
+
+    // 3. Eight threads pause and unpause all the time (nested, too) while one reads the ground: the reader never sees a pause.
+    {
+      long reads = 0, wrong = 0, pauses = 0;
+      using var stop = new CancellationTokenSource();
+      var pausers = Enumerable.Range(0, 8).Select(t => new Thread(() =>
+      {
+        while (!stop.IsCancellationRequested)
+        {
+          using (BakedGround.Pause())
+          {
+            if (t % 2 == 0)
+              using (BakedGround.Pause())
+                Interlocked.Increment(ref pauses);
+            if (BakedGround.GetBiomeHeightPostfix(10f, x, z) != 10f)
+              Interlocked.Increment(ref wrong);
+          }
+        }
+      })).ToArray();
+      foreach (var thread in pausers)
+        thread.Start();
+      var reader = Task.Run(() =>
+      {
+        while (Volatile.Read(ref reads) < 200_000)
+        {
+          if (!Town(BakedGround.GetBiomeHeightPostfix(10f, x, z)))
+            Interlocked.Increment(ref wrong);
+          Interlocked.Increment(ref reads);
+        }
+      });
+      reader.Wait();
+      stop.Cancel();
+      foreach (var thread in pausers)
+        thread.Join();
+      C(wrong == 0 && pauses > 1000, $"{reads:N0} reads of the ground while eight threads paused {pauses:N0} times: the reader always had the ground, and a pausing thread never did ({wrong} wrong)");
+      C(!BakedGround.IsPaused, "nothing is left paused here");
+    }
+
+    // 4. A pool thread that paused and let go is a normal thread again when the pool gives it out the next time.
+    {
+      int stillPaused = 0;
+      for (int n = 0; n < 200; n++)
+      {
+        Task.Run(() => { using (BakedGround.Pause()) { } }).Wait();
+        if (Task.Run(() => BakedGround.IsPaused || !Town(BakedGround.GetBiomeHeightPostfix(10f, x, z))).Result)
+          stillPaused++;
+      }
+      C(stillPaused == 0, $"pool threads that paused are not paused when they are used again ({stillPaused} of 200 were)");
+    }
+  }
+
   public static void ServerGroundThreadsTest()
   {
     Section("ground: the postfix on many threads while the layer is swapped whole");
