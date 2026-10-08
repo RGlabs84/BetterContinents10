@@ -101,7 +101,51 @@ internal static class BakedConsumables
     Forget();
   }
 
-  /// <summary>The layer's own count of the records of a palette entry set that are consumable kinds, said for bc_bake info and stats.</summary>
-  internal static string Summary(int kinds, long records) =>
-    $"{kinds} consumable kind{(kinds == 1 ? "" : "s")} ({records:N0} records) placed as real objects, never drawn";
+  /// <summary>What `bc_bake info` says about consumables (one line each): the consumable kinds this layer has in this game and how many records of
+  /// each, the Live ones among them (the file marks them Live, and they are placed once all the same), and what this session placed. Reads every
+  /// zone of the layer once, so it is for a command, not a frame.</summary>
+  internal static List<string> InfoLines(BakedLayer layer)
+  {
+    var context = new BakedServer.Context(layer);
+    var names = new string?[layer.Palette.Count];
+    int kinds = 0;
+    for (int i = 0; i < names.Length; i++)
+      if (BakedServer.IsConsumable(context, i, layer.Palette[i], out var kind))
+      {
+        names[i] = kind?.Candidate.Name ?? layer.Palette[i].Candidates[0].Name;
+        kinds++;
+      }
+    var lines = new List<string>();
+    if (kinds == 0)
+    {
+      lines.Add("Consumables: none of this layer's pieces is something a player picks up or harvests (a Pickable, PickableItem, ItemDrop or Plant), in this game.");
+      return lines;
+    }
+    var perKind = new SortedDictionary<string, long>(StringComparer.Ordinal);
+    long records = 0, live = 0;
+    foreach (var row in layer.Zones)
+    {
+      if (row.Placements == 0)
+        continue;
+      var data = layer.Decode(row);
+      for (int k = 0; k < data.Count; k++)
+      {
+        string? name = names[data.Palette[k]];
+        if (name == null)
+          continue;
+        perKind.TryGetValue(name, out long seen);
+        perKind[name] = seen + 1;
+        records++;
+        if (layer.Palette[data.Palette[k]].Role == BakedRole.Live)
+          live++;
+      }
+    }
+    var parts = new List<string>();
+    foreach (var kv in perKind)
+      parts.Add($"{kv.Key} {kv.Value:N0}");
+    lines.Add($"Consumables: {perKind.Count} kind{(perKind.Count == 1 ? "" : "s")}, {records:N0} records ({live:N0} of them marked Live in the file). They are never baked, drawn or protected: " +
+              "each is placed once as an ordinary object of the game when its zone generates, and the game owns it from then. " + string.Join(", ", parts) + ".");
+    lines.Add($"Consumables this session: {Placed:N0} placed, {Failed:N0} could not be placed.");
+    return lines;
+  }
 }

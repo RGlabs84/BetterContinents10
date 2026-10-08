@@ -164,4 +164,39 @@ internal static partial class Tests
       BakedConsumables.SessionStarts();
     }
   }
+
+  public static void ConsumablesInfoTest()
+  {
+    Section("consumables, report: the layer's consumable kinds and records, and what the session placed (bc_bake info)");
+    var layer = ServerValtima(nameof(ConsumablesInfoTest));
+    if (layer == null)
+      return;
+    var (find, probe, view, placed, failed) = (BakedServer.FindPrefab, BakedConsumables.Probe, BakedServer.ViewOf, BakedConsumables.Placed, BakedConsumables.Failed);
+    try
+    {
+      var prefabs = new Dictionary<string, GameObject>();
+      foreach (var name in new[] { "Pickable_Flax_Wild", "Pickable_Dandelion", "Pickable_Mushroom", "RaspberryBush" })
+        prefabs[name] = ApiAlive<GameObject>();
+      BakedServer.FindPrefab = name => prefabs.TryGetValue(name, out var prefab) ? prefab : null;
+      BakedConsumables.Probe = prefab => prefabs.Values.Any(p => ReferenceEquals(p, prefab));
+      BakedServer.ViewOf = _ => true;
+      BakedConsumables.SessionStarts();
+      var lines = BakedConsumables.InfoLines(layer);
+      C(lines.Count == 2 && lines[0].Contains("4 kinds, 12,052 records (0 of them marked Live"), "VALtima's file has four consumable kinds and 12,052 records, none of them Live: " + lines[0]);
+      C(lines[0].Contains("Pickable_Flax_Wild 4,080") && lines[0].Contains("Pickable_Dandelion 3,992") && lines[0].Contains("Pickable_Mushroom 2,884") && lines[0].Contains("RaspberryBush 1,096"), "with the count of each kind");
+      C(lines[1] == "Consumables this session: 0 placed, 0 could not be placed.", "and what the session placed: " + lines[1]);
+      BakedConsumables.Placed = 11;
+      BakedConsumables.Failed = 2;
+      C(BakedConsumables.InfoLines(layer)[1] == "Consumables this session: 11 placed, 2 could not be placed.", "the session's counts follow");
+      BakedServer.FindPrefab = _ => null;
+      var none = BakedConsumables.InfoLines(layer);
+      C(none.Count == 1 && none[0].StartsWith("Consumables: none"), "in a game that has none of the prefabs it says there are none: " + none[0]);
+    }
+    finally
+    {
+      (BakedServer.FindPrefab, BakedConsumables.Probe, BakedServer.ViewOf) = (find, probe, view);
+      BakedConsumables.Placed = placed;
+      BakedConsumables.Failed = failed;
+    }
+  }
 }
