@@ -49,18 +49,18 @@ internal static partial class BakeRunner
     var layer = ctx.Layer;
     var pieces = data.Pieces;
     bool live = w.Live;
-    var before = layer.Current;
+    // The layer as it was and as it ends, for the reconciliation of the Live pieces, which comes last: between a change of the layer and the keys
+    // of the town pieces it would find records with no keyed piece, and seed a second one.
+    var first = layer.Current;
+    LayerChange? last = null;
 
     if (plan.AddRecords)
     {
       var change = data.IsBake ? layer.Add(data) : layer.PutBack(data);
       w.RecordsPut = data.Records.Count;
+      last = change;
       if (live)
-      {
         yield return PushAndSay(ctx, change);
-        yield return ReconcileFor(ctx, data, before, change);
-      }
-      before = change.Layer;
     }
 
     if (plan.CompleteAdoption)
@@ -124,12 +124,13 @@ internal static partial class BakeRunner
     {
       var change = data.IsBake ? layer.UndoBake(data.Number) : layer.Remove(data);
       w.RecordsTaken = data.Records.Count;
+      last = change;
       if (live)
-      {
         yield return PushAndSay(ctx, change);
-        yield return ReconcileFor(ctx, data, before, change);
-      }
     }
+
+    if (live && last != null)
+      yield return ReconcileFor(ctx, data, first, last);
   }
 
   // The Live pieces of the layer follow a change of it where they can have been affected: a drop (its pieces go, or stand as orphans), and an

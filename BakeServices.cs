@@ -8,19 +8,17 @@ using UnityEngine;
 
 namespace BetterContinents;
 
-// What the bake needs from the other parts of baked placements, reached through small interfaces: the transport and the reconciliation of Live
-// pieces (the network and server work), the drawing, the counts, hide and show (the client work), and the conversion of a world to one that keeps
-// the game's terrain. Until those are part of the build, the stand-ins below answer that the part is not available in this build; the real ones
-// replace them in BakeServices.
+// What the bake needs from the other parts of baked placements, reached through small interfaces so that the whole runner runs offline against
+// stand-ins (Tests.BakeRunner.cs): the transport and the reconciliation of Live pieces (the network and server work, BakedTransfer and
+// BakedReconcile), the drawing, the counts, hide and show (the client work, BakedClient), and the conversion of a world to one that keeps the game's
+// terrain. The adapters over them are in BakeAdapters.cs.
 internal static class BakeServices
 {
-  public static IBakeTransport Transport { get; set; } = new UnavailableTransport();
-  public static IBakeReconcile? Reconcile { get; set; }
-  public static IBakeConvert Convert { get; set; } = new UnavailableConvert();
-  public static IBakeClientTools Client { get; set; } = new UnavailableClientTools();
-  public static IBakeOrphans Orphans { get; set; } = new UnavailableOrphans();
-
-  public const string NotHere = "not available in this build";
+  public static IBakeTransport Transport { get; set; } = new BakedTransport();
+  public static IBakeReconcile? Reconcile { get; set; } = new BakedReconciler();
+  public static IBakeConvert Convert { get; set; } = new BakedConvert();
+  public static IBakeClientTools Client { get; set; } = new BakedClientTools();
+  public static IBakeOrphans Orphans { get; set; } = new BakedOrphans();
 }
 
 // The tools that act on this machine's drawing of the baked pieces.
@@ -52,48 +50,6 @@ internal interface IBakeOrphans
   string? Unavailable { get; }
   IReadOnlyList<BakeOrphan> List();
   void Destroy(IEnumerable<ZDOID> ids, Action<string> say);
-}
-
-internal sealed class UnavailableTransport : IBakeTransport
-{
-  public string? Unavailable => "sending a changed layer to the players is " + BakeServices.NotHere;
-
-  public int Players => ZNet.instance != null ? ZNet.instance.GetPeers().Count : 0;
-
-  // Which version each player runs is the transport's to know; this stand-in knows none.
-  public IReadOnlyList<(string Name, string? Version)> Peers =>
-    ZNet.instance == null ? [] : ZNet.instance.GetPeers().Select(p => (p.m_playerName ?? "", (string?)null)).ToList();
-
-  public System.Collections.IEnumerator Push(LayerChange change, Action<BakePush> done) =>
-    throw new NotSupportedException("sending a changed layer is " + BakeServices.NotHere);
-}
-
-internal sealed class UnavailableConvert : IBakeConvert
-{
-  public string? Unavailable => "making a world a Better Continents world that keeps the game's terrain is " + BakeServices.NotHere;
-
-  public BakeWorldKind Kind => BakeRuntime.KindOfWorld();
-
-  public void Convert() => throw new NotSupportedException(Unavailable);
-}
-
-internal sealed class UnavailableClientTools : IBakeClientTools
-{
-  public string? Unavailable => "the drawing of baked pieces is " + BakeServices.NotHere;
-
-  public void Stats(Action<string> say) => say("bc_bake stats: " + Unavailable + ".");
-  public void Hide() => throw new NotSupportedException(Unavailable);
-  public void Show() => throw new NotSupportedException(Unavailable);
-  public IReadOnlyList<string>? MissingKinds() => null;
-}
-
-internal sealed class UnavailableOrphans : IBakeOrphans
-{
-  public string? Unavailable => "the list of orphans is " + BakeServices.NotHere;
-
-  public IReadOnlyList<BakeOrphan> List() => [];
-
-  public void Destroy(IEnumerable<ZDOID> ids, Action<string> say) => say("bc_bake orphans: " + Unavailable + ".");
 }
 
 // The game's side of a context: the world's folder of undo files, and the pieces of a BakeContext as they are in the running game.
@@ -140,6 +96,13 @@ internal static class BakeRuntime
   {
     if (!ZdoBakeWorld.Instance.Ready)
       return null;
+    // A world whose save did not load correctly has some of its objects and the game will not save it: whatever is pending is not settled against
+    // a world that is not whole.
+    if (ZNet.m_loadError)
+    {
+      BetterContinents.LogWarning("bc_bake: the world did not load correctly (saving is off), so the unfinished operations are not checked this time.");
+      return null;
+    }
     return Context(BetterContinents.Log, new BakeWho { Name = "world load" });
   }
 

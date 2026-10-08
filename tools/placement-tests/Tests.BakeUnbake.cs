@@ -90,11 +90,13 @@ internal static partial class Tests
     fx.Said.Clear();
     BakeUndoRun(fx, null);
     var undo = fx.Clock.Events.Skip(before).ToList();
-    var wantUndo = new List<string> { "state Undoing", "layer", "push r3", "reconcile r3" };
+    // The reconciliation comes last: between the records coming back and the keys going on it would find records with no keyed piece.
+    var wantUndo = new List<string> { "state Undoing", "layer", "push r3" };
     wantUndo.AddRange(Enumerable.Repeat("key", 8));
     wantUndo.AddRange(Enumerable.Repeat("remove", 8));
+    wantUndo.Add("reconcile r3");
     C(undo.Select(e => e.StartsWith("key ") ? "key" : e.StartsWith("remove ") ? "remove" : e).SequenceEqual(wantUndo),
-      "the state, the records back and the players told, then the keys, then the pieces the unbake made go: " + string.Join(" > ", undo));
+      "the state, the records back and the players told, then the keys, then the pieces the unbake made go, then the live pieces follow: " + string.Join(" > ", undo));
     C(fx.Said.Any(l => l.StartsWith("bc_bake: undo of unbake 2 done in") && l.Contains("8 pieces removed") && l.Contains("10 records put back")), "what it says: " + string.Join(" | ", fx.Said));
     C(BakeKeysOfSource(fx.Port, 1).SequenceEqual(recordsOfBake), "the ten records are back exactly as the bake made them");
     C(fx.World.Objects.Count == objectsBaked && taken.All(p => !BakeStands(fx, p)), "the eight pieces are gone again as objects");

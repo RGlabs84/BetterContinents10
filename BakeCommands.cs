@@ -545,10 +545,10 @@ internal static class BakeDropWorld
     {
       say($"bc_bake drop {name}: a dry run, nothing changes. 'bc_bake drop {name} confirm' drops the layer.");
       if (inGame > 0)
-        say($"This world's layer holds {BakeTally.Num(inGame)} pieces baked in the game. Dropping it removes them for good (a copy of the file is kept as BetterContinents.pre-drop). "
+        say($"This world's layer holds {BakeTally.Num(inGame)} pieces baked in the game. Dropping it removes them for good (a copy of the file is kept at {backup}). "
           + "To keep them as real pieces, load the world and run 'bc_bake unbake world confirm' first.");
       else
-        say($"This world's layer holds {BakeTally.Num(layer.Placements)} records from a compiler's file and none baked in the game. A copy of the file is kept as BetterContinents.pre-drop.");
+        say($"This world's layer holds {BakeTally.Num(layer.Placements)} records from a compiler's file and none baked in the game. A copy of the file is kept at {backup}.");
       say(settings.GameTerrain
         ? "The world keeps the game's own terrain, and the layer is all its settings hold: the file goes, and the world is the game's own world again."
         : "The world keeps its Better Continents settings and maps; only the layer goes.");

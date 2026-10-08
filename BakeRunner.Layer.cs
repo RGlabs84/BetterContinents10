@@ -180,6 +180,14 @@ internal sealed class LayerPort : IBakeLayerPort
 
   public LayerChange Load(BakedLayer file, OperationInfo operation, out int leftOut)
   {
+    var made = BuildLoad(file, operation, out leftOut);
+    return Install(made);
+  }
+
+  public BakedLayer PreviewLoad(BakedLayer file, OperationInfo operation) => BuildLoad(file, operation, out _).Layer;
+
+  private (BakedLayer Layer, ZoneKey[] Changed) BuildLoad(BakedLayer file, OperationInfo operation, out int leftOut)
+  {
     var basis = current();
     int left = 0;
     var made = Guarded(() =>
@@ -191,7 +199,7 @@ internal sealed class LayerPort : IBakeLayerPort
       return edit.Build();
     });
     leftOut = left;
-    return Install(made);
+    return made;
   }
 
   // ------------------------------------------------------------------------------------------------ the pieces of an edit

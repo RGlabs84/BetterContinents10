@@ -9,6 +9,11 @@ namespace BetterContinents;
 
 internal static partial class BakeRunner
 {
+  // The registry's entry of a load: the compiler's records it adds and the ones it replaces.
+  private static OperationInfo LoadOperation(BakeContext ctx, int number, long incoming, long replaced) =>
+    new((ushort)number, OperationKind.Load, OperationState.InLayer, ctx.UnixTime(), ctx.Who.Name, 0f, 0f, 0f, 0f, 0f,
+      (uint)Math.Min(incoming, uint.MaxValue), (uint)Math.Min(replaced, uint.MaxValue), 0, ctx.Version);
+
   // `bc_bake load [<file>] [convert] [confirm]` (6.2, U5): a compiler's new file in a running world. The file's records without a source and its zone
   // sections replace the layer's; every in-game record stays; the palette is rebuilt. The layer as it was is kept in the undo folder first
   // (layer-r<revision>.bcp), so that loading that file goes back. No undo file and no state: the new layer replaces the old in one step, and a
@@ -61,6 +66,22 @@ internal static partial class BakeRunner
       {
         foreach (var line in lines)
           say(line);
+        // What the merge makes, and what the live pieces would do about it: the layer is built and planned against, and dropped.
+        BakedLayer? merged = null;
+        try
+        {
+          merged = layer.PreviewLoad(file, LoadOperation(ctx, ctx.Journal.NextNumber(layer.NextOperation), incoming, current));
+        }
+        catch (BakedFormatException e)
+        {
+          say($"The layer cannot hold this file with the records that stay: {e.Message}.");
+        }
+        if (merged != null)
+        {
+          say($"The layer after it: revision {merged.Revision}, {Num(merged.Placements)} records, {Bytes(merged.Length)}.");
+          if (ctx.Reconcile != null)
+            yield return ctx.Reconcile.Preview(layer.Current, merged, say);
+        }
         WorldAllows(ctx, words, confirm: false, saysInDryRun: true);
         if (ctx.Transport.Unavailable is { } soon)
           say($"This build cannot load yet: {soon}.");
@@ -91,8 +112,7 @@ internal static partial class BakeRunner
         ctx.Convert.Convert();
         say("bc_bake: this world is now a Better Continents world that keeps the game's own ground and biomes.");
       }
-      var operation = new OperationInfo((ushort)number, OperationKind.Load, OperationState.InLayer, ctx.UnixTime(), ctx.Who.Name, 0f, 0f, 0f, 0f, 0f,
-        (uint)Math.Min(incoming, uint.MaxValue), (uint)Math.Min(current, uint.MaxValue), 0, ctx.Version);
+      var operation = LoadOperation(ctx, number, incoming, current);
       var before = layer.Current;
       var change = layer.Load(file, operation, out int leftOut);
       say($"bc_bake: load {number}: layer revision {change.Revision} ({Bytes(change.Bytes)}), {Num(incoming)} compiler records." + (leftOut > 0 ? $" {Num(leftOut)} records baked in game in the file were left out." : ""));

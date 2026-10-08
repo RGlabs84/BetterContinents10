@@ -144,6 +144,10 @@ internal static partial class Tests
     C(fx.Clock.Events.Count == events && dry.Contains("bc_bake load placements.bcp: a dry run, nothing changes. 'bc_bake load placements.bcp confirm' loads it.") && dry.Contains("File: revision 1, 44 records in"), "a dry run says what the file holds and changes nothing: " + dry);
     C(dry.Contains("It replaces the layer's 43 compiler records with its 44") && dry.Contains("the 0 records baked in game stay.") && dry.Contains("kept in the undo folder first"), "and what it replaces");
 
+    C(dry.Contains("The layer after it: revision 2, 44 records, ") && dry.Contains("The live pieces would follow: ") && fx.Reconcile.Previews == 1,
+      "the dry run builds the merged layer and has the live pieces' planner say what it would do (B's Gather and Plan in the game): " + dry);
+    C(fx.Layer.Revision == 1 && fx.Clock.Events.Count == events, "and the layer it built for that is dropped");
+
     fx.Said.Clear();
     BakeDrive(BakeRunner.Load(fx.Ctx, "placements.bcp", bytes, BakeWordsOf("confirm")), fx, "a load");
     var run = fx.Clock.Events.Skip(events).ToList();
@@ -263,8 +267,8 @@ internal static partial class Tests
     var path = Write("shaped", World(layer));
     var backup = Path.Combine(dir, "backups", "shaped", "BetterContinents.pre-drop");
     BakeDropWorld.RunOnFile(path, backup, "Shaped", false, said.Add);
-    C(said[0].StartsWith("bc_bake drop Shaped: a dry run") && said[1] == $"This world's layer holds {BakeTally.Num(inGameBefore)} pieces baked in the game. Dropping it removes them for good (a copy of the file is kept as BetterContinents.pre-drop). "
-      + "To keep them as real pieces, load the world and run 'bc_bake unbake world confirm' first.", "the dry run of a world with in-game records says what 4.5 says: " + string.Join(" | ", said));
+    C(said[0].StartsWith("bc_bake drop Shaped: a dry run") && said[1] == $"This world's layer holds {BakeTally.Num(inGameBefore)} pieces baked in the game. Dropping it removes them for good (a copy of the file is kept at {backup}). "
+      + "To keep them as real pieces, load the world and run 'bc_bake unbake world confirm' first.", "the dry run of a world with in-game records says what 4.5 says, and where the copy goes: " + string.Join(" | ", said));
     C(said[2].Contains("only the layer goes") && !File.Exists(backup), "and that only the layer goes; nothing was changed");
     var original = File.ReadAllBytes(path);
     said.Clear();

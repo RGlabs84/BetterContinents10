@@ -143,6 +143,9 @@ internal interface IBakeLayerPort
   // A compiler's new file (6.2): its records without a source and its sections replace the layer's; every in-game record stays; the operation
   // is entered. `leftOut`: the records of the file that an in-game bake owns, which are not taken.
   LayerChange Load(BakedLayer file, OperationInfo operation, out int leftOut);
+  // The layer a load would make, without making it current (the dry run of a load: the reconciliation plans against it). Throws
+  // BakedFormatException when the layer cannot hold the merge.
+  BakedLayer PreviewLoad(BakedLayer file, OperationInfo operation);
 }
 
 // What the clients are told, and who they are.
@@ -169,6 +172,8 @@ internal interface IBakeTransport
 internal interface IBakeReconcile
 {
   IEnumerator Run(BakedLayer? old, LayerChange change, Action<string> say);
+  // What a run would do for `next`, said and not done (the dry run of a load).
+  IEnumerator Preview(BakedLayer? old, BakedLayer next, Action<string> say);
 }
 
 // What the world's settings say about its being a Better Continents world (4.1, 4.3).

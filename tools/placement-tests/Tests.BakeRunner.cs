@@ -258,6 +258,15 @@ internal static partial class Tests
       Clock.Events.Add("reconcile r" + change.Revision);
       yield return null;
     }
+
+    public int Previews;
+
+    public IEnumerator Preview(BakedLayer old, BakedLayer next, Action<string> say)
+    {
+      Previews++;
+      say($"The live pieces would follow: {next.Registry.Operations.Count} operations in the layer (a stand-in).");
+      yield return null;
+    }
   }
 
   // The moment after a mutation: the layer, the objects (copied) and the undo folder's files.
