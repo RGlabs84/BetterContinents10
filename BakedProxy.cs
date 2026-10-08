@@ -88,9 +88,13 @@ internal static class BakedProxy
     blockedWhy = "";
   }
 
+  // the reach of the last frame, for the stats (which run offline in the tests, where Unity's quality settings cannot be asked)
+  private static float lastReach;
+
   private static ProxyFrame Frame(Camera cam, BuiltZone[] ring, int ringVersion)
   {
     var p = cam.transform.position;
+    lastReach = ShadowReach();
     return new ProxyFrame
     {
       Camera = p,
@@ -101,7 +105,7 @@ internal static class BakedProxy
       Policy = BakedDraw.ShadowSetting,
       Enabled = Enabled && !blocked,
       Hidden = BakedDraw.Hidden,
-      Reach = ShadowReach(),
+      Reach = lastReach,
       Now = Time.realtimeSinceStartup,
     };
   }
@@ -255,10 +259,10 @@ internal static class BakedProxy
       say($"Shadow proxies: off, {blockedWhy}; every piece casts its own shadows.");
       return;
     }
-    float reach = ShadowReach();
+    float reach = lastReach;
     if (reach <= 0f)
     {
-      say("Shadow proxies: none, the game has shadows off (shadow distance 0).");
+      say("Shadow proxies: none yet, or the game has shadows off (shadow distance 0).");
       return;
     }
     if (BakedDraw.ShadowSetting == BakedShadows.Off)

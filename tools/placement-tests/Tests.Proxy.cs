@@ -65,8 +65,6 @@ internal static class ProxyKit
   {
     public readonly List<ProxyChunk> Uploaded = [], Freed = [], Drawn = [];
     public readonly ProxyBook Book;
-    public bool FailUpload;
-
     public Fake()
     {
       Book = new ProxyBook
@@ -75,8 +73,6 @@ internal static class ProxyKit
         Settle = _ => true,
         Upload = (chunk, _) =>
         {
-          if (FailUpload)
-            return false;
           chunk.Vertices = chunk.Normals = null;
           chunk.Indices = null;
           Uploaded.Add(chunk);
@@ -102,6 +98,9 @@ internal static class ProxyKit
 
 internal static partial class Tests
 {
+  // Unity's Vector3.ToString needs a module that is not here
+  private static string Fmt3(Vector3 v) => FormattableString.Invariant($"({v.x:0.###}, {v.y:0.###}, {v.z:0.###})");
+
   private static bool ProxyNear(Vector3 a, Vector3 b, float tolerance = 0.01f) => Math.Abs(a.x - b.x) < tolerance && Math.Abs(a.y - b.y) < tolerance && Math.Abs(a.z - b.z) < tolerance;
 
   // ---- the merge --------------------------------------------------------------------------------------------------------------------------
@@ -119,7 +118,7 @@ internal static partial class Tests
     var chunk = built.Chunks.Single();
     C(chunk.VertexCount == 3 && chunk.IndexCount == 3 && chunk.Layer == 10, "one instance of one triangle: one chunk of 3 vertices and 3 indices");
     C(ProxyNear(chunk.Vertices![0], new Vector3(10, 2, 20)) && ProxyNear(chunk.Vertices[1], new Vector3(11, 2, 20)) && ProxyNear(chunk.Vertices[2], new Vector3(10, 3, 20)),
-      $"the vertices are the instance's, relative to the zone's origin on x and z ({chunk.Vertices[0]}, {chunk.Vertices[1]}, {chunk.Vertices[2]})");
+      $"the vertices are the instance's, relative to the zone's origin on x and z ({Fmt3(chunk.Vertices[0])}, {Fmt3(chunk.Vertices[1])}, {Fmt3(chunk.Vertices[2])})");
     C(chunk.Normals!.All(n => ProxyNear(n, Vector3.forward)) && chunk.Indices!.SequenceEqual([0, 1, 2]), "the normals face +z and the winding is as it was");
     C(ProxyNear(new Vector3(chunk.MinX, chunk.MinY, chunk.MinZ), new Vector3(10, 2, 20)) && ProxyNear(new Vector3(chunk.MaxX, chunk.MaxY, chunk.MaxZ), new Vector3(11, 3, 20)),
       "the chunk's box is that of its vertices");
@@ -128,7 +127,7 @@ internal static partial class Tests
     // a turn of 90 degrees about y carries x to -z and the normal to +x
     var turned = BakedZoneBuild.Build(ClientKit.Zone(0, 0, (0, 5.0, 1.0, 5.0, 90.0, null)), [kind], 1);
     var tc = ProxyMerge.Merge(turned, true, BakedShadows.All).Chunks.Single();
-    C(ProxyNear(tc.Vertices![1], new Vector3(5, 1, 4)) && ProxyNear(tc.Vertices[2], new Vector3(5, 2, 5)), $"yaw 90: the triangle's x edge points along -z ({tc.Vertices[1]})");
+    C(ProxyNear(tc.Vertices![1], new Vector3(5, 1, 4)) && ProxyNear(tc.Vertices[2], new Vector3(5, 2, 5)), $"yaw 90: the triangle's x edge points along -z ({Fmt3(tc.Vertices[1])})");
     C(tc.Normals!.All(n => ProxyNear(n, Vector3.right, 0.02f)), "...and its normal along +x");
 
     // a part that stands in the piece at a place of its own (a local matrix): the instance's matrix times it
@@ -142,10 +141,10 @@ internal static partial class Tests
     var door = ClientKit.Kind("door", movedPiece);
     var doorZone = BakedZoneBuild.Build(ClientKit.Zone(0, 0, (0, 3.0, 1.0, 4.0, 0.0, null)), [door], 1);
     var dc = ProxyMerge.Merge(doorZone, true, BakedShadows.All).Chunks.Single();
-    C(ProxyNear(dc.Vertices![0], new Vector3(3, 11, 4)), $"a part's own matrix is applied below the instance's ({dc.Vertices[0]})");
+    C(ProxyNear(dc.Vertices![0], new Vector3(3, 11, 4)), $"a part's own matrix is applied below the instance's ({Fmt3(dc.Vertices[0])})");
 
     // the transform itself, over many matrices with mirrors and uneven scales: the winding stays outward and the normals are the inverse transpose
-    var rnd = new Random(20261008);
+    var rnd = new System.Random(20261008);
     int wrong = 0, mirrored = 0;
     for (int n = 0; n < 400; n++)
     {
