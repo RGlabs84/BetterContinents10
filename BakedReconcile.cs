@@ -274,6 +274,9 @@ internal static class BakedReconcile
     // Fermenter: what is in it (the hash of the item's name). Turret: its ammunition.
     if (zdo.GetInt(ZDOVars.s_content, 0) != 0 || zdo.GetInt(ZDOVars.s_ammo, 0) > 0)
       return true;
+    // Beehive: its honey; a sap collector: its sap (both "level"). VALtima's towns seed Live beehives.
+    if (zdo.GetInt(ZDOVars.s_level, 0) > 0)
+      return true;
     foreach (var key in ArmorStandItems)
       if (zdo.GetInt(key, 0) != 0)
         return true;

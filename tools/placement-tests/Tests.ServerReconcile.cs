@@ -249,6 +249,7 @@ internal static partial class Tests
       C(Has(z => z.Set("slot0", "RawMeat")) && Has(z => z.Set("slot15", "Fish")) && !Has(z => z.Set("slot3", "")) && !Has(z => z.Set("slot16", "Fish")) && !Has(z => z.Set("slotstatus0", 2)),
         "a cooking station holds the food on any of its slots; an empty slot, a seventeenth and a status are not food");
       C(Has(z => z.Set(ZDOVars.s_ammo, 7)) && !Has(z => z.Set(ZDOVars.s_ammo, 0)) && !Has(z => z.Set(ZDOVars.s_ammoType, "arrow_wood")), "a turret holds its ammunition, and its ammunition type alone is not ammunition");
+      C(Has(z => z.Set(ZDOVars.s_level, 2)) && !Has(z => z.Set(ZDOVars.s_level, 0)), "a beehive holds its honey (and a sap collector its sap): \"level\" above 0");
       var several = fake.New("piece_chest");
       several.Set(ZDOVars.s_items, Inventory(109, 0, wide: true).GetArray());
       several.Set(ZDOVars.s_queued, 0);
