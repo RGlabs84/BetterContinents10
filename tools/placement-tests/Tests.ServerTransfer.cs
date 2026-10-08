@@ -953,6 +953,8 @@ internal static partial class Tests
     using (var real = new XferWorld())
     {
       var pair = real.Joined("real", layer, scripted: false);
+      // The client's own layer: the one before.
+      BakedLayerStore.Set(layer, null);
       var patch = BakedPatch.Make(layer, next, changed);
       pair.Client.Pending = next;
       var sent = new BakedTransfer.SendResult();
@@ -965,6 +967,7 @@ internal static partial class Tests
     using (var real = new XferWorld())
     {
       var pair = real.Joined("wrong base", layer, scripted: false);
+      BakedLayerStore.Set(layer, null);
       var patch = BakedPatch.Make(layer, next, changed);
       pair.Client.Pending = next;
       var sent = new BakedTransfer.SendResult();
