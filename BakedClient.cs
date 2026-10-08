@@ -235,7 +235,8 @@ internal static class BakedClient
       }
       if (!Active())
         return;
-      // the manager is not running in this world yet: this is its first layer, and nothing is waiting for it
+      // the manager is not running in this world yet: this is its first layer here (Prepare adopts it, and Adopt queues the report of Applied
+      // for it: a push that made it is waited for)
       if (!ReferenceEquals(scene, ZNetScene.instance) || layer == null)
       {
         Prepare();
