@@ -30,6 +30,9 @@ internal static partial class Tests
     public Action<BakeFx> Operate = null!;
     // After the check: null, or what is wrong. `reference` is the layer the whole operation made when nothing stopped it.
     public Func<BakeFx, BakedLayer, string> Verify = null!;
+    // The pieces that must be somewhere (an object, or a record) at every moment of the operation in the running game, not only after a
+    // stop: a piece in neither place for a moment is one a crash at that moment would leave to the undo file alone. Null: none to follow.
+    public Func<List<PieceCopy>> Pieces = null;
   }
 
   private static BakeFx BakeReload(BakeFx proto, BakeMoment journal, BakeMoment layer, BakeMoment objects, string folderName, long session)
@@ -107,6 +110,25 @@ internal static partial class Tests
     {
       problems.Add($"{test.Name}: the recording holds {moments.Count} moments for {mutations} mutations");
       return 0;
+    }
+    // Each piece is an object or a record at every moment the operation holds (it is made, or put in the layer, before it is taken out of the other).
+    if (test.Pieces != null)
+    {
+      var pieces = test.Pieces();
+      foreach (var moment in moments)
+      {
+        var port = new LayerPort(() => moment.Layer, (_, _) => { });
+        var records = port.RecordsIn(port.ZonesWithRecords(), _ => true);
+        foreach (var p in pieces)
+        {
+          bool stands = moment.Objects.Any(o => BakeMath.SamePlace(p, o.Prefab, o.X, o.Y, o.Z, o.RotX, o.RotY, o.RotZ));
+          if (!stands && !records.Any(r => BakeIsRecord(r, p) && r.Role != BakedRole.Live))
+          {
+            problems.Add($"{test.Name}: after '{moment.What}' the {p.PrefabName} at {p.X}, {p.Z} is neither an object nor a record");
+            break;
+          }
+        }
+      }
     }
     int trials = 0;
     for (int k = 0; k <= mutations; k++)
@@ -279,6 +301,7 @@ internal static partial class Tests
     };
     test.Operate = fx => BakeRun(fx, BakeStandardArea(), words);
     test.Verify = (fx, reference) => BakeVerifyBakes(fx, reference, 0, new BakeOpSpec { Number = 1, Pieces = taken, Adopted = adopted });
+    test.Pieces = () => taken;
     return test;
   }
 
@@ -401,6 +424,8 @@ internal static partial class Tests
     };
     test.Operate = operate;
     test.Verify = (fx, reference) => BakeVerifyWorld(fx, sameRecords ? bakeKeys : null, taken, town ? adopted : [], baseObjects, dropped);
+    if (!dropped)
+      test.Pieces = () => taken;
     return test;
   }
 
@@ -492,6 +517,7 @@ internal static partial class Tests
       BakeRun(fx, BakeSecondArea());
     };
     two.Verify = (fx, reference) => BakeVerifyBakes(fx, reference, 0, new BakeOpSpec { Number = 1, Pieces = first }, new BakeOpSpec { Number = 2, Pieces = second });
+    two.Pieces = () => first.Concat(second).ToList();
     cases.Add(two);
 
     // A bake on a compiler's layer: the registry appears with it.
@@ -506,6 +532,7 @@ internal static partial class Tests
     };
     onLayer.Operate = fx => BakeRun(fx, BakeStandardArea(), "confirm");
     onLayer.Verify = (fx, reference) => BakeVerifyBakes(fx, reference, (int)compiler.Placements, new BakeOpSpec { Number = 1, Pieces = onFile });
+    onLayer.Pieces = () => onFile;
     cases.Add(onLayer);
 
     foreach (var test in cases)
