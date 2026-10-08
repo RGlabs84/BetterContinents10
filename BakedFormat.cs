@@ -820,6 +820,36 @@ internal sealed class PaletteEntry : IEquatable<PaletteEntry>
   public bool Protected => (Flags & PaletteFlags.Protect) != 0;
   public bool HasTint => Tint.Length > 0;
 
+  private double reach = -1.0;
+
+  // How far from a record's point, level, in m at scale 1, the colliders this entry has in the layer's data reach: the farthest corner of its
+  // boxes from the point, or a trunk's. A bound, never less than the truth (BakedPlacements.SurfaceHeight leaves out the records a line is
+  // farther from); a record scaled up reaches that many times as far.
+  public double ColliderReach
+  {
+    get
+    {
+      if (reach >= 0.0)
+        return reach;
+      var anchor = Candidates[0].Anchor;
+      double far = 0.0;
+      if (Collision == BakedCollision.Boxes)
+      {
+        foreach (var box in Boxes)
+        {
+          var c = box.Centre - anchor;
+          var size = box.Size;
+          double centre = Math.Sqrt((double)c.x * c.x + (double)c.y * c.y + (double)c.z * c.z);
+          double half = 0.5 * Math.Sqrt((double)size.x * size.x + (double)size.y * size.y + (double)size.z * size.z);
+          far = Math.Max(far, centre + half);
+        }
+      }
+      else if (Collision == BakedCollision.Trunk)
+        far = Math.Sqrt((double)anchor.x * anchor.x + (double)anchor.y * anchor.y + (double)anchor.z * anchor.z) + 0.5;
+      return reach = far;
+    }
+  }
+
   public bool TryGetTag(string key, out Tag tag)
   {
     foreach (var t in Tags)
@@ -1424,10 +1454,14 @@ internal sealed class ZoneData
     return n == 0 ? null : at;
   }
 
+  private bool positionsBuilt;
+
   private void BuildPositions()
   {
-    if (rotationAt != null || scaleAt != null || idAt != null || sourceAt != null || seedAt != null || Count == 0)
+    // Once, also when no record has a run (every Positions is then null): a zone of plain records is not scanned again at every Record(k).
+    if (positionsBuilt || Count == 0)
       return;
+    positionsBuilt = true;
     rotationAt = Positions(Flags, RecordFlags.FullRotation);
     scaleAt = Positions(Flags, RecordFlags.Scale);
     idAt = Positions(Flags, RecordFlags.Id);

@@ -59,24 +59,30 @@ internal static class BakedApi
 {
   // Slice B: after every key of a seeded piece is written, while the seeding instance still exists (spec 0.1 item 4). `instance` is null
   // where none exists.
-  internal static void RaiseLiveSeeded(ZDO zdo, GameObject? instance, int source, uint id) => Raise(() => BakedPlacements.RaiseLiveSeeded(zdo, instance, source, id));
+  internal static void RaiseLiveSeeded(ZDO zdo, GameObject? instance, int source, uint id) => BakedPlacements.RaiseLiveSeeded(zdo, instance, source, id);
 
-  internal static void RaiseLayerChanged() => Raise(BakedPlacements.RaiseLayerChanged);
+  internal static void RaiseLayerChanged() => BakedPlacements.RaiseLayerChanged();
 
   // Slice D: after step 8 of a bake, and after an unbake or an undo.
-  internal static void RaiseBaked(OperationInfo operation) => Raise(() => BakedPlacements.RaiseBaked(BakeInfo.Of(operation)));
-  internal static void RaiseUnbaked(OperationInfo operation) => Raise(() => BakedPlacements.RaiseUnbaked(BakeInfo.Of(operation)));
+  internal static void RaiseBaked(OperationInfo operation) => BakedPlacements.RaiseBaked(BakeInfo.Of(operation));
+  internal static void RaiseUnbaked(OperationInfo operation) => BakedPlacements.RaiseUnbaked(BakeInfo.Of(operation));
 
-  // A handler of another mod that throws must not stop the work of this one.
-  private static void Raise(Action raise)
+  // Calls the handlers of an event one by one: a handler of another mod that throws must stop neither the work of this one nor the handlers
+  // after it. A failure is logged, with `what` before it.
+  internal static void Each<T>(T? handlers, Action<T> call, string what = "A handler of the baked placements API threw") where T : Delegate
   {
-    try
+    if (handlers == null)
+      return;
+    foreach (var handler in handlers.GetInvocationList())
     {
-      raise();
-    }
-    catch (Exception e)
-    {
-      BetterContinents.LogError("A handler of the baked placements API threw: " + e);
+      try
+      {
+        call((T)handler);
+      }
+      catch (Exception e)
+      {
+        BetterContinents.LogError(what + ": " + e);
+      }
     }
   }
 }
@@ -175,10 +181,10 @@ public static class BakedPlacements
   public static event Action<BakeInfo>? Baked;
   public static event Action<BakeInfo>? Unbaked;
 
-  internal static void RaiseLayerChanged() => LayerChanged?.Invoke();
-  internal static void RaiseLiveSeeded(ZDO zdo, GameObject? instance, int source, uint id) => LiveSeeded?.Invoke(zdo, instance, source, id);
-  internal static void RaiseBaked(BakeInfo info) => Baked?.Invoke(info);
-  internal static void RaiseUnbaked(BakeInfo info) => Unbaked?.Invoke(info);
+  internal static void RaiseLayerChanged() => BakedApi.Each(LayerChanged, handler => handler());
+  internal static void RaiseLiveSeeded(ZDO zdo, GameObject? instance, int source, uint id) => BakedApi.Each(LiveSeeded, handler => handler(zdo, instance, source, id));
+  internal static void RaiseBaked(BakeInfo info) => BakedApi.Each(Baked, handler => handler(info));
+  internal static void RaiseUnbaked(BakeInfo info) => BakedApi.Each(Unbaked, handler => handler(info));
 
   // The registry of the current layer: what was baked, unbaked, loaded and dropped, in order.
   public static IReadOnlyList<BakeInfo> Operations =>
@@ -278,21 +284,31 @@ public static class BakedPlacements
       var palette = layer.Palette[data.Palette[k]];
       if (palette.Collision != BakedCollision.Boxes && palette.Collision != BakedCollision.Trunk)
         continue;
-      // A cheap test first: nothing within 12 m of the line in the plane can reach it.
+      // A cheap test first: nothing farther from the record's point than its colliders can reach (the entry's reach, times the largest scale)
+      // is on the line. A box can be longer than a zone's 12 m: a wall scaled up reaches far.
       double px = data.WorldX(k), pz = data.WorldZ(k);
-      if (Math.Abs(px - x) > 12.0 || Math.Abs(pz - z) > 12.0)
+      double reach = palette.ColliderReach;
+      if ((data.Flags[k] & RecordFlags.Scale) != 0)
+      {
+        var s = data.Record(k).Scale;
+        reach *= Math.Max(1.0, Math.Max(s.x, Math.Max(s.y, s.z)));
+      }
+      if (Math.Abs(px - x) > reach || Math.Abs(pz - z) > reach)
         continue;
       var record = data.Record(k);
       var rotation = record.Rotation;
       var scale = record.Scale;
       var point = new Vector3((float)px, (float)data.WorldY(k), (float)pz);
+      var anchor = palette.Candidates[0].Anchor;
       if (palette.Collision == BakedCollision.Trunk)
       {
-        if (BoxTop(point, new Vector3(0f, 1.5f, 0f), new Vector3(0.6f, 3f, 0.6f), rotation, scale, x, z, fromY, out double trunk))
+        // A tree's trunk: 0.6 m across and 3 m up from its foot, whatever the tree's size and turn (VALtima's town pack makes it so, and so does the
+        // client's collider). The foot is the piece's pivot: the point less the first candidate's anchor, turned and scaled.
+        var foot = point - rotation * Vector3.Scale(scale, anchor);
+        if (BoxTop(foot, new Vector3(0f, 1.5f, 0f), new Vector3(0.6f, 3f, 0.6f), new Quaternion(0f, 0f, 0f, 1f), Vector3.one, x, z, fromY, out double trunk))
           yield return trunk;
         continue;
       }
-      var anchor = palette.Candidates[0].Anchor;
       foreach (var box in palette.Boxes)
         if (BoxTop(point, box.Centre - anchor, box.Size, rotation, scale, x, z, fromY, out double top))
           yield return top;

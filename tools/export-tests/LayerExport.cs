@@ -80,5 +80,56 @@ internal static class LayerExport
     while (drive2.MoveNext())
       Thread.Sleep(1);
     Program.C(WorldExport.Phase == "Done" && !File.Exists(Path.Combine(dir2, "placements.bcp")) && !File.ReadAllText(Path.Combine(dir2, "README.txt")).Contains("placements.bcp"), "a world without a layer has no placements.bcp, and the README does not mention it");
+
+    Cancelled(work, o, wg);
+  }
+
+  // A cancel while the layer is being written: placements.bcp goes with the rest of the export's files (and the folder the export made). Zone extras of
+  // random bytes (kept as they are, and they do not compress) make a layer of tens of MB, so that the write is still going when the cancel comes.
+  private static void Cancelled(string work, WorldExport.Options o, WorldGenerator wg)
+  {
+    var random = new System.Random(4);
+    var edit = LayerEdit.New("export cancel test");
+    edit.PaletteIndexFor(new PaletteEntry([new Candidate("stone_wall_2x1", 0, 0, 0)], BakedRole.Static, BakedCollision.Prefab));
+    edit.AddRecords([ZoneRecord.CreateYaw(0, 3, 40, 3, 0)]);
+    for (int i = 0; i < 3; i++)
+    {
+      var junk = new byte[8 * 1024 * 1024];
+      random.NextBytes(junk);
+      edit.SetSections(new ZoneKey(10 + i, 0), new ZoneSections { Extras = [new ZoneExtra("junk", junk)] });
+    }
+    var layer = edit.Build().Layer;
+    BC.Settings = new BC.BetterContinentsSettings { EnabledForThisWorld = true, GameTerrain = true, Version = 12, Layer = layer };
+    var dir = Path.Combine(work, "layer-export-cancel");
+    var file = Path.Combine(dir, "placements.bcp");
+    var job = EndToEnd.MakeJob(o, dir, wg);
+    EndToEnd.SetRunning(true);
+    var drive = EndToEnd.Drive(job);
+    bool cancelled = false, sawFile = false, sawPartial = false;
+    while (drive.MoveNext())
+    {
+      if (File.Exists(file))
+      {
+        sawFile = true;
+        try
+        {
+          if (new FileInfo(file).Length < layer.Length)
+            sawPartial = true;
+        }
+        catch (IOException)
+        {
+        }
+      }
+      if (!cancelled && WorldExport.Phase == "Writing the baked layer")
+      {
+        cancelled = true;
+        WorldExport.Cancel();
+      }
+      Thread.Sleep(1);
+    }
+    System.Console.WriteLine($"    a layer of {layer.Length:N0} bytes; the cancel came while the file was {(sawPartial ? "half written" : sawFile ? "there, whole" : "not yet there")}");
+    Program.C(cancelled, "the export was in 'Writing the baked layer' at a frame, and was cancelled there");
+    Program.C(WorldExport.Phase == "Cancelled" && !WorldExport.IsRunning && WorldExport.LastError == null, $"the export ends 'Cancelled' ({WorldExport.Phase})");
+    Program.C(!File.Exists(file) && !Directory.Exists(dir), "placements.bcp is deleted with the folder the export made");
   }
 }
