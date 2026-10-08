@@ -731,7 +731,7 @@ internal static class BakeCrash
       case OperationKind.BakeBox:
         return PlanBake(state, recordsPresent, hasAdopted, standingIndices, missingIndices);
       case OperationKind.Unbake:
-        return PlanUnbake(state, recordsPresent, standingIndices, missingIndices);
+        return PlanUnbake(state, recordsPresent, hasAdopted, standingIndices, missingIndices);
       case OperationKind.Drop:
         return PlanDrop(state, recordsPresent);
       default:
@@ -794,7 +794,10 @@ internal static class BakeCrash
     };
   }
 
-  private static BakeCrashPlan PlanUnbake(BakeState state, bool recordsPresent, int[] standingIndices, int[] missingIndices)
+  // hasAdopted: the unbake frees Live pieces (a Live record's piece stands already; it only loses its bake keys). The keys come off before
+  // the record goes, and go back on after the record is back, whatever the layer holds, so that no keyed piece is left without its record (the
+  // reconciliation would destroy it) and no record without a keyed piece (it would seed a second one).
+  private static BakeCrashPlan PlanUnbake(BakeState state, bool recordsPresent, bool hasAdopted, int[] standingIndices, int[] missingIndices)
   {
     switch (state)
     {
@@ -807,6 +810,7 @@ internal static class BakeCrash
           Final = BakeState.Settled,
           CreatePieces = missingIndices,
           RemoveRecords = recordsPresent,
+          ReleaseAdopted = hasAdopted,
           Why = "finishing the unbake: making the missing pieces, then taking the records out",
         };
       case BakeState.Undoing:
@@ -816,6 +820,7 @@ internal static class BakeCrash
           Final = BakeState.Undone,
           AddRecords = !recordsPresent,
           RemoveStatics = standingIndices,
+          CompleteAdoption = hasAdopted,
           Why = "finishing the undo: the records back, then the pieces it made go",
         };
       default:

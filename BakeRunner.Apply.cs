@@ -119,7 +119,8 @@ internal static partial class BakeRunner
       }
     }
 
-    if (plan.RemoveRecords)
+    // A world with no layer has no records to take out (an operation whose records never reached the settings: its bake was abandoned).
+    if (plan.RemoveRecords && layer.HasLayer)
     {
       var change = data.IsBake ? layer.UndoBake(data.Number) : layer.Remove(data);
       w.RecordsTaken = data.Records.Count;

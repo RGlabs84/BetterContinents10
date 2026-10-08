@@ -299,6 +299,159 @@ internal static partial class Tests
 
   private static BakeArea BakeSecondArea() => BakeArea.OfCircle(133f, 5f, 12f);
 
+  // ------------------------------------------------------------------------------------------------ the other operations
+
+  private static bool BakeSameValues(PieceCopy a, PieceCopy b) => a.Values.SequenceEqual(b.Values);
+
+  // The world after a check, whatever operation was stopped: no operation left unsettled, every piece in exactly one place (an object, or a
+  // record of the layer; or, after a drop, in neither only if the whole drop happened), all the pieces in the same place (an operation is all or
+  // nothing for what it covers), every piece that is an object with the values it had, every town piece with its keys exactly when the layer has
+  // its Live record, and nothing else in the layer or the world.
+  private static string BakeVerifyWorld(BakeFx fx, List<string> bakeKeys, List<PieceCopy> pieces, List<PieceCopy> town, int baseObjects, bool dropped = false)
+  {
+    var journal = new BakeJournal(fx.Folder);
+    foreach (int n in journal.Pending())
+      return $"operation {n} is {(journal.GetState(n)?.ToString() ?? "stateless")}, not settled";
+    var records = BakeRecordsOf(fx);
+    var layerKeys = records.Select(BakeRecordKey).OrderBy(k => k, StringComparer.Ordinal).ToList();
+    int asRecords = 0, asObjects = 0;
+    foreach (var p in pieces)
+    {
+      // The game's save cuts an angle to the half degree below it, and a piece an unbake made has the float noise of its angles, so a piece
+      // that went through a save and a load is within a half degree of the one it was (BakeMath.SamePlace is for the pieces of an undo file,
+      // which carry their own angles).
+      var stand = fx.World.Objects.Values.Where(o => o.Prefab == p.Prefab && Math.Abs(o.X - p.X) < 0.01 && Math.Abs(o.Y - p.Y) < 0.01 && Math.Abs(o.Z - p.Z) < 0.01
+        && BakeMath.AngleBetween(BakeMath.EulerToQuaternion(o.RotX, o.RotY, o.RotZ), BakeMath.EulerToQuaternion(p.RotX, p.RotY, p.RotZ)) <= 0.6).ToList();
+      int record = records.Count(r => BakeIsRecord(r, p) && r.Role != BakedRole.Live);
+      if (stand.Count + record > 1)
+        return $"the {p.PrefabName} at {p.X}, {p.Z} is in {stand.Count} places as an object and {record} as a record";
+      if (stand.Count + record == 0)
+      {
+        if (!dropped)
+          return $"the {p.PrefabName} at {p.X}, {p.Z} is nowhere";
+        continue;
+      }
+      if (stand.Count == 1 && !BakeSameValues(stand[0], p))
+        return $"the {p.PrefabName} at {p.X}, {p.Z} stands with other values ({BakeDescribeValues(stand[0])} for {BakeDescribeValues(p)})";
+      asObjects += stand.Count;
+      asRecords += record;
+    }
+    if (asObjects > 0 && asRecords > 0)
+      return $"{asObjects} pieces are objects and {asRecords} are records: an operation is all or nothing";
+    if (dropped && asObjects > 0)
+      return "a drop made pieces";
+    int liveRecords = 0;
+    foreach (var p in town)
+    {
+      var stand = fx.World.Objects.Values.Where(o => o.Prefab == p.Prefab && Math.Abs(o.X - p.X) < 0.01 && Math.Abs(o.Z - p.Z) < 0.01).ToList();
+      if (stand.Count != 1)
+        return $"the town piece {p.PrefabName} stands {stand.Count} times";
+      bool keyed = BakeHasKeys(stand[0]);
+      if (BakeHasAnyKey(stand[0]) && !keyed)
+        return $"the town piece {p.PrefabName} has some of its keys only";
+      bool live = records.Any(r => r.Role == BakedRole.Live && BakeIsRecord(r, p));
+      if (!dropped && keyed != live)
+        return $"the town piece {p.PrefabName} is {(keyed ? "keyed" : "free")} and the layer {(live ? "holds" : "lacks")} its Live record";
+      if (live)
+        liveRecords++;
+    }
+    if (records.Count != asRecords + liveRecords)
+      return $"the layer holds {records.Count} records for {asRecords} pieces and {liveRecords} town pieces";
+    if (records.Count > 0 && bakeKeys != null && !layerKeys.SequenceEqual(bakeKeys))
+      return "the records in the layer are not the ones the bake made";
+    if (fx.World.Objects.Count != baseObjects + asObjects)
+      return $"the world holds {fx.World.Objects.Count} objects, not {baseObjects + asObjects}";
+    return null;
+  }
+
+  // Finishes what an earlier operation of a fixture left to the next load, as that load would, and starts recording.
+  private static void BakeSettleAndRecord(BakeFx fx)
+  {
+    var plain = new BakeJournal(fx.Folder);
+    foreach (int n in plain.Pending())
+      plain.SetState(n, fx.Port.TryGetOperation(n, out var op) && op.State == OperationState.Undone ? BakeState.Undone : BakeState.Settled);
+    fx.Clock.Count = 0;
+    fx.Clock.Events.Clear();
+    fx.Said.Clear();
+    BakeRunner.Reset();
+    fx.Recording = true;
+    fx.Clock.Applied = what => fx.Moments.Add(fx.Snap(what));
+    fx.Moments.Add(fx.Snap("start"));
+  }
+
+  // A case that begins after earlier operations, each settled: `prior` runs them, `operate` is the one that is stopped.
+  private static BakeCase BakeCaseAfter(string name, bool town, Action<BakeFx> prior, Action<BakeFx> operate, bool dropped = false)
+  {
+    List<PieceCopy> taken = null, adopted = null;
+    List<string> bakeKeys = null;
+    int baseObjects = 0;
+    var test = new BakeCase { Name = name };
+    test.Start = folder =>
+    {
+      BakeRunner.Reset();
+      var fx = BakeNewFx(folder, BakeStandardWorld, out taken);
+      adopted = fx.World.Objects.Values.Where(o => o.PrefabName is "wood_door" or "piece_chest").Select(BakeClone).ToList();
+      baseObjects = fx.World.Objects.Count - taken.Count;
+      prior(fx);
+      bakeKeys = fx.Layer == null ? null : BakeKeysOfSource(fx.Port, 1);
+      if (bakeKeys is { Count: 0 })
+        bakeKeys = null;
+      BakeSettleAndRecord(fx);
+      return fx;
+    };
+    test.Operate = operate;
+    test.Verify = (fx, reference) => BakeVerifyWorld(fx, bakeKeys, taken, town ? adopted : [], baseObjects, dropped);
+    return test;
+  }
+
+  private static void BakeCrashOperationsTest()
+  {
+    Section("crash proof: unbake, undo and drop stopped at every mutation, settled by every pair of saved moments");
+    BakeRunner.Reset();
+    int total = 0;
+    foreach (bool town in new[] { false, true })
+    {
+      var words = town ? "town confirm" : "confirm";
+      string suffix = town ? "-town" : "";
+      var cases = new List<BakeCase>
+      {
+        BakeCaseAfter("unbake" + suffix, town, fx => BakeRun(fx, BakeStandardArea(), words), fx => BakeUnbakeRun(fx, BakeWholeWorld)),
+        BakeCaseAfter("undo-bake" + suffix, town, fx => BakeRun(fx, BakeStandardArea(), words), fx => BakeUndoRun(fx, 1)),
+        BakeCaseAfter("undo-unbake" + suffix, town, fx =>
+        {
+          BakeRun(fx, BakeStandardArea(), words);
+          BakeUnbakeRun(fx, BakeWholeWorld);
+        }, fx => BakeUndoRun(fx, 2)),
+        BakeCaseAfter("drop" + suffix, town, fx => BakeRun(fx, BakeStandardArea(), words), fx => BakeDropRun(fx, new DropScope { Bake = 1 }), dropped: true),
+        BakeCaseAfter("undo-drop" + suffix, town, fx =>
+        {
+          BakeRun(fx, BakeStandardArea(), words);
+          BakeDropRun(fx, new DropScope { Bake = 1 });
+        }, fx => BakeUndoRun(fx, 2), dropped: true),
+      };
+      foreach (var test in cases)
+      {
+        int trials = BakeProve(test, out var problems);
+        total += trials;
+        C(problems.Count == 0, $"{test.Name}: {trials} stops and pairs of saved moments, each settled with every piece in one place" + (problems.Count > 0 ? $" ({problems.Count} wrong; first: " + string.Join(" || ", problems.Take(3)) + ")" : ""));
+      }
+    }
+    // A bake and an unbake of it in one run, the bake still unsettled when the unbake starts.
+    foreach (bool town in new[] { false, true })
+    {
+      var words = town ? "town confirm" : "confirm";
+      var test = BakeCaseAfter("bake-then-unbake" + (town ? "-town" : ""), town, fx => { }, fx =>
+      {
+        BakeRun(fx, BakeStandardArea(), words);
+        BakeUnbakeRun(fx, BakeWholeWorld);
+      });
+      int trials = BakeProve(test, out var problems);
+      total += trials;
+      C(problems.Count == 0, $"{test.Name}: {trials} stops and pairs of saved moments, each settled with every piece in one place" + (problems.Count > 0 ? $" ({problems.Count} wrong; first: " + string.Join(" || ", problems.Take(3)) + ")" : ""));
+    }
+    System.Console.WriteLine($"   {total} states settled in all");
+  }
+
   private static void BakeCrashBakeTest()
   {
     Section("crash proof: a bake stopped at every mutation, settled by every pair of saved moments");

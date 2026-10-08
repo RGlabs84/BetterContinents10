@@ -435,8 +435,16 @@ internal static class BakeMath
     if (AngleBetween(EulerToQuaternion(copy.RotX, copy.RotY, copy.RotZ), there) <= PlaceDegrees)
       return true;
     var saved = RotationAfterSave(copy.RotX, copy.RotY, copy.RotZ);
-    return AngleBetween(EulerToQuaternion(saved.X, saved.Y, saved.Z), there) <= PlaceDegrees;
+    if (AngleBetween(EulerToQuaternion(saved.X, saved.Y, saved.Z), there) <= PlaceDegrees)
+      return true;
+    // The save cuts an angle to the half degree below it, so an angle that is 45 less a little noise (44.9995) is saved as 44.5. A piece an unbake
+    // would make has angles of that kind (a full rotation is kept to 16 bits a component: about two thousandths of a degree), and the object that
+    // is it may be the one a bake took the record of, whose angle is 45 itself: the angles are looked at again without the noise (to 0.01).
+    var clean = RotationAfterSave(Denoise(copy.RotX), Denoise(copy.RotY), Denoise(copy.RotZ));
+    return AngleBetween(EulerToQuaternion(clean.X, clean.Y, clean.Z), there) <= PlaceDegrees;
   }
+
+  private static float Denoise(float degrees) => (float)(Math.Round(degrees * 100.0) / 100.0);
 }
 
 // One object of the world as the matching sees it: where it stands, turned as its ZDO stores it.
