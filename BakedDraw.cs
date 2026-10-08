@@ -360,7 +360,7 @@ internal static class BakedDraw
     int camZx = Mathf.RoundToInt(job.CamX / 64f), camZz = Mathf.RoundToInt(job.CamZ / 64f);
     var keys = new int[job.Zones.Length];
     var sortKeys = new int[job.Zones.Length];
-    var covers = new bool[]?[job.Zones.Length];
+    bool[]?[] covers = new bool[job.Zones.Length][];
     var order = new int[job.Zones.Length];
     for (int i = 0; i < order.Length; i++)
     {

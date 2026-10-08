@@ -102,7 +102,7 @@ internal static class ProxyKit
 
 internal static partial class Tests
 {
-  private static bool Near(Vector3 a, Vector3 b, float tolerance = 0.01f) => Math.Abs(a.x - b.x) < tolerance && Math.Abs(a.y - b.y) < tolerance && Math.Abs(a.z - b.z) < tolerance;
+  private static bool ProxyNear(Vector3 a, Vector3 b, float tolerance = 0.01f) => Math.Abs(a.x - b.x) < tolerance && Math.Abs(a.y - b.y) < tolerance && Math.Abs(a.z - b.z) < tolerance;
 
   // ---- the merge --------------------------------------------------------------------------------------------------------------------------
 
@@ -118,18 +118,18 @@ internal static partial class Tests
     var built = ProxyMerge.Merge(zone, true, BakedShadows.All);
     var chunk = built.Chunks.Single();
     C(chunk.VertexCount == 3 && chunk.IndexCount == 3 && chunk.Layer == 10, "one instance of one triangle: one chunk of 3 vertices and 3 indices");
-    C(Near(chunk.Vertices![0], new Vector3(10, 2, 20)) && Near(chunk.Vertices[1], new Vector3(11, 2, 20)) && Near(chunk.Vertices[2], new Vector3(10, 3, 20)),
+    C(ProxyNear(chunk.Vertices![0], new Vector3(10, 2, 20)) && ProxyNear(chunk.Vertices[1], new Vector3(11, 2, 20)) && ProxyNear(chunk.Vertices[2], new Vector3(10, 3, 20)),
       $"the vertices are the instance's, relative to the zone's origin on x and z ({chunk.Vertices[0]}, {chunk.Vertices[1]}, {chunk.Vertices[2]})");
-    C(chunk.Normals!.All(n => Near(n, Vector3.forward)) && chunk.Indices!.SequenceEqual([0, 1, 2]), "the normals face +z and the winding is as it was");
-    C(Near(new Vector3(chunk.MinX, chunk.MinY, chunk.MinZ), new Vector3(10, 2, 20)) && Near(new Vector3(chunk.MaxX, chunk.MaxY, chunk.MaxZ), new Vector3(11, 3, 20)),
+    C(chunk.Normals!.All(n => ProxyNear(n, Vector3.forward)) && chunk.Indices!.SequenceEqual([0, 1, 2]), "the normals face +z and the winding is as it was");
+    C(ProxyNear(new Vector3(chunk.MinX, chunk.MinY, chunk.MinZ), new Vector3(10, 2, 20)) && ProxyNear(new Vector3(chunk.MaxX, chunk.MaxY, chunk.MaxZ), new Vector3(11, 3, 20)),
       "the chunk's box is that of its vertices");
     C(built.KindCovered.SequenceEqual([true]) && built.Triangles == 1 && built.Vertices == 3 && built.Bytes == 3 * 24 + 3 * 4, "the kind is covered; triangles, vertices and bytes are counted");
 
     // a turn of 90 degrees about y carries x to -z and the normal to +x
     var turned = BakedZoneBuild.Build(ClientKit.Zone(0, 0, (0, 5.0, 1.0, 5.0, 90.0, null)), [kind], 1);
     var tc = ProxyMerge.Merge(turned, true, BakedShadows.All).Chunks.Single();
-    C(Near(tc.Vertices![1], new Vector3(5, 1, 4)) && Near(tc.Vertices[2], new Vector3(5, 2, 5)), $"yaw 90: the triangle's x edge points along -z ({tc.Vertices[1]})");
-    C(tc.Normals!.All(n => Near(n, Vector3.right, 0.02f)), "...and its normal along +x");
+    C(ProxyNear(tc.Vertices![1], new Vector3(5, 1, 4)) && ProxyNear(tc.Vertices[2], new Vector3(5, 2, 5)), $"yaw 90: the triangle's x edge points along -z ({tc.Vertices[1]})");
+    C(tc.Normals!.All(n => ProxyNear(n, Vector3.right, 0.02f)), "...and its normal along +x");
 
     // a part that stands in the piece at a place of its own (a local matrix): the instance's matrix times it
     var movedPiece = ClientKit.NoLods("door", 1f);
@@ -142,7 +142,7 @@ internal static partial class Tests
     var door = ClientKit.Kind("door", movedPiece);
     var doorZone = BakedZoneBuild.Build(ClientKit.Zone(0, 0, (0, 3.0, 1.0, 4.0, 0.0, null)), [door], 1);
     var dc = ProxyMerge.Merge(doorZone, true, BakedShadows.All).Chunks.Single();
-    C(Near(dc.Vertices![0], new Vector3(3, 11, 4)), $"a part's own matrix is applied below the instance's ({dc.Vertices[0]})");
+    C(ProxyNear(dc.Vertices![0], new Vector3(3, 11, 4)), $"a part's own matrix is applied below the instance's ({dc.Vertices[0]})");
 
     // the transform itself, over many matrices with mirrors and uneven scales: the winding stays outward and the normals are the inverse transpose
     var rnd = new Random(20261008);
@@ -164,7 +164,7 @@ internal static partial class Tests
       float len = (float)Math.Sqrt(ProxyKit.Dot(facing, facing));
       bool outward = ProxyKit.Dot(facing, nm[0]) > 0f && ProxyKit.Dot(facing, facing) > 0f;
       bool parallel = len > 1e-6f && ProxyKit.Dot(facing, expected) / len > 0.9999f;
-      bool normalOk = Near(nm[0], expected, 0.001f) && Near(nm[1], expected, 0.001f);
+      bool normalOk = ProxyNear(nm[0], expected, 0.001f) && ProxyNear(nm[1], expected, 0.001f);
       if (!(outward && parallel && normalOk))
         wrong++;
     }
@@ -176,7 +176,7 @@ internal static partial class Tests
     var mn = new Vector3[3];
     var mi = new int[3];
     ProxyMerge.Transform(tri, mirror, 0f, 0f, mv, mn, 0, mi, 0);
-    C(mi.SequenceEqual([0, 2, 1]) && Near(mv[1], new Vector3(-1, 0, 0)) && Near(mn[0], Vector3.forward), "a mirrored scale (-1, 1, 1): the second and third indices swap, the normal still faces +z");
+    C(mi.SequenceEqual([0, 2, 1]) && ProxyNear(mv[1], new Vector3(-1, 0, 0)) && ProxyNear(mn[0], Vector3.forward), "a mirrored scale (-1, 1, 1): the second and third indices swap, the normal still faces +z");
     var unmirrored = BakedMath.Frame(BakedMath.FromYaw(0, 2f, 3f, 1f), Vector3.zero);
     ProxyMerge.Transform(tri, unmirrored, 0f, 0f, mv, mn, 0, mi, 0);
     C(mi.SequenceEqual([0, 1, 2]), "an unmirrored one keeps the order");
@@ -362,7 +362,7 @@ internal static partial class Tests
     Buffer.BlockCopy(values, 0, bytes, 0, 72);
     var pos = ProxyDecode.ReadVectors(bytes, 3, 24, 0, VertexAttributeFormat.Float32, 3, false);
     var nrm = ProxyDecode.ReadVectors(bytes, 3, 24, 12, VertexAttributeFormat.Float32, 3, true);
-    C(pos != null && Near(pos[1], new Vector3(1, 0, 0)) && Near(pos[2], new Vector3(0, 1, 0)) && nrm != null && nrm.All(n => Near(n, Vector3.forward)), "positions and normals are read from their offsets in a stride");
+    C(pos != null && ProxyNear(pos[1], new Vector3(1, 0, 0)) && ProxyNear(pos[2], new Vector3(0, 1, 0)) && nrm != null && nrm.All(n => ProxyNear(n, Vector3.forward)), "positions and normals are read from their offsets in a stride");
     C(ProxyDecode.ReadVectors(bytes, 3, 24, 0, VertexAttributeFormat.Float32, 3, false)!.Length == 3 && ProxyDecode.ReadVectors(bytes, 4, 24, 0, VertexAttributeFormat.Float32, 3, false) == null,
       "too few bytes for the vertices claimed: nothing");
     C(ProxyDecode.ReadVectors(bytes, 3, 24, 20, VertexAttributeFormat.Float32, 3, false) == null && ProxyDecode.ReadVectors(bytes, 3, 24, 0, VertexAttributeFormat.Float32, 2, false) == null, "an attribute that overruns its stride, or has fewer than three components: nothing");
@@ -375,7 +375,7 @@ internal static partial class Tests
     h[24] = 127; h[25] = 0; h[26] = 0x81; h[27] = 0;          // (1, 0, -1)
     var hp = ProxyDecode.ReadVectors(h, 2, 16, 0, VertexAttributeFormat.Float16, 4, false);
     var hn = ProxyDecode.ReadVectors(h, 2, 16, 8, VertexAttributeFormat.SNorm8, 4, true);
-    C(hp != null && Near(hp[0], new Vector3(1, 2, -2)) && hp[1] == hp[0] && hn != null && Near(hn[0], Vector3.up) && Near(hn[1], new Vector3(1, 0, -1)), "half precision positions and SNorm8 normals");
+    C(hp != null && ProxyNear(hp[0], new Vector3(1, 2, -2)) && hp[1] == hp[0] && hn != null && ProxyNear(hn[0], Vector3.up) && ProxyNear(hn[1], new Vector3(1, 0, -1)), "half precision positions and SNorm8 normals");
     C(ProxyDecode.ReadVectors(h, 2, 16, 8, VertexAttributeFormat.SNorm8, 4, false) == null && ProxyDecode.ReadVectors(h, 2, 16, 0, VertexAttributeFormat.UNorm8, 4, true) == null, "a normalised format is not a position; a format that is not read is not read");
 
     // indices
@@ -391,10 +391,10 @@ internal static partial class Tests
     Vector3[] vertices = [new(0, 0, 0), new(1, 0, 0), new(0, 1, 0), new(5, 5, 5), new(6, 5, 5), new(5, 6, 5)];
     var second = ProxyShape.Make(vertices, null, [3, 4, 5]);
     C(second != null && second.Vertices.Length == 3 && second.Vertices[0] == new Vector3(5, 5, 5) && second.Indices.SequenceEqual([0, 1, 2]), "only the vertices the submesh's triangles use are kept");
-    C(second!.Normals.All(n => Near(n, Vector3.forward)), "missing normals are made up from the triangles");
+    C(second!.Normals.All(n => ProxyNear(n, Vector3.forward)), "missing normals are made up from the triangles");
     Vector3[] given = [Vector3.up, Vector3.up, Vector3.up, Vector3.right, Vector3.right, Vector3.zero];
     var kept = ProxyShape.Make(vertices, given, [3, 4, 5]);
-    C(Near(kept!.Normals[0], Vector3.right) && Near(kept.Normals[2], Vector3.up), "given normals are kept, in the vertices' new places; one of no length becomes up");
+    C(ProxyNear(kept!.Normals[0], Vector3.right) && ProxyNear(kept.Normals[2], Vector3.up), "given normals are kept, in the vertices' new places; one of no length becomes up");
     C(ProxyShape.Make(vertices, null, [0, 1, 9]) == null && ProxyShape.Make(vertices, null, []) == null && ProxyShape.Make([], null, [0, 1, 2]) == null, "an index outside the vertices, or no triangle: no shape");
     C(ProxyShape.Make(vertices, null, [0, 1, 2, 3])!.Triangles == 1, "a stray index after the last whole triangle is left out");
   }

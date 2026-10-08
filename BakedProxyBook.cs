@@ -157,7 +157,6 @@ internal sealed class ProxyBook
   private int ringVersion = -1;
   private BakedShadows policy = BakedShadows.All;
   private float now;
-  private Vector3 camera;
 
   // statistics
   private int builds, uploads, failures, budgetSkips, drawsLastFrame;
@@ -174,7 +173,6 @@ internal sealed class ProxyBook
   internal void Tick(in ProxyFrame f)
   {
     now = f.Now;
-    camera = f.Camera;
     if (f.Hidden)
     {
       // nothing is drawn: what was taken back goes at once
