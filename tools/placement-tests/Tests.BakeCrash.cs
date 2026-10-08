@@ -98,6 +98,18 @@ internal static partial class Tests
     C(b5.Final == BakeState.Undone && !b5.AddRecords && b5.RemoveStatics.SequenceEqual([2]), "undoing an unbake, records back: the pieces left go. " + BakeCrashSay(b5));
     C(!BakePlan(Unbake, BakeState.Removing, true, "###").Changes && BakePlan(Unbake, BakeState.Removing, true, "###").Final == BakeState.Abandoned, "a state an unbake cannot be in is abandoned, touching nothing");
 
+    Section("crash rules: an unbake that frees Live pieces (their keys come off before their records go, and go back on after they are back)");
+    var f1 = BakePlan(Unbake, BakeState.Unbaking, true, "...", adopted: true);
+    C(f1.Final == BakeState.Settled && f1.ReleaseAdopted && !f1.CompleteAdoption && f1.RemoveRecords && f1.CreatePieces.SequenceEqual([0, 1, 2]), "Unbaking: the keys come off, whatever the layer holds. " + BakeCrashSay(f1));
+    var f2 = BakePlan(Unbake, BakeState.Unbaking, false, "###", adopted: true);
+    C(f2.ReleaseAdopted && !f2.RemoveRecords && f2.Final == BakeState.Settled, "Unbaking, the records already out (the keys may not be): the keys come off. " + BakeCrashSay(f2));
+    var f3 = BakePlan(Unbake, BakeState.Undoing, false, "###", adopted: true);
+    C(f3.Final == BakeState.Undone && f3.CompleteAdoption && !f3.ReleaseAdopted && f3.AddRecords && f3.RemoveStatics.SequenceEqual([0, 1, 2]), "Undoing: the records back, the keys back on, the pieces it made go. " + BakeCrashSay(f3));
+    var f4 = BakePlan(Unbake, BakeState.Undoing, true, "...", adopted: true);
+    C(f4.CompleteAdoption && !f4.AddRecords && f4.Changes, "Undoing, the records back already (the keys may not be): the keys go back on. " + BakeCrashSay(f4));
+    C(!BakePlan(Unbake, BakeState.Prepared, true, "...", adopted: true).Changes && !BakePlan(Unbake, BakeState.Unbaking, true, "...", adopted: false).ReleaseAdopted && !BakePlan(Unbake, BakeState.Undoing, false, "###", adopted: false).CompleteAdoption,
+      "Prepared touches nothing, and an unbake that frees nobody touches no keys");
+
     Section("crash rules: drop");
     const OperationKind Drop = OperationKind.Drop;
     C(BakePlan(Drop, BakeState.Prepared, true, "").Final == BakeState.Abandoned, "a drop whose layer still has the records did not take effect");
@@ -313,6 +325,60 @@ internal static partial class Tests
     return sc;
   }
 
+  // An unbake of a bake whose records include Live ones: the pieces are made, the Live pieces lose their keys, then the records come out.
+  private static BakeScenario BakeScenarioUnbakeFreed()
+  {
+    var sc = new BakeScenario
+    {
+      Name = "unbake that frees Live pieces",
+      Kind = OperationKind.Unbake,
+      Adopted = true,
+      Initial = new BakeSim { State = BakeState.Settled, Records = true, World = [false, false, false], Keyed = [true, true] },
+    };
+    sc.Steps.Add(s => s.State = BakeState.Prepared);
+    sc.Steps.Add(s => s.State = BakeState.Unbaking);
+    for (int i = 0; i < 3; i++)
+    {
+      int k = i;
+      sc.Steps.Add(s => s.World[k] = true);
+    }
+    sc.Steps.Add(s => s.Keyed[0] = false);
+    sc.Steps.Add(s => s.Keyed[1] = false);
+    sc.Steps.Add(s => s.Records = false);
+    sc.Expect = (final, records, world, keyed) =>
+    {
+      if (final == BakeState.Settled)
+        return (!records ? null : "settled with the records in") ?? BakeAll(world, true, "the pieces") ?? BakeAll(keyed, false, "the keys");
+      if (final == BakeState.Abandoned)
+        return (records ? null : "abandoned without the records") ?? BakeAll(world, false, "the pieces") ?? BakeAll(keyed, true, "the keys");
+      return "an unbake ends " + final;
+    };
+    return sc;
+  }
+
+  private static BakeScenario BakeScenarioUndoUnbakeFreed()
+  {
+    var sc = new BakeScenario
+    {
+      Name = "undo of an unbake that freed Live pieces",
+      Kind = OperationKind.Unbake,
+      Adopted = true,
+      Initial = new BakeSim { State = BakeState.Unbaking, Records = false, World = [true, true, true], Keyed = [false, false] },
+    };
+    sc.Steps.Add(s => s.State = BakeState.Undoing);
+    sc.Steps.Add(s => s.Records = true);
+    sc.Steps.Add(s => s.Keyed[0] = true);
+    sc.Steps.Add(s => s.Keyed[1] = true);
+    for (int i = 0; i < 3; i++)
+    {
+      int k = i;
+      sc.Steps.Add(s => s.World[k] = false);
+    }
+    sc.Expect = (final, records, world, keyed) =>
+      final != BakeState.Undone ? "an undo ends " + final : (records ? null : "undone without the records") ?? BakeAll(world, false, "the pieces") ?? BakeAll(keyed, true, "the keys");
+    return sc;
+  }
+
   private static BakeScenario BakeScenarioDrop(bool undo)
   {
     var sc = new BakeScenario
@@ -346,6 +412,7 @@ internal static partial class Tests
     {
       BakeScenarioBake(false, true), BakeScenarioBake(false, false), BakeScenarioBake(true, true), BakeScenarioBake(true, false),
       BakeScenarioUndoBake(false), BakeScenarioUndoBake(true), BakeScenarioUnbake(), BakeScenarioUndoUnbake(), BakeScenarioDrop(false), BakeScenarioDrop(true),
+      BakeScenarioUnbakeFreed(), BakeScenarioUndoUnbakeFreed(),
     };
     int total = 0;
     foreach (var sc in scenarios)

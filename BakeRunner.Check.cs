@@ -58,6 +58,13 @@ internal static partial class BakeRunner
       ctx.Say($"bc_bake: the undo files of this world cannot be listed ({e.Message}); nothing was checked.");
       return result;
     }
+    // A settings file that is there and was not read has no layer to settle against: the records may be in it. Whatever is pending waits.
+    if (pending.Count > 0 && ctx.Convert?.Kind == BakeWorldKind.Unreadable)
+    {
+      ctx.Say($"bc_bake: this world has a Better Continents settings file that was not read (a newer Better Continents wrote it, or it is damaged), so its layer is not here to settle {pending.Count} unfinished "
+        + $"operation{(pending.Count == 1 ? "" : "s")} against. Nothing is changed; the undo files wait.");
+      return result;
+    }
     foreach (int number in pending)
     {
       try

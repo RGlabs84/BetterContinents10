@@ -276,4 +276,34 @@ internal static partial class Tests
     C(BakeRunner.Stuck == null, "a stop before the undo file is written leaves nothing half done to hold the world for");
     BakeRunner.Reset();
   }
+
+  private static void BakeCheckGuardTest()
+  {
+    Section("check: a world whose settings did not load, or never reached the disk");
+    BakeRunner.Reset();
+    var rec = BakeNewFx("guard", BakeStandardWorld, out var taken, recording: true);
+    BakeRun(rec, BakeStandardArea());
+    var last = rec.Moments.Count - 1;
+    // The statics are gone from the objects, and the settings (the layer) are as they were before the bake.
+    var unreadable = BakeReload(rec, rec.Moments[last], rec.Moments[0], rec.Moments[last], "guard-unreadable", 32000);
+    unreadable.Convert.Kind = BakeWorldKind.Unreadable;
+    var before = unreadable.Snap("before");
+    var result = BakeRunner.CheckPending(unreadable.Ctx);
+    C(result.Examined == 0 && BakeSameState(before, unreadable.Snap("after")), "a settings file that was not read: nothing is settled and nothing is changed");
+    C(unreadable.Said.Count == 1 && unreadable.Said[0].Contains("was not read") && unreadable.Said[0].Contains("the undo files wait"), "and it says so: " + string.Join(" | ", unreadable.Said));
+
+    var vanilla = BakeReload(rec, rec.Moments[last], rec.Moments[0], rec.Moments[last], "guard-vanilla", 32001);
+    vanilla.Convert.Kind = BakeWorldKind.Vanilla;
+    var result2 = BakeRunner.CheckPending(vanilla.Ctx);
+    C(result2.Failed == 1 && result2.Settled == 0 && vanilla.Layer == null && vanilla.World.Objects.Count == 5, "a world with no settings (a first save after 'convert' that was cut) cannot take the records back: the operation stays unsettled");
+    C(vanilla.Said.Any(l => l.Contains("this world's settings did not reach the disk") && l.Contains("'bc_bake undo 1 confirm' makes its pieces again")), "and says how to get the pieces back: " + string.Join(" | ", vanilla.Said));
+    C(new BakeJournal(vanilla.Folder).Pending().SequenceEqual([1]), "it is still pending");
+    // The undo makes the pieces again, with no layer to change.
+    vanilla.Said.Clear();
+    BakeRunner.Reset();
+    BakeUndoRun(vanilla, 1);
+    C(taken.All(p => vanilla.World.Objects.Values.Any(o => BakeMath.SamePlace(p, o.Prefab, o.X, o.Y, o.Z, o.RotX, o.RotY, o.RotZ) && BakeSameValues(o, p))) && vanilla.Layer == null, "'bc_bake undo 1 confirm' makes the eight pieces again, with their values, and the world still has no layer: " + string.Join(" | ", vanilla.Said));
+    C(new BakeJournal(vanilla.Folder).GetState(1) == BakeState.Undoing, "it ends as any undo does");
+    BakeRunner.Reset();
+  }
 }
