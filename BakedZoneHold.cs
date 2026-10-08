@@ -24,6 +24,22 @@ internal static class BakedZoneHold
   /// <summary>A zone waits at most this long (seconds) for its colliders: a login at a logout point has no timeout of its own.</summary>
   internal const float Timeout = 10f;
 
+  /// <summary>How far round a zone's centre the grass is cut again when its hold ends, in metres. The game builds a grass patch (8 m) once, while
+  /// the player is near, and a zone that is held does not count as loaded (Heightmap.FindBiomeClutter says no biome there), so a patch built
+  /// meanwhile stays bare until it is cut again. A zone reaches 32 m from its centre: 64 m takes in every patch that touches it, with a margin.</summary>
+  internal const float GrassRadius = 64f;
+
+  // The game's side of the hold, as fields for the offline tests to stand in for (as BakedGround's are): the zone system whose loading list is
+  // used, a ZDO made without the engine, the clock (BakedClient's) and the grass.
+  internal static Func<ZoneSystem?> GameZones = () => ZoneSystem.instance;
+  internal static Func<ZDO> NewZdo = () => new ZDO();
+  internal static Action<Vector3, float> ResetGrass = (centre, radius) =>
+  {
+    var clutter = ClutterSystem.instance;
+    if (clutter)
+      clutter.ResetGrass(centre, radius);
+  };
+
   private sealed class Hold(ZDO placeholder, Vector2s zone, float since)
   {
     internal readonly ZDO Placeholder = placeholder;
@@ -44,7 +60,7 @@ internal static class BakedZoneHold
   /// it files the zone's hold under), so that is all it has.</summary>
   internal static ZDO MakePlaceholder(ZoneKey zone)
   {
-    var zdo = new ZDO();
+    var zdo = NewZdo();
     zdo.Init();
     zdo.m_position = zone.Centre;
     zdo.Type = ZDO.ObjectType.Solid;
@@ -54,24 +70,28 @@ internal static class BakedZoneHold
   /// <summary>Holds a zone (if it is not held already).</summary>
   internal static void Take(ZoneKey zone)
   {
-    var system = ZoneSystem.instance;
+    var system = GameZones();
     if (system == null || Holds.ContainsKey(zone))
       return;
     var zdo = MakePlaceholder(zone);
     system.SetLoadingInZone(zdo);
-    Holds[zone] = new Hold(zdo, zone.ToVector2s(), Time.realtimeSinceStartup);
+    Holds[zone] = new Hold(zdo, zone.ToVector2s(), BakedClient.Now());
   }
 
-  /// <summary>Lets a zone go: its placeholder comes out of the game's list, and the zone's entry with it when nothing else holds the zone.</summary>
+  /// <summary>Lets a zone go: its placeholder comes out of the game's list, and the zone's entry with it when nothing else holds the zone. The
+  /// grass round the zone is cut again then (GrassRadius): a patch built while the zone was held has no biome to grow on.</summary>
   internal static void Release(ZoneKey zone)
   {
     if (!Holds.TryGetValue(zone, out var hold))
       return;
     Holds.Remove(zone);
-    var system = ZoneSystem.instance;
+    var system = GameZones();
     var zones = system != null ? system.m_loadingObjectsInZones : null;
     if (zones != null)
       Remove(zones, hold.Zone, hold.Placeholder);
+    // (with no world there is no grass to cut)
+    if (system != null)
+      ResetGrass(zone.Centre, GrassRadius);
   }
 
   /// <summary>Takes one placeholder out of a loading list and the zone's entry when it was the last: by reference, since ZDO equality is by id and
@@ -102,7 +122,7 @@ internal static class BakedZoneHold
   {
     if (Holds.Count == 0)
       return;
-    float now = Time.realtimeSinceStartup;
+    float now = BakedClient.Now();
     Expired.Clear();
     foreach (var kv in Holds)
       if (now - kv.Value.Since >= Timeout)

@@ -90,6 +90,13 @@ internal static class BakedClient
   internal const float HandoverCap = 10f, AppliedCap = 10f;
   private const float ResolveBudgetMs = 4f;
 
+  // The game's side of the manager, as fields for the offline tests to stand in for: the clock, and whether this machine has a world, a layer and a
+  // screen to draw on (a headless server, a machine with no graphics, the menu and the loading screen have none).
+  internal static Func<float> Now = () => Time.realtimeSinceStartup;
+  internal static Func<bool> Active = () =>
+    BakedLayerStore.Current != null && ZNetScene.instance != null && ZoneSystem.instance != null && ZNet.instance != null && !ZNet.instance.IsDedicated()
+    && SystemInfo.graphicsDeviceType != GraphicsDeviceType.Null;
+
   private static BakedClientHost? host;
   private static bool subscribed;
   private static BakedLayer? layer;
@@ -107,6 +114,13 @@ internal static class BakedClient
   private static readonly HashSet<string> Reported = [];
   private static readonly List<ZDO> ZdoScratch = [];
 
+  // ---- what the offline tests look at ----------------------------------------------------------------------------------------------
+
+  /// <summary>The layer this manager works for now, and its zones' slots (for the offline tests).</summary>
+  internal static BakedLayer? CurrentLayer => layer;
+  internal static IReadOnlyDictionary<ZoneKey, ZoneSlot> SlotsNow => Slots;
+  internal static ZoneSlot SlotOf(ZoneKey key) => Slot(key);
+
   // ---- what the rest of the mod calls ---------------------------------------------------------------------------------------------
 
   /// <summary>
@@ -119,7 +133,7 @@ internal static class BakedClient
     var current = layer;
     if (current == null || !current.TryGetZoneRow(key, out var row) || row.Placements == 0)
       return true;
-    if (!Slots.TryGetValue(key, out var slot) || !slot.WantsColliders(Time.realtimeSinceStartup))
+    if (!Slots.TryGetValue(key, out var slot) || !slot.WantsColliders(Now()))
       return true;
     return slot.Dirty ? false : SlotReady(slot);
   }
@@ -207,10 +221,18 @@ internal static class BakedClient
 
   // A layer or a patch is installed (BakedLayerStore.Changed, on the main thread; zones null: all of them). Where this client is not drawing
   // anything (no world up, or a machine with no screen) BakedTransfer answers Applied itself: ClientReports is false until the manager runs.
-  private static void OnLayerChanged(BakedLayer? old, BakedLayer? next, ZoneKey[]? changed)
+  internal static void OnLayerChanged(BakedLayer? old, BakedLayer? next, ZoneKey[]? changed)
   {
     try
     {
+      // The layer goes (a world is left, a session starts, a layer is dropped): all of it goes with it now, also where there is nothing up to
+      // draw it (the menu, a loading screen). The next frame would find it out in Prepare, but nothing waits for a frame.
+      if (next == null)
+      {
+        if (scene != null || layer != null || Slots.Count > 0)
+          Teardown();
+        return;
+      }
       if (!Active())
         return;
       // the manager is not running in this world yet: this is its first layer, and nothing is waiting for it
@@ -253,12 +275,14 @@ internal static class BakedClient
     ringsDirty = true;
     // the changed zones inside the collider ring must have their new colliders before the server hears Applied
     var wait = new HashSet<ZoneKey>();
-    float now = Time.realtimeSinceStartup;
+    float now = Now();
     foreach (var s in Slots.Values)
       if (s.WantsColliders(now) && (changed == null || Array.IndexOf(changed, s.Key) >= 0))
         wait.Add(s.Key);
-    if (old != null)
-      Pending.Add(new Applying(next.Revision, wait, now));
+    // After EVERY change, the first layer of a world too: BakedTransfer.Install leaves the answer to this manager as soon as it runs
+    // (ClientReports), and the machine that runs the world waits for it (Push). The zones of a first layer are not known until the rings are
+    // made, a moment from now (FillApplying).
+    Pending.Add(new Applying(next.Revision, wait, now) { Fill = old == null });
   }
 
   private sealed class Applying(uint revision, HashSet<ZoneKey> zones, float since)
@@ -266,12 +290,28 @@ internal static class BakedClient
     internal readonly uint Revision = revision;
     internal readonly HashSet<ZoneKey> Zones = zones;
     internal readonly float Since = since;
+    /// <summary>The zones are taken in when the rings have been made (the first layer of a world).</summary>
+    internal bool Fill;
   }
 
   private static readonly List<Applying> Pending = [];
 
+  // The first layer of a world is waited for in the zones of the collider ring, once the rings are made.
+  internal static void FillApplying(float now)
+  {
+    foreach (var p in Pending)
+    {
+      if (!p.Fill)
+        continue;
+      p.Fill = false;
+      foreach (var s in Slots.Values)
+        if (s.WantsColliders(now))
+          p.Zones.Add(s.Key);
+    }
+  }
+
   // every changed zone inside the collider ring has its new build with its colliders standing, or has left the ring, or 10 s have passed
-  private static void CheckApplied(float now)
+  internal static void CheckApplied(float now)
   {
     for (int i = 0; i < Pending.Count; i++)
     {
@@ -297,11 +337,6 @@ internal static class BakedClient
 
   // ---- the frame -------------------------------------------------------------------------------------------------------------------
 
-  // Whether this client draws and builds anything now: a layer, a world, a camera, a machine with a screen.
-  private static bool Active() =>
-    BakedLayerStore.Current != null && ZNetScene.instance != null && ZoneSystem.instance != null && ZNet.instance != null && !ZNet.instance.IsDedicated()
-    && SystemInfo.graphicsDeviceType != GraphicsDeviceType.Null;
-
   // LateUpdate of the host
   internal static void Frame()
   {
@@ -317,7 +352,7 @@ internal static class BakedClient
 
   // The world and the layer this manager works for: starts it in a new world, takes in a layer swapped without a Changed event, and lets go of
   // everything when there is no world or no layer. False when there is nothing to do.
-  private static bool Prepare()
+  internal static bool Prepare()
   {
     var current = BakedLayerStore.Current;
     if (current == null || !Active())
@@ -348,7 +383,7 @@ internal static class BakedClient
     var cam = Utils.GetMainCamera();
     if (cam == null)
       return;
-    float now = Time.realtimeSinceStartup;
+    float now = Now();
     integratedThisFrame = 0;
 
     var cz = ZoneKey.OfPoint(cam.transform.position);
@@ -360,6 +395,7 @@ internal static class BakedClient
       ringsDirty = false;
       Rings(now);
     }
+    FillApplying(now);
 
     BakedZoneHold.Expire();
     Advance(now);
@@ -448,7 +484,7 @@ internal static class BakedClient
   {
     if (!Slots.TryGetValue(key, out var s))
     {
-      float now = Time.realtimeSinceStartup;
+      float now = Now();
       Slots[key] = s = new ZoneSlot(key) { LeftDraw = now, LeftCollider = now };
     }
     return s;
@@ -757,7 +793,7 @@ internal static class BakedClient
   {
     if (!Prepare())
       return false;
-    float now = Time.realtimeSinceStartup;
+    float now = Now();
     var centre = ZoneKey.OfPoint(point);
     bool waits = false;
     for (int dz = -1; dz <= 1; dz++)
