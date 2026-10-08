@@ -109,6 +109,31 @@ internal static class BakedMath
     return new Linear { M00 = c * sx, M02 = s * sz, M11 = sy, M20 = -s * sx, M22 = c * sz };
   }
 
+  /// <summary>Unity's Quaternion.Euler(x, y, z) in degrees (a turn about z, then x, then y: R = Ry * Rx * Rz), scaled along its own axes. Managed
+  /// arithmetic only, so a worker may use it.</summary>
+  internal static Linear Euler(float xDegrees, float yDegrees, float zDegrees, float sx = 1f, float sy = 1f, float sz = 1f)
+  {
+    double rx = xDegrees * (Math.PI / 180.0), ry = yDegrees * (Math.PI / 180.0), rz = zDegrees * (Math.PI / 180.0);
+    double cx = Math.Cos(rx), sinx = Math.Sin(rx), cy = Math.Cos(ry), siny = Math.Sin(ry), cz = Math.Cos(rz), sinz = Math.Sin(rz);
+    return new Linear
+    {
+      M00 = (float)(cy * cz + siny * sinx * sinz) * sx, M01 = (float)(-cy * sinz + siny * sinx * cz) * sy, M02 = (float)(siny * cx) * sz,
+      M10 = (float)(cx * sinz) * sx, M11 = (float)(cx * cz) * sy, M12 = (float)(-sinx) * sz,
+      M20 = (float)(-siny * cz + cy * sinx * sinz) * sx, M21 = (float)(siny * sinz + cy * sinx * cz) * sy, M22 = (float)(cy * cx) * sz,
+    };
+  }
+
+  /// <summary>The matrix of a translation, a 3 x 3 and nothing else.</summary>
+  internal static Matrix4x4 Frame(in Linear a, Vector3 t)
+  {
+    var m = new Matrix4x4();
+    m.m00 = a.M00; m.m01 = a.M01; m.m02 = a.M02; m.m03 = t.x;
+    m.m10 = a.M10; m.m11 = a.M11; m.m12 = a.M12; m.m13 = t.y;
+    m.m20 = a.M20; m.m21 = a.M21; m.m22 = a.M22; m.m23 = t.z;
+    m.m33 = 1f;
+    return m;
+  }
+
   /// <summary>A rotation by a quaternion (x, y, z, w; normalised here), scaled along its own axes.</summary>
   internal static Linear FromQuaternion(float qx, float qy, float qz, float qw, float sx, float sy, float sz)
   {
@@ -242,6 +267,7 @@ internal static class BakedZoneBuild
     var lod = new Vector4[n];
     var combo = new byte[n];
     var bucket = new byte[n];
+    uint[]? looks = null;   // each record's look hash, for the pieces whose parts RandomPieceRotation turns
     var welds = new Dictionary<int, Weld>();
     var convex = new List<ConvexCollider>();
     var copies = new List<LocalProp>();
@@ -319,6 +345,9 @@ internal static class BakedZoneBuild
         var r = BakedMath.Point(m, piece.LodCenter);
         lod[i] = new Vector4(r.x, r.y, r.z, s * s);
         Grow(boxes, cell * 6, m.m03, m.m13, m.m23, piece.Radius * s);
+        // a part RandomPieceRotation turns: its steps come from the record's place (BakedLook.RotationStep), the same on every machine
+        if (piece.HasRotation)
+          (looks ??= new uint[n])[i] = BakedFormat.LookHash(px, py, pz);
         if (piece.Slots.Length > 0 || piece.HasBuckets)
         {
           uint h = BakedFormat.LookHash(px, py, pz);
@@ -393,7 +422,10 @@ internal static class BakedZoneBuild
       if (ki.Combo != null) ki.Combo[pos] = combo[i];
       if (ki.Bucket != null) ki.Bucket[pos] = bucket[i];
       for (int j = 0; j < piece.Locals.Length; j++)
-        ki.Locals[j][pos] = BakedMath.Mul(root[i], piece.Locals[j]);
+      {
+        var turned = j < piece.LocalRotations.Length ? piece.LocalRotations[j] : null;
+        ki.Locals[j][pos] = BakedMath.Mul(root[i], turned != null ? turned.At(looks![i]) : piece.Locals[j]);
+      }
       float reach = piece.Radius * (float)Math.Sqrt(lod[i].w);
       Grow(ki.CellBox, cell * 6, root[i].m03, root[i].m13, root[i].m23, reach);
     }

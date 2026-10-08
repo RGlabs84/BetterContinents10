@@ -66,6 +66,90 @@ internal static class BakedLook
 
   /// <summary>The variant of MaterialVariation slot <paramref name="slot"/> (its ZDO key is "MatVar" + slot) for a record's look hash.</summary>
   internal static int Variant(uint hash, int slot, IReadOnlyList<float> weights) => Variant(BakedFormat.VariantUnit(hash, slot), weights);
+
+  /// <summary>
+  /// The step (0 up to, not including, <paramref name="steps"/>) that RandomPieceRotation's axis <paramref name="axis"/> (0 x, 1 y, 2 z) turns the
+  /// part <paramref name="salt"/> to, for a record's look hash. The game seeds Unity's Random with (int)x * (int)(y * 10) * (int)(z * 100) of
+  /// the part's place and asks it for each axis in turn; that generator is not thread safe and a different seed gives an equal-looking piece, so
+  /// the drawing uses its own: a murmur3 finish of the record's look hash mixed with the part's salt (its place among its siblings, so the parts
+  /// of one piece turn alone) and the axis. Deterministic and pure, so every machine draws the same piece. Fewer than two steps is no turn.
+  /// </summary>
+  internal static int RotationStep(uint hash, uint salt, int axis, int steps)
+  {
+    if (steps <= 1)
+      return 0;
+    unchecked
+    {
+      uint h = hash ^ (salt * 0x85EBCA6Bu) ^ ((uint)(axis + 1) * 0x9E3779B9u);
+      h ^= h >> 16;
+      h *= 0x85EBCA6Bu;
+      h ^= h >> 13;
+      h *= 0xC2B2AE35u;
+      h ^= h >> 16;
+      return (int)(h % (uint)steps);
+    }
+  }
+}
+
+/// <summary>
+/// A part that RandomPieceRotation turns: when the piece wakes, the component sets its object's local rotation to Euler(x, y, z), each angle a
+/// random whole step of 360 / steps degrees (or 0 on an axis that does not rotate). Its place and scale stay, and the prefab's own rotation
+/// of that object is replaced. The part's matrix (to the piece's root) is therefore Parent * (place, Euler, scale) * Below, with Parent the object's
+/// parent to the root and Below the renderer relative to the object; a zone works it out for every instance from the record's look hash.
+/// </summary>
+internal sealed class PartRotation
+{
+  /// <summary>Which axes turn, and in how many steps (RandomPieceRotation.m_rotateX/Y/Z and m_stepsX/Y/Z).</summary>
+  internal bool RotateX, RotateY, RotateZ;
+  internal int StepsX = 4, StepsY = 4, StepsZ = 4;
+  /// <summary>The object's place among its siblings from the root down, hashed: parts of one piece that turn alone get different steps.</summary>
+  internal uint Salt;
+  /// <summary>The object the component is on (the harvest only: parts under it share its entry).</summary>
+  internal Transform? Owner;
+  /// <summary>The object's parent to the root (with the root's own scale), the object's local place and scale, the renderer relative to the object.</summary>
+  internal Matrix4x4 Parent = Matrix4x4.identity, Below = Matrix4x4.identity;
+  internal Vector3 Position, Scale = Vector3.one;
+
+  /// <summary>The step each axis takes for a look hash (0 on an axis that does not rotate).</summary>
+  internal (int X, int Y, int Z) StepsFor(uint hash) => (
+    RotateX ? BakedLook.RotationStep(hash, Salt, 0, StepsX) : 0,
+    RotateY ? BakedLook.RotationStep(hash, Salt, 1, StepsY) : 0,
+    RotateZ ? BakedLook.RotationStep(hash, Salt, 2, StepsZ) : 0);
+
+  /// <summary>The angle of a step: step * 360 / steps, as the component works it out.</summary>
+  internal static float Angle(int step, int steps) => steps <= 1 ? 0f : step * 360f / steps;
+
+  /// <summary>The part's matrix to the root for those steps.</summary>
+  internal Matrix4x4 AtSteps(int x, int y, int z)
+  {
+    var turn = BakedMath.Euler(Angle(x, StepsX), Angle(y, StepsY), Angle(z, StepsZ), Scale.x, Scale.y, Scale.z);
+    return BakedMath.Mul(BakedMath.Mul(Parent, BakedMath.Frame(turn, Position)), Below);
+  }
+
+  /// <summary>The part's matrix to the root for a record's look hash.</summary>
+  internal Matrix4x4 At(uint hash)
+  {
+    var (x, y, z) = StepsFor(hash);
+    return AtSteps(x, y, z);
+  }
+
+  /// <summary>The farthest any corner of a mesh's bounds reaches from the root over every turn this part can take (at most 8 x 8 x 8 of them).</summary>
+  internal float Reach(Bounds bounds)
+  {
+    float r = 0f;
+    for (int x = 0; x < (RotateX ? Math.Max(StepsX, 1) : 1); x++)
+      for (int y = 0; y < (RotateY ? Math.Max(StepsY, 1) : 1); y++)
+        for (int z = 0; z < (RotateZ ? Math.Max(StepsZ, 1) : 1); z++)
+        {
+          var m = AtSteps(x, y, z);
+          for (int i = 0; i < 8; i++)
+          {
+            var c = new Vector3((i & 1) == 0 ? bounds.min.x : bounds.max.x, (i & 2) == 0 ? bounds.min.y : bounds.max.y, (i & 4) == 0 ? bounds.min.z : bounds.max.z);
+            r = Math.Max(r, BakedMath.Point(m, c).magnitude);
+          }
+        }
+    return r;
+  }
 }
 
 /// <summary>One MaterialVariation of a piece: the slot it replaces, and its variants' weights.</summary>
@@ -127,6 +211,21 @@ internal sealed class PieceKind
   internal float Radius;
   /// <summary>The distinct non-identity part matrices: a zone keeps one array of instance matrices for each.</summary>
   internal Matrix4x4[] Locals = [];
+  /// <summary>Parallel to Locals (it may be shorter): the entry RandomPieceRotation turns (Locals holds its matrix with no turn), else null. Such an
+  /// entry's matrix is worked out for each instance from the record's look hash.</summary>
+  internal PartRotation?[] LocalRotations
+  {
+    get => localRotations;
+    set
+    {
+      localRotations = value;
+      hasRotation = null;
+    }
+  }
+  private PartRotation?[] localRotations = [];
+  private bool? hasRotation;
+  /// <summary>Some part of the piece is turned by RandomPieceRotation.</summary>
+  internal bool HasRotation => hasRotation ??= Array.Exists(localRotations, r => r != null);
   internal VariantSlot[] Slots = [];
   /// <summary>How many combinations of slot variants there are (the product of the slots' counts; 1 for none).</summary>
   internal int Combos = 1;
@@ -411,7 +510,8 @@ internal static class BakedKinds
       if (needPiece)
       {
         piece = HarvestOnce(prefab, name, e.Tint, tint, e.TintFilter);
-        if (piece == null)
+        // a copy needs only its prefab: a light with no mesh or collider of its own is still lit (a bake makes Copy records with collision 3)
+        if (piece == null && e.Role != BakedRole.Copy)
           continue;
       }
       k.Piece = piece;
@@ -550,6 +650,8 @@ internal static class BakedKinds
     int combos = 1;
     var parts = new List<RenderPart>();
     var locals = new List<Matrix4x4>();
+    var turns = new List<PartRotation?>();   // parallel to locals: the entry RandomPieceRotation turns, else null
+    var turnOf = new Dictionary<(Transform, Matrix4x4), int>();
     float radius = 0f;
     bool hasBuckets = false;
     foreach (var r in renderers)
@@ -560,8 +662,10 @@ internal static class BakedKinds
       if (!inNear && !inFar)
         continue;
       var mesh = r.GetComponent<MeshFilter>().sharedMesh;
-      Matrix4x4 local = ToRoot(r.transform);
-      radius = Mathf.Max(radius, RadiusOf(mesh.bounds, local));
+      // a mesh under a RandomPieceRotation is turned when the piece wakes: its matrix is worked out for each instance
+      var turn = RotationOf(r.transform, root, ToRoot, name);
+      Matrix4x4 local = turn != null ? turn.AtSteps(0, 0, 0) : ToRoot(r.transform);
+      radius = Mathf.Max(radius, turn != null ? turn.Reach(mesh.bounds) : RadiusOf(mesh.bounds, local));
       var mats = r.sharedMaterials;
       var variation = r.GetComponent<MaterialVariation>();
       randomOf.TryGetValue(r, out var random);
@@ -572,17 +676,33 @@ internal static class BakedKinds
           continue;
         var part = new RenderPart
         {
-          Mesh = mesh, Submesh = s, Material = m, Local = local, LocalIsIdentity = local == Matrix4x4.identity,
+          Mesh = mesh, Submesh = s, Material = m, Local = local, LocalIsIdentity = turn == null && local == Matrix4x4.identity,
           Shadows = r.shadowCastingMode, ReceiveShadows = r.receiveShadows, InNear = inNear, InFar = inFar,
           Triangles = (int)(mesh.GetIndexCount(s) / 3),
         };
-        if (!part.LocalIsIdentity)
+        if (turn != null)
         {
-          int at = locals.IndexOf(local);
+          // one entry for each turned object and renderer place; never shared with a part that is not turned
+          if (!turnOf.TryGetValue((turn.Owner!, turn.Below), out int at))
+          {
+            at = locals.Count;
+            locals.Add(local);
+            turns.Add(turn);
+            turnOf[(turn.Owner!, turn.Below)] = at;
+          }
+          part.LocalIndex = at;
+        }
+        else if (!part.LocalIsIdentity)
+        {
+          int at = -1;
+          for (int e = 0; e < locals.Count && at < 0; e++)
+            if (turns[e] == null && locals[e] == local)
+              at = e;
           if (at < 0)
           {
             at = locals.Count;
             locals.Add(local);
+            turns.Add(null);
           }
           part.LocalIndex = at;
         }
@@ -636,7 +756,7 @@ internal static class BakedKinds
     var kind = new PieceKind
     {
       Name = name, Label = tint.Length > 0 ? $"{name} ({tint})" : name, Prefab = prefab,
-      Parts = parts.ToArray(), Radius = Mathf.Max(radius, 0.5f), Locals = locals.ToArray(),
+      Parts = parts.ToArray(), Radius = Mathf.Max(radius, 0.5f), Locals = locals.ToArray(), LocalRotations = turns.ToArray(),
       Slots = slots.ToArray(), Combos = combos, HasBuckets = hasBuckets,
       HasChair = prefab.GetComponentInChildren<Chair>(true) != null,
     };
@@ -675,6 +795,39 @@ internal static class BakedKinds
     }
     Describe(kind, root);
     return kind;
+  }
+
+  // The RandomPieceRotation that turns a renderer: the nearest one on its object or above it, below the root. A root with one turns the whole
+  // piece and replaces its placement; no piece of the game does that, and it is not drawn turned. One further up is not applied either (a
+  // renderer under two: no piece of the game has that).
+  private static PartRotation? RotationOf(Transform part, Transform root, Func<Transform, Matrix4x4> toRoot, string name)
+  {
+    for (var t = part; t != null && t != root; t = t.parent)
+    {
+      var rotation = t.GetComponent<RandomPieceRotation>();
+      if (rotation == null)
+        continue;
+      for (var above = t.parent; above != null && above != root; above = above.parent)
+        if (above.GetComponent<RandomPieceRotation>() != null && Reported.Add("nested-rotation:" + name))
+          LogWarning($"baked piece \"{name}\": a mesh under two RandomPieceRotations is turned by the nearer one only");
+      uint salt = 2166136261u;
+      for (var up = t; up != null && up != root; up = up.parent)
+        unchecked
+        {
+          salt = (salt ^ (uint)up.GetSiblingIndex()) * 16777619u;
+        }
+      return new PartRotation
+      {
+        Owner = t,
+        RotateX = rotation.m_rotateX, RotateY = rotation.m_rotateY, RotateZ = rotation.m_rotateZ,
+        StepsX = rotation.m_stepsX, StepsY = rotation.m_stepsY, StepsZ = rotation.m_stepsZ,
+        Salt = salt,
+        Parent = t.parent != null ? toRoot(t.parent) : Matrix4x4.identity,
+        Position = t.localPosition, Scale = t.localScale,
+        Below = t.worldToLocalMatrix * part.localToWorldMatrix,
+      };
+    }
+    return null;
   }
 
   // one property block for each of the 8 seed buckets: bucket b has the values RandomMaterialValues gives seed b (property i gets seed b + i,

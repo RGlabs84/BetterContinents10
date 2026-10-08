@@ -827,7 +827,8 @@ internal static partial class BakeRunner
       return;
     if (cls.Baked)
     {
-      var record = BakeCapture.MakeRecord(copy, facts!, cls.Kind == BakeKind.Seat ? BakedRole.Seat : BakedRole.Static, number, 0, into.Pool);
+      var role = cls.Kind switch { BakeKind.Seat => BakedRole.Seat, BakeKind.Copy => BakedRole.Copy, _ => BakedRole.Static };
+      var record = BakeCapture.MakeRecord(copy, facts!, role, number, 0, into.Pool);
       into.Records.Add(record);
       into.Statics.Add(new Taken { Id = piece.Id, Copy = copy, Record = record });
       return;

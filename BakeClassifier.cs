@@ -24,7 +24,10 @@ namespace BetterContinents;
 //   4 no creator, and no 'any'                            not touched: not built by a player
 //   5 a loose body (a Rigidbody that moves, ZSyncTransform, ItemDrop, Ship, Vagon, Character, Tameable)   not touched: it moves
 //   6 any component outside StaticSafe in an active part, any Light or EffectArea, comfort, connection data in the ZDO   stays a real piece
-//     (with 'town': adopted, a protected Live record of the bake)
+//     (with 'town': adopted, a protected Live record of the bake; except the two kinds below)
+//       - with 'town', a piece whose ONLY reason is comfort is decor: a Seat when it has a Chair, else a Static (a baked piece gives no comfort)
+//       - with 'town', a piece whose reasons are ONLY light and fire (LightAndFire) is a lit copy (role Copy): a Fireplace that carries a
+//         Burning EffectArea, the area a cooking station looks for (CookingStation.IsFireLit), is a fire to cook on and stays real
 //   7 a Chair                                             a Seat record
 //   8 otherwise                                           a Static record
 internal static class BakeClassifier
@@ -37,6 +40,9 @@ internal static class BakeClassifier
     "DisableInPlacementGhost", "ImpactEffect",
     // The game's editor-made mesh merge: it keeps the merged mesh and has no code that runs in the game (assembly_simplemeshcombine).
     "SimpleMeshCombine",
+    // It only turns a mesh in steps when the piece wakes (RandomPieceRotation.Awake sets transform.localRotation from a seed of the position); the
+    // drawing of a baked piece does the same (BakedKinds: a step on each axis from the record's place, deterministic on every machine).
+    "RandomPieceRotation",
     // Unity's own, the ones that only draw or collide.
     "UnityEngine.Transform", "UnityEngine.MeshFilter", "UnityEngine.MeshRenderer", "UnityEngine.SkinnedMeshRenderer",
     "UnityEngine.BoxCollider", "UnityEngine.SphereCollider", "UnityEngine.CapsuleCollider", "UnityEngine.MeshCollider",
@@ -58,6 +64,25 @@ internal static class BakeClassifier
 
   // A Chair is what makes a Seat; with nothing else against it, it is not a reason to keep a piece real.
   private const string Chair = "Chair";
+
+  // What a fire or a light may carry and still be a lit copy (with 'town'): the components of its flame, its light, its sound and the warmth area
+  // it makes. A lit copy (BakedCopies) keeps the visual ones; the Fireplace, the EffectArea and the sound's TimedDestruction are stripped, so
+  // the copy has no fuel, no warmth and no area. Everything else that is not StaticSafe keeps a piece real: portals (TeleportWorld), guard
+  // stones (PrivateArea), shield generators, turrets, wisp lures (WispSpawner), a Demister, a Switch, a Destructible ...
+  internal static readonly HashSet<string> LightAndFire =
+  [
+    "Fireplace", "UnityEngine.Light", "LightFlicker", "LightLod",
+    "UnityEngine.ParticleSystem", "UnityEngine.ParticleSystemRenderer",
+    "ZSFX", "UnityEngine.AudioSource", "EffectArea",
+    // sfx_fire_loop, the fire's sound object, carries a TimedDestruction that runs only when something calls Trigger() on it (AudioMan, for the
+    // sounds it spawns); the fire pieces do not (m_triggerOnAwake is off on every one of the game's)
+    "TimedDestruction",
+    // a lantern's flame loop and glow sprite (the Fine Wood lanterns and candles); the lit copy keeps both
+    "UnityEngine.Animator", "UnityEngine.SpriteRenderer",
+  ];
+
+  // What the class says of a piece that is baked for less than it was: the dry run counts these apart.
+  internal const string NoteComfort = "comfort decor", NoteLit = "lit copy";
 
   // Rule 5's loose bodies, by the game's component names (Character covers Humanoid and Player through their base types).
   private static readonly string[] Movers = ["ZSyncTransform", "ItemDrop", "Ship", "Vagon", "Character", "Tameable"];
@@ -102,7 +127,20 @@ internal static class BakeClassifier
     // 6
     var stays = StayReason(prefab, obj);
     if (stays.Group != null)
+    {
+      // 'town' also bakes the pieces that stay real only for their comfort or only for their light and fire: a town's decor and street lights
+      // are most of its pieces, and each real one is an object the game keeps awake. Without 'town' nothing changes.
+      if (words.Town)
+      {
+        if (prefab.Comfort > 0 && StayReason(prefab, obj, ignoreComfort: true).Group == null)
+          return prefab.Has(Chair)
+            ? new BakeClass(BakeKind.Seat, "", "is a chair that only gives comfort; baked, it gives none", "", NoteComfort)
+            : new BakeClass(BakeKind.Static, "", "only gives comfort; baked, it gives none", "", NoteComfort);
+        if (OnlyLightAndFire(prefab, obj))
+          return new BakeClass(BakeKind.Copy, "", "only lights and burns; baked, it is a lit copy that never needs fuel", "", NoteLit);
+      }
       return new BakeClass(words.Town ? BakeKind.Adopt : BakeKind.Stays, stays.Group, stays.Reason, stays.Component);
+    }
     // 7
     if (prefab.Has(Chair))
       return new BakeClass(BakeKind.Seat, "", "is a chair");
@@ -111,7 +149,8 @@ internal static class BakeClassifier
   }
 
   // Why a piece stays real, if it does: the group the report counts it in, in words, and the component that decided.
-  private static (string? Group, string Reason, string Component) StayReason(PrefabFacts prefab, ObjectFacts obj)
+  // ignoreComfort asks whether anything else keeps the piece real (a piece that stays only for its comfort is decor).
+  private static (string? Group, string Reason, string Component) StayReason(PrefabFacts prefab, ObjectFacts obj, bool ignoreComfort = false)
   {
     if (prefab.Has("Door")) return (Doors, "opens and closes (Door)", "Door");
     if (prefab.Has("Container")) return (Chests, "holds items (Container)", "Container");
@@ -124,7 +163,7 @@ internal static class BakeClassifier
         return (Stations, $"works or keeps contents ({station})", station);
     // Comfort is counted from real Piece instances near the player; a local copy would put a Piece without a ZDO into the
     // game's piece lists.
-    if (prefab.Comfort > 0) return (Comfort, $"gives comfort ({prefab.Comfort})", "Piece");
+    if (prefab.Comfort > 0 && !ignoreComfort) return (Comfort, $"gives comfort ({prefab.Comfort})", "Piece");
     if (prefab.Has("UnityEngine.Light")) return (Lights, "lights its surroundings (Light)", "UnityEngine.Light");
     if (prefab.Has("EffectArea")) return (Lights, "makes an area (EffectArea)", "EffectArea");
     if (prefab.Has("Sign")) return (Signs, "holds a text (Sign)", "Sign");
@@ -138,6 +177,27 @@ internal static class BakeClassifier
     // The ZDO says what the prefab cannot: links to other objects (a portal's pair, a spawner's spawn).
     if (obj.HasConnection) return (Other, "is linked to other objects", "");
     return (null, "", "");
+  }
+
+  // Whether a piece stays real only for its light and fire: it has a Fireplace or a Light, and none of the other reasons of rule 6 (a door, a
+  // container, a bed, a station, a sign, comfort, a chair, connection data) and no active component outside StaticSafe and LightAndFire. A
+  // fire with a Burning EffectArea anywhere in it (even in the part that is inactive until it is lit) is one a cooking station or a cauldron
+  // looks for (CookingStation.IsFireLit, CraftingStation.m_haveFire), so it stays real.
+  private static bool OnlyLightAndFire(PrefabFacts prefab, ObjectFacts obj)
+  {
+    if (!prefab.Has("Fireplace") && !prefab.Has("UnityEngine.Light"))
+      return false;
+    if (prefab.BurningArea || prefab.Comfort > 0 || prefab.Has(Chair) || obj.HasConnection)
+      return false;
+    if (prefab.Has("Door") || prefab.Has("Container") || prefab.Has("Bed") || prefab.Has("Sign"))
+      return false;
+    foreach (var station in StationComponents)
+      if (prefab.Has(station))
+        return false;
+    foreach (var component in prefab.Components)
+      if (component.Active && !StaticSafe.Contains(component.Name) && !LightAndFire.Contains(component.Name))
+        return false;
+    return true;
   }
 
   private static readonly string[] StationComponents =
@@ -184,6 +244,9 @@ internal enum BakeKind
   // Becomes a record, and the piece goes.
   Seat,
   Static,
+  // Becomes a record of role Copy, and the piece goes: a light or a fire, lit within Light Distance of the camera by a copy of the prefab
+  // that never needs fuel ('town' only).
+  Copy,
 }
 
 // A piece's class: what is done with it, the report's group for it, and why in a few words.
@@ -195,17 +258,20 @@ internal readonly struct BakeClass
   public string Reason { get; }
   // The component that decided (rule 2, 5 or 6), else empty.
   public string Component { get; }
+  // What the dry run counts apart among the records: NoteComfort (a baked piece gives no comfort) or NoteLit (a lit copy); else empty.
+  public string Note { get; }
 
-  public BakeClass(BakeKind kind, string group, string reason, string component = "")
+  public BakeClass(BakeKind kind, string group, string reason, string component = "", string note = "")
   {
     Kind = kind;
     Group = group;
     Reason = reason;
     Component = component;
+    Note = note;
   }
 
   // Becomes a record and is removed as an object.
-  public bool Baked => Kind is BakeKind.Static or BakeKind.Seat;
+  public bool Baked => Kind is BakeKind.Static or BakeKind.Seat or BakeKind.Copy;
   // A real piece that stays one (rule 6), adopted or not.
   public bool StaysReal => Kind is BakeKind.Stays or BakeKind.Adopt;
   // Not changed at all.
@@ -216,7 +282,8 @@ internal readonly struct BakeClass
 // The command's words that change what the classifier decides; the rest of the words belong to the command.
 internal readonly struct BakeWords
 {
-  // Rule 6's pieces become protected Live records of the bake.
+  // Rule 6's pieces become protected Live records of the bake, except the ones that stay only for their comfort (baked as decor) or only
+  // for their light and fire (baked as lit copies).
   public bool Town { get; init; }
   // Rule 4's creator-less pieces are taken too.
   public bool Any { get; init; }
@@ -274,8 +341,12 @@ internal sealed class PrefabFacts
   public bool SyncsScale { get; }
   // How far above its pivot the prefab reaches, in whole metres, for the y bounds of the zone its records are in; 0 when not known.
   public float Height { get; }
+  // Some EffectArea in the hierarchy, in an active part or not, has the Burning flag: the area a cooking station looks for at its fire
+  // (CookingStation.IsFireLit). A fire's area sits in the part that is inactive until it is lit, so inactive parts count.
+  public bool BurningArea { get; }
 
-  public PrefabFacts(string name, IEnumerable<ComponentFact> components, bool nonKinematicBody = false, int comfort = 0, bool syncsScale = false, float height = 0f)
+  public PrefabFacts(string name, IEnumerable<ComponentFact> components, bool nonKinematicBody = false, int comfort = 0, bool syncsScale = false, float height = 0f,
+    bool burningArea = false)
   {
     Name = name;
     Components = [.. components];
@@ -283,10 +354,12 @@ internal sealed class PrefabFacts
     Comfort = comfort;
     SyncsScale = syncsScale;
     Height = height;
+    BurningArea = burningArea;
   }
 
-  public PrefabFacts(string name, IEnumerable<string> components, bool nonKinematicBody = false, int comfort = 0, bool syncsScale = false, float height = 0f)
-    : this(name, components.Select(c => new ComponentFact(c, BasesOf(c))), nonKinematicBody, comfort, syncsScale, height)
+  public PrefabFacts(string name, IEnumerable<string> components, bool nonKinematicBody = false, int comfort = 0, bool syncsScale = false, float height = 0f,
+    bool burningArea = false)
+    : this(name, components.Select(c => new ComponentFact(c, BasesOf(c))), nonKinematicBody, comfort, syncsScale, height, burningArea)
   {
   }
 
@@ -311,7 +384,7 @@ internal sealed class PrefabFacts
   {
     var components = new List<ComponentFact>();
     var seen = new Dictionary<string, int>();
-    bool body = false;
+    bool body = false, burning = false;
     int comfort = 0;
     foreach (var component in prefab.GetComponentsInChildren<Component>(true))
     {
@@ -346,10 +419,16 @@ internal sealed class PrefabFacts
         body = true;
       if (component is Piece piece)
         comfort = Math.Max(comfort, piece.m_comfort);
+      if (component is EffectArea area && IsBurning(area.m_type))
+        burning = true;
     }
     var view = prefab.GetComponent<ZNetView>();
-    return new PrefabFacts(prefab.name, components, body, comfort, view != null && view.m_syncInitialScale, HeightOf(prefab));
+    return new PrefabFacts(prefab.name, components, body, comfort, view != null && view.m_syncInitialScale, HeightOf(prefab), burning);
   }
+
+  // The area a cooking station and a cauldron look for at a fire (EffectArea.Type.Burning, 8; the game's fire pits, hearths, bonfires and braziers
+  // carry one named FireBurn, in the part that is switched on when the fire is lit; their torches carry only Fire).
+  internal static bool IsBurning(EffectArea.Type type) => (type & EffectArea.Type.Burning) != 0;
 
   // Whether a part is active in the prefab: it and every parent up to the prefab's root are (the root itself counts as active).
   private static bool ActiveIn(Transform part, Transform root)
@@ -395,6 +474,10 @@ internal sealed class BakeTally
   public Dictionary<string, int> Baked { get; } = [];
   public int Records { get; private set; }
   public int Seats { get; private set; }
+  // The records that are baked for less than the piece was (only with 'town'), by prefab name: comfort decor (a baked piece gives no comfort) and
+  // lights and fires (lit copies, which never need fuel).
+  public Dictionary<string, int> ComfortDecor { get; } = [];
+  public Dictionary<string, int> LitCopies { get; } = [];
   // Pieces that stay real (rule 6) by group, and one example of each "other".
   public Dictionary<string, int> Stays { get; } = [];
   public List<string> OtherExamples { get; } = [];
@@ -422,10 +505,15 @@ internal sealed class BakeTally
     {
       case BakeKind.Static:
       case BakeKind.Seat:
+      case BakeKind.Copy:
         Records++;
         if (cls.Kind == BakeKind.Seat)
           Seats++;
         Baked[prefabName] = Baked.TryGetValue(prefabName, out var n) ? n + 1 : 1;
+        if (cls.Note == BakeClassifier.NoteComfort)
+          Bump(ComfortDecor, prefabName);
+        else if (cls.Note == BakeClassifier.NoteLit)
+          Bump(LitCopies, prefabName);
         break;
       case BakeKind.Stays:
       case BakeKind.Adopt:
@@ -447,15 +535,19 @@ internal sealed class BakeTally
 
   private static void Bump(Dictionary<string, int> counts, string group) => counts[group] = counts.TryGetValue(group, out var n) ? n + 1 : 1;
 
+  public int ComfortDecorCount => ComfortDecor.Values.Sum();
+  public int LitCopyCount => LitCopies.Values.Sum();
   public int StayCount => Stays.Values.Sum();
   public int UntouchedCount => Untouched.Values.Sum();
 
   internal static string Num(long n) => n.ToString("N0", CultureInfo.InvariantCulture);
 
   // "stone_wall_2x1 1,204, wood_floor 980, darkwood_roof 611 and 18 more kinds"
-  internal string BakedKinds(int show = 3)
+  internal string BakedKinds(int show = 3) => KindsOf(Baked, show);
+
+  internal static string KindsOf(Dictionary<string, int> counts, int show)
   {
-    var top = Baked.OrderByDescending(p => p.Value).ThenBy(p => p.Key, StringComparer.Ordinal).ToList();
+    var top = counts.OrderByDescending(p => p.Value).ThenBy(p => p.Key, StringComparer.Ordinal).ToList();
     var text = string.Join(", ", top.Take(show).Select(p => $"{p.Key} {Num(p.Value)}"));
     if (top.Count > show)
       text += $" and {Num(top.Count - show)} more kinds";
@@ -466,6 +558,11 @@ internal sealed class BakeTally
   internal IEnumerable<string> Lines(BakeWords words)
   {
     yield return $"Found {Num(Found)} pieces. " + (Records == 0 ? "Nothing to bake." : $"To bake: {Num(Records)} ({BakedKinds()}).");
+    // Only with 'town' (the pieces that otherwise stay real): said apart, because they are baked for less than they were.
+    if (ComfortDecorCount > 0)
+      yield return $"Comfort: {Num(ComfortDecorCount)} become decor ({KindsOf(ComfortDecor, 3)}). A baked piece gives no comfort.";
+    if (LitCopyCount > 0)
+      yield return $"Lights: {Num(LitCopyCount)} become lit copies ({KindsOf(LitCopies, 3)}). They never need fuel and give no warmth; fires you cook on stay real pieces.";
     if (StayCount > 0)
     {
       var groups = new List<string>();

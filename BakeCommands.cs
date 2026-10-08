@@ -240,7 +240,8 @@ internal static class BakeCommands
     output(BakeCommandLine.Usage);
     output("bc_bake bakes the pieces players built into the world's layer: drawn and solid on every client, never an object, so they cost no instance, no save size and no network traffic.");
     output("bc_bake area 40 [town] [any]      a dry run: what a bake of the 40 m around you would do; add 'confirm' to bake. Doors, chests, fires, beds, stations, lights and comfort stay real pieces;");
-    output("                                  'town' makes them protected parts of the layer; 'any' takes pieces nobody built. 'convert' lets a world that is not a Better Continents world become one.");
+    output("                                  'town' makes them protected parts of the layer, and bakes the ones that are only comfort decor (they then give no comfort) or only lights and fires");
+    output("                                  (lit copies that never need fuel; fires you cook on stay real); 'any' takes pieces nobody built. 'convert' lets a world that is not a Better Continents world become one.");
     output("bc_bake box x1 z1 x2 z2           the same for a box (up to 512 x 512 m).");
     output("bc_bake unbake 40 | box ... | world [all]   turns records back into real pieces (the compiler's too with 'all'). 'unbake world' is the way out: do it before removing Better Continents.");
     output("bc_bake undo [n]                  puts the newest operation (or n) back exactly as it was, from its undo file.");
