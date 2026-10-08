@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-09-22 for alt-biome planting (0.8.1), and on 2026-09-25 for version-agnostic wording (0.9.1), and on 2026-09-29 for Expand World Data biomes (0.9.3), and modified on 2026-10-04 for the unifying refactor (0.10.0), and on 2026-10-06 and 2026-10-07 for 16k worlds (0.10.3).
+// Added by Wubarrk on 2026-09-22 for alt-biome planting (0.8.1), and on 2026-09-25 for version-agnostic wording (0.9.1), and on 2026-09-29 for Expand World Data biomes (0.9.3), and modified on 2026-10-04 for the unifying refactor (0.10.0), and on 2026-10-06 and 2026-10-07 for 16k worlds (0.10.3), and on 2026-10-07 for baked placements (0.10.4).
 
 using System;
 using System.Collections;
@@ -68,7 +68,8 @@ public partial class BetterContinents
     // the grid is verified at world load, because Expand World Size applies its grid transpilers per world.
     public static void Configure()
     {
-      WorldEnabled = Settings.EnabledForThisWorld;
+      // A world that keeps the game's own terrain is not shaped: everything alt-biome behaves as it does without Better Continents.
+      WorldEnabled = Settings.ShapesWorld;
       Active = Settings.EffectiveAltBiomes;
       var size = Geometry;
       // A world laid out to its own size (WorldSizeHelper.Layout) has a grid of that size: its points reach the world's
@@ -161,6 +162,9 @@ public partial class BetterContinents
       // A planted map the settings could not read would silently plant nothing: that is a planting error too.
       if (WorldEnabled && Active.Mode != AltBiomeMode.Off && Settings.AltBiomeMapError != null)
         throw FailLoad("reading the alt-biome map", new System.IO.InvalidDataException(Settings.AltBiomeMapError));
+      // A baked layer the settings could not read would leave every baked building out of the world: that stops the load too.
+      if (Settings.EnabledForThisWorld && Settings.LayerError != null)
+        throw FailLoad("reading the baked layer", new System.IO.InvalidDataException(Settings.LayerError));
     }
 
     internal static void AfterVerifyBiomeData(World world) => OnBiomeDataReady(world, "world load");
@@ -1340,6 +1344,8 @@ public partial class BetterContinents
       // world that fails here; only its settings file (or a fix in Better Continents) can.
       var advice = e is System.IO.InvalidDataException && Settings.AltBiomeMapError != null
         ? "The alt-biome map stored in the world's Better Continents settings is damaged: restore the settings from a backup (the previous save's copy ends in .old)."
+        : e is System.IO.InvalidDataException && Settings.LayerError != null
+        ? "The baked layer stored in the world's Better Continents settings cannot be read: it may have been made by a newer Better Continents (update it), or be damaged (restore the settings from a backup; the previous save's copy ends in .old). It is kept as it is, so nothing is lost."
         : "This is a Better Continents error: please report it with this log.";
       var message = $"Better Continents: {what} failed for world '{world}': {cause.Message}. "
                     + "The world load was stopped so that no zone is generated with the wrong alt biomes. " + advice;

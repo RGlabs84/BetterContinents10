@@ -1,4 +1,4 @@
-﻿// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and alt-biome planting (0.8.1), and on 2026-10-06 for 16k worlds (0.10.3).
+﻿// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and alt-biome planting (0.8.1), and on 2026-10-06 for 16k worlds (0.10.3), and on 2026-10-07 for baked placements (0.10.4).
 
 using HarmonyLib;
 using TMPro;
@@ -27,6 +27,8 @@ public partial class BetterContinents
         {
             // Unpatching everything on main menu means other patches don't have to check for main menu.
             Settings.EnabledForThisWorld = false;
+            // The last world's baked layer goes with it (and what draws and patches for it).
+            BakedLayerStore.Set(null, null);
             // The alt-biome map pins and the server's placement belong to the world that was just left.
             AltBiomeReport.ForgetPins();
             AltBiomeControl.ResetServerAssignment();

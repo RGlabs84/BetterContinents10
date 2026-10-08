@@ -1,4 +1,4 @@
-﻿// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0), and on 2026-10-04 for the vegetation twin guard (0.10.0), and on 2026-10-04 for the unifying refactor (0.10.0).
+﻿// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0), and on 2026-10-04 for the vegetation twin guard (0.10.0), and on 2026-10-04 for the unifying refactor (0.10.0), and on 2026-10-07 for baked placements (0.10.4).
 
 using System;
 using System.Collections.Generic;
@@ -17,7 +17,7 @@ public partial class BetterContinents
     [HarmonyPostfix, HarmonyPatch(nameof(ZoneSystem.Load))]
     private static void LoadPostfix(ZoneSystem __instance)
     {
-      if (Settings.EnabledForThisWorld)
+      if (Settings.ShapesWorld)
       {
         if (!__instance.m_locationsGenerated && __instance.m_locationInstances.Count > 0)
         {
@@ -31,7 +31,7 @@ public partial class BetterContinents
     [HarmonyPostfix, HarmonyPatch(nameof(ZoneSystem.ClearNonPlacedLocations), []), HarmonyPriority(Priority.Low)]
     private static void ClearNonPlacedLocationsPostfix(ZoneSystem __instance)
     {
-      if (!Settings.EnabledForThisWorld) return;
+      if (!Settings.ShapesWorld) return;
       if (!Settings.HasLocationMap && !Settings.OverrideStartPosition) return;
       List<ZoneSystem.ZoneLocation> locs = [.. __instance.m_locations.Where(loc => loc.m_enable && loc.m_quantity != 0).OrderByDescending(x => x.m_prioritized)];
       PlaceLocations(__instance, locs, Settings, (x, z) => WorldGenerator.instance.GetHeight(x, z));
@@ -107,7 +107,7 @@ public partial class BetterContinents
     [HarmonyPrefix, HarmonyPatch(nameof(ZoneSystem.CountNrOfLocation))]
     private static bool CountNrOfLocation(ZoneSystem.ZoneLocation location, ref int __result)
     {
-      if (!Settings.EnabledForThisWorld) return true;
+      if (!Settings.ShapesWorld) return true;
       if (!Settings.SkipDefaultLocations) return true;
       if (location.m_prefabName == "StartTemple") return true;
       __result = location.m_quantity;

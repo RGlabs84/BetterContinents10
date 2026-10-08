@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and modified for alt-biome planting (0.8.1), and on 2026-09-29 for Expand World Data biomes (0.9.3), and modified on 2026-10-04 for the unifying refactor (0.10.0).
+// Added by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and modified for alt-biome planting (0.8.1), and on 2026-09-29 for Expand World Data biomes (0.9.3), and modified on 2026-10-04 for the unifying refactor (0.10.0), and on 2026-10-07 for baked placements (0.10.4).
 
 using System.Collections.Generic;
 using System.Linq;
@@ -77,7 +77,7 @@ public partial class BetterContinents
     [HarmonyPostfix, HarmonyPatch("RandomBiomeFromBiomes")]
     private static void RandomBiomeFromBiomesPostfix(AltBiomeWorldData __instance, Heightmap.Biome biome, ref Heightmap.Biome __result)
     {
-      if (!Settings.EnabledForThisWorld)
+      if (!Settings.ShapesWorld)
         return;
       if ((__result & biome) != 0 && __instance.Biomes.TryGetValue(__result, out var picked) && picked.AllPoints.Count > 0)
         return;
