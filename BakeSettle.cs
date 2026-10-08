@@ -89,7 +89,8 @@ internal static class BakeSettle
     uint completed = saves.Completed;
     foreach (var w in waiting.ToList())
     {
-      if (completed - w.CompletedThen < (uint)w.Needed)
+      // (A count that went back is another world's: it settles nothing.)
+      if ((long)completed - w.CompletedThen < w.Needed)
         continue;
       waiting.Remove(w);
       try
