@@ -125,7 +125,13 @@ internal static class BakeRuntime
       Journal = journal,
       Say = say,
       Who = who,
-      Ended = ended,
+      // An operation ends in a state a load settles; a complete save that began after it settles it without one (BakeSettle).
+      Ended = ended ?? ((number, final) =>
+      {
+        BakeSettle.Register(GameSaves.Instance, journal, number, final);
+        BakeSettle.EnsureLoop();
+      }),
+      Began = number => BakeSettle.Cancel(journal, number),
     };
   }
 

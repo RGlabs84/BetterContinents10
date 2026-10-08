@@ -275,6 +275,13 @@ internal static partial class Tests
     Distant = p.Distant, Type = p.Type, Values = (ZdoValue[])p.Values.Clone(), UserId = p.UserId, Id = p.Id,
   };
 
+  private sealed class BakeFakeSaves : IBakeSaves
+  {
+    public uint Completed { get; set; }
+    public bool Saving { get; set; }
+    public bool WorldReady { get; set; } = true;
+  }
+
   // One run of the runner on stand-ins.
   private sealed class BakeFx
   {
@@ -293,6 +300,8 @@ internal static partial class Tests
     public double Time;
     public bool Recording;
     public long Creator = 5005;
+    // The world's saves, as BakeSettle asks about them.
+    public readonly BakeFakeSaves Saves = new();
 
     public BakeMoment Snap(string what)
     {
@@ -400,6 +409,8 @@ internal static partial class Tests
       Who = new BakeWho { Name = "Tester", PlatformId = "Steam_1", Creator = fx.Creator },
       Version = "0.10.4",
       UnixTime = () => 1791400000,
+      Ended = (number, final) => BakeSettle.Register(fx.Saves, fx.Journal, number, final),
+      Began = number => BakeSettle.Cancel(fx.Journal, number),
     };
   }
 

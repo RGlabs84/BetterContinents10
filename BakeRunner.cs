@@ -140,6 +140,9 @@ internal interface IBakeLayerPort
   LayerChange UndoBake(int number);
   // An undo of an unbake or a drop: its records back, its operation marked undone.
   LayerChange PutBack(BakeJournalData data);
+  // A compiler's new file (6.2): its records without a source and its sections replace the layer's; every in-game record stays; the operation
+  // is entered. `leftOut`: the records of the file that an in-game bake owns, which are not taken.
+  LayerChange Load(BakedLayer file, OperationInfo operation, out int leftOut);
 }
 
 // What the clients are told, and who they are.
@@ -218,6 +221,8 @@ internal sealed class BakeContext
   // An operation ended as it should in this session, in the state that the next world load settles: after a complete world save that began
   // later, that state may be written as the final one it is given here (BakeSettle). Null in the tests and at world load.
   public Action<int, BakeState>? Ended { get; init; }
+  // An operation takes up an undo file that an earlier one ended in a state to settle (an undo of it): that wait is over.
+  public Action<int>? Began { get; init; }
 }
 
 // The area of a bake or an unbake: a circle of 4 to 256 m, or a world-aligned box up to 512 x 512 m; all heights; a piece is in it when
@@ -304,8 +309,11 @@ internal sealed class BakeArea
 
   // The words that make this area again: "area 40 at 812 -1206", "box 1 2 3 4".
   public string Words(bool at) => Circle
-    ? "area " + Radius.ToString("0.#", CultureInfo.InvariantCulture) + (at ? $" at {Round(CenterX)} {Round(CenterZ)}" : "")
-    : $"box {Round(MinX)} {Round(MinZ)} {Round(MaxX)} {Round(MaxZ)}";
+    ? "area " + Radius.ToString("0.#", CultureInfo.InvariantCulture) + (at ? $" at {Exact(CenterX)} {Exact(CenterZ)}" : "")
+    : $"box {Exact(MinX)} {Exact(MinZ)} {Exact(MaxX)} {Exact(MaxZ)}";
+
+  // A coordinate as the words that make the area again need it: not rounded to the metre.
+  private static string Exact(float v) => v.ToString("0.##", CultureInfo.InvariantCulture);
 
   private static string Round(float v) => Math.Round(v).ToString("0", CultureInfo.InvariantCulture);
   private static string Plural(int zones) => zones == 1 ? "1 zone" : zones + " zones";

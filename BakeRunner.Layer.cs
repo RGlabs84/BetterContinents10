@@ -178,6 +178,22 @@ internal sealed class LayerPort : IBakeLayerPort
     return Install(made);
   }
 
+  public LayerChange Load(BakedLayer file, OperationInfo operation, out int leftOut)
+  {
+    var basis = current();
+    int left = 0;
+    var made = Guarded(() =>
+    {
+      var edit = basis != null ? basis.Edit() : LayerEdit.New();
+      left = edit.ReplaceSource0(file);
+      edit.EnsureNextOperation(operation.Number);
+      edit.AddOperation(operation);
+      return edit.Build();
+    });
+    leftOut = left;
+    return Install(made);
+  }
+
   // ------------------------------------------------------------------------------------------------ the pieces of an edit
 
   private static (BakedLayer Layer, ZoneKey[] Changed) BuildAdd(BakedLayer? basis, BakeJournalData data)

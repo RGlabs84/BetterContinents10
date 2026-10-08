@@ -24,8 +24,9 @@ internal static partial class BakeRunner
   // It finishes whatever a crash or a save cut left half done, so that every piece is in exactly one place: an object or a record.
   internal static void AfterWorldLoad()
   {
-    // A world is loaded: whatever an earlier world left half done is not this one's.
+    // A world is loaded: whatever an earlier world left half done is not this one's, and no operation waits for a save any more.
     Reset();
+    BakeSettle.Clear();
     try
     {
       var ctx = BakeRuntime.ContextForCheck();

@@ -380,7 +380,7 @@ internal static partial class Tests
   }
 
   // A case that begins after earlier operations, each settled: `prior` runs them, `operate` is the one that is stopped.
-  private static BakeCase BakeCaseAfter(string name, bool town, Action<BakeFx> prior, Action<BakeFx> operate, bool dropped = false)
+  private static BakeCase BakeCaseAfter(string name, bool town, Action<BakeFx> prior, Action<BakeFx> operate, bool dropped = false, bool sameRecords = true)
   {
     List<PieceCopy> taken = null, adopted = null;
     List<string> bakeKeys = null;
@@ -400,7 +400,7 @@ internal static partial class Tests
       return fx;
     };
     test.Operate = operate;
-    test.Verify = (fx, reference) => BakeVerifyWorld(fx, bakeKeys, taken, town ? adopted : [], baseObjects, dropped);
+    test.Verify = (fx, reference) => BakeVerifyWorld(fx, sameRecords ? bakeKeys : null, taken, town ? adopted : [], baseObjects, dropped);
     return test;
   }
 
@@ -435,6 +435,19 @@ internal static partial class Tests
         total += trials;
         C(problems.Count == 0, $"{test.Name}: {trials} stops and pairs of saved moments, each settled with every piece in one place" + (problems.Count > 0 ? $" ({problems.Count} wrong; first: " + string.Join(" || ", problems.Take(3)) + ")" : ""));
       }
+    }
+    // An unbake and a bake of the same pieces again in one run (the workflow of editing a town): the unbake still unsettled when the bake starts.
+    foreach (bool town in new[] { false, true })
+    {
+      var words = town ? "town confirm" : "confirm";
+      var test = BakeCaseAfter("unbake-then-bake" + (town ? "-town" : ""), town, fx => BakeRun(fx, BakeStandardArea(), words), fx =>
+      {
+        BakeUnbakeRun(fx, BakeWholeWorld);
+        BakeRun(fx, BakeStandardArea(), words);
+      }, sameRecords: false);
+      int trials = BakeProve(test, out var problems);
+      total += trials;
+      C(problems.Count == 0, $"{test.Name}: {trials} stops and pairs of saved moments, each settled with every piece in one place" + (problems.Count > 0 ? $" ({problems.Count} wrong; first: " + string.Join(" || ", problems.Take(3)) + ")" : ""));
     }
     // A bake and an unbake of it in one run, the bake still unsettled when the unbake starts.
     foreach (bool town in new[] { false, true })

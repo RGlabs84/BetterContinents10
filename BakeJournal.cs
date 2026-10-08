@@ -583,6 +583,9 @@ internal class BakeJournal
   // Virtual so that the tests can stop the operation at every write (Tests.BakeRunner.cs): a write is one mutation of the undo file.
   internal virtual void Write(BakeJournalData data) => WriteAtomic(JournalPath(data.Number), BakeJournalFile.Encode(data));
 
+  // The layer as it is, kept in the folder before `bc_bake load` replaces the compiler's records (6.2): loading that file goes back.
+  internal virtual void KeepLayer(BakedLayer layer) => WriteAtomic(LayerPath(layer.Revision), layer.Bytes, layer.Length);
+
   internal BakeJournalData Read(int number)
   {
     byte[] bytes;

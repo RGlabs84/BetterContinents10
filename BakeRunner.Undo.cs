@@ -95,6 +95,7 @@ internal static partial class BakeRunner
       double began = ctx.Clock();
       say($"bc_bake: undo of {word} {number} started: {Num(make)} pieces to make, {Num(remove)} to remove.");
       touched = true;
+      ctx.Began?.Invoke(number);
       ctx.Journal.SetState(number, BakeState.Undoing);
       yield return Apply(ctx, work);
       // The end state is Undoing, which the next world load settles into Undone.
