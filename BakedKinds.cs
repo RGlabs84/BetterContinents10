@@ -411,7 +411,8 @@ internal static class BakedKinds
       if (needPiece)
       {
         piece = HarvestOnce(prefab, name, e.Tint, tint, e.TintFilter);
-        if (piece == null)
+        // a copy needs only its prefab: a light with no mesh or collider of its own is still lit (a bake makes Copy records with collision 3)
+        if (piece == null && e.Role != BakedRole.Copy)
           continue;
       }
       k.Piece = piece;

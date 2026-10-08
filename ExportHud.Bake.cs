@@ -179,7 +179,8 @@ public static partial class ExportHud
     GUILayout.EndHorizontal();
     bakeTown = GUILayout.Toggle(bakeTown, new GUIContent("Town: doors, chests and stations become protected parts of the layer",
       "town: the pieces that stay real (doors, chests, stations, beds, fires, lights, signs) are kept as protected parts of the bake, so an "
-      + "undo or a later load of a town file finds them, and nobody can break or remove them."));
+      + "undo or a later load of a town file finds them, and nobody can break or remove them. Pieces that are only comfort decor (rugs, chairs, "
+      + "banners) are baked and give no comfort; pieces that are only lights or fires you do not cook on become lit copies that never need fuel."));
     bakeAny = GUILayout.Toggle(bakeAny, new GUIContent("Also pieces nobody built (ruins and the like)",
       "any: pieces without a builder (a location's walls, ruins) are baked too. A zone reset places a location again over them."));
     bakeConvert = GUILayout.Toggle(bakeConvert, new GUIContent("Convert: this world was made without Better Continents' maps",
