@@ -137,8 +137,10 @@ internal readonly struct OrphanInfo(ZDOID id, string prefab, Vector3 position, s
 //  * Replace   a piece stands, but moved or is another prefab: it is removed and the record is seeded (a static piece's GameObject does
 //              not follow a change of its ZDO's position on clients).
 //  * Remove    a piece stands whose record the layer no longer has.
-//  * Orphan    Remove or Replace of a container that holds items: it stays where it is, loses its bake keys, and carries bc_bake_orphan
-//              instead (the old (source, id)), so that `bc_bake orphans` can list it and an admin decide. Never destroyed here.
+//  * Orphan    Remove or Replace of a piece that holds items (HoldsItems: a container, a stand, a smelter's queue, a fermenter, a cooking
+//              station, a turret's ammunition): it stays where it is, loses its bake keys, and carries bc_bake_orphan instead (the old
+//              (source, id)), so that `bc_bake orphans` can list it and an admin decide. Never destroyed here. The planner decides from what
+//              a piece held when it looked; the executor looks again as it makes each change (a chest opened meanwhile is not destroyed).
 //  Records in zones the world has not generated are left to seeding (BakedServer), and a piece is never moved. A second run over the
 //  same layer changes nothing: it is all Keep, at the revision they have.
 //
@@ -235,8 +237,16 @@ internal static class BakedReconcile
   // Version.Item.Smaller: an inventory saved from this version on counts its items in a ushort.
   private const int SmallerVersion = 108;
 
-  /// <summary>Whether a piece holds something a player put in it: a container with an item (the inventory's bytes, whose count is read; an
-  /// inventory that cannot be read counts as holding), or an item stand with an item on it. Nothing here is destroyed while it does.</summary>
+  // The keys of the stations that hold what a player put in them without an inventory of the game's: an armor stand's slots ("0_item" ...),
+  // a cooking station's ("slot0" ...). The game saves a count of slots in the prefab, not in the ZDO, so the first 16 are looked at.
+  private const int StationSlots = 16;
+  private static readonly int[] ArmorStandItems = Enumerable.Range(0, StationSlots).Select(i => (i + "_item").GetStableHashCode()).ToArray();
+  private static readonly int[] CookingSlots = Enumerable.Range(0, StationSlots).Select(i => ("slot" + i).GetStableHashCode()).ToArray();
+
+  /// <summary>Whether a piece holds something a player put in it, which nothing here may destroy: a container with an item (the inventory's
+  /// bytes, whose count is read; an inventory that cannot be read counts as holding), an item stand with an item on it, an armor stand with
+  /// anything on it, a smelter, kiln or windmill with ore queued or product waiting, a fermenter with something in it, a cooking station with
+  /// food on it, a turret with ammunition. (Not fuel: every fire and torch would otherwise stand as an orphan at every change.)</summary>
   internal static bool HoldsItems(ZDO zdo)
   {
     var items = zdo.GetByteArray(ZDOVars.s_items);
@@ -256,7 +266,21 @@ internal static class BakedReconcile
         return true;
       }
     }
-    return zdo.GetInt(ZDOVars.s_item, 0) != 0;
+    if (zdo.GetInt(ZDOVars.s_item, 0) != 0)
+      return true;
+    // Smelter: ore in the queue ("queued", with "item<i>" for each), or what it made and has not given out (SpawnOre).
+    if (zdo.GetInt(ZDOVars.s_queued, 0) > 0 || !string.IsNullOrEmpty(zdo.GetString(ZDOVars.s_spawnOre, "")))
+      return true;
+    // Fermenter: what is in it (the hash of the item's name). Turret: its ammunition.
+    if (zdo.GetInt(ZDOVars.s_content, 0) != 0 || zdo.GetInt(ZDOVars.s_ammo, 0) > 0)
+      return true;
+    foreach (var key in ArmorStandItems)
+      if (zdo.GetInt(key, 0) != 0)
+        return true;
+    foreach (var key in CookingSlots)
+      if (!string.IsNullOrEmpty(zdo.GetString(key, "")))
+        return true;
+    return false;
   }
 
   // ---- the world as input ------------------------------------------------------------------------------------------------------------------
@@ -461,15 +485,12 @@ internal static class BakedReconcile
           counts.Seeded++;
         return false;
       case ReconcileAction.Replace:
-        if (Destroy(item.Piece!))
-          counts.Replaced++;
+        bool replaced = Retire(item.Piece!, counts, replacing: true);
         if (Seed(context, item.Record!))
           counts.Seeded++;
-        return true;
+        return replaced;
       case ReconcileAction.Remove:
-        if (Destroy(item.Piece!))
-          counts.Removed++;
-        return true;
+        return Retire(item.Piece!, counts, replacing: false);
       default:
         if (MakeOrphan(item.Piece!))
           counts.Orphaned++;
@@ -477,6 +498,28 @@ internal static class BakedReconcile
           counts.Seeded++;
         return false;
     }
+  }
+
+  // A piece the plan removes or replaces goes, unless it holds items now. The plan is frames old when it runs (a plan of thousands of changes
+  // takes seconds, and a chest the plan saw empty can be opened meanwhile): the piece is looked at again as it is destroyed, and one with
+  // something in it stays as an orphan, as the planner would have made it. True when the piece was destroyed.
+  private static bool Retire(WorldPiece piece, Counts counts, bool replacing)
+  {
+    var zdo = Find(piece);
+    if (zdo == null)
+      return false;
+    if (HoldsItems(zdo))
+    {
+      MakeOrphan(zdo, piece.Source, piece.BakeId);
+      counts.Orphaned++;
+      return false;
+    }
+    Destroy(zdo);
+    if (replacing)
+      counts.Replaced++;
+    else
+      counts.Removed++;
+    return true;
   }
 
   /// <summary>Makes a record's piece. (A field, for the offline tests.)</summary>
@@ -496,12 +539,6 @@ internal static class BakedReconcile
 
   /// <summary>Destroys a piece as the game does: this machine takes it over first (without a revision bump: it is about to go), and an
   /// instance goes with its object.</summary>
-  private static bool Destroy(WorldPiece piece)
-  {
-    var zdo = Find(piece);
-    return zdo != null && Destroy(zdo);
-  }
-
   internal static bool Destroy(ZDO zdo)
   {
     zdo.SetOwnerInternal(ZDOMan.GetSessionID());

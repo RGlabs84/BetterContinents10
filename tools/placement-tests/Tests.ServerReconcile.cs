@@ -229,6 +229,30 @@ internal static partial class Tests
       C(!Holds(Inventory(107, 0, wide: false).GetArray()) && Holds(Inventory(107, 2, wide: false).GetArray()), "an older inventory counts its items in an int");
       C(Holds([1, 2]), "bytes nobody can read count as holding something: nothing is destroyed on a guess");
       C(!Holds([]) && Holds(null, "sword".GetStableHashCode()), "an item stand holds its item, and an empty array holds nothing");
+
+      // The stations that hold what a player put in them, without an inventory of the game's.
+      bool Has(Action<ZDO> set)
+      {
+        var zdo = fake.New("piece_station");
+        set(zdo);
+        return BakedReconcile.HoldsItems(zdo);
+      }
+      C(!Has(_ => { }), "a piece with nothing saved holds nothing");
+      C(Has(z => z.Set("2_item".GetStableHashCode(), "ArmorBronzeChest".GetStableHashCode())) && Has(z => z.Set("0_item".GetStableHashCode(), 5)) && Has(z => z.Set("15_item".GetStableHashCode(), 5)),
+        "an armor stand holds what is on any of its slots (0_item ... 15_item is the hash of the item's prefab)");
+      C(!Has(z => z.Set("0_item".GetStableHashCode(), 0)) && !Has(z => z.Set("16_item".GetStableHashCode(), 5)) && !Has(z => z.Set("0_variant".GetStableHashCode(), 3)) && !Has(z => z.Set("pose".GetStableHashCode(), 2)),
+        "an empty slot, a slot past the sixteenth, a variant and a pose are not items");
+      C(Has(z => z.Set(ZDOVars.s_queued, 3)) && !Has(z => z.Set(ZDOVars.s_queued, 0)), "a smelter, kiln or furnace holds the ore in its queue");
+      C(Has(z => z.Set(ZDOVars.s_spawnOre, "CopperOre")) && !Has(z => z.Set(ZDOVars.s_spawnOre, "")), "and what it made and has not given out");
+      C(!Has(z => z.Set(ZDOVars.s_fuel, 12.5f)) && !Has(z => z.Set(ZDOVars.s_fuel, 0f)), "fuel is not an item: every fire and torch would otherwise be an orphan at every change");
+      C(Has(z => z.Set(ZDOVars.s_content, "Mead".GetStableHashCode())) && !Has(z => z.Set(ZDOVars.s_content, 0)), "a fermenter holds its content");
+      C(Has(z => z.Set("slot0", "RawMeat")) && Has(z => z.Set("slot15", "Fish")) && !Has(z => z.Set("slot3", "")) && !Has(z => z.Set("slot16", "Fish")) && !Has(z => z.Set("slotstatus0", 2)),
+        "a cooking station holds the food on any of its slots; an empty slot, a seventeenth and a status are not food");
+      C(Has(z => z.Set(ZDOVars.s_ammo, 7)) && !Has(z => z.Set(ZDOVars.s_ammo, 0)) && !Has(z => z.Set(ZDOVars.s_ammoType, "arrow_wood")), "a turret holds its ammunition, and its ammunition type alone is not ammunition");
+      var several = fake.New("piece_chest");
+      several.Set(ZDOVars.s_items, Inventory(109, 0, wide: true).GetArray());
+      several.Set(ZDOVars.s_queued, 0);
+      C(!BakedReconcile.HoldsItems(several), "an empty inventory and an empty queue together hold nothing");
     }
   }
 }

@@ -108,6 +108,7 @@ internal static partial class Program
     BakedGatherTests();
     BakedExecuteTests();
     BakedExecuteLimitsTests();
+    BakedExecuteRecheckTests();
     BakedVegetationTests();
     BakedOrphanTests();
   }
@@ -497,6 +498,63 @@ internal static partial class Program
     });
     C(plan3.Seeds == 5 && lines3.Count == 1 && lines3[0].Contains("5 could not be done (see the log)") && !lines3[0].Contains("seeded"), "five seeders that throw are five errors, counted: " + string.Join(" | ", lines3));
     C(logged.Count(l => l.Contains("could not be reconciled")) == 3, $"and only three are logged, with their reason ({logged.Count(l => l.Contains("could not be reconciled"))})");
+  }
+
+  // The plan is frames old when it runs: a chest it saw empty may have been opened and filled meanwhile.
+  private static void BakedExecuteRecheckTests()
+  {
+    Section("baked reconciliation: a piece that holds items when the change is made is not destroyed, whatever the plan saw");
+    ZDOExtraData.Reset();
+    using var seams = new SeedSeams();
+    var w = new World();
+    var zone = Z(1, 1);
+    w.Generated.Add(zone);
+    BakedReconcile.IsGenerated = z => w.Generated.Contains(z.ToVector2s());
+    BakedReconcile.RotationOf = _ => Quaternion.identity;
+    var seeded = new List<LiveRecord>();
+    BakedReconcile.Seeder = (context, record) =>
+    {
+      seeded.Add(record);
+      return true;
+    };
+    var sends = new List<int>();
+    ZoneRegen.SendDestroyQueue = () =>
+    {
+      sends.Add(w.DestroyQueue.Count);
+      w.Flush();
+    };
+    var opened = BakedPieceAt(w, zone, "piece_chest", 0, 1, dx: -10f);
+    var movedAway = BakedPieceAt(w, zone, "piece_chest", 0, 2, dx: 10f);
+    var untouched = BakedPieceAt(w, zone, "forge", 0, 3, dz: 10f);
+    var smelter = BakedPieceAt(w, zone, "smelter", 0, 4, dz: -10f);
+    ReconcileInput gathered = null;
+    var scan = BakedReconcile.Gather(null, null, made => gathered = made);
+    while (scan.MoveNext())
+    {
+    }
+    // The record of `movedAway` is 3 m off (a Replace); the other three have no record (Remove).
+    gathered.Revision = 2;
+    gathered.Records.Add(SeedRecord(0, 2, "piece_chest", movedAway.GetPosition() + new Vector3(3f, 0f, 0f)));
+    var plan = BakedReconcile.Plan(gathered);
+    C(plan.Removes == 3 && plan.Replaces == 1 && plan.Orphans == 0, $"(the plan saw them all empty: {plan.Summary()})");
+    // Meanwhile players put things in: a chest, the moved chest, a smelter's queue.
+    ZDOExtraData.Set(opened.m_uid, ZDOVars.s_items, ChestWithItems(2));
+    ZDOExtraData.Set(movedAway.m_uid, ZDOVars.s_items, ChestWithItems(1));
+    ZDOExtraData.Set(smelter.m_uid, ZDOVars.s_queued, 4);
+    var lines = new List<string>();
+    var run = BakedReconcile.Execute(plan, lines.Add);
+    while (run.MoveNext())
+    {
+    }
+    var gone = w.All.ToHashSet();
+    C(!gone.Contains(opened.m_uid) && !gone.Contains(movedAway.m_uid) && !gone.Contains(smelter.m_uid), "the chest, the chest that was to be replaced and the smelter with ore queued are not destroyed");
+    C(opened.GetString(BakedKeys.Orphan) == "0/1" && movedAway.GetString(BakedKeys.Orphan) == "0/2" && smelter.GetString(BakedKeys.Orphan) == "0/4"
+      && !opened.GetInt(BakedKeys.Id, out _) && !movedAway.GetInt(BakedKeys.Id, out _) && !smelter.GetInt(BakedKeys.Id, out _), "each is an orphan now: its bake keys gone, the mark saying what it was");
+    C(gone.Contains(untouched.m_uid) && w.All.Count() == 1, "the one that is still empty goes, and nothing else");
+    C(seeded.Count == 1 && seeded[0].Id == 2, "the replaced chest's record is seeded where it belongs all the same (the orphan stays where it stood)");
+    C(sends.Count == 1 && sends[0] == 1, $"only the one that was destroyed is sent ({string.Join(",", sends)})");
+    C(lines.SequenceEqual(["Baked pieces reconciled: 1 seeded, 1 removed, 3 left standing as orphans (`bc_bake orphans` lists them), 0 kept."]), "and the output counts them as orphans: " + string.Join(" | ", lines));
+    C(BakedReconcile.Orphans().Count == 3 && BakedReconcile.Orphans().All(o => o.HoldsItems), "`bc_bake orphans` lists the three, each holding items");
   }
 
   private static void BakedVegetationTests()
