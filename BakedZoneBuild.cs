@@ -83,6 +83,8 @@ internal sealed class BuiltZone
   internal int Records, Drawn, Skipped;
   /// <summary>Records of consumable kinds: placed as real objects by the server, never drawn here and given no collider (spec 0.2).</summary>
   internal int Consumables;
+  /// <summary>Records of consumable kinds that the compiler marked decor (palette flag 32): built like any other record, drawn as scenery, placed as nothing.</summary>
+  internal int DecorRecords;
 
   internal bool HasColliders => Colliders.Length > 0 || Convex.Length > 0;
   internal bool HasProps => Copies.Length > 0 || Seats.Length > 0;
@@ -304,6 +306,8 @@ internal static class BakedZoneBuild
         built.Consumables++;
         continue;
       }
+      if (kind.Decor)
+        built.DecorRecords++;
       if (kind.Role == BakedRole.Live)
         continue;
       var flags = data.Flags[i];

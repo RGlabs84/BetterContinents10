@@ -61,8 +61,11 @@ internal enum PaletteFlags : byte
   Protect = 4,
   LOD0Only = 8,
   NoCopyLight = 16,
+  // BC: a compiler marks a consumable kind (a Pickable, PickableItem, ItemDrop or Plant) as scenery: the client draws its records like any Static
+  // or Copy, and nothing places them as real objects (BakedConsumables). Only on role Static or Copy; no effect on a prefab that is no consumable.
+  Decor = 32,
   // Every bit this version knows.
-  All = 31,
+  All = 63,
 }
 
 [Flags]
@@ -818,6 +821,9 @@ internal sealed class PaletteEntry : IEquatable<PaletteEntry>
   // The prefab that names the entry (its first candidate).
   public string Name => Candidates[0].Name;
   public bool Protected => (Flags & PaletteFlags.Protect) != 0;
+  // The compiler's mark (flag 32) that this entry is scenery even when its prefab is a consumable. It counts on role Static or Copy only: the reader
+  // refuses it on a Live or Seat entry, and an entry made in memory with that mix is not decor (it stays what it was before the flag).
+  public bool IsDecor => (Flags & PaletteFlags.Decor) != 0 && (Role == BakedRole.Static || Role == BakedRole.Copy);
   public bool HasTint => Tint.Length > 0;
 
   private double reach = -1.0;
@@ -1672,6 +1678,9 @@ internal static class BakedCodec
         throw new BakedFormatException($"its layer is {layer} (0 to 31)", r.Where);
       if ((flags & ~(int)PaletteFlags.All) != 0)
         throw new BakedFormatException($"made by a newer Better Continents or tool: palette flag bit {LowestBit(flags & ~(int)PaletteFlags.All)}", r.Where);
+      // Decor (flag 32) is the compiler's word that a consumable kind is scenery: it means something on a drawn role only.
+      if ((flags & (int)PaletteFlags.Decor) != 0 && (role == (int)BakedRole.Live || role == (int)BakedRole.Seat))
+        throw new BakedFormatException($"it is marked decor (flag 32), which only a Static or Copy entry can be, and its role is {(BakedRole)role}", r.Where);
       Box[]? boxes = null;
       if (collision == (int)BakedCollision.Boxes)
       {
@@ -1719,6 +1728,8 @@ internal static class BakedCodec
       throw new BakedFormatException($"its layer is {entry.Layer} (0 to 31)", where);
     if ((entry.Flags & ~PaletteFlags.All) != 0)
       throw new BakedFormatException("it has a flag format 1 does not know", where);
+    if ((entry.Flags & PaletteFlags.Decor) != 0 && (entry.Role == BakedRole.Live || entry.Role == BakedRole.Seat))
+      throw new BakedFormatException($"it is marked decor (flag 32), which only a Static or Copy entry can be, and its role is {entry.Role}", where);
     if (entry.Boxes.Length > 255 || entry.Tags.Length > 255)
       throw new BakedFormatException("it has over 255 boxes or tags", where);
     foreach (var c in entry.Candidates)

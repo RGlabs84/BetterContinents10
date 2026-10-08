@@ -33,6 +33,9 @@ internal sealed class UnbakeGather
   public Dictionary<string, int> StayKinds { get; } = [];
   // Records of a consumable kind (spec 0.2): the game placed them as its own vegetation when the zone generated, and they stay in the layer.
   public int Consumables { get; set; }
+  // Records of a consumable kind that the compiler marked decor (palette flag 32): drawn as scenery, never an object, so there is no piece to make of one;
+  // they stay in the layer.
+  public int DecorConsumables { get; set; }
   // Objects in the zones of an area (not asked for a whole world).
   public long Objects { get; set; }
   public List<WorldObject> ObjectsScratch { get; } = [];
@@ -316,6 +319,8 @@ internal static partial class BakeRunner
   {
     if (gather.Consumables > 0)
       lines.Add($"Left alone: {Num(gather.Consumables)} records of kinds that give items when used. The game places them as its own vegetation when a zone generates, and they stay in the layer.");
+    if (gather.DecorConsumables > 0)
+      lines.Add($"Left alone: {Num(gather.DecorConsumables)} records of kinds that give items when used, which the compiler's file marks as decor. They are scenery, not pickable objects, and they stay in the layer.");
     if (gather.Stay > 0)
       lines.Add($"Not unbaked: {Num(gather.Stay)} records stay in the layer ({KindsText(gather.StayKinds)}): this game cannot make them as pieces.");
   }
@@ -368,7 +373,10 @@ internal static partial class BakeRunner
           into.InGame++;
         if (IsConsumableRecord(ctx, record))
         {
-          into.Consumables++;
+          if (record.Entry.IsDecor)
+            into.DecorConsumables++;
+          else
+            into.Consumables++;
           continue;
         }
         if (record.Role == BakedRole.Live)

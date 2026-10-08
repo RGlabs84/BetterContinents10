@@ -173,7 +173,10 @@ internal readonly struct OrphanInfo(ZDOID id, string prefab, Vector3 position, s
 // placed once when a zone generates, so in a zone that is generated already a destroyed one would never come back. An object is one when it is
 // the prefab of one of the next layer's consumable records in that zone and stands within PositionTolerance of where the record puts it (Gather
 // reads them for the zones that grew, VegetationGrowth.Keep); the old layer's consumable that the next moved or dropped, and any other
-// mushroom or bush, is plain vegetation and goes.
+// mushroom or bush, is plain vegetation and goes. A record of a kind the compiler marked decor (palette flag 32) is not a consumable here: the
+// client draws it and nothing places it, so a real object of its prefab at its pivot is not its own copy and is cleared like any other vegetation
+// in a cell that grew (no duplicate of the drawn one stays); outside the cells that grew nothing is ever removed for a decor record, so a world
+// that already placed the kind as real objects (from a file without the flag) keeps them until their zone is reset or a player picks them.
 //
 // When: at world load on the machine that runs the world (after the zones and every object are loaded: a ZNet.LoadWorld postfix, after
 // BakeRunner's check of what a crash or a cut save left, which settles every bake, unbake and undo first), and after `bc_bake load`,

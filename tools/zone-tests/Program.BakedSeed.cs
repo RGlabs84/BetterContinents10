@@ -122,6 +122,7 @@ internal static partial class Program
     BakedVegetationTests();
     BakedOrphanTests();
     BakedConsumableTests();
+    BakedDecorFlagTests();
   }
 
   // ------------------------------------------------------------------------------------------------ what stands

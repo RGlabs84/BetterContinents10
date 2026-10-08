@@ -173,6 +173,12 @@ internal static class BakedClient
     if (consumables > 0 || BakedConsumables.Kinds.Count > 0)
       say($"Baked placements: {BakedConsumables.Kinds.Count} consumable kinds ({string.Join(", ", BakedConsumables.Kinds.Take(8))}{(BakedConsumables.Kinds.Count > 8 ? ", ..." : "")}) " +
           $"and {consumables:N0} of their records in the zones built here are placed as real objects, never drawn.");
+    int decor = 0;
+    foreach (var s in Slots.Values)
+      decor += s.Current?.DecorRecords ?? 0;
+    if (decor > 0 || BakedConsumables.DecorKinds.Count > 0)
+      say($"Baked placements: {BakedConsumables.DecorKinds.Count} decor kinds ({string.Join(", ", BakedConsumables.DecorKinds.Take(8))}{(BakedConsumables.DecorKinds.Count > 8 ? ", ..." : "")}) " +
+          $"and {decor:N0} of their records in the zones built here are drawn as scenery, not placed as objects and not pickable.");
     int copyRecords = 0, lit = 0;
     foreach (var s in Slots.Values)
     {

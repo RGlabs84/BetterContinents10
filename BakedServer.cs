@@ -15,7 +15,8 @@ namespace BetterContinents;
 //
 //  * Consumables (build spec 0.2, BakedConsumables): every record of a consumable kind, whatever its role, is placed ONCE here as an ordinary
 //    object of the game, with no bake keys, no bc_protect and no creator, so the game owns it from then on. Reconciliation never seeds or removes
-//    one. The kind is decided by the prefab the entry resolves to (its first candidate the game has), not by its name.
+//    one. The kind is decided by the prefab the entry resolves to (its first candidate the game has), not by its name. Not the entries the
+//    compiler marked decor (palette flag 32, Static or Copy): their records are scenery the client draws, so nothing is placed for them here.
 //
 //  * Every Live record of the zone, of every source, is seeded unless its (source, id) already stands in the zone: after a zone reset the
 //    kept piece stays and is not seeded twice. The zone's objects are found the way ZoneRegen finds them, each by its own position.
@@ -204,11 +205,16 @@ internal static class BakedServer
     // entries that are not consumables.
     public readonly Dictionary<int, Resolved?> Consumables = [];
     public readonly HashSet<int> Plain = [];
+    // The entries whose prefab is a consumable kind that the compiler marked decor (palette flag 32), by palette index: the prefab's name. These
+    // are in Plain as well: they are not consumables to place, they are scenery the client draws.
+    public readonly Dictionary<int, string> Decor = [];
   }
 
   /// <summary>Whether a palette entry is a consumable kind, decided by the prefab it resolves to: the first candidate the game has (the one the
   /// client would draw), so an entry whose first candidate is missing is what its stand-in is. <paramref name="kind"/> is what to place, null
-  /// when the prefab cannot be placed (it has no ZNetView; said once). An entry the game has no prefab of is not one.</summary>
+  /// when the prefab cannot be placed (it has no ZNetView; said once). An entry the game has no prefab of is not one. An entry the compiler marked
+  /// decor (<see cref="PaletteEntry.IsDecor"/>) is not one either, whatever its prefab: its records are scenery the client draws and nothing here
+  /// places (<paramref name="context"/>.Decor names it).</summary>
   internal static bool IsConsumable(Context context, int index, PaletteEntry palette, out Resolved? kind)
   {
     if (context.Consumables.TryGetValue(index, out kind))
@@ -223,6 +229,12 @@ internal static class BakedServer
         continue;
       if (!BakedConsumables.Is(prefab))
         break;
+      if (palette.IsDecor)
+      {
+        BakedConsumables.NoteDecor(candidate.Name);
+        context.Decor[index] = candidate.Name;
+        break;
+      }
       BakedConsumables.Note(candidate.Name);
       var scale = ViewOf(prefab);
       if (scale == null)

@@ -286,6 +286,9 @@ internal sealed class BakedKind
   /// <summary>The entry's prefab is a consumable kind (BakedConsumables, spec 0.2): the server places its records as ordinary objects when a zone
   /// generates, so this client never draws one and gives it no collider, whatever its role.</summary>
   internal bool Consumable;
+  /// <summary>The entry's prefab is a consumable kind that the compiler marked decor (palette flag 32, Static or Copy): it is drawn, and collided with as
+  /// the file says, like any other piece, and nothing is placed for its records. Counted by bc_bake stats; nothing else reads it.</summary>
+  internal bool Decor;
   /// <summary>Instanced: a Static, Seat or Copy entry with a piece that has something to draw. A Copy is drawn unlit (its prefab's intact look) wherever
   /// no lit copy stands at it: beyond Light Distance, and within it beyond the Light Count nearest (BakedLightCount).</summary>
   internal bool Draws => Piece != null && Piece.NearParts.Length > 0 && (Role == BakedRole.Static || Role == BakedRole.Seat || Role == BakedRole.Copy);
@@ -319,6 +322,9 @@ internal sealed class EntryDef
   internal string TintFilter = "";
   /// <summary>The entry's MatVar tags: slot key (the number after "MatVar") to variant.</summary>
   internal Dictionary<int, int>? MatVar;
+
+  /// <summary>The compiler marked the entry decor (flag 32) and its role is one that is drawn as it is: Static or Copy (as PaletteEntry.IsDecor).</summary>
+  internal bool IsDecor => (Flags & PaletteFlags.Decor) != 0 && (Role == BakedRole.Static || Role == BakedRole.Copy);
 
   /// <summary>An entry of the layer's palette, as the client reads it.</summary>
   internal static EntryDef From(PaletteEntry e)
@@ -452,8 +458,12 @@ internal static class BakedKinds
     (ReferenceEquals(k.Prefab, null) || k.Prefab != null) && (k.Piece == null || ReferenceEquals(k.Piece.Prefab, null) || k.Piece.Prefab != null);
 
   /// <summary>The name of the consumable prefab an entry resolves to, or null when it does not: the first candidate the game has decides (the one
-  /// that would be drawn), so a missing mod's pickable whose stand-in is a plain bush is a bush. Null too where no world is up to ask.</summary>
-  internal static string? ConsumableOf(EntryDef e)
+  /// that would be drawn), so a missing mod's pickable whose stand-in is a plain bush is a bush. Null too where no world is up to ask, and for an
+  /// entry the compiler marked decor (<see cref="EntryDef.IsDecor"/>): that one is drawn as scenery whatever its prefab is.</summary>
+  internal static string? ConsumableOf(EntryDef e) => e.IsDecor ? null : ConsumablePrefabOf(e);
+
+  // The consumable prefab an entry resolves to, decor or not.
+  private static string? ConsumablePrefabOf(EntryDef e)
   {
     if (ZNetScene.instance == null)
       return null;
@@ -489,6 +499,12 @@ internal static class BakedKinds
       k.Boxes = [];
       BakedConsumables.Note(consumable);
       return k;
+    }
+    // ... unless the compiler marked the entry decor: that pickable is scenery, drawn and collided with as the file says, like any Static or Copy
+    if (e.IsDecor && ConsumablePrefabOf(e) is { } decor)
+    {
+      k.Decor = true;
+      BakedConsumables.NoteDecor(decor);
     }
     // a live record is the real piece (the server seeds it): nothing to draw, nothing to stand on
     if (e.Role == BakedRole.Live || ZNetScene.instance == null)
