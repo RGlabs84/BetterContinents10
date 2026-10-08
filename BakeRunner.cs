@@ -113,6 +113,8 @@ internal sealed class BakeEstimate
 // The layer, as the runner needs it (slice A's BakedLayerStore and LayerEdit behind it).
 internal interface IBakeLayerPort
 {
+  // The layer this machine holds now (the reconciliation of Live pieces compares it with the one an edit makes).
+  BakedLayer? Current { get; }
   bool HasLayer { get; }
   uint Revision { get; }
   long Bytes { get; }
@@ -150,6 +152,8 @@ internal sealed class BakePush
 
 internal interface IBakeTransport
 {
+  // Why this build cannot send a changed layer to the players (and so cannot change the world), or null. A dry run works without it.
+  string? Unavailable { get; }
   // Remote clients that take part in the world.
   int Players { get; }
   // Sends the new layer and waits until every client has it, has left, or has been silent 30 s after its last packet (5.3).
@@ -178,6 +182,8 @@ internal enum BakeWorldKind
 // The world's conversion to a GameTerrain world.
 internal interface IBakeConvert
 {
+  // Why this build cannot convert a world, or null.
+  string? Unavailable { get; }
   BakeWorldKind Kind { get; }
   // Makes the world a Better Continents world that keeps the game's terrain, and tells every client (4.3).
   void Convert();
@@ -209,6 +215,9 @@ internal sealed class BakeContext
   public BakeWho Who { get; init; } = new();
   public string Version { get; init; } = ModInfo.Version;
   public Func<long> UnixTime { get; init; } = () => DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+  // An operation ended as it should in this session, in the state that the next world load settles: after a complete world save that began
+  // later, that state may be written as the final one it is given here (BakeSettle). Null in the tests and at world load.
+  public Action<int, BakeState>? Ended { get; init; }
 }
 
 // The area of a bake or an unbake: a circle of 4 to 256 m, or a world-aligned box up to 512 x 512 m; all heights; a piece is in it when
@@ -266,7 +275,9 @@ internal sealed class BakeArea
   public List<ZoneKey> Zones()
   {
     var zones = new List<ZoneKey>();
-    int x0 = BakedFormat.ZoneOf(MinX), x1 = BakedFormat.ZoneOf(MaxX), z0 = BakedFormat.ZoneOf(MinZ), z1 = BakedFormat.ZoneOf(MaxZ);
+    // A hair of margin: the game works out an object's zone in single precision, and an object a hair inside the area is looked for in its zone.
+    const double Margin = 0.01;
+    int x0 = BakedFormat.ZoneOf(MinX - Margin), x1 = BakedFormat.ZoneOf(MaxX + Margin), z0 = BakedFormat.ZoneOf(MinZ - Margin), z1 = BakedFormat.ZoneOf(MaxZ + Margin);
     for (int zz = z0; zz <= z1; zz++)
       for (int zx = x0; zx <= x1; zx++)
       {
@@ -335,6 +346,8 @@ internal static partial class BakeRunner
   internal const int AdoptionsPerFrame = 200;
   // How long undo and unbake wait for the restored objects to reach the clients.
   internal const double SentTimeout = 60.0;
+  // How often the wait asks whether they have.
+  internal const double SentPoll = 0.5;
   // How far above its y a record of an in-game bake reaches, for its zone's y bounds (culling): taller than any piece.
   internal const float RecordHeight = 12f;
   // The creator the pieces get when the admin is the server's console and so has no player id: any nonzero id keeps a zone reset from
@@ -343,6 +356,11 @@ internal static partial class BakeRunner
 
   // The operation that is under way on this machine (one at a time per world), or null.
   internal static string? Running { get; private set; }
+  // The operation that stopped on an error or because the world closed, and left itself half done: the next world load settles it, and until
+  // then nothing else changes the world, or it would build on a state nobody has checked.
+  internal static string? Stuck { get; private set; }
+  // The running operation has written its undo file: from then on a stop leaves something half done.
+  private static bool touched;
 
   // Starts an operation; false, and the line to say, when one is under way already. A dry run changes nothing and may always go.
   internal static bool Enter(string what, bool confirm, out string refusal)
@@ -355,7 +373,13 @@ internal static partial class BakeRunner
       refusal = $"bc_bake: {Running} is still running. One operation runs at a time: wait for its last line.";
       return false;
     }
+    if (Stuck != null)
+    {
+      refusal = $"bc_bake: {Stuck} stopped half done. Load the world again to settle it (the undo file says what was left) before changing it with anything else.";
+      return false;
+    }
     Running = what;
+    touched = false;
     return true;
   }
 
@@ -365,8 +389,13 @@ internal static partial class BakeRunner
       Running = null;
   }
 
-  // Forgets an operation that was under way (a world that closed, the tests).
-  internal static void Reset() => Running = null;
+  // Forgets an operation that was under way and one that was left half done (a world that is loaded again, the tests).
+  internal static void Reset()
+  {
+    Running = null;
+    Stuck = null;
+    touched = false;
+  }
 
   // Runs an operation to its end, flattening the routines it yields (so that what they throw is seen here), and saying what went wrong
   // when something throws (the game's coroutine would only log it, and the admin would wait for lines that never come). The journal
@@ -389,14 +418,14 @@ internal static partial class BakeRunner
       catch (BakeStopException e)
       {
         say($"bc_bake: {what} stopped: {e.Message}");
-        Running = null;
+        Stopped(what);
         yield break;
       }
       catch (Exception e)
       {
         BetterContinents.LogError($"bc_bake: {what} threw: {e}");
         say($"bc_bake: {what} stopped on an error: {e.Message}. The log has it. The next world load settles what was left half done (the undo file says what).");
-        Running = null;
+        Stopped(what);
         yield break;
       }
       if (!more)
@@ -411,6 +440,14 @@ internal static partial class BakeRunner
       }
       yield return current;
     }
+  }
+
+  // An operation stopped: it is no longer running, and if it had begun to change things the world is not changed by anything else until a load.
+  private static void Stopped(string what)
+  {
+    if (touched)
+      Stuck = what;
+    Running = null;
   }
 
   // The pieces' number for display: "1,204".
@@ -455,6 +492,12 @@ internal static partial class BakeRunner
           + "Continents, or the game without it, opens it without the baked pieces. Add 'convert' to go ahead.");
       return false;
     }
+    if (ctx.Convert?.Unavailable is { } cannot)
+    {
+      if (confirm || saysInDryRun)
+        ctx.Say($"bc_bake: {cannot}. Nothing is changed.");
+      return false;
+    }
     var others = ctx.Transport.Peers.Where(p => p.Version != ModInfo.Version).ToList();
     if (others.Count > 0)
     {
@@ -473,6 +516,7 @@ internal static partial class BakeRunner
     {
       ctx.Journal.Prune();
       ctx.Journal.Write(data);
+      touched = true;
       ctx.Journal.SetState(data.Number, BakeState.Prepared);
       return true;
     }
@@ -497,12 +541,20 @@ internal static partial class BakeRunner
   {
     if (ids.Count == 0)
       yield break;
-    double start = ctx.Clock();
-    while (!ctx.World.AllSent(ids))
+    double start = ctx.Clock(), asked = start - SentPoll;
+    while (true)
     {
+      double now = ctx.Clock();
+      // What ZDOMan has sent each peer is walked for every piece: twice a second is often enough.
+      if (now - asked >= SentPoll)
+      {
+        asked = now;
+        if (ctx.World.AllSent(ids))
+          yield break;
+      }
       if (!ctx.World.Ready)
         throw new BakeStopException("the world closed while the pieces were being sent");
-      if (ctx.Clock() - start > SentTimeout)
+      if (now - start > SentTimeout)
       {
         ctx.Say($"bc_bake: {what} had not reached every player after {SentTimeout:0} s; going on.");
         yield break;
@@ -635,6 +687,13 @@ internal static partial class BakeRunner
         if (players > 0)
           say($"{players} player{(players == 1 ? "" : "s")} connected; each gets the change{(estimate is { PatchBytes: >= 0 } ? $" ({About(estimate.PatchBytes)})" : "")} before the pieces go.");
         WorldAllows(ctx, words, confirm: false, saysInDryRun: true);
+        if (ctx.Transport.Unavailable is { } soon)
+          say($"This build cannot bake yet: {soon}.");
+        yield break;
+      }
+      if (ctx.Transport.Unavailable is { } nope)
+      {
+        say($"bc_bake: {nope}, and a bake takes its pieces out of the world once the players have the layer. Nothing is changed.");
         yield break;
       }
       if (!WorldAllows(ctx, words, confirm: true, saysInDryRun: true))
@@ -686,6 +745,7 @@ internal static partial class BakeRunner
       }
       // Step 8.
       ctx.Journal.SetState(number, BakeState.Removed);
+      ctx.Ended?.Invoke(number, BakeState.Settled);
       BakedApi.RaiseBaked(data.ToOperation());
       double took = ctx.Clock() - began;
       var stay = tally.StayCount;

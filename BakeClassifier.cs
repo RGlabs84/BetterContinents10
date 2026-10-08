@@ -238,18 +238,21 @@ internal sealed class PrefabFacts
   public int Comfort { get; }
   // ZNetView.m_syncInitialScale: the ZDO's scale is part of the piece.
   public bool SyncsScale { get; }
+  // How far above its pivot the prefab reaches, in whole metres, for the y bounds of the zone its records are in; 0 when not known.
+  public float Height { get; }
 
-  public PrefabFacts(string name, IEnumerable<ComponentFact> components, bool nonKinematicBody = false, int comfort = 0, bool syncsScale = false)
+  public PrefabFacts(string name, IEnumerable<ComponentFact> components, bool nonKinematicBody = false, int comfort = 0, bool syncsScale = false, float height = 0f)
   {
     Name = name;
     Components = [.. components];
     NonKinematicBody = nonKinematicBody;
     Comfort = comfort;
     SyncsScale = syncsScale;
+    Height = height;
   }
 
-  public PrefabFacts(string name, IEnumerable<string> components, bool nonKinematicBody = false, int comfort = 0, bool syncsScale = false)
-    : this(name, components.Select(c => new ComponentFact(c, BasesOf(c))), nonKinematicBody, comfort, syncsScale)
+  public PrefabFacts(string name, IEnumerable<string> components, bool nonKinematicBody = false, int comfort = 0, bool syncsScale = false, float height = 0f)
+    : this(name, components.Select(c => new ComponentFact(c, BasesOf(c))), nonKinematicBody, comfort, syncsScale, height)
   {
   }
 
@@ -300,7 +303,33 @@ internal sealed class PrefabFacts
         comfort = Math.Max(comfort, piece.m_comfort);
     }
     var view = prefab.GetComponent<ZNetView>();
-    return new PrefabFacts(prefab.name, components, body, comfort, view != null && view.m_syncInitialScale);
+    return new PrefabFacts(prefab.name, components, body, comfort, view != null && view.m_syncInitialScale, HeightOf(prefab));
+  }
+
+  // The highest corner of any mesh's bounds, in the prefab's own frame, rounded up to a whole metre with a margin (0 when it has no mesh).
+  // Mesh.bounds is stored with the mesh, so it can be read from a mesh the CPU cannot read.
+  private static float HeightOf(GameObject prefab)
+  {
+    float top = 0f;
+    bool any = false;
+    var toRoot = prefab.transform.worldToLocalMatrix;
+    foreach (var filter in prefab.GetComponentsInChildren<MeshFilter>(true))
+    {
+      var mesh = filter.sharedMesh;
+      if (mesh == null)
+        continue;
+      var matrix = toRoot * filter.transform.localToWorldMatrix;
+      var bounds = mesh.bounds;
+      for (int corner = 0; corner < 8; corner++)
+      {
+        var offset = new Vector3((corner & 1) == 0 ? -1f : 1f, (corner & 2) == 0 ? -1f : 1f, (corner & 4) == 0 ? -1f : 1f);
+        var point = matrix.MultiplyPoint3x4(bounds.center + Vector3.Scale(bounds.extents, offset));
+        any = true;
+        if (point.y > top)
+          top = point.y;
+      }
+    }
+    return any ? Mathf.Max(1f, Mathf.Ceil(top + 0.5f)) : 0f;
   }
 }
 

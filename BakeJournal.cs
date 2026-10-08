@@ -532,7 +532,7 @@ internal static class BakeJournalFile
 // An operation's folder on the machine that runs the world: <save data>/BetterContinents/bakes/<world name>-<world uid>/. Never
 // inside the world's own folder: the game's rename and backup delete or skip the files they do not know (SaveSystemPatch), and the
 // export keeps its files out of it for the same reason.
-internal sealed class BakeJournal
+internal class BakeJournal
 {
   // How many finished operations are kept, besides every one that is not finished (10.6).
   internal const int KeepOperations = 20;
@@ -577,7 +577,8 @@ internal sealed class BakeJournal
     File.Move(tmp, path);
   }
 
-  internal void Write(BakeJournalData data) => WriteAtomic(JournalPath(data.Number), BakeJournalFile.Encode(data));
+  // Virtual so that the tests can stop the operation at every write (Tests.BakeRunner.cs): a write is one mutation of the undo file.
+  internal virtual void Write(BakeJournalData data) => WriteAtomic(JournalPath(data.Number), BakeJournalFile.Encode(data));
 
   internal BakeJournalData Read(int number)
   {
@@ -596,7 +597,7 @@ internal sealed class BakeJournal
     return data;
   }
 
-  internal void SetState(int number, BakeState state) => WriteAtomic(StatePath(number), Encoding.ASCII.GetBytes(state.Name() + "\n"));
+  internal virtual void SetState(int number, BakeState state) => WriteAtomic(StatePath(number), Encoding.ASCII.GetBytes(state.Name() + "\n"));
 
   // null when there is no state file, or it holds something this version does not know.
   internal BakeState? GetState(int number)

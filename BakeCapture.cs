@@ -82,6 +82,10 @@ internal sealed class BakeRecord
   // The value set the record points to (its content), so that a record read back carries it.
   public ValueSet Values { get; }
 
+  // How far above its y the piece reaches, in m, for the y bounds of its zone (culling): the prefab's own height when it is known, else a
+  // height taller than any piece. Not kept in the journal: a record put back from it gets the taller one.
+  public float Height { get; init; } = BakeRunner.RecordHeight;
+
   public BakeRecord(PaletteEntry entry, ZoneRecord record, ValueSet values)
   {
     Entry = entry;
@@ -174,7 +178,7 @@ internal static class BakeCapture
         q = (-q.X, -q.Y, -q.Z, -q.W);
       record = ZoneRecord.Create(0, copy.X, copy.Y, copy.Z, new Quaternion((float)q.X, (float)q.Y, (float)q.Z, (float)q.W), scale, lasting, source, setIndex, seed);
     }
-    return new BakeRecord(entry, record, set);
+    return new BakeRecord(entry, record, set) { Height = facts.Height > 0f ? facts.Height : BakeRunner.RecordHeight };
   }
 
   // The scale a ZNetView with m_syncInitialScale gives its piece: the Vec3 "scale" when it is not zero, else the float "scaleScalar" on
@@ -355,6 +359,36 @@ internal static class BakeMath
       cy * cx * cz + sy * sx * sz);
   }
 
+  // Unity's Quaternion.eulerAngles, in double precision and without the call into the engine: each angle in [0, 360), the inverse of
+  // EulerToQuaternion. At a pitch of +-90 degrees the roll is taken as 0 and the yaw absorbs it, as Unity does.
+  internal static (float X, float Y, float Z) EulerOf(Quaternion q)
+  {
+    double x = q.x, y = q.y, z = q.z, w = q.w;
+    double length = Math.Sqrt(x * x + y * y + z * z + w * w);
+    if (length < 1e-12)
+      return (0f, 0f, 0f);
+    x /= length;
+    y /= length;
+    z /= length;
+    w /= length;
+    // The rotation matrix of q = qy * qx * qz.
+    double m12 = 2 * (y * z - w * x);
+    double pitch = Math.Asin(Math.Max(-1.0, Math.Min(1.0, -m12)));
+    double yaw, roll;
+    if (Math.Abs(m12) < 0.999999)
+    {
+      yaw = Math.Atan2(2 * (x * z + w * y), 1 - 2 * (x * x + y * y));
+      roll = Math.Atan2(2 * (x * y + w * z), 1 - 2 * (x * x + z * z));
+    }
+    else
+    {
+      yaw = Math.Atan2(-2 * (x * z - w * y), 1 - 2 * (y * y + z * z));
+      roll = 0;
+    }
+    const double Deg = 180.0 / Math.PI;
+    return ((float)BakeCapture.Wrap360(pitch * Deg), (float)BakeCapture.Wrap360(yaw * Deg), (float)BakeCapture.Wrap360(roll * Deg));
+  }
+
   // The angle in degrees between two rotations.
   internal static double AngleBetween((double X, double Y, double Z, double W) a, (double X, double Y, double Z, double W) b)
   {
@@ -403,4 +437,69 @@ internal static class BakeMath
     var saved = RotationAfterSave(copy.RotX, copy.RotY, copy.RotZ);
     return AngleBetween(EulerToQuaternion(saved.X, saved.Y, saved.Z), there) <= PlaceDegrees;
   }
+}
+
+// One object of the world as the matching sees it: where it stands, turned as its ZDO stores it.
+internal readonly struct ObjectPose
+{
+  public ZDOID Id { get; init; }
+  public int Prefab { get; init; }
+  public float X { get; init; }
+  public float Y { get; init; }
+  public float Z { get; init; }
+  public float RotX { get; init; }
+  public float RotY { get; init; }
+  public float RotZ { get; init; }
+}
+
+// Which object is which piece of an undo file (10.8): ZDOIDs change at every load, so an object is found by its prefab, its place within a
+// centimetre and its turn within a tenth of a degree (BakeMath.SamePlace, which also takes the half degrees the game's save cuts a turn to).
+internal static class BakeMatch
+{
+  // The cells objects are filed in: a cell is 2 cm, and a piece looks in the cell it is in and the eight around it, so that anything within
+  // 1 cm is found whichever side of a cell's edge it is on.
+  private const double Cell = 0.02;
+
+  // For each piece, the index in `objects` of the object that is it now, or -1; each object answers for one piece at most.
+  internal static int[] Find(IReadOnlyList<ObjectPose> objects, IReadOnlyList<PieceCopy> pieces)
+  {
+    var found = new int[pieces.Count];
+    for (int i = 0; i < found.Length; i++)
+      found[i] = -1;
+    if (objects.Count == 0 || pieces.Count == 0)
+      return found;
+    var cells = new Dictionary<(int Prefab, long X, long Z), List<int>>();
+    for (int i = 0; i < objects.Count; i++)
+    {
+      var o = objects[i];
+      var key = (o.Prefab, CellOf(o.X), CellOf(o.Z));
+      if (!cells.TryGetValue(key, out var list))
+        cells[key] = list = [];
+      list.Add(i);
+    }
+    var taken = new bool[objects.Count];
+    for (int p = 0; p < pieces.Count; p++)
+    {
+      var piece = pieces[p];
+      long cx = CellOf(piece.X), cz = CellOf(piece.Z);
+      for (long dx = -1; dx <= 1 && found[p] < 0; dx++)
+        for (long dz = -1; dz <= 1 && found[p] < 0; dz++)
+        {
+          if (!cells.TryGetValue((piece.Prefab, cx + dx, cz + dz), out var list))
+            continue;
+          foreach (int i in list)
+          {
+            var o = objects[i];
+            if (taken[i] || !BakeMath.SamePlace(piece, o.Prefab, o.X, o.Y, o.Z, o.RotX, o.RotY, o.RotZ))
+              continue;
+            taken[i] = true;
+            found[p] = i;
+            break;
+          }
+        }
+    }
+    return found;
+  }
+
+  private static long CellOf(double metres) => (long)Math.Floor(metres / Cell);
 }
