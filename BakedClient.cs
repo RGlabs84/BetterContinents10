@@ -30,7 +30,7 @@ namespace BetterContinents;
 /// <summary>Where the client side reads its settings (section 11.2): bound by SettingsSchema, null where the config is not (the offline suite).</summary>
 internal static class BakedSettings
 {
-  internal static ConfigEntry<int>? DrawDistance;
+  internal static ConfigEntry<int>? DrawDistance, LightShadows;
   internal static ConfigEntry<float>? DrawScale, DetailScale, LightDistance, SeatDistance;
   internal static ConfigEntry<BakedShadows>? Shadows;
   internal static ConfigEntry<string>? Tints;
@@ -433,6 +433,8 @@ internal static class BakedClient
       props.UpdateLit(eye, light);
       props.UpdateSeats(at, seat);
     }
+    // only the Light Shadows nearest lit copies keep their lights' shadows (one ranking across the zones, a few times a second)
+    BakedLightShadows.Update(eye, BakedSettings.LightShadows?.Value ?? 4, Time.unscaledTime);
 
     BakedDraw.Tick(cam, ring, ringVersion);
     BakedDraw.Submit();
@@ -874,6 +876,7 @@ internal static class BakedClient
     building = 0;
     BakedZoneHold.ReleaseAll();
     BakedPaint.Clear();
+    BakedLightShadows.Clear();
     BakedDraw.Reset();
     BakedKinds.ResetAll();
     ring = [];
