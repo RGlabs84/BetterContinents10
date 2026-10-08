@@ -91,6 +91,7 @@ internal static partial class Program
     BakedConsumableKindTests();
     BakedConsumableSeedTests();
     BakedConsumableReconcileTests();
+    BakedConsumableVegetationTests();
     BakedConsumableCodeTests();
     BakedConsumableValtimaTests();
   }
@@ -372,6 +373,107 @@ internal static partial class Program
     raw.IsConsumable = _ => false;
     var control = BakedReconcile.Plan(raw);
     C(control.Seeds == 1 && control.Replaces == 2 && control.Removes == 1 && control.Orphans == 1, $"(without the test it would have planned the flax too: {control.Summary()})");
+  }
+
+  // ------------------------------------------------------------------------------------------------ the vegetation clean-up
+
+  // A layer of one zone: flax (Static), a mushroom (Live, id 7) and a wall, at (entry, x, z) metres from the zone's south-west corner, with a clear mask
+  // over the cells that hold (rows 0 and 1, columns 0 and 1: the first 8 m both ways) or none.
+  private static BakedLayer ClearingLayer(ZoneKey zone, bool mask, params (int Entry, double X, double Z)[] records)
+  {
+    var edit = LayerEdit.New("clearing");
+    var entries = new[]
+    {
+      edit.PaletteIndexFor(new PaletteEntry([new Candidate("Pickable_Flax_Wild", 0, 0, 0)], BakedRole.Static, BakedCollision.None)),
+      edit.PaletteIndexFor(new PaletteEntry([new Candidate("Pickable_Mushroom", 0, 0, 0)], BakedRole.Live, BakedCollision.Prefab, 0, PaletteFlags.Protect)),
+      edit.PaletteIndexFor(new PaletteEntry([new Candidate("stone_wall_2x1", 0, 0, 0)], BakedRole.Static, BakedCollision.None)),
+    };
+    edit.AddRecords(records.Select(r => ZoneRecord.CreateYaw(entries[r.Entry], zone.OriginX + r.X, 40, zone.OriginZ + r.Z, 0, null, r.Entry == 1 ? 7u : null)));
+    if (mask)
+    {
+      var bits = new byte[BakedFormat.MaskBytes];
+      foreach (int cell in new[] { 0, 1, 16, 17 })
+        bits[cell >> 3] |= (byte)(1 << (cell & 7));
+      edit.SetSections(zone, new ZoneSections { Mask = bits });
+    }
+    return edit.Build().Layer;
+  }
+
+  private static void BakedConsumableVegetationTests()
+  {
+    Section("baked consumables: the vegetation clean-up keeps the next layer's own consumables, and clears the rest as before");
+    ZDOExtraData.Reset();
+    using var seams = new SeedSeams();
+    var w = new World();
+    var key = new ZoneKey(4, 4);
+    var zone = key.ToVector2s();
+    w.Generated.Add(zone);
+    BakedReconcile.IsGenerated = z => w.Generated.Contains(z.ToVector2s());
+    BakedReconcile.RotationOf = _ => Quaternion.identity;
+    ZoneRegen.SendDestroyQueue = w.Flush;
+    var game = new ConsumableGame().Has("Pickable_Flax_Wild", consumable: true).Has("Pickable_Mushroom", consumable: true).Has("stone_wall_2x1").Has("Pine");
+    game.Install();
+    BakedReconcile.VegetationPrefabs = () => ["Pickable_Flax_Wild".GetStableHashCode(), "Pickable_Mushroom".GetStableHashCode(), "Pine".GetStableHashCode()];
+
+    // The old layer has flax at A, B and C and no clear mask. The next keeps A, moves B, drops C, has a Live mushroom and a wall, and clears the cells over all of it.
+    var old = ClearingLayer(key, mask: false, (0, 1.5, 1.5), (0, 5.5, 1.5), (0, 1.5, 5.5));
+    var next = ClearingLayer(key, mask: true, (0, 1.5, 1.5), (0, 5.5, 6.5), (1, 7.0, 3.0), (2, 2.5, 7.0));
+    ZDO At(string prefab, double x, double z, float dx = 0f) => w.Add(zone, prefab, (float)(x + dx - 32.0), (float)(z - 32.0), y: 40f);
+    var placedA = At("Pickable_Flax_Wild", 1.5, 1.5);
+    var nearA = At("Pickable_Flax_Wild", 1.5, 1.5, dx: 0.04f);
+    var vanillaFlax = At("Pickable_Flax_Wild", 1.5, 1.5, dx: 0.2f);
+    var oldB = At("Pickable_Flax_Wild", 5.5, 1.5);
+    var newB = At("Pickable_Flax_Wild", 5.5, 6.5);
+    var oldC = At("Pickable_Flax_Wild", 1.5, 5.5);
+    var placedMushroom = At("Pickable_Mushroom", 7.0, 3.0);
+    var vanillaMushroom = At("Pickable_Mushroom", 7.5, 3.0);
+    var pine = At("Pine", 3.0, 3.0);
+    var pineOnA = At("Pine", 1.5, 1.5);
+    var outside = At("Pickable_Flax_Wild", 30.0, 30.0);
+    var door = At("wood_door", 2.0, 2.0);
+    var planted = Creator(At("Pickable_Flax_Wild", 1.5, 1.5, dx: 0.01f), 42L);
+
+    ReconcileInput input = null;
+    var gathering = BakedReconcile.Gather(old, next, made => input = made);
+    while (gathering.MoveNext())
+    {
+    }
+    var growth = input.Growth.Single();
+    C(growth.Zone.Equals(key) && growth.Keep != null && growth.Keep.Count == 2 && growth.Keep["Pickable_Flax_Wild".GetStableHashCode()].Count == 2 && growth.Keep["Pickable_Mushroom".GetStableHashCode()].Count == 1,
+      "Gather reads the next layer's consumables of the zone that grew: two flax and the Live mushroom, not the wall");
+    var plan = BakedReconcile.Plan(input);
+    C(plan.Vegetation.Count == 1 && ReferenceEquals(plan.Vegetation[0], growth) && plan.Seeds == 0, "the plan carries them with the growth, and seeds nothing for the Live mushroom");
+    var lines = new List<string>();
+    var run = BakedReconcile.Execute(plan, lines.Add);
+    while (run.MoveNext())
+    {
+    }
+    var gone = w.All.ToHashSet();
+    C(!gone.Contains(placedA.m_uid) && !gone.Contains(newB.m_uid) && !gone.Contains(placedMushroom.m_uid), "(a) a placed consumable that matches the next layer's record stays in a cell that is cleared: the flax at A, the flax at the moved B, the Live mushroom");
+    C(!gone.Contains(nearA.m_uid), "4 cm from the pivot is the same place");
+    C(gone.Contains(vanillaFlax.m_uid) && gone.Contains(vanillaMushroom.m_uid), "(b) a vanilla object of the same prefab at another spot (20 cm, 50 cm) is cleared");
+    C(gone.Contains(oldB.m_uid) && gone.Contains(oldC.m_uid), "(c) a consumable of the old layer that the next moved, or dropped, is plain vegetation now and goes");
+    C(gone.Contains(pine.m_uid) && gone.Contains(pineOnA.m_uid), "(d) a tree in the cell goes, as before, also one standing exactly where a consumable record would put its pivot (another prefab)");
+    C(!gone.Contains(outside.m_uid) && !gone.Contains(door.m_uid) && !gone.Contains(planted.m_uid), "and what was never cleared stays: outside the cleared cells, no vegetation, a planted one");
+    C(lines.Count == 1 && lines[0].Contains("6 trees, rocks and bushes cleared"), "the output counts six: " + string.Join(" | ", lines));
+
+    // A layer with no consumable in the zone keeps nothing: everything of the vegetation prefabs goes.
+    ZDOExtraData.Reset();
+    w = new World();
+    w.Generated.Add(zone);
+    ZoneRegen.SendDestroyQueue = w.Flush;
+    var bare = ClearingLayer(key, mask: true, (2, 2.5, 7.0));
+    var stays = At("Pickable_Flax_Wild", 1.5, 1.5);
+    input = null;
+    gathering = BakedReconcile.Gather(old, bare, made => input = made);
+    while (gathering.MoveNext())
+    {
+    }
+    var again = BakedReconcile.Execute(BakedReconcile.Plan(input), lines.Add);
+    while (again.MoveNext())
+    {
+    }
+    C(input.Growth.Single().Keep == null && w.All.Contains(stays.m_uid), "with no consumable record in the next layer's zone nothing is kept: the flax goes");
   }
 
   // ------------------------------------------------------------------------------------------------ what the real placement may do
