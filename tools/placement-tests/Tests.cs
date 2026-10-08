@@ -36,7 +36,17 @@ internal static partial class Tests
     Checks++;
     Failures++;
     System.Console.WriteLine($"FAIL {test} threw {e.GetType().Name}: {e.Message}");
-    System.Console.WriteLine(e.StackTrace);
+    try
+    {
+      System.Console.WriteLine(e.StackTrace);
+    }
+    catch (Exception)
+    {
+      // Formatting a trace reads the custom attributes of every method on it, and a Unity method's name an assembly of Unity's this suite does
+      // not have: that would end the whole run. The methods' names alone need nothing.
+      foreach (var frame in new System.Diagnostics.StackTrace(e, true).GetFrames())
+        System.Console.WriteLine("   at " + frame.GetMethod()?.DeclaringType?.FullName + "." + frame.GetMethod()?.Name);
+    }
   }
 
   // Whether an action throws BakedFormatException whose message contains every given part (not case sensitive).
