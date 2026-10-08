@@ -642,8 +642,8 @@ internal static class BakedReconcile
   // ---- vegetation ------------------------------------------------------------------------------------------------------------------------
 
   // What the world made in the cells the file has cleared since: the prefabs of ZoneSystem.m_vegetation, with no creator and no bake id, except the
-// next layer's own consumables (VegetationGrowth.Keep: the same prefab within 5 cm of a record's pivot). A consumable of the old layer that the next
-// moved or dropped, and any other mushroom or bush, is plain vegetation and goes.
+  // next layer's own consumables (VegetationGrowth.Keep: the same prefab within 5 cm of a record's pivot). A consumable of the old layer that the next
+  // moved or dropped, and any other mushroom or bush, is plain vegetation and goes.
   private static bool ClearVegetation(VegetationGrowth growth, Counts counts)
   {
     var man = Objects();
