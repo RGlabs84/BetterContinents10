@@ -214,6 +214,7 @@ internal static partial class Tests
     fx.Said.Clear();
     BakeUnbakeRun(fx, BakeWholeWorld, "all", "unbake world all");
     C(fx.Said.Any(l => l.Contains("To unbake: 40 pieces (stone_wall 35, roof 5). 3 live pieces lose their bake keys")) && fx.Said.Any(l => l.StartsWith("With 'all' the compiler's records come out too")), "with 'all' the dry run warns that a load brings them back: " + string.Join(" | ", fx.Said));
+    C(fx.Said.Any(l => l == "Found 43 records here: 0 baked in game, 43 from the compiler's file."), "and counts the compiler's records it found, without the hint to add 'all': " + string.Join(" | ", fx.Said));
     fx.Said.Clear();
     BakeUnbakeRun(fx, BakeWholeWorld, "all confirm", "unbake world all");
     C(fx.Layer.Placements == 0 && fx.World.Objects.Count == 3 + 40, "all 43 records are out of the layer; 40 pieces are made");

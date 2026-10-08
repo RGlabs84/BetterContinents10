@@ -329,11 +329,10 @@ internal static partial class BakeRunner
       {
         if (!record.Record.HasSource)
         {
+          into.Compiler++;
+          // The compiler's records come out only with 'all' (6.3).
           if (!words.All)
-          {
-            into.Compiler++;
             continue;
-          }
         }
         else
           into.InGame++;
