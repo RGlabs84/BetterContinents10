@@ -80,4 +80,88 @@ internal static partial class Tests
       BakedConsumables.Probe = probe;
     }
   }
+
+  // ------------------------------------------------------------------------------------------------ the client
+
+  public static void ConsumablesClientTest()
+  {
+    Section("consumables, client: an entry is a consumable by the prefab it resolves to, and a zone builds no instance and no collider for one");
+    var probe = BakedConsumables.Probe;
+    using var scene = new ApiScene();
+    try
+    {
+      foreach (var name in new[] { "Pickable_Flax_Wild", "Pickable_Mushroom", "Bush01", "wood_door", "Pine" })
+        scene.Add(name);
+      GameObject Prefab(string name) => scene.Prefabs[name.GetStableHashCode()];
+      var consumables = new[] { Prefab("Pickable_Flax_Wild"), Prefab("Pickable_Mushroom") };
+      BakedConsumables.Probe = prefab => consumables.Any(c => ReferenceEquals(c, prefab));
+      EntryDef Def(BakedRole role, params string[] names) => new() { Names = names, Anchors = names.Select(_ => Vector3.zero).ToArray(), Role = role };
+
+      C(BakedKinds.ConsumableOf(Def(BakedRole.Static, "Pickable_Flax_Wild")) == "Pickable_Flax_Wild", "a Static entry of a pickable is a consumable");
+      C(BakedKinds.ConsumableOf(Def(BakedRole.Live, "Pickable_Mushroom")) == "Pickable_Mushroom" && BakedKinds.ConsumableOf(Def(BakedRole.Copy, "Pickable_Mushroom")) != null, "whatever its role");
+      C(BakedKinds.ConsumableOf(Def(BakedRole.Static, "Pine")) == null && BakedKinds.ConsumableOf(Def(BakedRole.Live, "wood_door")) == null, "a tree and a door are not");
+      C(BakedKinds.ConsumableOf(Def(BakedRole.Static, "RaspberryBush", "Bush01")) == null, "RaspberryBush missing, its stand-in Bush01 is not a consumable: the entry is not one");
+      C(BakedKinds.ConsumableOf(Def(BakedRole.Static, "Missing_Mod_Berry", "Pickable_Flax_Wild")) == "Pickable_Flax_Wild", "a missing first candidate whose stand-in is a pickable is one, by the stand-in");
+      C(BakedKinds.ConsumableOf(Def(BakedRole.Static, "Pine", "Pickable_Flax_Wild")) == null, "and a pickable that is only the stand-in of a prefab the game has is not looked at: the first candidate the game has decides");
+      C(BakedKinds.ConsumableOf(Def(BakedRole.Static, "Missing_Mod_Berry")) == null && BakedKinds.ConsumableOf(Def(BakedRole.Static)) == null, "an entry the game has no prefab of is not one");
+
+      // A kind that would be drawn, collided with, copied and sat on is left out of the zone whole.
+      BakedConsumables.SessionStarts();
+      var piece = ClientKit.NoLods("flax", 1f);
+      var flax = ClientKit.Kind("Pickable_Flax_Wild", piece, collision: BakedCollision.Boxes, boxes: [new KindBox(Vector3.zero, Vector3.one)]);
+      var copy = ClientKit.Kind("Pickable_Mushroom", piece, role: BakedRole.Copy, collision: BakedCollision.Boxes, boxes: [new KindBox(Vector3.zero, Vector3.one)]);
+      var live = ClientKit.Kind("Pickable_Mushroom", null, role: BakedRole.Live);
+      var wall = ClientKit.Kind("stone_wall", ClientKit.NoLods("wall", 2f), collision: BakedCollision.Boxes, boxes: [new KindBox(Vector3.zero, Vector3.one)]);
+      var records = new[] { (0, 4.0, 5.0, 6.0, 0.0, (Vector3?)null), (0, 8.0, 5.0, 6.0, 20.0, null), (1, 10.0, 5.0, 6.0, 0.0, null), (2, 12.0, 5.0, 6.0, 0.0, null), (3, 14.0, 5.0, 6.0, 0.0, null) };
+      var kinds = new[] { flax, copy, live, wall };
+      var before = BakedZoneBuild.Build(ClientKit.Zone(0, 0, records), kinds, 1);
+      C(before.Drawn == 3 && before.Consumables == 0 && before.Colliders.Length == 1 && before.Colliders[0].Triangles.Length == 4 * 36, "(without the flag the flax is drawn, and all four boxes would be collided with)");
+      foreach (var kind in new[] { flax, copy, live })
+        kind.Consumable = true;
+      var zone = BakedZoneBuild.Build(ClientKit.Zone(0, 0, records), kinds, 1);
+      C(zone.Consumables == 4 && zone.Drawn == 1 && zone.Kinds.Length == 1 && zone.Kinds[0].Kind == wall && zone.Kinds[0].Count == 1,
+        $"no instance is built for a consumable: only the wall is drawn ({zone.Drawn} drawn, {zone.Consumables} consumables)");
+      C(zone.Colliders.Length == 1 && zone.Colliders[0].Triangles.Length == 36 && zone.Copies.Length == 0 && zone.Seats.Length == 0 && zone.Convex.Length == 0 && zone.Skipped == 0,
+        "no collider (the only box is the wall's), no copy, no seat, nothing skipped");
+    }
+    finally
+    {
+      BakedConsumables.Probe = probe;
+    }
+  }
+
+  public static void ConsumablesStatsTest()
+  {
+    Section("consumables, client: bc_bake stats says how many kinds and records are placed as real objects");
+    var layer = MakeSample(91).Layer;
+    var rig = new ClientLayerRig();
+    BakedLayerStore.Changed += BakedClient.OnLayerChanged;
+    try
+    {
+      using var scene = new ApiScene();
+      BakedConsumables.SessionStarts();
+      BakedLayerStore.Set(layer, null);
+      BakedClient.Prepare();
+      var lines = new List<string>();
+      BakedClient.Stats(lines.Add);
+      C(!lines.Any(l => l.Contains("real objects")), "with none in view the stats do not mention them: " + string.Join(" | ", lines));
+      BakedConsumables.Note("Pickable_Flax_Wild");
+      BakedConsumables.Note("Pickable_Mushroom");
+      var zone = BakedClient.SlotOf(new ZoneKey(0, 0));
+      zone.Current = BuiltZone.Empty(0, 0, layer.Revision);
+      zone.Current.Consumables = 41;
+      var other = BakedClient.SlotOf(new ZoneKey(1, 0));
+      other.Current = BuiltZone.Empty(1, 0, layer.Revision);
+      other.Current.Consumables = 1;
+      lines.Clear();
+      BakedClient.Stats(lines.Add);
+      C(lines.Any(l => l.Contains("2 consumable kinds") && l.Contains("Pickable_Flax_Wild") && l.Contains("42") && l.Contains("placed as real objects, never drawn")), "the stats name the kinds and count the records of the zones built: " + string.Join(" | ", lines));
+    }
+    finally
+    {
+      BakedLayerStore.Changed -= BakedClient.OnLayerChanged;
+      rig.Dispose();
+      BakedConsumables.SessionStarts();
+    }
+  }
 }

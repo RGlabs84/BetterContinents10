@@ -3,6 +3,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using System.Threading;
 using BepInEx.Configuration;
 using HarmonyLib;
@@ -165,6 +166,12 @@ internal static class BakedClient
     say($"Baked placements: layer r{layer.Revision}, {layer.Placements:N0} records in {layer.Zones.Count:N0} zones. This client: {Slots.Count} zones " +
         $"({drawn} built, {withColliders} with colliders standing, {waiting} being built or handed over), {BakedZoneHold.Count} held, " +
         $"{BakedPaint.ZonesPainted} painted, {BakedKinds.All.Count} kinds drawn.");
+    int consumables = 0;
+    foreach (var s in Slots.Values)
+      consumables += s.Current?.Consumables ?? 0;
+    if (consumables > 0 || BakedConsumables.Kinds.Count > 0)
+      say($"Baked placements: {BakedConsumables.Kinds.Count} consumable kinds ({string.Join(", ", BakedConsumables.Kinds.Take(8))}{(BakedConsumables.Kinds.Count > 8 ? ", ..." : "")}) " +
+          $"and {consumables:N0} of their records in the zones built here are placed as real objects, never drawn.");
     BakedDraw.Report(say, ring.Length);
   }
 

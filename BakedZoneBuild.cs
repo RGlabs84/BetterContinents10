@@ -72,6 +72,8 @@ internal sealed class BuiltZone
   /// <summary>The world box of the copies' and the seats' positions (minimum x, y, z, then maximum), for the early-out of the near test.</summary>
   internal readonly float[] CopyBox = new float[6], SeatBox = new float[6];
   internal int Records, Drawn, Skipped;
+  /// <summary>Records of consumable kinds: placed as real objects by the server, never drawn here and given no collider (spec 0.2).</summary>
+  internal int Consumables;
 
   internal bool HasColliders => Colliders.Length > 0 || Convex.Length > 0;
   internal bool HasProps => Copies.Length > 0 || Seats.Length > 0;
@@ -258,6 +260,12 @@ internal static class BakedZoneBuild
       if (kind == null)
       {
         built.Skipped++;
+        continue;
+      }
+      // a consumable kind: neither drawn nor collided with, whatever its role (the game owns the object the server placed)
+      if (kind.Consumable)
+      {
+        built.Consumables++;
         continue;
       }
       if (kind.Role == BakedRole.Live)
