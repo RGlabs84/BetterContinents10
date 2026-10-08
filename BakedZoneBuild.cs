@@ -78,6 +78,14 @@ internal sealed class BuiltZone
   /// old or new, whatever the main thread does meanwhile. BakedDraw.LitVersion counts the publications, so that a job is started for each.
   /// </summary>
   internal volatile bool[]? Lit;
+  /// <summary>
+  /// Which entries of Kinds a shadow proxy covers now (BakedProxyBook): one array the main thread makes and PUBLISHES by assigning this field, and never
+  /// changes after (null: none). The cull-and-LOD worker reads the field once for the zone, and sends the instances of a covered kind, for the parts the
+  /// proxy takes, to draws that cast nothing. BakedDraw.ProxyVersion counts the publications, so that a job is started for each.
+  /// </summary>
+  internal volatile bool[]? ProxyCover;
+  /// <summary>The zone's shadow proxy, if it has one (main thread only).</summary>
+  internal ZoneProxy? Proxy;
   /// <summary>The world box of the copies' and the seats' positions (minimum x, y, z, then maximum), for the early-out of the near test.</summary>
   internal readonly float[] CopyBox = new float[6], SeatBox = new float[6];
   internal int Records, Drawn, Skipped;

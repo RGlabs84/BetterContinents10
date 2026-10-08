@@ -188,6 +188,7 @@ internal static class BakedClient
     if (copyRecords > 0)
       say(BakedLightCount.StatsLine(copyRecords, lit, BakedSettings.LightCount?.Value ?? BakedLightCount.Default, BakedSettings.LightDistance?.Value ?? 90f, BakedDraw.Hidden));
     BakedDraw.Report(say, ring.Length);
+    BakedProxy.Report(say, ring.Length);
   }
 
   /// <summary>bc_bake hide: this client stops drawing the layer's pieces (and its lit copies); the colliders and the seats stay.</summary>
@@ -458,8 +459,11 @@ internal static class BakedClient
     // only the Light Shadows nearest lit copies keep their lights' shadows (one ranking across the zones, a few times a second)
     BakedLightShadows.Update(eye, BakedSettings.LightShadows?.Value ?? 4, Time.unscaledTime);
 
+    // the shadow proxies follow the ring first, so that a change of what they cover starts the next drawing job at once
+    BakedProxy.Tick(cam, ring, ringVersion);
     BakedDraw.Tick(cam, ring, ringVersion);
     BakedDraw.Submit();
+    BakedProxy.Submit(cam, ring, ringVersion);
   }
 
   // ---- rings ------------------------------------------------------------------------------------------------------------------------
@@ -900,6 +904,7 @@ internal static class BakedClient
     BakedPaint.Clear();
     BakedLightShadows.Clear();
     BakedLightCount.Clear();
+    BakedProxy.Reset();
     BakedDraw.Reset();
     BakedKinds.ResetAll();
     ring = [];

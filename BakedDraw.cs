@@ -33,6 +33,10 @@ internal enum BakedShadows
 // (VALtima's Britain d1 at U1: 4.8 M triangles submitted, 94.8 M drawn). Near the camera a segment is one zone; farther out, one of four
 // slabs (east, west, north, south) that stay clear of the near zones, so the lights and the near cascades never meet them.
 //
+// A zone that has a shadow proxy (BakedProxyBook: its casters merged into a few meshes that are drawn for shadows alone) sends the instances the
+// proxy covers to draws that cast nothing, so the shadow passes meet a few proxy meshes in place of the thousands of calls. What a proxy does
+// not take (a cutout's shadow needs its texture, a mesh the CPU and the GPU would not give up) keeps casting by instancing, as before.
+//
 // Unity 6's RenderParams start with shadows, received shadows, light probes and reflection probes all OFF. Every one is set: a piece drawn
 // without them is flat and unlit next to the game's own pieces.
 
@@ -45,8 +49,12 @@ internal sealed class BatchBuf
   /// <summary>The runs the list is drawn in: where each starts in M, and its bounds (six floats, minimum then maximum).</summary>
   internal int[] SegStart = new int[4];
   internal float[] SegBox = new float[24];
+  /// <summary>Each run's key: the zone or slab it casts from (not negative), or NoCast for the run that casts nothing.</summary>
+  internal int[] SegKey = new int[4];
   internal int Segs;
   private int segKey;
+  /// <summary>The key of the run that casts no shadow (what a shadow proxy covers, and a batch that casts nothing).</summary>
+  internal const int NoCast = -1;
 
   internal void Begin()
   {
@@ -66,8 +74,10 @@ internal sealed class BatchBuf
     {
       Array.Resize(ref SegStart, Segs * 2);
       Array.Resize(ref SegBox, Segs * 12);
+      Array.Resize(ref SegKey, Segs * 2);
     }
     SegStart[Segs] = Count;
+    SegKey[Segs] = key;
     int at = Segs * 6;
     SegBox[at] = SegBox[at + 1] = SegBox[at + 2] = float.MaxValue;
     SegBox[at + 3] = SegBox[at + 4] = SegBox[at + 5] = float.MinValue;
@@ -85,12 +95,13 @@ internal sealed class BatchBuf
     return new Bounds((min + max) * 0.5f, max - min);
   }
 
-  /// <summary>The calls drawing this list takes, <paramref name="limit"/> instances a call at most.</summary>
-  internal int Calls(int limit)
+  /// <summary>The calls drawing this list takes, <paramref name="limit"/> instances a call at most; with <paramref name="castingOnly"/>, those of the runs that cast.</summary>
+  internal int Calls(int limit, bool castingOnly = false)
   {
     int calls = 0;
     for (int s = 0; s < Segs; s++)
-      calls += (SegEnd(s) - SegStart[s] + limit - 1) / limit;
+      if (!castingOnly || SegKey[s] != NoCast)
+        calls += (SegEnd(s) - SegStart[s] + limit - 1) / limit;
     return calls;
   }
 
@@ -217,6 +228,8 @@ internal sealed class CullJob
   internal int RingVersion, BatchVersion;
   /// <summary>BakedDraw.LitVersion when the job was made: the lit copies it knew of (BuiltZone.Lit) are the ones published up to it.</summary>
   internal int LitVersion;
+  /// <summary>BakedDraw.ProxyVersion when the job was made: the proxy coverage it read (BuiltZone.ProxyCover) is the one published up to it, or a later one.</summary>
+  internal int ProxyVersion;
 }
 
 /// <summary>The camera's frustum as six planes, widened for how far the camera can move or turn before the next job.</summary>
@@ -288,6 +301,8 @@ internal static class BakedDraw
   internal const float CasterReach = 16f;
   /// <summary>A casting batch is drawn a zone at a time within this many zones of the camera's (Chebyshev), by slab beyond.</summary>
   internal const int NearZones = 2;
+  /// <summary>Added to the sort key of a zone no shadow proxy covers, so that the covered zones come first (SegmentKey stays below it).</summary>
+  private const int ProxiedKeys = 1000;
   /// <summary>Cells of a zone: 4 x 4 of 16 m.</summary>
   internal const int CellsAcross = 4, Cells = 16;
   internal const float CellSize = 16f;
@@ -340,20 +355,26 @@ internal static class BakedDraw
     var state = new byte[Cells];
     int stamp = 0, zones = 0, cells = 0, drawn = 0;
     float margin = job.Shadows == BakedShadows.Off ? 0f : job.CasterMargin;
-    // the zones in segment order, so that each segment's instances arrive together
+    // the zones in segment order, so that each segment's instances arrive together; the zones a shadow proxy covers come first, since what they
+    // send to a casting segment is only what the proxy cannot take. Each zone's coverage is read once.
     int camZx = Mathf.RoundToInt(job.CamX / 64f), camZz = Mathf.RoundToInt(job.CamZ / 64f);
     var keys = new int[job.Zones.Length];
+    var sortKeys = new int[job.Zones.Length];
+    var covers = new bool[]?[job.Zones.Length];
     var order = new int[job.Zones.Length];
     for (int i = 0; i < order.Length; i++)
     {
+      covers[i] = job.Shadows == BakedShadows.Off ? null : job.Zones[i].ProxyCover;
       keys[i] = SegmentKey(job.Zones[i].Zx - camZx, job.Zones[i].Zz - camZz);
+      sortKeys[i] = (covers[i] != null ? 0 : ProxiedKeys) + keys[i];
       order[i] = i;
     }
-    Array.Sort((int[])keys.Clone(), order);
+    Array.Sort(sortKeys, order);
     foreach (int zi in order)
     {
       var zone = job.Zones[zi];
       int key = keys[zi];
+      var cover = covers[zi];
       // 2 = in view, 1 = outside it by no more than the casters' reach, 0 = out
       bool any = false;
       for (int c = 0; c < Cells; c++)
@@ -376,9 +397,11 @@ internal static class BakedDraw
       // the lit copies standing in this zone, as the main thread published them (one whole snapshot, never changed after): a Copy record with a lit
       // copy is not drawn here, or it would be drawn twice
       var lit = zone.Lit;
-      foreach (var ki in zone.Kinds)
+      for (int g = 0; g < zone.Kinds.Length; g++)
       {
+        var ki = zone.Kinds[g];
         var kind = ki.Kind;
+        bool covered = cover != null && g < cover.Length && cover[g];
         if (kind.JobStamp != job.Id)
           Memo(job, kind);
         for (int c = 0; c < Cells; c++)
@@ -386,7 +409,7 @@ internal static class BakedDraw
           if (state[c] == 0 || ki.CellStart[c + 1] == ki.CellStart[c])
             continue;
           stamp++;
-          drawn += FillCell(job, ki, c, state[c] == 2, stamp, key, lit);
+          drawn += FillCell(job, ki, c, state[c] == 2, stamp, key, lit, covered);
         }
       }
     }
@@ -424,7 +447,7 @@ internal static class BakedDraw
     kind.JobSingle = piece.SingleLod || near <= 0f || kind.Lod0Only;
   }
 
-  private static int FillCell(CullJob job, KindInstances ki, int cell, bool inView, int stamp, int segment, bool[]? litCopies)
+  private static int FillCell(CullJob job, KindInstances ki, int cell, bool inView, int stamp, int segment, bool[]? litCopies, bool covered)
   {
     var kind = ki.Kind;
     var piece = kind.Piece!;
@@ -467,15 +490,17 @@ internal static class BakedDraw
         if (!plain)
           at += c / part.SlotStride % part.SlotCount * part.Buckets + (part.Buckets > 1 ? k : 0);
         var b = batches[at];
+        // a part the zone's shadow proxy takes casts through the proxy, not through this draw
+        bool cast = b.JobCasts && !(covered && part.ProxyState == RenderPart.ProxyOk);
         // an instance outside the view is only here for the shadow it casts into it; a shadow-only part is drawn only to cast
-        if (b.Dead || (!inView && !b.JobCasts) || (!b.JobCasts && part.Shadows == ShadowCastingMode.ShadowsOnly))
+        if (b.Dead || (!inView && !cast) || (!cast && part.Shadows == ShadowCastingMode.ShadowsOnly))
           continue;
         var buf = b.Buf[1 - b.Front];
         if (b.Stamp != stamp)
         {
           b.Stamp = stamp;
-          // a batch that does not cast is one segment: only the camera culls it, and fewer calls cost less
-          buf.Open(b.JobCasts ? segment : 0);
+          // what casts nothing is one segment: only the camera culls it, and fewer calls cost less
+          buf.Open(cast ? segment : BatchBuf.NoCast);
           buf.Union(ki.CellBox, cell * 6);
         }
         buf.Add(part.LocalIndex < 0 ? ki.Root[i] : ki.Locals[part.LocalIndex][i]);
@@ -515,7 +540,7 @@ internal static class BakedDraw
   // the settings a job is made with (their defaults where the config is not bound: the offline suite)
   private static float DetailScale => BakedSettings.DetailScale?.Value ?? 1f;
   private static float DrawScale => BakedSettings.DrawScale?.Value ?? 1.5f;
-  private static BakedShadows ShadowSetting => BakedSettings.Shadows?.Value ?? BakedShadows.All;
+  internal static BakedShadows ShadowSetting => BakedSettings.Shadows?.Value ?? BakedShadows.All;
 
   /// <summary>Drawing is switched off (bc_bake hide): no job, no submission.</summary>
   internal static bool Hidden;
@@ -526,6 +551,13 @@ internal static class BakedDraw
   /// a job that knows is adopted (LitAdopted reaches the version of its publication), so that no record is ever neither drawn nor lit.
   /// </summary>
   internal static int LitVersion, LitAdopted;
+
+  /// <summary>
+  /// The same for the shadow proxies (BakedProxyBook): how many times the main thread has published a change of which kinds a zone's proxy covers
+  /// (BuiltZone.ProxyCover), and the last of them a finished job knew of. A change starts a job; a proxy whose coverage was taken back is destroyed
+  /// only after a job that knows is adopted (ProxyAdopted reaches the version of its publication), so that no instance is ever left without a shadow.
+  /// </summary>
+  internal static int ProxyVersion, ProxyAdopted;
 
   /// <summary>Whether a job is running now.</summary>
   internal static bool Busy => running != null;
@@ -564,7 +596,7 @@ internal static class BakedDraw
     float k = QualitySettings.lodBias / (2f * Mathf.Tan(cam.fieldOfView * 0.5f * Mathf.Deg2Rad));
     Vector3 eye = cam.transform.position, forward = cam.transform.forward;
     bool due = frame == null || ringVersion != frame.RingVersion || BakedKinds.Version != frame.BatchVersion
-      || LitVersion != frame.LitVersion || DetailScale != frame.DetailScale || DrawScale != frame.DrawScale || ShadowSetting != frame.Shadows
+      || LitVersion != frame.LitVersion || ProxyVersion != frame.ProxyVersion || DetailScale != frame.DetailScale || DrawScale != frame.DrawScale || ShadowSetting != frame.Shadows
       || (eye - frame.Eye).sqrMagnitude >= RefreshDistance * RefreshDistance
       || Vector3.Angle(forward, frame.Forward) >= RefreshAngle
       || Mathf.Abs(k - frame.K) > frame.K * 0.02f;
@@ -599,7 +631,7 @@ internal static class BakedDraw
       DetailScale = DetailScale, DrawScale = DrawScale, Shadows = ShadowSetting,
       CasterMargin = CasterReach,
       Zones = ring, Batches = batchSnapshot, Kinds = kindSnapshot,
-      RingVersion = ringVersion, BatchVersion = batchVersion, LitVersion = LitVersion,
+      RingVersion = ringVersion, BatchVersion = batchVersion, LitVersion = LitVersion, ProxyVersion = ProxyVersion,
     };
     BakedFrustum.Make(job.Planes, t.position, t.forward, t.right, t.up, cam.fieldOfView, cam.aspect, cam.farClipPlane, AngleMargin, MoveMargin);
     running = job;
@@ -628,6 +660,7 @@ internal static class BakedDraw
     }
     frame = job;
     LitAdopted = Math.Max(LitAdopted, job.LitVersion);
+    ProxyAdopted = Math.Max(ProxyAdopted, job.ProxyVersion);
     jobsRun++;
     jobMsAverage = jobsRun == 1 ? job.Ms : jobMsAverage * 0.95 + job.Ms * 0.05;
     jobMsMax = Math.Max(job.Ms, jobMsMax * 0.99);
@@ -696,6 +729,8 @@ internal static class BakedDraw
       for (int s = 0; s < buf.Segs; s++)
       {
         rp.worldBounds = buf.SegBounds(s);
+        // a run the job made for what a proxy covers casts nothing, in a batch that casts elsewhere
+        rp.shadowCastingMode = buf.SegKey[s] != BatchBuf.NoCast ? b.Part.Shadows : ShadowCastingMode.Off;
         int end = buf.SegEnd(s);
         for (int start = buf.SegStart[s]; start < end; start += b.CallLimit)
         {
@@ -755,7 +790,7 @@ internal static class BakedDraw
       row.Calls[b.Lod] += calls;
       row.Triangles[b.Lod] += (long)buf.Count * b.Part.Triangles;
       if (b.Casts)
-        row.Casting[b.Lod] += calls;
+        row.Casting[b.Lod] += buf.Calls(b.CallLimit, castingOnly: true);
     }
     rows.Sort((a, b) => (b.Ms[0] + b.Ms[1]).CompareTo(a.Ms[0] + a.Ms[1]));
     var total = new Row { Name = "total" };

@@ -186,6 +186,12 @@ internal sealed class RenderPart
   internal MaterialPropertyBlock?[]? BucketProps;
   /// <summary>Triangles one instance draws (for bc_bake stats).</summary>
   internal int Triangles;
+
+  // The shadow proxy's view of this part (BakedProxy): whether its shadow can be merged into a zone's proxy, and its shape if so. Settled once,
+  // on the main thread, the first time a zone that draws the part wants a proxy; a worker reads it only after it is final.
+  internal const byte ProxyUnknown = 0, ProxyOk = 1, ProxyUnreadable = 2, ProxyCutout = 3, ProxyReading = 4, ProxyOther = 5;
+  internal volatile byte ProxyState;
+  internal ProxyShape? Shape;
 }
 
 /// <summary>
