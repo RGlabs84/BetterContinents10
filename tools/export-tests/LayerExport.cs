@@ -1,11 +1,13 @@
 // Added by Wubarrk on 2026-10-07 for baked placements (0.10.4).
 
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Threading;
+using HarmonyLib;
 using UnityEngine;
 using BetterContinents;
 using BC = BetterContinents.BetterContinents;
@@ -80,5 +82,137 @@ internal static class LayerExport
     while (drive2.MoveNext())
       Thread.Sleep(1);
     Program.C(WorldExport.Phase == "Done" && !File.Exists(Path.Combine(dir2, "placements.bcp")) && !File.ReadAllText(Path.Combine(dir2, "README.txt")).Contains("placements.bcp"), "a world without a layer has no placements.bcp, and the README does not mention it");
+
+    Cancelled(work, o, wg);
+    Pauses(work, o, wg, layer);
+  }
+
+  // ---- the heights are sampled without the layer's ground, on every thread that samples ----------------------------------------
+
+  // How deep the calling thread's pauses are, and what the heights asked for did while one was on: by the export's phase, the heights asked for
+  // and the ones asked for with no pause on the asking thread.
+  [ThreadStatic] private static int pauseDepth;
+  private static readonly Dictionary<string, (long Asked, long Unpaused)> Heights = new();
+  private static long pausesMade;
+
+  private sealed class CountedPause : IDisposable
+  {
+    private bool done;
+
+    public CountedPause()
+    {
+      pauseDepth++;
+      Interlocked.Increment(ref pausesMade);
+    }
+
+    public void Dispose()
+    {
+      if (done)
+        return;
+      done = true;
+      pauseDepth--;
+    }
+  }
+
+  private static void HeightAsked()
+  {
+    var phase = WorldExport.Phase;
+    bool paused = pauseDepth > 0;
+    lock (Heights)
+    {
+      Heights.TryGetValue(phase, out var seen);
+      Heights[phase] = (seen.Asked + 1, seen.Unpaused + (paused ? 0 : 1));
+    }
+  }
+
+  // The world made from the export applies the layer's ground again, so the export's heights must be the world's own: WorldGenerator.GetBiomeHeight
+  // is asked on the sampling workers of both samplers (the corner rows and the bands of the terrain pass), and every one of those threads has paused
+  // the ground (a pause is per thread, so one thread's does not cover another's).
+  private static void Pauses(string work, WorldExport.Options o, WorldGenerator wg, BakedLayer layer)
+  {
+    BC.Settings = new BC.BetterContinentsSettings { EnabledForThisWorld = true, GameTerrain = true, Version = 12, Layer = layer };
+    var harmony = new Harmony("layer-export-pauses");
+    var method = AccessTools.Method(typeof(WorldGenerator), nameof(WorldGenerator.GetBiomeHeight));
+    var before = WorldExport.SamplingPause;
+    Heights.Clear();
+    pausesMade = 0;
+    var dir = Path.Combine(work, "layer-export-pauses");
+    try
+    {
+      harmony.Patch(method, prefix: new HarmonyMethod(typeof(LayerExport), nameof(HeightAsked)));
+      WorldExport.SamplingPause = () => new CountedPause();
+      var job = EndToEnd.MakeJob(o, dir, wg);
+      EndToEnd.SetRunning(true);
+      var drive = EndToEnd.Drive(job);
+      while (drive.MoveNext())
+        Thread.Sleep(1);
+    }
+    finally
+    {
+      WorldExport.SamplingPause = before;
+      harmony.Unpatch(method, HarmonyPatchType.Prefix, harmony.Id);
+    }
+    long asked, unpaused;
+    lock (Heights)
+    {
+      asked = Heights.Values.Sum(v => v.Asked);
+      unpaused = Heights.Values.Sum(v => v.Unpaused);
+      System.Console.WriteLine("    heights asked, by phase: " + string.Join("; ", Heights.Select(kv => $"{kv.Key}: {kv.Value.Asked:N0} ({kv.Value.Unpaused:N0} with no pause)")));
+    }
+    Program.C(WorldExport.Phase == "Done" && WorldExport.LastError == null, $"the export with a pause counted finishes ({WorldExport.Phase})");
+    Program.C(asked >= (long)o.Size * o.Size && Heights.TryGetValue("Sampling heights", out var terrain) && terrain.Asked >= (long)o.Size * o.Size,
+      $"the terrain pass asked for the heights of its {o.Size} x {o.Size} pixels ({asked:N0} asked)");
+    Program.C(unpaused == 0, $"and every height was asked with a pause on the asking thread: {unpaused:N0} were not");
+    Program.C(pausesMade >= 2 && pauseDepth == 0, $"each sampling worker made its own pause ({pausesMade}), and the thread that drove the export has none");
+    Program.C(Heights.Keys.All(k => k == "Sampling heights" || k == "Sampling zone corners" || k == "Sampling terrain masks"), "and nothing else in the export asked for a height: " + string.Join(", ", Heights.Keys));
+  }
+
+  // A cancel while the layer is being written: placements.bcp goes with the rest of the export's files (and the folder the export made). Zone extras of
+  // random bytes (kept as they are, and they do not compress) make a layer of tens of MB, so that the write is still going when the cancel comes.
+  private static void Cancelled(string work, WorldExport.Options o, WorldGenerator wg)
+  {
+    var random = new System.Random(4);
+    var edit = LayerEdit.New("export cancel test");
+    edit.PaletteIndexFor(new PaletteEntry([new Candidate("stone_wall_2x1", 0, 0, 0)], BakedRole.Static, BakedCollision.Prefab));
+    edit.AddRecords([ZoneRecord.CreateYaw(0, 3, 40, 3, 0)]);
+    for (int i = 0; i < 3; i++)
+    {
+      var junk = new byte[8 * 1024 * 1024];
+      random.NextBytes(junk);
+      edit.SetSections(new ZoneKey(10 + i, 0), new ZoneSections { Extras = [new ZoneExtra("junk", junk)] });
+    }
+    var layer = edit.Build().Layer;
+    BC.Settings = new BC.BetterContinentsSettings { EnabledForThisWorld = true, GameTerrain = true, Version = 12, Layer = layer };
+    var dir = Path.Combine(work, "layer-export-cancel");
+    var file = Path.Combine(dir, "placements.bcp");
+    var job = EndToEnd.MakeJob(o, dir, wg);
+    EndToEnd.SetRunning(true);
+    var drive = EndToEnd.Drive(job);
+    bool cancelled = false, sawFile = false, sawPartial = false;
+    while (drive.MoveNext())
+    {
+      if (File.Exists(file))
+      {
+        sawFile = true;
+        try
+        {
+          if (new FileInfo(file).Length < layer.Length)
+            sawPartial = true;
+        }
+        catch (IOException)
+        {
+        }
+      }
+      if (!cancelled && WorldExport.Phase == "Writing the baked layer")
+      {
+        cancelled = true;
+        WorldExport.Cancel();
+      }
+      Thread.Sleep(1);
+    }
+    System.Console.WriteLine($"    a layer of {layer.Length:N0} bytes; the cancel came while the file was {(sawPartial ? "half written" : sawFile ? "there, whole" : "not yet there")}");
+    Program.C(cancelled, "the export was in 'Writing the baked layer' at a frame, and was cancelled there");
+    Program.C(WorldExport.Phase == "Cancelled" && !WorldExport.IsRunning && WorldExport.LastError == null, $"the export ends 'Cancelled' ({WorldExport.Phase})");
+    Program.C(!File.Exists(file) && !Directory.Exists(dir), "placements.bcp is deleted with the folder the export made");
   }
 }

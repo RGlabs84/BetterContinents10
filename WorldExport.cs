@@ -446,6 +446,11 @@ public static class WorldExport
   // The work item the running export waits on, so a cancel or a failure can let it finish before deleting files.
   private static Task? pending;
 
+  // The world's own heights, without the layer's ground: the world made from the export applies the ground again (BakedGround.Pause). A pause
+  // belongs to the thread that makes it, so each thread that samples heights makes its own, and the running game keeps the towns' ground while
+  // the export runs. (A field, for the tests to watch which threads pause.)
+  internal static Func<IDisposable> SamplingPause = BakedGround.Pause;
+
   /// <summary>Whether an export can start now: a world is loaded, nothing is running, and Allowed() says yes.</summary>
   public static bool CanExport(out string reason)
   {
@@ -1156,8 +1161,7 @@ public static class WorldExport
       int workers = Math.Max(1, Math.Min(Workers, rows));
       return Task.Run(() => GameUtils.SimpleParallelFor(workers, 0, workers, w =>
       {
-        // The world's own heights, without the layer's ground: the export's world applies it again (BakedGround.Pause).
-        using var withoutGround = BakedGround.Pause();
+        using var withoutGround = SamplingPause();
         for (int r = w; r < rows; r += workers)
         {
           if (cancelRequested)
@@ -1239,6 +1243,7 @@ public static class WorldExport
             var buffers = sets[set];
             GameUtils.SimpleParallelFor(workers, 0, workers, w =>
             {
+              using var withoutGround = SamplingPause();
               for (int r = w; r < count + extra; r += workers)
               {
                 if (cancelRequested)
