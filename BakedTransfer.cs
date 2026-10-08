@@ -64,9 +64,21 @@ internal static class BakedTransfer
 
   /// <summary>Set by BakedClient while its manager runs (build spec 7.6: where the machine is not a dedicated server and its graphics device
   /// is not Null, once a world is loaded): it reports Applied through ReportApplied after every change of the layer, so a push waits for
-  /// it on the machine that runs the world, and a client leaves the answer to it. When it is not set nothing is there to rebuild (the
-  /// loading screen, a dedicated server, a machine with no graphics): a client answers by itself and a push does not wait.</summary>
+  /// it on the machine that runs the world. When it is not set nothing is there to rebuild (the loading screen, a dedicated server, a machine
+  /// with no graphics) and a push does not wait. (A client's Install does not read it: it asks whether the manager claimed the layer.)</summary>
   internal static volatile bool ClientReports;
+
+  /// <summary>The revision of the layer whose Applied report BakedClient's manager has taken on: it queued the wait for that layer's colliders
+  /// (Adopt), so it will say Applied itself. 0 when it took none. A client's Install asks it right after the layer is current, rather than
+  /// reading ClientReports, which a manager sets when it runs and not when it has taken this layer on: a manager that is up but could not
+  /// take the layer (an error, a world that is over) would leave the server waiting for an answer nobody gives.</summary>
+  private static long claimed;
+
+  /// <summary>BakedClient's manager says it will report Applied for this layer's revision (it queued the wait; main thread).</summary>
+  internal static void Claim(uint revision) => claimed = revision;
+
+  /// <summary>For the tests: the revision the manager took on.</summary>
+  internal static long ClaimedRevision => claimed;
 
   // ---- one connection ----------------------------------------------------------------------------------------------------------------
 
@@ -212,6 +224,7 @@ internal static class BakedTransfer
     download = null;
     ClientLink = null;
     localApplied = 0;
+    claimed = 0;
     downloads = installed = 0;
     BakedCache.SessionStarts();
     BakedGround.Subscribe();
@@ -916,6 +929,8 @@ internal static class BakedTransfer
   /// <summary>The layer is this machine's now: current, with its zones that changed (null: every one), and the server told.</summary>
   private static void Install(BakedLayer layer, ZoneKey[]? changed, bool joining, string id)
   {
+    // Nothing taken on yet: a claim left by an earlier layer (the same revision number may come again) is not this one's.
+    claimed = 0;
     BakedLayerStore.Set(layer, changed);
     BakedCache.Replaced(id);
     if (joining)
@@ -923,9 +938,10 @@ internal static class BakedTransfer
       ClientLink?.Invoke(RpcReady, 1);
       return;
     }
-    // Pushed during play: BakedClient reports when the zones inside its collider ring have their new colliders. Where nothing is there
-    // to rebuild (the loading screen, a machine with no graphics) the answer is now.
-    if (!ClientReports)
+    // Pushed during play: BakedClient reports when the zones inside its collider ring have their new colliders, if its manager took this
+    // layer on while Set told it (BakedLayerStore.Changed: it queued the wait and claimed the revision). Where it did not (the loading screen,
+    // a machine with no graphics, a manager that failed to take it) nothing will rebuild, and the answer is now.
+    if (claimed != layer.Revision)
       ReportApplied((int)layer.Revision);
   }
 

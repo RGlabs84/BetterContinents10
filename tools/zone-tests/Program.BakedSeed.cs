@@ -73,6 +73,10 @@ internal static partial class Program
     private readonly Func<ZDO, Quaternion> rotationOf = BakedReconcile.RotationOf;
     private readonly Func<HashSet<int>> vegetation = BakedReconcile.VegetationPrefabs;
     private readonly Func<ZDOMan?> objects = BakedReconcile.Objects;
+    private readonly Func<GameObject, bool?> viewOf = BakedServer.ViewOf;
+    private readonly Func<BakedServer.Context, int, PaletteEntry, ZoneRecord, bool, List<GameObject>?, bool> makeConsumable = BakedServer.MakeConsumable;
+    private readonly Func<int, bool> consumablePrefab = BakedReconcile.ConsumablePrefab;
+    private readonly Func<GameObject, bool> probe = BakedConsumables.Probe;
     private readonly Func<ZoneKey, bool> isGenerated = BakedReconcile.IsGenerated;
     private readonly Action sendQueue = ZoneRegen.SendDestroyQueue;
     private readonly BC.BetterContinentsSettings settings = BC.Settings;
@@ -82,6 +86,8 @@ internal static partial class Program
     {
       // zdo.Set and zdo.RemoveInt ask the game whether this is the server.
       SetStatic(typeof(ZNet), "m_isServer", true);
+      // The game has no prefabs here (the tests that need some say which).
+      BakedServer.FindPrefab = _ => null;
     }
 
     public void Dispose()
@@ -89,6 +95,10 @@ internal static partial class Program
       BakedServer.FindPrefab = findPrefab;
       BakedServer.ZdosIn = zdosIn;
       BakedServer.MakePiece = makePiece;
+      BakedServer.ViewOf = viewOf;
+      BakedServer.MakeConsumable = makeConsumable;
+      BakedReconcile.ConsumablePrefab = consumablePrefab;
+      BakedConsumables.Probe = probe;
       BakedReconcile.Seeder = seeder;
       BakedReconcile.RotationOf = rotationOf;
       BakedReconcile.VegetationPrefabs = vegetation;
@@ -111,6 +121,7 @@ internal static partial class Program
     BakedExecuteRecheckTests();
     BakedVegetationTests();
     BakedOrphanTests();
+    BakedConsumableTests();
   }
 
   // ------------------------------------------------------------------------------------------------ what stands

@@ -3,6 +3,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using System.Threading;
 using BepInEx.Configuration;
 using HarmonyLib;
@@ -165,6 +166,12 @@ internal static class BakedClient
     say($"Baked placements: layer r{layer.Revision}, {layer.Placements:N0} records in {layer.Zones.Count:N0} zones. This client: {Slots.Count} zones " +
         $"({drawn} built, {withColliders} with colliders standing, {waiting} being built or handed over), {BakedZoneHold.Count} held, " +
         $"{BakedPaint.ZonesPainted} painted, {BakedKinds.All.Count} kinds drawn.");
+    int consumables = 0;
+    foreach (var s in Slots.Values)
+      consumables += s.Current?.Consumables ?? 0;
+    if (consumables > 0 || BakedConsumables.Kinds.Count > 0)
+      say($"Baked placements: {BakedConsumables.Kinds.Count} consumable kinds ({string.Join(", ", BakedConsumables.Kinds.Take(8))}{(BakedConsumables.Kinds.Count > 8 ? ", ..." : "")}) " +
+          $"and {consumables:N0} of their records in the zones built here are placed as real objects, never drawn.");
     BakedDraw.Report(say, ring.Length);
   }
 
@@ -220,7 +227,7 @@ internal static class BakedClient
   // ---- the layer -------------------------------------------------------------------------------------------------------------------
 
   // A layer or a patch is installed (BakedLayerStore.Changed, on the main thread; zones null: all of them). Where this client is not drawing
-  // anything (no world up, or a machine with no screen) BakedTransfer answers Applied itself: ClientReports is false until the manager runs.
+  // anything (no world up, or a machine with no screen) BakedTransfer answers Applied itself: the manager has claimed no revision (Adopt does).
   internal static void OnLayerChanged(BakedLayer? old, BakedLayer? next, ZoneKey[]? changed)
   {
     try
@@ -280,10 +287,12 @@ internal static class BakedClient
     foreach (var s in Slots.Values)
       if (s.WantsColliders(now) && (changed == null || Array.IndexOf(changed, s.Key) >= 0))
         wait.Add(s.Key);
-    // After EVERY change, the first layer of a world too: BakedTransfer.Install leaves the answer to this manager as soon as it runs
-    // (ClientReports), and the machine that runs the world waits for it (Push). The zones of a first layer are not known until the rings are
+    // After EVERY change, the first layer of a world too: BakedTransfer.Install leaves the answer to this manager when it has claimed the
+    // revision (below), and the machine that runs the world waits for it (Push). The zones of a first layer are not known until the rings are
     // made, a moment from now (FillApplying).
     Pending.Add(new Applying(next.Revision, wait, now) { Fill = old == null });
+    // BakedTransfer.Install asks, right after the layer is current: this manager will say Applied for it, nothing else need.
+    BakedTransfer.Claim(next.Revision);
   }
 
   private sealed class Applying(uint revision, HashSet<ZoneKey> zones, float since)

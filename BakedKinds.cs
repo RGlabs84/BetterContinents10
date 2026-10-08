@@ -184,6 +184,9 @@ internal sealed class BakedKind
   internal bool NoShadows => (Flags & PaletteFlags.NoShadows) != 0;
   internal bool Lod0Only => (Flags & PaletteFlags.LOD0Only) != 0;
   internal bool NoCopyLight => (Flags & PaletteFlags.NoCopyLight) != 0;
+  /// <summary>The entry's prefab is a consumable kind (BakedConsumables, spec 0.2): the server places its records as ordinary objects when a zone
+  /// generates, so this client never draws one and gives it no collider, whatever its role.</summary>
+  internal bool Consumable;
   /// <summary>Instanced: a Static or Seat entry with a piece that has something to draw.</summary>
   internal bool Draws => Piece != null && Piece.NearParts.Length > 0 && (Role == BakedRole.Static || Role == BakedRole.Seat);
 
@@ -319,6 +322,7 @@ internal static class BakedKinds
   /// <summary>A world ends: every kind and its batches go (the game's prefabs may not be the same ones in the next).</summary>
   internal static void ResetAll()
   {
+    BakedConsumables.Forget();
     Forget();
     All.Clear();
     Version++;
@@ -347,6 +351,22 @@ internal static class BakedKinds
   private static bool Alive(BakedKind k) =>
     (ReferenceEquals(k.Prefab, null) || k.Prefab != null) && (k.Piece == null || ReferenceEquals(k.Piece.Prefab, null) || k.Piece.Prefab != null);
 
+  /// <summary>The name of the consumable prefab an entry resolves to, or null when it does not: the first candidate the game has decides (the one
+  /// that would be drawn), so a missing mod's pickable whose stand-in is a plain bush is a bush. Null too where no world is up to ask.</summary>
+  internal static string? ConsumableOf(EntryDef e)
+  {
+    if (ZNetScene.instance == null)
+      return null;
+    foreach (string name in e.Names)
+    {
+      var prefab = ZNetScene.instance.GetPrefab(name);
+      if (prefab == null)
+        continue;
+      return BakedConsumables.Is(prefab) ? name : null;
+    }
+    return null;
+  }
+
   private static BakedKind Build(EntryDef e, Color tint)
   {
     var k = new BakedKind
@@ -360,6 +380,16 @@ internal static class BakedKinds
     k.Boxes = new Matrix4x4[e.Boxes.Length];
     for (int i = 0; i < e.Boxes.Length; i++)
       k.Boxes[i] = BakedMath.BoxMatrix(e.Boxes[i].Centre, e.Boxes[i].Size);
+    // a consumable kind is decided by the prefab the entry resolves to (its first candidate the game has), whatever its role: its records are
+    // real objects the server placed when the zone generated, so nothing is drawn and nothing is built to stand on
+    var consumable = ConsumableOf(e);
+    if (consumable != null)
+    {
+      k.Consumable = true;
+      k.Boxes = [];
+      BakedConsumables.Note(consumable);
+      return k;
+    }
     // a live record is the real piece (the server seeds it): nothing to draw, nothing to stand on
     if (e.Role == BakedRole.Live || ZNetScene.instance == null)
       return k;
