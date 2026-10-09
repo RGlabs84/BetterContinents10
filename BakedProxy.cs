@@ -3,7 +3,11 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Diagnostics;
 using System.Linq;
+using System.Threading;
+using Unity.Collections;
+using Unity.Collections.LowLevel.Unsafe;
 using UnityEngine;
 using UnityEngine.Rendering;
 using static BetterContinents.BetterContinents;
@@ -48,8 +52,9 @@ internal static class BakedProxy
     {
       if (ring.Length > 0 && material == null && !blocked)
         MakeMaterial();
-      Book.Tick(Frame(cam, ring, ringVersion));
+      // the reads that finished since the last frame are taken in first, so that the book settles their parts this frame
       BakedMeshShapes.Pump(Time.realtimeSinceStartup);
+      Book.Tick(Frame(cam, ring, ringVersion));
     }
     catch (Exception e)
     {
@@ -285,28 +290,43 @@ internal static class BakedProxy
   }
 }
 
-// WHAT A PART'S SHADOW IS MADE OF: whether its material's shadow is its shape, and the shape itself, read once per mesh and kept. A mesh the CPU can read
-// is read; one it cannot is read back from the GPU (Mesh.GetVertexBuffer and GetIndexBuffer, then AsyncGPUReadback, which takes a few frames), and where
-// that fails the part keeps casting by instancing.
+// WHAT A PART'S SHADOW IS MADE OF: whether its material's shadow is its shape, and the shape itself, read once per mesh and kept. The shape is read OFF the main
+// thread. A mesh the CPU can read: the main thread acquires a read-only MeshData (Mesh.AcquireReadOnlyMeshData, not thread safe: it stays on the main thread, as
+// does the dispose), a worker copies the positions, normals and triangles out of it (MeshData's getters are IsThreadSafe) and makes the shape, and the main thread
+// disposes the MeshData when the worker is out. A mesh it cannot read is read back from the GPU (Mesh.GetVertexBuffer and GetIndexBuffer, then
+// AsyncGPUReadback, which takes a few frames): the callback only keeps the bytes, a worker decodes them. A part is "Reading" until its worker has finished; where
+// a read fails the part keeps casting by instancing.
 internal static class BakedMeshShapes
 {
   /// <summary>Meshes read back from the GPU at once.</summary>
   internal const int MaxReads = 4;
+  /// <summary>Meshes read by workers from their CPU copy at once.</summary>
+  internal const int MaxCpuReads = 8;
   /// <summary>Seconds a read back may take before it is given up.</summary>
   internal const float ReadTimeout = 10f;
+  /// <summary>How long Clear waits for workers still in a MeshData (milliseconds) before leaving them to Pump.</summary>
+  internal const int ClearWaitMs = 2000;
+
+  /// <summary>Runs a job on a worker.</summary>
+  internal static Action<Action> Work = job => ThreadPool.QueueUserWorkItem(_ => job());
 
   private static readonly Dictionary<long, ProxyShape?> Shapes = new();
   private static readonly Dictionary<int, (byte State, string Why)> Materials = new();
   private static readonly Dictionary<long, Read> Reads = new();
+  // reads dropped (a world ended) whose workers had not finished: their MeshData is disposed when they have
+  private static readonly List<Read> Orphans = [];
   private static readonly List<long> Done = [];
   private static readonly HashSet<string> Reported = [];
-  private static int cpuRead, gpuRead, gpuFailed;
+  private static int cpuRead, gpuRead, unreadable, cpuActive;
+  // worker time spent reading and decoding (Stopwatch ticks)
+  private static long workerTicks;
 
-  private sealed class Read(Mesh mesh, int sub, float started)
+  private sealed class Read(Mesh mesh, int sub, float started, bool gpu)
   {
     internal readonly Mesh Mesh = mesh;
     internal readonly int Sub = sub;
     internal readonly float Started = started;
+    internal readonly bool Gpu = gpu;
     internal GraphicsBuffer? Vertices, Indices;
     internal byte[]? VertexBytes, IndexBytes;
     internal bool Failed;
@@ -314,6 +334,15 @@ internal static class BakedMeshShapes
     internal VertexAttributeFormat PosFormat, NormalFormat;
     internal bool HasNormals, Wide;
     internal string Name = "";
+    // a CPU read: the read-only MeshData the worker copies from (made and disposed by the main thread)
+    internal Mesh.MeshDataArray Data;
+    internal bool HasData;
+    // a worker has been given the job (a GPU read: the decode, once the bytes are in)
+    internal bool Sent;
+    /// <summary>Set last by the worker: no worker is in this read any more, and Shape and Error are final.</summary>
+    internal volatile bool Complete;
+    internal ProxyShape? Shape;
+    internal string? Error;
 
     internal bool Finished => Failed || (VertexBytes != null && IndexBytes != null);
   }
@@ -322,12 +351,54 @@ internal static class BakedMeshShapes
   internal static void Clear()
   {
     foreach (var r in Reads.Values)
-      Release(r);
+      Retire(r);
     Reads.Clear();
+    cpuActive = 0;
     Shapes.Clear();
     Materials.Clear();
     Reported.Clear();
-    cpuRead = gpuRead = gpuFailed = 0;
+    cpuRead = gpuRead = unreadable = 0;
+    workerTicks = 0;
+    // a worker may be in a MeshData: it is given a moment (a mesh takes microseconds) and what is left is let go by Pump
+    var wait = Stopwatch.StartNew();
+    DrainOrphans();
+    while (Orphans.Count > 0 && wait.ElapsedMilliseconds < ClearWaitMs)
+    {
+      Thread.Sleep(1);
+      DrainOrphans();
+    }
+  }
+
+  // a read nobody will use: the GPU buffers go now (the decode works on a byte array), a MeshData goes when its worker is out
+  private static void Retire(Read r)
+  {
+    Release(r);
+    if (r.Gpu || !r.HasData)
+      return;
+    if (r.Complete)
+      DisposeData(r);
+    else
+      Orphans.Add(r);
+  }
+
+  private static void DrainOrphans()
+  {
+    for (int i = Orphans.Count - 1; i >= 0; i--)
+      if (Orphans[i].Complete)
+      {
+        DisposeData(Orphans[i]);
+        Orphans.RemoveAt(i);
+      }
+  }
+
+  private static void DisposeData(Read r)
+  {
+    if (!r.HasData)
+      return;
+    r.HasData = false;
+    var data = r.Data;
+    r.Data = default;
+    data.Dispose();
   }
 
   // ---- settling a part -------------------------------------------------------------------------------------------------------------
@@ -375,20 +446,29 @@ internal static class BakedMeshShapes
     }
     if (mesh.isReadable)
     {
-      shape = ReadCpu(mesh, part.Submesh);
-      Shapes[key] = shape;
-      if (shape != null)
-        cpuRead++;
-      Finish(part, shape);
-      return true;
+      if (cpuActive >= MaxCpuReads)
+      {
+        part.ProxyState = RenderPart.ProxyReading;
+        return false;
+      }
+      if (!StartCpuRead(mesh, part.Submesh, key))
+      {
+        Shapes[key] = null;
+        unreadable++;
+        Finish(part, null);
+        return true;
+      }
+      part.ProxyState = RenderPart.ProxyReading;
+      return false;
     }
     if (!SystemInfo.supportsAsyncGPUReadback)
     {
       Shapes[key] = null;
+      unreadable++;
       Finish(part, null);
       return true;
     }
-    if (Reads.Count >= MaxReads)
+    if (Reads.Count - cpuActive >= MaxReads)
     {
       part.ProxyState = RenderPart.ProxyReading;
       return false;
@@ -396,6 +476,7 @@ internal static class BakedMeshShapes
     if (!StartRead(mesh, part.Submesh, key))
     {
       Shapes[key] = null;
+      unreadable++;
       Finish(part, null);
       return true;
     }
@@ -478,20 +559,90 @@ internal static class BakedMeshShapes
 
   // ---- reading a mesh -----------------------------------------------------------------------------------------------------------------
 
-  private static ProxyShape? ReadCpu(Mesh mesh, int sub)
+  // Main thread: the mesh's CPU data is held read-only for a worker (cheap: no copy), and the worker is sent.
+  private static bool StartCpuRead(Mesh mesh, int sub, long key)
   {
+    var read = new Read(mesh, sub, Time.realtimeSinceStartup, false) { Name = mesh.name };
     try
     {
       if (sub >= mesh.subMeshCount || mesh.GetSubMesh(sub).topology != MeshTopology.Triangles)
-        return null;
-      var vertices = mesh.vertices;
-      var normals = mesh.normals;
-      return ProxyShape.Make(vertices, normals.Length == vertices.Length ? normals : null, mesh.GetTriangles(sub, true));
+        return false;
+      read.Data = Mesh.AcquireReadOnlyMeshData(mesh);
+      read.HasData = true;
     }
     catch (Exception e)
     {
       Note2($"mesh \"{mesh.name}\" could not be read: {e.Message}");
-      return null;
+      DisposeData(read);
+      return false;
+    }
+    Reads[key] = read;
+    cpuActive++;
+    read.Sent = true;
+    Work(() => CpuReadJob(read));
+    return true;
+  }
+
+  // Worker: copies the positions, normals and triangles of the submesh out of the MeshData into plain arrays (the getters convert any vertex format to floats
+  // and apply the submesh's base vertex) and makes the shape.
+  private static unsafe void CpuReadJob(Read r)
+  {
+    long t0 = Stopwatch.GetTimestamp();
+    try
+    {
+      var data = r.Data[0];
+      if (r.Sub >= data.subMeshCount)
+        return;
+      var d = data.GetSubMesh(r.Sub);
+      int vertexCount = data.vertexCount;
+      if (d.topology != MeshTopology.Triangles || vertexCount <= 0 || d.indexCount < 3)
+        return;
+      var vertices = new Vector3[vertexCount];
+      fixed (Vector3* p = vertices)
+        data.GetVertices(NativeArrayUnsafeUtility.ConvertExistingDataToNativeArray<Vector3>(p, vertexCount, Allocator.None));
+      Vector3[]? normals = null;
+      if (data.HasVertexAttribute(VertexAttribute.Normal))
+      {
+        normals = new Vector3[vertexCount];
+        fixed (Vector3* p = normals)
+          data.GetNormals(NativeArrayUnsafeUtility.ConvertExistingDataToNativeArray<Vector3>(p, vertexCount, Allocator.None));
+      }
+      var triangles = new int[d.indexCount];
+      fixed (int* p = triangles)
+        data.GetIndices(NativeArrayUnsafeUtility.ConvertExistingDataToNativeArray<int>(p, triangles.Length, Allocator.None), r.Sub, true);
+      r.Shape = ProxyShape.Make(vertices, normals, triangles);
+    }
+    catch (Exception e)
+    {
+      r.Error = e.Message;
+    }
+    finally
+    {
+      Interlocked.Add(ref workerTicks, Stopwatch.GetTimestamp() - t0);
+      r.Complete = true;
+    }
+  }
+
+  // Worker: the bytes read back from the GPU become a shape.
+  private static void DecodeJob(Read r)
+  {
+    long t0 = Stopwatch.GetTimestamp();
+    try
+    {
+      var positions = ProxyDecode.ReadVectors(r.VertexBytes!, r.VertexCount, r.Stride, r.PosOffset, r.PosFormat, r.PosDimension, false);
+      var normals = r.HasNormals ? ProxyDecode.ReadVectors(r.VertexBytes!, r.VertexCount, r.Stride, r.NormalOffset, r.NormalFormat, r.NormalDimension, true) : null;
+      var indices = ProxyDecode.ReadIndices(r.IndexBytes!, r.Wide, r.IndexStart, r.IndexCount, r.BaseVertex, r.VertexCount);
+      if (positions != null && indices != null)
+        r.Shape = ProxyShape.Make(positions, normals, indices);
+    }
+    catch (Exception e)
+    {
+      r.Error = e.Message;
+    }
+    finally
+    {
+      Interlocked.Add(ref workerTicks, Stopwatch.GetTimestamp() - t0);
+      r.Complete = true;
     }
   }
 
@@ -505,7 +656,7 @@ internal static class BakedMeshShapes
   // stream, or in a format that is not read, they are made up from the triangles.
   private static bool StartRead(Mesh mesh, int sub, long key)
   {
-    var read = new Read(mesh, sub, Time.realtimeSinceStartup) { Name = mesh.name };
+    var read = new Read(mesh, sub, Time.realtimeSinceStartup, true) { Name = mesh.name };
     try
     {
       if (sub >= mesh.subMeshCount || !mesh.HasVertexAttribute(VertexAttribute.Position))
@@ -555,46 +706,54 @@ internal static class BakedMeshShapes
     return true;
   }
 
-  /// <summary>Main thread, once a frame: finishes the reads that are done, failed or too slow.</summary>
+  /// <summary>
+  /// Main thread, once a frame: sends the decode of a GPU read whose bytes are in, takes in the reads whose worker is out (disposing the MeshData of a CPU read),
+  /// and gives up on a GPU read that is too slow.
+  /// </summary>
   internal static void Pump(float now)
   {
+    DrainOrphans();
     if (Reads.Count == 0)
       return;
     Done.Clear();
     foreach (var kv in Reads)
     {
       var r = kv.Value;
-      if (r.Finished || now - r.Started > ReadTimeout)
+      if (r.Gpu && !r.Sent)
+      {
+        if (r.Finished && !r.Failed)
+        {
+          r.Sent = true;
+          Work(() => DecodeJob(r));
+        }
+        else if (r.Failed || now - r.Started > ReadTimeout)
+        {
+          if (!r.Failed)
+            Note2($"mesh \"{r.Name}\": the read back from the GPU took more than {ReadTimeout:0} s");
+          r.Complete = true;
+          Done.Add(kv.Key);
+        }
+      }
+      else if (r.Complete)
         Done.Add(kv.Key);
     }
     foreach (long key in Done)
     {
       var r = Reads[key];
       Reads.Remove(key);
-      ProxyShape? shape = null;
-      if (!r.Failed && r.VertexBytes != null && r.IndexBytes != null)
+      if (!r.Gpu)
+        cpuActive--;
+      if (r.Error != null)
+        Note2(r.Gpu ? $"mesh \"{r.Name}\" was read back from the GPU but could not be decoded: {r.Error}" : $"mesh \"{r.Name}\" could not be read: {r.Error}");
+      if (r.Shape != null)
       {
-        try
-        {
-          var positions = ProxyDecode.ReadVectors(r.VertexBytes, r.VertexCount, r.Stride, r.PosOffset, r.PosFormat, r.PosDimension, false);
-          var normals = r.HasNormals ? ProxyDecode.ReadVectors(r.VertexBytes, r.VertexCount, r.Stride, r.NormalOffset, r.NormalFormat, r.NormalDimension, true) : null;
-          var indices = ProxyDecode.ReadIndices(r.IndexBytes, r.Wide, r.IndexStart, r.IndexCount, r.BaseVertex, r.VertexCount);
-          if (positions != null && indices != null)
-            shape = ProxyShape.Make(positions, normals, indices);
-        }
-        catch (Exception e)
-        {
-          Note2($"mesh \"{r.Name}\" was read back from the GPU but could not be decoded: {e.Message}");
-        }
+        if (r.Gpu) gpuRead++; else cpuRead++;
       }
-      else if (now - r.Started > ReadTimeout)
-        Note2($"mesh \"{r.Name}\": the read back from the GPU took more than {ReadTimeout:0} s");
-      if (shape != null)
-        gpuRead++;
       else
-        gpuFailed++;
+        unreadable++;
       Release(r);
-      Shapes[key] = shape;
+      DisposeData(r);
+      Shapes[key] = r.Shape;
     }
     Done.Clear();
   }
@@ -642,7 +801,7 @@ internal static class BakedMeshShapes
       "Shadow proxy parts of {0:N0} pieces: {1:N0} merged, {2:N0} left to the instancing as unreadable{3}, {4:N0} as cutout or blended{5}, {6:N0} of other shaders{7}; {8:N0} not looked at yet, {9:N0} being read back.",
       seen.Count, counts[RenderPart.ProxyOk], counts[RenderPart.ProxyUnreadable], Names(RenderPart.ProxyUnreadable), counts[RenderPart.ProxyCutout],
       Names(RenderPart.ProxyCutout), counts[RenderPart.ProxyOther], Names(RenderPart.ProxyOther), counts[RenderPart.ProxyUnknown], counts[RenderPart.ProxyReading]);
-    yield return string.Format(c, "Shadow proxy shapes: {0:N0} read by the CPU, {1:N0} read back from the GPU, {2:N0} that neither could read, {3:N0} reads under way.",
-      cpuRead, gpuRead, gpuFailed, Reads.Count);
+    yield return string.Format(c, "Shadow proxy shapes: {0:N0} read by the CPU, {1:N0} read back from the GPU, {2:N0} that neither could read, {3:N0} reads under way; the workers spent {4:0.0} ms reading and decoding them.",
+      cpuRead, gpuRead, unreadable, Reads.Count, Interlocked.Read(ref workerTicks) * 1000.0 / Stopwatch.Frequency);
   }
 }
