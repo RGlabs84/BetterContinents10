@@ -136,7 +136,10 @@ internal static class ProxyKit
     }
   }
 
-  /// <summary>A chunk's numbers read back from its store, as the GPU and the shader would read them: world positions less the zone's origin on x and z, normals, indices.</summary>
+  /// <summary>
+  /// A chunk's numbers read back from its store, as the GPU and the shader would read them: positions less the zone's origin on x and z (fractions of the chunk's box
+  /// carried to it), normals as the shader's inverse transpose of the chunk's matrix lands on them, indices.
+  /// </summary>
   public static (Vector3[] Positions, Vector3[] Normals, int[] Indices) Read(ProxyChunk c)
   {
     var store = (ByteStore)c.Store!;
@@ -145,16 +148,37 @@ internal static class ProxyKit
     var n = new Vector3[store.VertexCount];
     var pos = layout.Find(UnityEngine.Rendering.VertexAttribute.Position)!.Value;
     var nrm = layout.Find(UnityEngine.Rendering.VertexAttribute.Normal)!.Value;
+    var box = c.Quant;
     for (int v = 0; v < p.Length; v++)
     {
       int at = v * layout.Stride;
-      p[v] = new Vector3(BitConverter.ToSingle(store.Vertices, at + pos.Offset), BitConverter.ToSingle(store.Vertices, at + pos.Offset + 4), BitConverter.ToSingle(store.Vertices, at + pos.Offset + 8));
-      n[v] = new Vector3(BitConverter.ToSingle(store.Vertices, at + nrm.Offset), BitConverter.ToSingle(store.Vertices, at + nrm.Offset + 4), BitConverter.ToSingle(store.Vertices, at + nrm.Offset + 8));
+      if (pos.Format == UnityEngine.Rendering.VertexAttributeFormat.Float32)
+        p[v] = new Vector3(BitConverter.ToSingle(store.Vertices, at + pos.Offset), BitConverter.ToSingle(store.Vertices, at + pos.Offset + 4), BitConverter.ToSingle(store.Vertices, at + pos.Offset + 8));
+      else
+        p[v] = new Vector3(box.MinX + BitConverter.ToUInt16(store.Vertices, at + pos.Offset) / 65535f * box.SizeX, box.MinY + BitConverter.ToUInt16(store.Vertices, at + pos.Offset + 2) / 65535f * box.SizeY,
+          box.MinZ + BitConverter.ToUInt16(store.Vertices, at + pos.Offset + 4) / 65535f * box.SizeZ);
+      if (nrm.Format == UnityEngine.Rendering.VertexAttributeFormat.Float32)
+        n[v] = new Vector3(BitConverter.ToSingle(store.Vertices, at + nrm.Offset), BitConverter.ToSingle(store.Vertices, at + nrm.Offset + 4), BitConverter.ToSingle(store.Vertices, at + nrm.Offset + 8));
+      else
+        n[v] = Shader(box, Snorm(store.Vertices, at + nrm.Offset));
     }
     var idx = new int[store.IndexCount];
     for (int i = 0; i < idx.Length; i++)
       idx[i] = store.Wide ? BitConverter.ToInt32(store.Indices, i * 4) : BitConverter.ToUInt16(store.Indices, i * 2);
     return (p, n, idx);
+  }
+
+  /// <summary>Three signed bytes as the GPU reads them: value / 127, at least -1.</summary>
+  public static Vector3 Snorm(byte[] bytes, int at) =>
+    new(Math.Max((sbyte)bytes[at] / 127f, -1f), Math.Max((sbyte)bytes[at + 1] / 127f, -1f), Math.Max((sbyte)bytes[at + 2] / 127f, -1f));
+
+  /// <summary>What the piece shader makes of a stored normal: the inverse transpose of the chunk's matrix (its box's scale, so the stored value divided by the box's size), made unit.</summary>
+  public static Vector3 Shader(QuantBox box, Vector3 stored)
+  {
+    var m = box.ToWorld(0f, 0f);
+    double x = stored.x / m.m00, y = stored.y / m.m11, z = stored.z / m.m22;
+    double len = Math.Sqrt(x * x + y * y + z * z);
+    return len < 1e-20 ? Vector3.up : new Vector3((float)(x / len), (float)(y / len), (float)(z / len));
   }
 
   /// <summary>The geometric normal of a triangle of a chunk, by its winding (counter-clockwise seen from the front).</summary>
@@ -196,7 +220,7 @@ internal static partial class Tests
     C(cn.All(n => ProxyNear(n, Vector3.forward)) && ci.SequenceEqual([0, 1, 2]), "the normals face +z and the winding is as it was");
     C(ProxyNear(new Vector3(chunk.MinX, chunk.MinY, chunk.MinZ), new Vector3(10, 2, 20)) && ProxyNear(new Vector3(chunk.MaxX, chunk.MaxY, chunk.MaxZ), new Vector3(11, 3, 20)),
       "the chunk's box is that of its vertices");
-    C(built.KindCovered.SequenceEqual([true]) && built.Triangles == 1 && built.Vertices == 3 && built.Bytes == 3 * 24 + 3 * 2, "the kind is covered; triangles, vertices and bytes are counted (a 24 byte vertex, a 16 bit index)");
+    C(built.KindCovered.SequenceEqual([true]) && built.Triangles == 1 && built.Vertices == 3 && built.Bytes == 3 * 12 + 3 * 2, "the kind is covered; triangles, vertices and bytes are counted (a 12 byte vertex, a 16 bit index)");
 
     // a turn of 90 degrees about y carries x to -z and the normal to +x
     var turned = BakedZoneBuild.Build(ClientKit.Zone(0, 0, (0, 5.0, 1.0, 5.0, 90.0, null)), [kind], 1);
@@ -304,7 +328,7 @@ internal static partial class Tests
     {
       var (v, _, ix) = ProxyKit.Read(c);
       clean &= ix.All(i => i >= 0 && i < c.VertexCount) && v.Length == c.VertexCount && ix.Length == c.IndexCount;
-      boxed &= v.All(p => p.x >= c.MinX - 1e-4f && p.x <= c.MaxX + 1e-4f && p.y >= c.MinY - 1e-4f && p.y <= c.MaxY + 1e-4f && p.z >= c.MinZ - 1e-4f && p.z <= c.MaxZ + 1e-4f);
+      boxed &= v.All(p => p.x >= c.MinX - 1e-3f && p.x <= c.MaxX + 1e-3f && p.y >= c.MinY - 1e-3f && p.y <= c.MaxY + 1e-3f && p.z >= c.MinZ - 1e-3f && p.z <= c.MaxZ + 1e-3f);
     }
     C(clean, "each chunk's indices stay inside its own vertices");
     C(boxed, "each chunk's box holds its vertices");
@@ -574,7 +598,7 @@ internal static partial class Tests
     book.Submit(ProxyKit.Frame(ring, 1, Vector3.zero));
     C(fake.Drawn.Count == 2 && fake.Drawn.Contains(home.Proxy.Near.Chunks[0]) && fake.Drawn.Contains(distant.Proxy.Far.Chunks[0]), $"one mesh a zone is drawn ({fake.Drawn.Count})");
     var numbers = book.Numbers(2);
-    C(numbers.ZonesWithProxy == 2 && numbers.Near == 1 && numbers.Far == 2 && numbers.Triangles == 24 && numbers.Vertices == 36 && numbers.Bytes == 36 * 24L + 72 * 2L,
+    C(numbers.ZonesWithProxy == 2 && numbers.Near == 1 && numbers.Far == 2 && numbers.Triangles == 24 && numbers.Vertices == 36 && numbers.Bytes == 36 * 12L + 72 * 2L,
       $"the numbers: {numbers.Line()}");
 
     // the second proxy of a zone waits to be drawn until a job that knows the narrower coverage has been adopted
@@ -706,7 +730,7 @@ internal static partial class Tests
     var bigKind = ClientKit.Kind("big", big);
     var bigZone = BakedZoneBuild.Build(ClientKit.Zone(0, 0, Enumerable.Range(0, 1300).Select(i => (0, -30.0 + i % 60, 0.0, -30.0 + i / 60 % 60, 0.0, (Vector3?)null)).ToArray()), [bigKind], 1);
     var chunks = ProxyMerge.Merge(bigZone, true, BakedShadows.All);
-    C(chunks.Chunks.Length == 2 && chunks.Chunks[0].VertexCount == 120000 && chunks.Chunks[1].VertexCount == 10000, $"1,300 pieces of 100 vertices are two chunks at the default cap ({chunks.Chunks.Length})");
+    C(chunks.Chunks.Length == 2 && chunks.Chunks[0].VertexCount == 65500 && chunks.Chunks[1].VertexCount == 64500, $"1,300 pieces of 100 vertices are two chunks at the default cap of 65,535 ({chunks.Chunks.Length})");
     int made = 0;
     var failing = new ProxyKit.Fake();
     failing.Book.Upload = (c, _) =>
@@ -782,7 +806,7 @@ internal static partial class Tests
       "each store holds the vertices and 16 bit indices the plan counted");
     C(plan.WriteMs >= 0 && plan.PlanMs >= 0 && plan.Ms == plan.PlanMs + plan.WriteMs, "the worker time of both steps is counted");
     // the same through Merge
-    var merged = ProxyMerge.Merge(zone, true, BakedShadows.All, 1000);
+    var merged = ProxyMerge.Merge(zone, true, BakedShadows.All, 1000, VertexLayout.Plain);
     C(merged.Chunks.Length == plan.Chunks.Length && merged.Bytes == plan.Bytes, "Merge does the two steps into byte arrays");
 
     // what each kind costs: the sum is the whole
@@ -797,7 +821,7 @@ internal static partial class Tests
 
     // an instance bigger than the 16 bit index limit is a chunk of its own with 32 bit indices
     var big = ProxyPlanZone(out _, out _, walls: 1, beams: 3, fan: 70_000);
-    var bp = ProxyMerge.Merge(big, true, BakedShadows.All, 65_535);
+    var bp = ProxyMerge.Merge(big, true, BakedShadows.All, 65_535, VertexLayout.Plain);
     var wideChunk = bp.Chunks.Single(c => c.Wide);
     var (_, _, wideIdx) = ProxyKit.Read(wideChunk);
     C(wideChunk.VertexCount == 70_002 && wideIdx.Length == 70_000 * 3 && wideIdx.All(i => i >= 0 && i < 70_002) && wideChunk.Bytes == 70_002L * 24 + 70_000L * 3 * 4,
@@ -1012,5 +1036,162 @@ internal static partial class Tests
     noMemory.Book.Tick(ProxyKit.Frame([z5], 1, Vector3.zero));
     C(z5.Proxy!.Near.State == ProxyVariant.Failed && noMemory.Stores.Where(s => !s.Consumed).All(s => s.Releases == 1) && noMemory.Stores.Count(s => !s.Consumed) == 1 && noMemory.NoLeaks(out why) && noMemory.Book.Building == 0,
       "a store that cannot be made: the ones made are released, the proxy fails, the slot is back");
+  }
+
+  // ---- compact vertices ---------------------------------------------------------------------------------------------------------------------
+
+  private static float AngleBetween(Vector3 a, Vector3 b)
+  {
+    double dot = (a.x * (double)b.x + a.y * (double)b.y + a.z * (double)b.z) / (Math.Sqrt(a.x * (double)a.x + a.y * (double)a.y + a.z * (double)a.z) * Math.Sqrt(b.x * (double)b.x + b.y * (double)b.y + b.z * (double)b.z));
+    return (float)(Math.Acos(Math.Max(-1.0, Math.Min(1.0, dot))) * 180.0 / Math.PI);
+  }
+
+  private static void ProxyQuantTest()
+  {
+    Section("proxy: compact vertices");
+    var compact = VertexLayout.Compact;
+    C(compact.Stride == 12 && compact.Quantised && !VertexLayout.Plain.Quantised && ProxyMerge.Layout == compact && ProxyMerge.MaxChunkVertices == 65_535,
+      "the proxy's vertex is 12 bytes: four 16 bit fractions and four signed bytes; a chunk takes 65,535 vertices at most");
+
+    // the box: a tight box is kept, a side that is too thin is widened about the centre
+    var tight = QuantBox.Of(-30f, 0f, -32f, 30f, 40f, 32f);
+    C(tight.MinX == -30f && tight.SizeX == 60f && tight.SizeY == 40f && tight.SizeZ == 64f && tight.MinY == 0f, "a box whose sides are within 2:1 of the longest is kept");
+    var flat = QuantBox.Of(0f, 5f, 0f, 64f, 5.001f, 64f);
+    C(flat.SizeX == 64f && flat.SizeZ == 64f && flat.SizeY == 32f && Math.Abs(flat.MinY + flat.SizeY * 0.5f - 5.0005f) < 1e-4f, $"a flat box is widened to half the longest side about its centre ({flat.SizeY} m)");
+    var point = QuantBox.Of(3f, 4f, 5f, 3f, 4f, 5f);
+    C(point.SizeX == QuantBox.MinSide && point.SizeY == QuantBox.MinSide && point.SizeZ == QuantBox.MinSide && Math.Abs(point.MinX + point.SizeX * 0.5f - 3f) < 1e-6f, "a box of no size gets the minimum side, so the matrix has an inverse");
+    var m = flat.ToWorld(128f, -64f);
+    C(m.m00 == 64f && m.m11 == 32f && m.m22 == 64f && m.m03 == 128f + flat.MinX && m.m13 == flat.MinY && m.m23 == -64f + flat.MinZ && m.m33 == 1f && ProxyMerge.HasInverse(m), "the matrix scales the unit box to the box and puts it at the zone's place");
+
+    // positions: 1 mm on a 64 m box, w = 1
+    var rnd = new System.Random(20261009);
+    var box = QuantBox.Of(-32f, 0f, -32f, 32f, 24f, 32f);
+    int n = 20_000;
+    var pts = new Vector3[n];
+    var nrm = new Vector3[n];
+    for (int i = 0; i < n; i++)
+    {
+      pts[i] = new Vector3((float)(rnd.NextDouble() * 64 - 32), (float)(rnd.NextDouble() * 24), (float)(rnd.NextDouble() * 64 - 32));
+      nrm[i] = Vector3.up;
+    }
+    var bytes = new byte[n * 12];
+    VertexPacker.Pack(compact, new VertexSource(pts, nrm), n, box, bytes);
+    double worst = 0;
+    bool whole = true;
+    var world = box.ToWorld(0f, 0f);
+    for (int i = 0; i < n; i++)
+    {
+      var q = (BitConverter.ToUInt16(bytes, i * 12), BitConverter.ToUInt16(bytes, i * 12 + 2), BitConverter.ToUInt16(bytes, i * 12 + 4));
+      whole &= BitConverter.ToUInt16(bytes, i * 12 + 6) == 65535;
+      // through the matrix, as the GPU does: unit fraction to world
+      double x = world.m00 * (q.Item1 / 65535.0) + world.m03, y = world.m11 * (q.Item2 / 65535.0) + world.m13, z = world.m22 * (q.Item3 / 65535.0) + world.m23;
+      worst = Math.Max(worst, Math.Max(Math.Abs(x - pts[i].x), Math.Max(Math.Abs(y - pts[i].y), Math.Abs(z - pts[i].z))));
+    }
+    C(worst <= 0.001, $"20,000 positions through the matrix are within 1 mm of what was packed (worst {worst * 1000:0.000} mm)");
+    C(whole, "the fourth component of every position is 65535, which reads as 1 (the piece shader multiplies it into the translation)");
+    // the ends of the box
+    var ends = new byte[24];
+    VertexPacker.Pack(compact, new VertexSource([new Vector3(-30, 0, -32), new Vector3(30, 40, 32)], [Vector3.up, Vector3.up]), 2, tight, ends);
+    C(BitConverter.ToUInt16(ends, 0) == 0 && BitConverter.ToUInt16(ends, 2) == 0 && BitConverter.ToUInt16(ends, 4) == 0 && BitConverter.ToUInt16(ends, 12) == 65535 && BitConverter.ToUInt16(ends, 12 + 2) == 65535 && BitConverter.ToUInt16(ends, 12 + 4) == 65535,
+      "the box's corners are fractions 0 and 65535");
+
+    // normals: after the shader's inverse transpose, within one degree, in thin boxes too
+    double worstAngle = 0;
+    int checkedNormals = 0;
+    for (int t = 0; t < 400; t++)
+    {
+      float Side() => rnd.Next(5) == 0 ? 0f : (float)Math.Exp(rnd.NextDouble() * Math.Log(64.0 / 0.001) + Math.Log(0.001));
+      float sx = Side(), sy = Side(), sz = Side();
+      var b = QuantBox.Of(-sx / 2, -sy / 2, -sz / 2, sx / 2, sy / 2, sz / 2);
+      var ns = new Vector3[20];
+      for (int i = 0; i < ns.Length; i++)
+      {
+        double u = rnd.NextDouble() * 2 - 1, phi = rnd.NextDouble() * 2 * Math.PI, r = Math.Sqrt(1 - u * u);
+        ns[i] = new Vector3((float)(r * Math.Cos(phi)), (float)u, (float)(r * Math.Sin(phi)));
+      }
+      var pb = new byte[ns.Length * 12];
+      VertexPacker.Pack(compact, new VertexSource(new Vector3[ns.Length], ns), ns.Length, b, pb);
+      for (int i = 0; i < ns.Length; i++)
+      {
+        var landed = ProxyKit.Shader(b, ProxyKit.Snorm(pb, i * 12 + 8));
+        worstAngle = Math.Max(worstAngle, AngleBetween(landed, ns[i]));
+        checkedNormals++;
+      }
+    }
+    C(worstAngle <= 1.0, $"{checkedNormals} normals in 400 random boxes, thin and flat ones among them: the shader's normal is within {worstAngle:0.00} degrees of the true one");
+    // why the widening: the same normals in a 64 x 0.02 x 64 box that was not widened
+    var thin = new QuantBox(0f, 0f, 0f, 64f, 0.02f, 64f);
+    var slant = new[] { new Vector3(0.6f, 0.8f, 0f) };
+    var tb = new byte[12];
+    VertexPacker.Pack(compact, new VertexSource(new Vector3[1], slant), 1, thin, tb);
+    C(AngleBetween(ProxyKit.Shader(thin, ProxyKit.Snorm(tb, 8)), slant[0]) > 1.0, "...and a 64 x 0.02 x 64 box that was not widened would have put this normal more than a degree off");
+    // the unit box leaves a normal alone (float layouts)
+    C(QuantBox.Unit.Compensate(new Vector3(0.6f, 0.8f, 0f)) == new Vector3(0.6f, 0.8f, 0f), "the unit box does not touch a normal");
+
+    // winding survives the quantising: random matrices, mirrored ones among them
+    var tri = ProxyKit.Triangle();
+    int flipped = 0, mirrored = 0;
+    for (int k = 0; k < 400; k++)
+    {
+      var rot = BakedMath.Euler((float)(rnd.NextDouble() * 360), (float)(rnd.NextDouble() * 360), (float)(rnd.NextDouble() * 360),
+        (float)((rnd.NextDouble() * 2.7 + 0.3) * (rnd.Next(3) == 0 ? -1 : 1)), (float)((rnd.NextDouble() * 2.7 + 0.3) * (rnd.Next(3) == 0 ? -1 : 1)), (float)((rnd.NextDouble() * 2.7 + 0.3) * (rnd.Next(3) == 0 ? -1 : 1)));
+      var mat = BakedMath.Frame(rot, new Vector3((float)(rnd.NextDouble() * 60 - 30), (float)(rnd.NextDouble() * 10), (float)(rnd.NextDouble() * 60 - 30)));
+      if (BakedMath.Det3(mat) < 0f)
+        mirrored++;
+      var v = new Vector3[3];
+      var nn = new Vector3[3];
+      var ix = new int[3];
+      ProxyMerge.Transform(tri, mat, 0f, 0f, v, nn, 0, ix, 0);
+      var tb2 = QuantBox.Of(Math.Min(v[0].x, Math.Min(v[1].x, v[2].x)), Math.Min(v[0].y, Math.Min(v[1].y, v[2].y)), Math.Min(v[0].z, Math.Min(v[1].z, v[2].z)),
+        Math.Max(v[0].x, Math.Max(v[1].x, v[2].x)), Math.Max(v[0].y, Math.Max(v[1].y, v[2].y)), Math.Max(v[0].z, Math.Max(v[1].z, v[2].z)));
+      var pk = new byte[36];
+      VertexPacker.Pack(compact, new VertexSource(v, nn), 3, tb2, pk);
+      var back = new Vector3[3];
+      for (int i = 0; i < 3; i++)
+        back[i] = new Vector3(tb2.MinX + BitConverter.ToUInt16(pk, i * 12) / 65535f * tb2.SizeX, tb2.MinY + BitConverter.ToUInt16(pk, i * 12 + 2) / 65535f * tb2.SizeY, tb2.MinZ + BitConverter.ToUInt16(pk, i * 12 + 4) / 65535f * tb2.SizeZ);
+      var before = ProxyKit.Facing(v, ix, 0);
+      var after = ProxyKit.Facing(back, ix, 0);
+      if (!(ProxyKit.Dot(before, after) > 0f && AngleBetween(before, after) < 1f))
+        flipped++;
+    }
+    C(flipped == 0 && mirrored > 50, $"400 random matrices ({mirrored} mirrored): every triangle faces the way it did before the quantising ({flipped} changed)");
+
+    // the whole merge, compact against plain: same chunks, positions through the matrix within a millimetre, normals within a degree
+    var zone = BakedZoneBuild.Build(ClientKit.Zone(2, -1,
+      Enumerable.Range(0, 60).Select(i => (0, 2 * 64.0 + 4 + i % 50, i % 7 * 0.5, -64.0 + 3 + i * 5 % 55, i * 37.0 % 360, (Vector3?)null)).ToArray()), [ProxyKit.TwoLodKind("rock", ProxyKit.Fan(40), ProxyKit.Triangle(), flags: PaletteFlags.None)], 1);
+    var a = ProxyMerge.Merge(zone, true, BakedShadows.All, ProxyMerge.MaxChunkVertices, compact);
+    var b2 = ProxyMerge.Merge(zone, true, BakedShadows.All, ProxyMerge.MaxChunkVertices, VertexLayout.Plain);
+    C(a.Chunks.Length == b2.Chunks.Length && a.Vertices == b2.Vertices && a.Chunks.Zip(b2.Chunks, (x, y) => x.VertexCount == y.VertexCount && x.IndexCount == y.IndexCount).All(t => t),
+      "compact and plain merges split into the same chunks");
+    float ox = 2 * 64f, oz = -64f;
+    double posWorst = 0, nrmWorst = 0;
+    for (int c = 0; c < a.Chunks.Length; c++)
+    {
+      var (_, an, ai) = ProxyKit.Read(a.Chunks[c]);
+      var (pp, pn, pi) = ProxyKit.Read(b2.Chunks[c]);
+      var mat = a.Chunks[c].ToWorld(ox, oz);
+      var st = (ByteStore)a.Chunks[c].Store!;
+      for (int v = 0; v < pp.Length; v++)
+      {
+        double x = mat.m00 * (BitConverter.ToUInt16(st.Vertices, v * 12) / 65535.0) + mat.m03, y = mat.m11 * (BitConverter.ToUInt16(st.Vertices, v * 12 + 2) / 65535.0) + mat.m13, z = mat.m22 * (BitConverter.ToUInt16(st.Vertices, v * 12 + 4) / 65535.0) + mat.m23;
+        posWorst = Math.Max(posWorst, Math.Max(Math.Abs(x - (pp[v].x + ox)), Math.Max(Math.Abs(y - pp[v].y), Math.Abs(z - (pp[v].z + oz)))));
+        nrmWorst = Math.Max(nrmWorst, AngleBetween(an[v], pn[v]));
+      }
+      C(ai.SequenceEqual(pi), $"chunk {c}: the same indices");
+    }
+    C(posWorst <= 0.001 && nrmWorst <= 1.0, $"...positions through the chunk's matrix are within {posWorst * 1000:0.000} mm and normals within {nrmWorst:0.00} degrees of the plain merge's");
+    C(a.Bytes * 2 > b2.Bytes && a.Bytes * 5 < b2.Bytes * 3, $"...and the compact proxy takes {a.Bytes:N0} bytes where the plain one takes {b2.Bytes:N0}");
+
+    System.Console.WriteLine($"   compact vertices: worst position error {worst * 1000:0.000} mm over 20,000 points, worst normal {worstAngle:0.00} degrees over {checkedNormals} (merge: {posWorst * 1000:0.000} mm, {nrmWorst:0.00} degrees); {a.Bytes:N0} bytes against {b2.Bytes:N0}");
+
+    // the index width follows the chunk's vertex count
+    BuiltZone One(int fan) => ProxyPlanZone(out _, out _, walls: 1, beams: 0, fan: fan);
+    var edge = ProxyMerge.Plan(One(65_533), true, BakedShadows.All, compact);
+    var over = ProxyMerge.Plan(One(65_534), true, BakedShadows.All, compact);
+    C(edge.Chunks.Single().VertexCount == 65_535 && !edge.Chunks.Single().Wide && edge.Chunks.Single().Bytes == 65_535L * 12 + 65_533L * 3 * 2, "a chunk of 65,535 vertices has 16 bit indices");
+    C(over.Chunks.Single().VertexCount == 65_536 && over.Chunks.Single().Wide && over.Chunks.Single().Bytes == 65_536L * 12 + 65_534L * 3 * 4, "a lone mesh of 65,536 has 32 bit indices, and says its bytes so");
+    // two meshes of 32,002 share a chunk; a third starts the next
+    var three = ProxyMerge.Plan(ProxyPlanZone(out _, out _, walls: 3, beams: 0, fan: 32_000), true, BakedShadows.All, compact);
+    C(three.Chunks.Length == 2 && three.Chunks[0].VertexCount == 64_004 && three.Chunks[1].VertexCount == 32_002 && three.Chunks.All(c => !c.Wide), "three meshes of 32,002 vertices: two share a chunk, the third has the next");
   }
 }

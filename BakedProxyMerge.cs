@@ -316,8 +316,10 @@ internal sealed class ProxyChunk
   internal bool Wide;
   /// <summary>Where the numbers are written, until the main thread has made the mesh from them (then null). Set by the main thread before the worker writes.</summary>
   internal ChunkStore? Store;
-  /// <summary>The box of the vertices, relative to the zone's origin (minimum then maximum). Written with the chunk.</summary>
+  /// <summary>The tight box of the vertices, relative to the zone's origin (minimum then maximum). Written with the chunk.</summary>
   internal float MinX, MinY, MinZ, MaxX, MaxY, MaxZ;
+  /// <summary>The box the positions are stored in (the unit box for a layout that stores them as they are). Written with the chunk.</summary>
+  internal QuantBox Quant = QuantBox.Unit;
   /// <summary>Main thread: the mesh and how it is drawn, once uploaded.</summary>
   internal Mesh? Mesh;
   internal RenderParams Params;
@@ -326,6 +328,9 @@ internal sealed class ProxyChunk
   internal int Triangles => IndexCount / 3;
   /// <summary>Graphics memory (bytes): a vertex's stride, and two or four bytes an index.</summary>
   internal long Bytes => VertexCount * (long)Stride + IndexCount * (Wide ? 4L : 2L);
+
+  /// <summary>The matrix the chunk is drawn with, for a zone whose origin is (<paramref name="ox"/>, 0, <paramref name="oz"/>).</summary>
+  internal Matrix4x4 ToWorld(float ox, float oz) => Quant.ToWorld(ox, oz);
 }
 
 /// <summary>What one merge makes of a zone: first the plan (the chunks, their sizes, what they hold), then, once their stores are set, the numbers in them.</summary>
@@ -351,11 +356,14 @@ internal sealed class ProxyBuilt
 
 internal static class ProxyMerge
 {
-  /// <summary>The most vertices in a chunk (one more instance's mesh may take it past): a mesh is made, uploaded and sized for one chunk at a time.</summary>
-  internal const int MaxChunkVertices = 120_000;
+  /// <summary>
+  /// The most vertices in a chunk (one instance's mesh alone may take it past, and then has a chunk of its own): the most a 16 bit index reaches, and the
+  /// size of the worst single mesh the main thread applies.
+  /// </summary>
+  internal const int MaxChunkVertices = 65_535;
 
   /// <summary>How the proxy's vertices are packed.</summary>
-  internal static VertexLayout Layout => VertexLayout.Plain;
+  internal static VertexLayout Layout => VertexLayout.Compact;
 
   private delegate void PartVisitor(int kindIndex, ProxyShape shape, in Matrix4x4 m);
 
@@ -626,12 +634,15 @@ internal static class ProxyMerge
       var store = chunk.Store ?? throw new InvalidOperationException("a chunk has no store");
       chunk.MinX = minX; chunk.MinY = minY; chunk.MinZ = minZ;
       chunk.MaxX = maxX; chunk.MaxY = maxY; chunk.MaxZ = maxZ;
+      var box = layout.Quantised ? QuantBox.Of(minX, minY, minZ, maxX, maxY, maxZ) : QuantBox.Unit;
+      chunk.Quant = box;
       store.Open(layout, VCount, ICount, chunk.Wide, out var vertexBytes, out var indexBytes);
-      VertexPacker.Pack(layout, new VertexSource(vertices, normals), VCount, vertexBytes);
+      VertexPacker.Pack(layout, new VertexSource(vertices, normals), VCount, box, vertexBytes);
       VertexPacker.PackIndices(indices, ICount, chunk.Wide, indexBytes);
+      // the bounds are those of the numbers as the mesh holds them: the unit box when they are fractions, else the tight box
       var min = new Vector3(minX, minY, minZ);
       var max = new Vector3(maxX, maxY, maxZ);
-      store.Close(new Bounds((min + max) * 0.5f, max - min), VCount, ICount);
+      store.Close(layout.Quantised ? new Bounds(new Vector3(0.5f, 0.5f, 0.5f), Vector3.one) : new Bounds((min + max) * 0.5f, max - min), VCount, ICount);
     }
   }
 }

@@ -13,6 +13,10 @@ namespace BetterContinents;
 // two byte arrays. What is written is described by a VertexLayout (an interleaved vertex: which attributes, in which format) and packed by VertexPacker
 // from plain arrays, so a merge that wants more attributes names them in its layout and fills more arrays of its VertexSource; nothing here knows what a
 // proxy is.
+//
+// A compact layout stores positions as 16 bit fractions of a box (a QuantBox: the box of the chunk's own vertices) and normals as signed bytes; the chunk is
+// then drawn with a matrix that scales the unit box back to the box (QuantBox.ToWorld). That matrix is not uniform, and Unity moves a normal by the inverse
+// transpose of the object matrix, so the normals are stored already divided the other way (see QuantBox.Compensate): the shader then lands on the true one.
 
 /// <summary>One attribute of an interleaved vertex.</summary>
 internal readonly struct VertexField(VertexAttribute attribute, VertexAttributeFormat format, int dimension, int offset = 0)
@@ -75,6 +79,89 @@ internal sealed class VertexLayout
   internal static readonly VertexLayout Plain = new(
     new VertexField(VertexAttribute.Position, VertexAttributeFormat.Float32, 3),
     new VertexField(VertexAttribute.Normal, VertexAttributeFormat.Float32, 3));
+
+  /// <summary>
+  /// Position as four 16 bit fractions of the chunk's box (the w is 1: the game's piece shader reads in_POSITION0.www) and normal as four signed bytes
+  /// (the last is unused): 12 bytes a vertex.
+  /// </summary>
+  internal static readonly VertexLayout Compact = new(
+    new VertexField(VertexAttribute.Position, VertexAttributeFormat.UNorm16, 4),
+    new VertexField(VertexAttribute.Normal, VertexAttributeFormat.SNorm8, 4));
+
+  /// <summary>Whether positions are stored as fractions of a box, so that the chunk needs the matrix of its <see cref="QuantBox"/> to be drawn.</summary>
+  internal bool Quantised => Find(VertexAttribute.Position)?.Format == VertexAttributeFormat.UNorm16;
+}
+
+/// <summary>
+/// The box a chunk's positions are stored in (16 bit fractions of it), as an object-to-world matrix: the chunk is drawn with
+/// <see cref="ToWorld"/>, which carries the unit box the mesh holds to this box in the world.
+/// </summary>
+internal readonly struct QuantBox(float minX, float minY, float minZ, float sizeX, float sizeY, float sizeZ)
+{
+  /// <summary>A box side is at least this (metres), so that the matrix has an inverse.</summary>
+  internal const float MinSide = 0.01f;
+
+  /// <summary>
+  /// No side is shorter than the longest divided by this. Normals are stored multiplied by the box's size and the shader divides them by it again; a byte
+  /// of error in the thinnest side's share is made larger by (longest / thinnest) on the way out. At 2 the worst case is 0.78 degrees, below the one degree
+  /// asked; a thinner box costs nothing to widen, as its fractions only get finer.
+  /// </summary>
+  internal const float SkewLimit = 2f;
+
+  internal readonly float MinX = minX, MinY = minY, MinZ = minZ, SizeX = sizeX, SizeY = sizeY, SizeZ = sizeZ;
+
+  /// <summary>The box of a layout that stores its numbers as they are: the matrix is just the zone's place.</summary>
+  internal static readonly QuantBox Unit = new(0f, 0f, 0f, 1f, 1f, 1f);
+
+  internal bool IsUnit => MinX == 0f && MinY == 0f && MinZ == 0f && SizeX == 1f && SizeY == 1f && SizeZ == 1f;
+
+  /// <summary>
+  /// The box that stores the vertices of this tight box: the tight box itself, widened (about its centre) where a side is under MinSide or under the
+  /// longest side divided by <see cref="SkewLimit"/>.
+  /// </summary>
+  internal static QuantBox Of(float minX, float minY, float minZ, float maxX, float maxY, float maxZ)
+  {
+    float dx = Math.Max(maxX - minX, 0f), dy = Math.Max(maxY - minY, 0f), dz = Math.Max(maxZ - minZ, 0f);
+    float floor = Math.Max(MinSide, Math.Max(dx, Math.Max(dy, dz)) / SkewLimit);
+    float sx = Math.Max(dx, floor), sy = Math.Max(dy, floor), sz = Math.Max(dz, floor);
+    return new QuantBox((minX + maxX) * 0.5f - sx * 0.5f, (minY + maxY) * 0.5f - sy * 0.5f, (minZ + maxZ) * 0.5f - sz * 0.5f, sx, sy, sz);
+  }
+
+  /// <summary>
+  /// The matrix a chunk is drawn with: the unit box to this box, with the zone's origin (<paramref name="ox"/>, <paramref name="oz"/>) added, as the chunk's
+  /// vertices are relative to the zone.
+  /// </summary>
+  internal Matrix4x4 ToWorld(float ox, float oz)
+  {
+    var m = Matrix4x4.identity;
+    m.m00 = SizeX;
+    m.m11 = SizeY;
+    m.m22 = SizeZ;
+    m.m03 = ox + MinX;
+    m.m13 = MinY;
+    m.m23 = oz + MinZ;
+    return m;
+  }
+
+  /// <summary>A position (relative to the zone) as a 16 bit fraction of the box on one axis.</summary>
+  internal static ushort Fraction(float value, float min, float size)
+  {
+    float f = (value - min) / size * 65535f + 0.5f;
+    return f <= 0f ? (ushort)0 : f >= 65535f ? ushort.MaxValue : (ushort)f;
+  }
+
+  /// <summary>
+  /// A unit normal as it must be stored for a chunk drawn with <see cref="ToWorld"/>: Unity moves a normal by the inverse transpose of the matrix, which for this
+  /// matrix divides each component by the box's size, so the stored one is multiplied by it (and made unit length again). Unchanged for the unit box.
+  /// </summary>
+  internal Vector3 Compensate(Vector3 n)
+  {
+    if (IsUnit)
+      return n;
+    float x = n.x * SizeX, y = n.y * SizeY, z = n.z * SizeZ;
+    float len = (float)Math.Sqrt(x * x + y * y + z * z);
+    return len > 1e-20f ? new Vector3(x / len, y / len, z / len) : new Vector3(0f, 1f, 0f);
+  }
 }
 
 /// <summary>The numbers of a chunk's vertices, as plain arrays (the first <c>count</c> entries of each). Positions are needed; the rest only where the layout names the attribute.</summary>
@@ -91,10 +178,11 @@ internal static unsafe class VertexPacker
 {
   /// <summary>
   /// Writes <paramref name="count"/> vertices of <paramref name="src"/> in the layout into <paramref name="dst"/> (which must hold count * stride bytes).
-  /// Supported: Position as Float32 x 3 or x 4, Normal as Float32 x 3, TexCoord0 as Float32 x 2, Tangent as Float32 x 4. An attribute the layout names and the
+  /// Supported: Position as Float32 x 3 or x 4, or as UNorm16 x 4 (fractions of <paramref name="box"/>, w = 1); Normal as Float32 x 3 or SNorm8 x 4 (both
+  /// compensated for the box, see <see cref="QuantBox.Compensate"/>); TexCoord0 as Float32 x 2; Tangent as Float32 x 4. An attribute the layout names and the
   /// source does not carry, or a format not listed here, is an error: add the encoder here, with its test.
   /// </summary>
-  internal static void Pack(VertexLayout layout, in VertexSource src, int count, Span<byte> dst)
+  internal static void Pack(VertexLayout layout, in VertexSource src, int count, in QuantBox box, Span<byte> dst)
   {
     if (dst.Length < (long)count * layout.Stride)
       throw new ArgumentException($"{dst.Length} bytes cannot hold {count} vertices of {layout.Stride} bytes");
@@ -118,15 +206,38 @@ internal static unsafe class VertexPacker
                 p[3] = 1f;
             }
             break;
+          case (VertexAttribute.Position, VertexAttributeFormat.UNorm16, 4):
+            for (int v = 0; v < count; v++)
+            {
+              ushort* p = (ushort*)(at + (long)v * stride);
+              var s = src.Positions[v];
+              p[0] = QuantBox.Fraction(s.x, box.MinX, box.SizeX);
+              p[1] = QuantBox.Fraction(s.y, box.MinY, box.SizeY);
+              p[2] = QuantBox.Fraction(s.z, box.MinZ, box.SizeZ);
+              p[3] = ushort.MaxValue;
+            }
+            break;
           case (VertexAttribute.Normal, VertexAttributeFormat.Float32, 3):
             var normals = src.Normals ?? throw new ArgumentException("the layout has normals, the source none");
             for (int v = 0; v < count; v++)
             {
               float* p = (float*)(at + (long)v * stride);
-              var s = normals[v];
+              var s = box.Compensate(normals[v]);
               p[0] = s.x;
               p[1] = s.y;
               p[2] = s.z;
+            }
+            break;
+          case (VertexAttribute.Normal, VertexAttributeFormat.SNorm8, 4):
+            var snormals = src.Normals ?? throw new ArgumentException("the layout has normals, the source none");
+            for (int v = 0; v < count; v++)
+            {
+              sbyte* p = (sbyte*)(at + (long)v * stride);
+              var s = box.Compensate(snormals[v]);
+              p[0] = SNorm8(s.x);
+              p[1] = SNorm8(s.y);
+              p[2] = SNorm8(s.z);
+              p[3] = 0;
             }
             break;
           case (VertexAttribute.TexCoord0, VertexAttributeFormat.Float32, 2):
@@ -155,6 +266,16 @@ internal static unsafe class VertexPacker
       }
     }
   }
+
+  // a number in [-1, 1] as a signed byte, the way the GPU reads it back (value / 127)
+  private static sbyte SNorm8(float value)
+  {
+    float f = value * 127f;
+    return (sbyte)Math.Max(-127f, Math.Min(127f, f >= 0f ? f + 0.5f : f - 0.5f));
+  }
+
+  /// <summary>Packs with the unit box: for layouts that store their numbers as they are.</summary>
+  internal static void Pack(VertexLayout layout, in VertexSource src, int count, Span<byte> dst) => Pack(layout, src, count, QuantBox.Unit, dst);
 
   /// <summary>
   /// Writes the first <paramref name="count"/> indices as 16 or 32 bit numbers. A 16 bit chunk cannot hold an index past 65,535: that is an error, not a wrap.

@@ -83,7 +83,7 @@ internal sealed class ZoneProxy
   internal readonly ProxyVariant[] Both;
   /// <summary>The world box of the zone's pieces (minimum x, y, z, then maximum).</summary>
   internal readonly float[] Box = new float[6];
-  /// <summary>The zone object's place: the meshes' vertices are relative to it.</summary>
+  /// <summary>The zone object's place: the chunks' vertices are relative to it (each chunk is drawn with the matrix of its own box, ProxyChunk.ToWorld, built from the origin here).</summary>
   internal readonly Matrix4x4 ToWorld;
   /// <summary>The zone has left the ring (or the proxies are off): its proxies are gone or going.</summary>
   internal bool Dead;
@@ -806,13 +806,13 @@ internal sealed class ProxyBook
     {
       var v = Drawn(zp);
       if (v != null)
-        DrawChunks(v.Chunks, zp.ToWorld, zp.Zone.Zx * 64f, zp.Zone.Zz * 64f, f.Camera, reach2);
+        DrawChunks(v.Chunks, zp.Zone.Zx * 64f, zp.Zone.Zz * 64f, f.Camera, reach2);
     }
     foreach (var r in retired)
-      DrawChunks(r.Chunks, r.ToWorld, r.ToWorld.m03, r.ToWorld.m23, f.Camera, reach2);
+      DrawChunks(r.Chunks, r.ToWorld.m03, r.ToWorld.m23, f.Camera, reach2);
   }
 
-  private void DrawChunks(ProxyChunk[] chunks, Matrix4x4 toWorld, float ox, float oz, Vector3 cam, float reach2)
+  private void DrawChunks(ProxyChunk[] chunks, float ox, float oz, Vector3 cam, float reach2)
   {
     foreach (var chunk in chunks)
     {
@@ -823,7 +823,7 @@ internal sealed class ProxyBook
       float dz = Math.Max(Math.Max(chunk.MinZ + oz - cam.z, cam.z - (chunk.MaxZ + oz)), 0f);
       if (dx * dx + dy * dy + dz * dz > reach2)
         continue;
-      Draw(chunk, toWorld);
+      Draw(chunk, chunk.ToWorld(ox, oz));
       drawsLastFrame++;
     }
   }
