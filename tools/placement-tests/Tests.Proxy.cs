@@ -4,7 +4,8 @@
 // parts and matrices into vertices, normals and indices (a mirrored matrix turns the triangles round), the chunks and their layers, the level of
 // detail by distance, what a proxy leaves to the instancing (cutout materials, unreadable meshes, parts that do not cast), the numbers read back from
 // a GPU, how the drawing job routes a covered zone's instances, and the book's life of a proxy: made in steps, drawn, taken back only after a job
-// that knows has been adopted, freed when its zone is rebuilt, unloaded or out of the ring.
+// that knows has been adopted, freed when its zone is rebuilt, unloaded or out of the ring. The merge is two steps (a plan of the chunks, then the vertices
+// packed into stores a worker owns): every store made is released or handed on, on every path, and none is released while a worker is in its build.
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -60,10 +61,23 @@ internal static class ProxyKit
       Policy = policy, Enabled = enabled, Hidden = hidden, Reach = reach, Now = now,
     };
 
-  /// <summary>A book with the engine stood in for: workers run at once, every part is settled, uploads and frees are noted.</summary>
+  /// <summary>A store that remembers what became of it.</summary>
+  internal sealed class TrackedStore : ByteStore
+  {
+    public bool Consumed;
+    public int Releases;
+    internal override void Release()
+    {
+      Releases++;
+      base.Release();
+    }
+  }
+
+  /// <summary>A book with the engine stood in for: workers run at once, every part is settled, uploads and frees are noted, stores are tracked.</summary>
   public sealed class Fake
   {
     public readonly List<ProxyChunk> Uploaded = [], Freed = [], Drawn = [];
+    public readonly List<TrackedStore> Stores = [];
     public readonly ProxyBook Book;
     public Fake()
     {
@@ -71,10 +85,15 @@ internal static class ProxyKit
       {
         Work = job => job(),
         Settle = _ => true,
+        NewStore = _ =>
+        {
+          var store = new TrackedStore();
+          Stores.Add(store);
+          return store;
+        },
         Upload = (chunk, _) =>
         {
-          chunk.Vertices = chunk.Normals = null;
-          chunk.Indices = null;
+          Consume(chunk);
           Uploaded.Add(chunk);
           return true;
         },
@@ -82,6 +101,60 @@ internal static class ProxyKit
         Draw = (chunk, _) => Drawn.Add(chunk),
       };
     }
+
+    /// <summary>What the engine does with a store it makes a mesh from.</summary>
+    public static void Consume(ProxyChunk chunk)
+    {
+      if (chunk.Store is TrackedStore tracked)
+        tracked.Consumed = true;
+      chunk.Store = null;
+    }
+
+    /// <summary>Every store made was either handed on to a mesh or released, none twice, once the book has nothing in flight.</summary>
+    public bool NoLeaks(out string why)
+    {
+      foreach (var s in Stores)
+      {
+        if (s.Consumed && s.Releases > 0)
+        {
+          why = "a store was handed on and released";
+          return false;
+        }
+        if (s.Releases > 1)
+        {
+          why = "a store was released twice";
+          return false;
+        }
+        if (!s.Consumed && s.Releases == 0)
+        {
+          why = "a store was neither handed on nor released";
+          return false;
+        }
+      }
+      why = "";
+      return true;
+    }
+  }
+
+  /// <summary>A chunk's numbers read back from its store, as the GPU and the shader would read them: world positions less the zone's origin on x and z, normals, indices.</summary>
+  public static (Vector3[] Positions, Vector3[] Normals, int[] Indices) Read(ProxyChunk c)
+  {
+    var store = (ByteStore)c.Store!;
+    var layout = store.Layout!;
+    var p = new Vector3[store.VertexCount];
+    var n = new Vector3[store.VertexCount];
+    var pos = layout.Find(UnityEngine.Rendering.VertexAttribute.Position)!.Value;
+    var nrm = layout.Find(UnityEngine.Rendering.VertexAttribute.Normal)!.Value;
+    for (int v = 0; v < p.Length; v++)
+    {
+      int at = v * layout.Stride;
+      p[v] = new Vector3(BitConverter.ToSingle(store.Vertices, at + pos.Offset), BitConverter.ToSingle(store.Vertices, at + pos.Offset + 4), BitConverter.ToSingle(store.Vertices, at + pos.Offset + 8));
+      n[v] = new Vector3(BitConverter.ToSingle(store.Vertices, at + nrm.Offset), BitConverter.ToSingle(store.Vertices, at + nrm.Offset + 4), BitConverter.ToSingle(store.Vertices, at + nrm.Offset + 8));
+    }
+    var idx = new int[store.IndexCount];
+    for (int i = 0; i < idx.Length; i++)
+      idx[i] = store.Wide ? BitConverter.ToInt32(store.Indices, i * 4) : BitConverter.ToUInt16(store.Indices, i * 2);
+    return (p, n, idx);
   }
 
   /// <summary>The geometric normal of a triangle of a chunk, by its winding (counter-clockwise seen from the front).</summary>
@@ -116,19 +189,20 @@ internal static partial class Tests
     var zone = BakedZoneBuild.Build(ClientKit.Zone(1, 0, (0, 74.0, 2.0, 20.0, 0.0, null)), [kind], 1);
     var built = ProxyMerge.Merge(zone, true, BakedShadows.All);
     var chunk = built.Chunks.Single();
+    var (cv, cn, ci) = ProxyKit.Read(chunk);
     C(chunk.VertexCount == 3 && chunk.IndexCount == 3 && chunk.Layer == 10, "one instance of one triangle: one chunk of 3 vertices and 3 indices");
-    C(ProxyNear(chunk.Vertices![0], new Vector3(10, 2, 20)) && ProxyNear(chunk.Vertices[1], new Vector3(11, 2, 20)) && ProxyNear(chunk.Vertices[2], new Vector3(10, 3, 20)),
-      $"the vertices are the instance's, relative to the zone's origin on x and z ({Fmt3(chunk.Vertices[0])}, {Fmt3(chunk.Vertices[1])}, {Fmt3(chunk.Vertices[2])})");
-    C(chunk.Normals!.All(n => ProxyNear(n, Vector3.forward)) && chunk.Indices!.SequenceEqual([0, 1, 2]), "the normals face +z and the winding is as it was");
+    C(ProxyNear(cv[0], new Vector3(10, 2, 20)) && ProxyNear(cv[1], new Vector3(11, 2, 20)) && ProxyNear(cv[2], new Vector3(10, 3, 20)),
+      $"the vertices are the instance's, relative to the zone's origin on x and z ({Fmt3(cv[0])}, {Fmt3(cv[1])}, {Fmt3(cv[2])})");
+    C(cn.All(n => ProxyNear(n, Vector3.forward)) && ci.SequenceEqual([0, 1, 2]), "the normals face +z and the winding is as it was");
     C(ProxyNear(new Vector3(chunk.MinX, chunk.MinY, chunk.MinZ), new Vector3(10, 2, 20)) && ProxyNear(new Vector3(chunk.MaxX, chunk.MaxY, chunk.MaxZ), new Vector3(11, 3, 20)),
       "the chunk's box is that of its vertices");
-    C(built.KindCovered.SequenceEqual([true]) && built.Triangles == 1 && built.Vertices == 3 && built.Bytes == 3 * 24 + 3 * 4, "the kind is covered; triangles, vertices and bytes are counted");
+    C(built.KindCovered.SequenceEqual([true]) && built.Triangles == 1 && built.Vertices == 3 && built.Bytes == 3 * 24 + 3 * 2, "the kind is covered; triangles, vertices and bytes are counted (a 24 byte vertex, a 16 bit index)");
 
     // a turn of 90 degrees about y carries x to -z and the normal to +x
     var turned = BakedZoneBuild.Build(ClientKit.Zone(0, 0, (0, 5.0, 1.0, 5.0, 90.0, null)), [kind], 1);
-    var tc = ProxyMerge.Merge(turned, true, BakedShadows.All).Chunks.Single();
-    C(ProxyNear(tc.Vertices![1], new Vector3(5, 1, 4)) && ProxyNear(tc.Vertices[2], new Vector3(5, 2, 5)), $"yaw 90: the triangle's x edge points along -z ({Fmt3(tc.Vertices[1])})");
-    C(tc.Normals!.All(n => ProxyNear(n, Vector3.right, 0.02f)), "...and its normal along +x");
+    var (tv, tn, _) = ProxyKit.Read(ProxyMerge.Merge(turned, true, BakedShadows.All).Chunks.Single());
+    C(ProxyNear(tv[1], new Vector3(5, 1, 4)) && ProxyNear(tv[2], new Vector3(5, 2, 5)), $"yaw 90: the triangle's x edge points along -z ({Fmt3(tv[1])})");
+    C(tn.All(n => ProxyNear(n, Vector3.right, 0.02f)), "...and its normal along +x");
 
     // a part that stands in the piece at a place of its own (a local matrix): the instance's matrix times it
     var movedPiece = ClientKit.NoLods("door", 1f);
@@ -140,8 +214,8 @@ internal static partial class Tests
     movedPiece.Parts[0].LocalIsIdentity = false;
     var door = ClientKit.Kind("door", movedPiece);
     var doorZone = BakedZoneBuild.Build(ClientKit.Zone(0, 0, (0, 3.0, 1.0, 4.0, 0.0, null)), [door], 1);
-    var dc = ProxyMerge.Merge(doorZone, true, BakedShadows.All).Chunks.Single();
-    C(ProxyNear(dc.Vertices![0], new Vector3(3, 11, 4)), $"a part's own matrix is applied below the instance's ({Fmt3(dc.Vertices[0])})");
+    var (dv, _, _) = ProxyKit.Read(ProxyMerge.Merge(doorZone, true, BakedShadows.All).Chunks.Single());
+    C(ProxyNear(dv[0], new Vector3(3, 11, 4)), $"a part's own matrix is applied below the instance's ({Fmt3(dv[0])})");
 
     // the transform itself, over many matrices with mirrors and uneven scales: the winding stays outward and the normals are the inverse transpose
     var rnd = new System.Random(20261008);
@@ -228,8 +302,9 @@ internal static partial class Tests
     bool clean = true, boxed = true;
     foreach (var c in built.Chunks)
     {
-      clean &= c.Indices!.Take(c.IndexCount).All(i => i >= 0 && i < c.VertexCount) && c.Vertices!.Length == c.VertexCount && c.Indices.Length == c.IndexCount;
-      boxed &= c.Vertices!.All(v => v.x >= c.MinX - 1e-4f && v.x <= c.MaxX + 1e-4f && v.y >= c.MinY - 1e-4f && v.y <= c.MaxY + 1e-4f && v.z >= c.MinZ - 1e-4f && v.z <= c.MaxZ + 1e-4f);
+      var (v, _, ix) = ProxyKit.Read(c);
+      clean &= ix.All(i => i >= 0 && i < c.VertexCount) && v.Length == c.VertexCount && ix.Length == c.IndexCount;
+      boxed &= v.All(p => p.x >= c.MinX - 1e-4f && p.x <= c.MaxX + 1e-4f && p.y >= c.MinY - 1e-4f && p.y <= c.MaxY + 1e-4f && p.z >= c.MinZ - 1e-4f && p.z <= c.MaxZ + 1e-4f);
     }
     C(clean, "each chunk's indices stay inside its own vertices");
     C(boxed, "each chunk's box holds its vertices");
@@ -487,6 +562,8 @@ internal static partial class Tests
     var book = fake.Book;
     var ring = new[] { home, distant };
     int v0 = BakedDraw.ProxyVersion;
+    // two merges at a time (ProxyBook.MaxBuilds): the third starts on the next tick
+    book.Tick(ProxyKit.Frame(ring, 1, Vector3.zero, now: 0f));
     book.Tick(ProxyKit.Frame(ring, 1, Vector3.zero, now: 0f));
     C(home.Proxy != null && distant.Proxy != null && home.Proxy.Near.IsReady && home.Proxy.Far.IsReady && !distant.Proxy.Near.IsReady && distant.Proxy.Far.IsReady,
       "the camera's zone has both proxies, a far one only the far");
@@ -497,7 +574,7 @@ internal static partial class Tests
     book.Submit(ProxyKit.Frame(ring, 1, Vector3.zero));
     C(fake.Drawn.Count == 2 && fake.Drawn.Contains(home.Proxy.Near.Chunks[0]) && fake.Drawn.Contains(distant.Proxy.Far.Chunks[0]), $"one mesh a zone is drawn ({fake.Drawn.Count})");
     var numbers = book.Numbers(2);
-    C(numbers.ZonesWithProxy == 2 && numbers.Near == 1 && numbers.Far == 2 && numbers.Triangles == 24 && numbers.Vertices == 36 && numbers.Bytes == 36 * 24L + 72 * 4L,
+    C(numbers.ZonesWithProxy == 2 && numbers.Near == 1 && numbers.Far == 2 && numbers.Triangles == 24 && numbers.Vertices == 36 && numbers.Bytes == 36 * 24L + 72 * 2L,
       $"the numbers: {numbers.Line()}");
 
     // the second proxy of a zone waits to be drawn until a job that knows the narrower coverage has been adopted
@@ -632,7 +709,13 @@ internal static partial class Tests
     C(chunks.Chunks.Length == 2 && chunks.Chunks[0].VertexCount == 120000 && chunks.Chunks[1].VertexCount == 10000, $"1,300 pieces of 100 vertices are two chunks at the default cap ({chunks.Chunks.Length})");
     int made = 0;
     var failing = new ProxyKit.Fake();
-    failing.Book.Upload = (c, _) => ++made < 2;
+    failing.Book.Upload = (c, _) =>
+    {
+      if (++made >= 2)
+        return false;
+      ProxyKit.Fake.Consume(c);
+      return true;
+    };
     failing.Book.Tick(ProxyKit.Frame([bigZone], 1, Vector3.zero));
     C(bigZone.Proxy!.Near.State == ProxyVariant.Failed && bigZone.ProxyCover == null, "the second mesh cannot be made: the proxy fails and the zone is not covered");
     C(failing.Freed.Count == 1 && bigZone.Proxy.Near.Chunks.Length == 0, "...the first mesh, which was made, is freed");
@@ -663,5 +746,271 @@ internal static partial class Tests
     int meshes = reset.Uploaded.Count;
     reset.Book.Reset();
     C(meshes == 2 && reset.Freed.Count == 2 && resetZone.ProxyCover == null && resetZone.Proxy == null && reset.Book.Zones.Count == 0, "Reset frees every mesh and withdraws every coverage");
+  }
+
+  // ---- the two steps of a merge ---------------------------------------------------------------------------------------------------------
+
+  private static BuiltZone ProxyPlanZone(out BakedKind wall, out BakedKind beam, int walls = 40, int beams = 10, int fan = 98)
+  {
+    var shape = ProxyKit.Fan(fan);   // fan + 2 vertices
+    var piece = ClientKit.NoLods("wall", 1f);
+    ProxyKit.Take(piece.Parts[0], shape);
+    wall = ClientKit.Kind("wall", piece, layer: 10);
+    var piece2 = ClientKit.NoLods("beam", 1f);
+    ProxyKit.Take(piece2.Parts[0], ProxyKit.Triangle());
+    beam = ClientKit.Kind("beam", piece2, layer: 10);
+    var records = Enumerable.Range(0, walls + beams).Select(i => (i < walls ? 0 : 1, -30.0 + i % 60, 0.0, -30.0 + i * 7 % 60, 0.0, (Vector3?)null)).ToArray();
+    return BakedZoneBuild.Build(ClientKit.Zone(0, 0, records), [wall, beam], 1);
+  }
+
+  private static void ProxyPlanWriteTest()
+  {
+    Section("proxy: a merge in two steps");
+    var zone = ProxyPlanZone(out _, out _);
+    var plan = ProxyMerge.Plan(zone, true, BakedShadows.All, VertexLayout.Plain, maxVertices: 1000);
+    C(plan.Chunks.Length > 1 && plan.Chunks.All(c => c.Store == null) && plan.Chunks.All(c => c.VertexCount > 0 && c.VertexCount <= 1000), "the plan names the chunks and makes no store");
+    C(plan.Vertices == 40 * 100 + 10 * 3 && plan.Triangles == 40 * 98 + 10, $"...and counts what goes in them ({plan.Vertices} vertices, {plan.Triangles} triangles)");
+    C(plan.KindCovered.SequenceEqual([true, true]) && plan.PartsMerged == 50, "...and which kinds are covered");
+    C(plan.Layout == VertexLayout.Plain && plan.MaxVertices == 1000 && plan.Chunks.All(c => c.Stride == 24 && !c.Wide), "...with the layout and the cap it was made for");
+    // the write fills exactly what the plan counted
+    foreach (var c in plan.Chunks)
+      c.Store = new ByteStore();
+    bool done = ProxyMerge.Write(zone, true, BakedShadows.All, plan);
+    var stores = plan.Chunks.Select(c => (ByteStore)c.Store!).ToArray();
+    C(done && stores.All(s => s.Closed), "the write returns true and closes every chunk");
+    C(plan.Chunks.Zip(stores, (c, s) => c.VertexCount == s.VertexCount && c.IndexCount == s.IndexCount && s.Vertices.Length == c.VertexCount * 24 && s.Indices.Length == c.IndexCount * 2).All(b => b),
+      "each store holds the vertices and 16 bit indices the plan counted");
+    C(plan.WriteMs >= 0 && plan.PlanMs >= 0 && plan.Ms == plan.PlanMs + plan.WriteMs, "the worker time of both steps is counted");
+    // the same through Merge
+    var merged = ProxyMerge.Merge(zone, true, BakedShadows.All, 1000);
+    C(merged.Chunks.Length == plan.Chunks.Length && merged.Bytes == plan.Bytes, "Merge does the two steps into byte arrays");
+
+    // what each kind costs: the sum is the whole
+    C(plan.KindVertices.Sum() == plan.Vertices && plan.KindBytes.Sum() == plan.Bytes && plan.KindVertices[0] == 4000 && plan.KindVertices[1] == 30,
+      $"the kinds' vertices and bytes add up to the proxy's ({plan.KindBytes[0]} and {plan.KindBytes[1]} bytes)");
+
+    // a matrix with no inverse: neither step takes it, and they still agree
+    var singular = ProxyPlanZone(out _, out _, walls: 3, beams: 0);
+    singular.Kinds[0].Root[1] = new Matrix4x4();
+    var sp = ProxyMerge.Merge(singular, true, BakedShadows.All);
+    C(sp.Vertices == 200 && sp.KindCovered[0] && sp.Chunks.Single().VertexCount == 200, "an instance with a matrix that has no inverse adds nothing, in the plan as in the write");
+
+    // an instance bigger than the 16 bit index limit is a chunk of its own with 32 bit indices
+    var big = ProxyPlanZone(out _, out _, walls: 1, beams: 3, fan: 70_000);
+    var bp = ProxyMerge.Merge(big, true, BakedShadows.All, 65_535);
+    var wideChunk = bp.Chunks.Single(c => c.Wide);
+    var (_, _, wideIdx) = ProxyKit.Read(wideChunk);
+    C(wideChunk.VertexCount == 70_002 && wideIdx.Length == 70_000 * 3 && wideIdx.All(i => i >= 0 && i < 70_002) && wideChunk.Bytes == 70_002L * 24 + 70_000L * 3 * 4,
+      "a chunk of more than 65,535 vertices has 32 bit indices, and says its bytes so");
+    C(bp.Chunks.Where(c => !c.Wide).Sum(c => c.VertexCount) == 9 && bp.Chunks.Where(c => !c.Wide).All(c => c.Bytes == c.VertexCount * 24L + c.IndexCount * 2L), "...and the smaller pieces are in narrow ones");
+
+    // cancelling: stops at a chunk boundary, the rest untouched
+    var cancel = ProxyMerge.Plan(zone, true, BakedShadows.All, VertexLayout.Plain, 1000);
+    foreach (var c in cancel.Chunks)
+      c.Store = new ByteStore();
+    int asked = 0;
+    bool finished = ProxyMerge.Write(zone, true, BakedShadows.All, cancel, () => ++asked > 1);
+    var cs = cancel.Chunks.Select(c => (ByteStore)c.Store!).ToArray();
+    C(!finished && cs[0].Closed && cs.Skip(1).All(s => !s.Closed), "a write that is cancelled after the first chunk leaves the others unwritten");
+    // a write against a plan that does not fit the zone is refused, not guessed at
+    var other = ProxyPlanZone(out _, out _, walls: 5, beams: 0);
+    var wrong = ProxyMerge.Plan(zone, true, BakedShadows.All, VertexLayout.Plain, 1000);
+    foreach (var c in wrong.Chunks)
+      c.Store = new ByteStore();
+    bool refused = false;
+    try
+    {
+      ProxyMerge.Write(other, true, BakedShadows.All, wrong);
+    }
+    catch (InvalidOperationException)
+    {
+      refused = true;
+    }
+    C(refused, "a plan made for another zone is refused");
+  }
+
+  private static void ProxyPackTest()
+  {
+    Section("proxy: packing vertices and indices");
+    var plain = VertexLayout.Plain;
+    C(plain.Stride == 24 && plain.Fields[0].Offset == 0 && plain.Fields[1].Offset == 12 && plain.Find(UnityEngine.Rendering.VertexAttribute.Normal)!.Value.Offset == 12 && plain.Find(UnityEngine.Rendering.VertexAttribute.Tangent) == null,
+      "the plain layout: position at 0, normal at 12, 24 bytes");
+    var rich = new VertexLayout(
+      new VertexField(UnityEngine.Rendering.VertexAttribute.Position, UnityEngine.Rendering.VertexAttributeFormat.Float32, 3),
+      new VertexField(UnityEngine.Rendering.VertexAttribute.Normal, UnityEngine.Rendering.VertexAttributeFormat.Float32, 3),
+      new VertexField(UnityEngine.Rendering.VertexAttribute.Tangent, UnityEngine.Rendering.VertexAttributeFormat.Float32, 4),
+      new VertexField(UnityEngine.Rendering.VertexAttribute.TexCoord0, UnityEngine.Rendering.VertexAttributeFormat.Float32, 2));
+    C(rich.Stride == 48 && rich.Fields.Select(f => f.Offset).SequenceEqual([0, 12, 24, 40]), "a layout with tangents and uv0 follows on: offsets 0, 12, 24, 40 in 48 bytes");
+    bool refused = false;
+    try
+    {
+      _ = new VertexLayout(new VertexField(UnityEngine.Rendering.VertexAttribute.Position, UnityEngine.Rendering.VertexAttributeFormat.UNorm8, 3));
+    }
+    catch (ArgumentException)
+    {
+      refused = true;
+    }
+    C(refused, "an attribute that does not fill whole 4-byte words is refused");
+
+    Vector3[] p = [new(1, 2, 3), new(-4, 5.5f, 6), new(7, 8, -9)];
+    Vector3[] n = [Vector3.up, Vector3.right, Vector3.forward];
+    Vector2[] uv = [new(0, 1), new(0.5f, 0.25f), new(1, 0)];
+    Vector4[] t = [new(1, 0, 0, 1), new(0, 1, 0, -1), new(0, 0, 1, 1)];
+    var bytes = new byte[3 * rich.Stride];
+    VertexPacker.Pack(rich, new VertexSource(p, n, uv, t), 3, bytes);
+    float F(int vertex, int offset, int k) => BitConverter.ToSingle(bytes, vertex * rich.Stride + offset + k * 4);
+    C(F(1, 0, 0) == -4f && F(1, 0, 1) == 5.5f && F(2, 0, 2) == -9f && F(0, 12, 1) == 1f && F(1, 12, 0) == 1f && F(2, 12, 2) == 1f, "positions and normals are written at their offsets");
+    C(F(1, 24, 1) == 1f && F(1, 24, 3) == -1f && F(1, 40, 0) == 0.5f && F(1, 40, 1) == 0.25f && F(2, 40, 0) == 1f, "...tangents and uv0 too");
+    var posOnly = new VertexLayout(new VertexField(UnityEngine.Rendering.VertexAttribute.Position, UnityEngine.Rendering.VertexAttributeFormat.Float32, 4));
+    var pb = new byte[3 * 16];
+    VertexPacker.Pack(posOnly, new VertexSource(p), 3, pb);
+    C(BitConverter.ToSingle(pb, 16 + 12) == 1f && BitConverter.ToSingle(pb, 16) == -4f, "a four component position has w = 1");
+    bool missing = false, unsupported = false, tooSmall = false;
+    try { VertexPacker.Pack(plain, new VertexSource(p), 3, new byte[72]); } catch (ArgumentException) { missing = true; }
+    try
+    {
+      var half = new VertexLayout(new VertexField(UnityEngine.Rendering.VertexAttribute.Position, UnityEngine.Rendering.VertexAttributeFormat.Float16, 4));
+      VertexPacker.Pack(half, new VertexSource(p), 3, new byte[24]);
+    }
+    catch (NotSupportedException) { unsupported = true; }
+    try { VertexPacker.Pack(plain, new VertexSource(p, n), 3, new byte[71]); } catch (ArgumentException) { tooSmall = true; }
+    C(missing && unsupported && tooSmall, "an attribute the source does not carry, a format not packed, or too few bytes: an error, never a guess");
+
+    int[] ix = [0, 1, 2, 65535, 3, 4];
+    var narrow = new byte[12];
+    var wide = new byte[24];
+    VertexPacker.PackIndices(ix, 6, false, narrow);
+    VertexPacker.PackIndices(ix, 6, true, wide);
+    C(BitConverter.ToUInt16(narrow, 6) == 65535 && BitConverter.ToUInt16(narrow, 4) == 2 && BitConverter.ToInt32(wide, 12) == 65535, "indices as 16 or 32 bit numbers");
+    bool overflow = false;
+    try { VertexPacker.PackIndices([65536], 1, false, new byte[2]); } catch (ArgumentException) { overflow = true; }
+    C(overflow, "a 16 bit chunk refuses an index past 65,535");
+  }
+
+  // ---- the stores of a merge, on every path -------------------------------------------------------------------------------------------------
+
+  private static void ProxyStoreLifeTest()
+  {
+    Section("proxy: no store is leaked or released under a worker");
+    BakedDraw.ProxyAdopted = BakedDraw.ProxyVersion;
+    var kind = ProxyKit.TwoLodKind("wall", ProxyKit.Fan(10), ProxyKit.Triangle());
+    BuiltZone Make(int zx, int zz) => BakedZoneBuild.Build(ClientKit.Zone(zx, zz, (0, zx * 64.0 + 5, 0.0, zz * 64.0 + 5, 0.0, null)), [kind], 1);
+    string why;
+
+    // a merge that goes through: every store ends in a mesh
+    var fine = new ProxyKit.Fake();
+    var a = Make(0, 0);
+    fine.Book.Tick(ProxyKit.Frame([a], 1, Vector3.zero));
+    fine.Book.Reset();
+    C(fine.Stores.Count == 2 && fine.Stores.All(s => s.Consumed && s.Releases == 0) && fine.NoLeaks(out why), "a merge that is made: its stores became meshes");
+
+    // workers that are slow: the plan runs, the main thread gives the stores, the write waits in the queue
+    var queue = new List<Action>();
+    var slow = new ProxyKit.Fake();
+    slow.Book.Work = queue.Add;
+    var zone = Make(0, 0);
+    slow.Book.Tick(ProxyKit.Frame([zone], 1, Vector3.zero));
+    C(queue.Count == 2 && slow.Stores.Count == 0 && slow.Book.Building == 2, "the plan is queued; no store exists before it has run");
+    var plans = queue.ToArray();
+    queue.Clear();
+    foreach (var job in plans)
+      job();
+    slow.Book.Tick(ProxyKit.Frame([zone], 1, Vector3.zero));
+    C(slow.Stores.Count == 2 && queue.Count == 2 && slow.Book.Building == 2, "the plan is in: the main thread made the stores and queued the writes");
+
+    // the zone leaves the ring while the writes are queued: the stores stay (a worker may be in them) until the workers have stopped
+    slow.Book.Tick(ProxyKit.Frame([], 2, Vector3.zero));
+    C(slow.Stores.All(s => s.Releases == 0) && slow.Book.Building == 2, "a zone that leaves while its write is queued: nothing is released under the worker");
+    foreach (var job in queue.ToArray())
+      job();
+    queue.Clear();
+    C(slow.Book.Building == 0 && slow.Stores.All(s => s.Releases == 0), "the writes stop at once (they were told), and give their slots back");
+    slow.Book.Tick(ProxyKit.Frame([], 2, Vector3.zero));
+    C(slow.Stores.All(s => s.Releases == 1 && !s.Consumed) && slow.NoLeaks(out why), $"the next tick releases the stores ({(slow.NoLeaks(out why) ? "no leak" : why)})");
+
+    // Reset while a write is queued: the stores wait for the worker, then go
+    var queued = new List<Action>();
+    var held = new ProxyKit.Fake();
+    held.Book.Work = queued.Add;
+    held.Book.OrphanWaitMs = 20;
+    var z2 = Make(0, 0);
+    held.Book.Tick(ProxyKit.Frame([z2], 1, Vector3.zero));
+    foreach (var job in queued.ToArray())
+      job();
+    queued.Clear();
+    held.Book.Tick(ProxyKit.Frame([z2], 1, Vector3.zero));
+    C(held.Stores.Count == 2 && queued.Count == 2, "(again) two writes are queued");
+    held.Book.Reset();
+    C(held.Stores.All(s => s.Releases == 0) && held.Book.Building == 2, "Reset with a write still queued waits, then leaves the stores to the next tick");
+    foreach (var job in queued.ToArray())
+      job();
+    queued.Clear();
+    held.Book.Tick(ProxyKit.Frame([], 2, Vector3.zero));
+    C(held.Stores.All(s => s.Releases == 1) && held.Book.Building == 0 && held.NoLeaks(out why), $"...which releases them once the workers are done ({(held.NoLeaks(out why) ? "no leak" : why)})");
+
+    // the zone leaves while only the plan was made (before the stores): nothing to release, the slot is given back
+    var early = new List<Action>();
+    var e = new ProxyKit.Fake();
+    e.Book.Work = early.Add;
+    var z3 = Make(0, 0);
+    e.Book.Tick(ProxyKit.Frame([z3], 1, Vector3.zero));
+    foreach (var job in early.ToArray())
+      job();
+    early.Clear();
+    e.Book.Tick(ProxyKit.Frame([], 2, Vector3.zero));
+    C(e.Stores.Count == 0 && e.Book.Building == 0 && early.Count == 0, "a zone that leaves with its plan made: no store is ever made, the slot is back");
+
+    // a plan that is still being made when the zone leaves: its slot comes back when it ends
+    var running = new List<Action>();
+    var r = new ProxyKit.Fake();
+    r.Book.Work = running.Add;
+    var z4 = Make(0, 0);
+    r.Book.Tick(ProxyKit.Frame([z4], 1, Vector3.zero));
+    r.Book.Tick(ProxyKit.Frame([], 2, Vector3.zero));
+    foreach (var job in running.ToArray())
+      job();
+    running.Clear();
+    r.Book.Tick(ProxyKit.Frame([], 2, Vector3.zero));
+    C(r.Stores.Count == 0 && r.Book.Building == 0, "a plan that was still queued when the zone left does not run, and gives its slot back");
+
+    // the near memory budget: refused on the plan, so no store is made for the near proxy
+    var budget = new ProxyKit.Fake();
+    budget.Book.NearBudget = 100;
+    budget.Book.Tick(ProxyKit.Frame([Make(0, 0)], 1, Vector3.zero));
+    C(budget.Stores.Count == 1 && budget.Stores[0].Consumed && budget.NoLeaks(out why), "over the near budget the near proxy gets no store; the far one's became a mesh");
+
+    // a mesh that cannot be made: the stores of the chunks not yet made go
+    var failing = new ProxyKit.Fake();
+    var bigPiece = ClientKit.NoLods("big", 1f);
+    ProxyKit.Take(bigPiece.Parts[0], ProxyKit.Fan(98));
+    var bigKind = ClientKit.Kind("big", bigPiece);
+    var bigZone = BakedZoneBuild.Build(ClientKit.Zone(0, 0, Enumerable.Range(0, 1500).Select(i => (0, -30.0 + i % 60, 0.0, -30.0 + i / 60 % 60, 0.0, (Vector3?)null)).ToArray()), [bigKind], 1);
+    int made = 0;
+    failing.Book.Upload = (c, _) =>
+    {
+      if (++made >= 2)
+        return false;
+      ProxyKit.Fake.Consume(c);
+      return true;
+    };
+    failing.Book.Tick(ProxyKit.Frame([bigZone], 1, Vector3.zero));
+    failing.Book.Tick(ProxyKit.Frame([bigZone], 1, Vector3.zero));
+    var consumed = failing.Stores.Count(s => s.Consumed);
+    C(bigZone.Proxy!.Near.State == ProxyVariant.Failed && failing.Stores.Count >= 3 && consumed == 1 && failing.Stores.Where(s => !s.Consumed).All(s => s.Releases == 1), "a mesh that cannot be made: the stores of all the chunks after it are released");
+
+    // memory for a store that cannot be made: the stores already made go, the proxy fails
+    var noMemory = new ProxyKit.Fake();
+    int stores = 0;
+    var inner = noMemory.Book.NewStore;
+    noMemory.Book.NewStore = ch =>
+    {
+      if (++stores == 2)
+        throw new InvalidOperationException("no memory");
+      return inner(ch);
+    };
+    var z5 = BakedZoneBuild.Build(ClientKit.Zone(0, 0, Enumerable.Range(0, 1500).Select(i => (0, -30.0 + i % 60, 0.0, -30.0 + i / 60 % 60, 0.0, (Vector3?)null)).ToArray()), [bigKind], 1);
+    noMemory.Book.Tick(ProxyKit.Frame([z5], 1, Vector3.zero));
+    C(z5.Proxy!.Near.State == ProxyVariant.Failed && noMemory.Stores.Where(s => !s.Consumed).All(s => s.Releases == 1) && noMemory.Stores.Count(s => !s.Consumed) == 1 && noMemory.NoLeaks(out why) && noMemory.Book.Building == 0,
+      "a store that cannot be made: the ones made are released, the proxy fails, the slot is back");
   }
 }

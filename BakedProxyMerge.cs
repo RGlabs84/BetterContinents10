@@ -301,16 +301,22 @@ internal static class ProxyRules
   internal static byte Worse(byte a, byte b) => a == RenderPart.ProxyOk ? b : a;
 }
 
-/// <summary>One mesh of a proxy: the merged vertices of some of a zone's pieces (relative to the zone's origin, so the floats stay small), until it is uploaded.</summary>
+/// <summary>
+/// One mesh of a proxy: the merged vertices of some of a zone's pieces (relative to the zone's origin, so the numbers stay small), written by a worker into
+/// its <see cref="Store"/> until the main thread makes the mesh from them.
+/// </summary>
 internal sealed class ProxyChunk
 {
   /// <summary>The Unity layer of the pieces in it (a proxy is drawn on the layer its pieces are).</summary>
   internal int Layer;
-  /// <summary>The numbers, until the main thread has made the mesh from them (then null).</summary>
-  internal Vector3[]? Vertices, Normals;
-  internal int[]? Indices;
   internal int VertexCount, IndexCount;
-  /// <summary>The box of the vertices, relative to the zone's origin (minimum then maximum).</summary>
+  /// <summary>Bytes of one vertex, as the proxy's layout packs it.</summary>
+  internal int Stride;
+  /// <summary>32 bit indices (the chunk has more than 65,535 vertices); else 16 bit.</summary>
+  internal bool Wide;
+  /// <summary>Where the numbers are written, until the main thread has made the mesh from them (then null). Set by the main thread before the worker writes.</summary>
+  internal ChunkStore? Store;
+  /// <summary>The box of the vertices, relative to the zone's origin (minimum then maximum). Written with the chunk.</summary>
   internal float MinX, MinY, MinZ, MaxX, MaxY, MaxZ;
   /// <summary>Main thread: the mesh and how it is drawn, once uploaded.</summary>
   internal Mesh? Mesh;
@@ -318,21 +324,29 @@ internal sealed class ProxyChunk
   internal bool Live;
 
   internal int Triangles => IndexCount / 3;
-  /// <summary>Graphics memory (bytes): a position and a normal of three floats a vertex, and four bytes an index.</summary>
-  internal long Bytes => VertexCount * 24L + IndexCount * 4L;
+  /// <summary>Graphics memory (bytes): a vertex's stride, and two or four bytes an index.</summary>
+  internal long Bytes => VertexCount * (long)Stride + IndexCount * (Wide ? 4L : 2L);
 }
 
-/// <summary>What one merge made of a zone.</summary>
+/// <summary>What one merge makes of a zone: first the plan (the chunks, their sizes, what they hold), then, once their stores are set, the numbers in them.</summary>
 internal sealed class ProxyBuilt
 {
   internal bool Near;
   internal ProxyChunk[] Chunks = [];
+  /// <summary>How the vertices are packed, and the cap the plan split the chunks by: the write must use the same.</summary>
+  internal VertexLayout? Layout;
+  internal int MaxVertices;
   /// <summary>Per entry of the zone's Kinds: the proxy holds at least one part of it.</summary>
   internal bool[] KindCovered = [];
+  /// <summary>Per entry of the zone's Kinds: the vertices and graphics memory (bytes) of its parts in the proxy.</summary>
+  internal long[] KindVertices = [], KindBytes = [];
   /// <summary>Instances merged (one for each part of each instance).</summary>
   internal int PartsMerged;
   internal long Vertices, Triangles, Bytes;
-  internal double Ms;
+  /// <summary>Worker milliseconds: counting what goes where, and writing it.</summary>
+  internal double PlanMs, WriteMs;
+
+  internal double Ms => PlanMs + WriteMs;
 }
 
 internal static class ProxyMerge
@@ -340,44 +354,106 @@ internal static class ProxyMerge
   /// <summary>The most vertices in a chunk (one more instance's mesh may take it past): a mesh is made, uploaded and sized for one chunk at a time.</summary>
   internal const int MaxChunkVertices = 120_000;
 
-  /// <summary>
-  /// Merges the casters of a built zone into chunks, for the near variant (the pieces' first level of detail) or the far one (the last): every
-  /// instance of every kind, each part that <see cref="ProxyRules.MergedParts"/> names, moved by the instance's matrix. Cell by cell, so a chunk
-  /// holds pieces that stand together and its box is tight. Pure: no Unity object is touched.
-  /// </summary>
-  internal static ProxyBuilt Merge(BuiltZone zone, bool near, BakedShadows policy, int maxVertices = MaxChunkVertices)
+  /// <summary>How the proxy's vertices are packed.</summary>
+  internal static VertexLayout Layout => VertexLayout.Plain;
+
+  private delegate void PartVisitor(int kindIndex, ProxyShape shape, in Matrix4x4 m);
+
+  // which parts of each kind a variant merges, and the Unity layers they are on
+  private static List<RenderPart>[] UseOf(BuiltZone zone, bool near, BakedShadows policy, SortedSet<int> layers)
   {
-    long started = Stopwatch.GetTimestamp();
-    var built = new ProxyBuilt { Near = near, KindCovered = new bool[zone.Kinds.Length] };
-    float ox = zone.Zx * 64f, oz = zone.Zz * 64f;
     var use = new List<RenderPart>[zone.Kinds.Length];
-    var layers = new SortedSet<int>();
     for (int g = 0; g < use.Length; g++)
     {
       use[g] = ProxyRules.MergedParts(zone.Kinds[g].Kind, near, policy);
       if (use[g].Count > 0)
         layers.Add(zone.Kinds[g].Kind.UnityLayer);
     }
+    return use;
+  }
+
+  // every (instance, part) of a layer in merge order: cell by cell, so a chunk holds pieces that stand together and its box is tight
+  private static void Walk(BuiltZone zone, List<RenderPart>[] use, int layer, PartVisitor visit)
+  {
+    for (int cell = 0; cell < BakedDraw.Cells; cell++)
+      for (int g = 0; g < use.Length; g++)
+      {
+        var ki = zone.Kinds[g];
+        var parts = use[g];
+        if (parts.Count == 0 || ki.Kind.UnityLayer != layer)
+          continue;
+        for (int i = ki.CellStart[cell]; i < ki.CellStart[cell + 1]; i++)
+          foreach (var part in parts)
+            visit(g, part.Shape!, part.LocalIndex < 0 ? ki.Root[i] : ki.Locals[part.LocalIndex][i]);
+      }
+  }
+
+  /// <summary>
+  /// Merges the casters of a built zone into chunks, for the near variant (the pieces' first level of detail) or the far one (the last): every
+  /// instance of every kind, each part that <see cref="ProxyRules.MergedParts"/> names, moved by the instance's matrix. In two steps, so that the memory
+  /// a chunk is written into can be made before the writing: <see cref="Plan"/> counts (cheap), the caller gives every chunk a store, <see cref="Write"/>
+  /// fills them. This does both into byte arrays, for the tests. Pure: no Unity object is touched.
+  /// </summary>
+  internal static ProxyBuilt Merge(BuiltZone zone, bool near, BakedShadows policy, int maxVertices = MaxChunkVertices, VertexLayout? layout = null)
+  {
+    var built = Plan(zone, near, policy, layout ?? Layout, maxVertices);
+    foreach (var chunk in built.Chunks)
+      chunk.Store = new ByteStore();
+    Write(zone, near, policy, built);
+    return built;
+  }
+
+  /// <summary>
+  /// Step one: which chunks the merge makes, how many vertices and indices each takes, which kinds are covered and what each kind costs. No vertex is moved:
+  /// the chunk boundaries depend on the vertex counts and on which matrices have an inverse, and nothing else.
+  /// </summary>
+  internal static ProxyBuilt Plan(BuiltZone zone, bool near, BakedShadows policy, VertexLayout layout, int maxVertices = MaxChunkVertices)
+  {
+    long started = Stopwatch.GetTimestamp();
+    int kinds = zone.Kinds.Length;
+    var built = new ProxyBuilt
+    {
+      Near = near, Layout = layout, MaxVertices = maxVertices, KindCovered = new bool[kinds], KindVertices = new long[kinds], KindBytes = new long[kinds],
+    };
+    var layers = new SortedSet<int>();
+    var use = UseOf(zone, near, policy, layers);
     var chunks = new List<ProxyChunk>();
+    var kindV = new int[kinds];
+    var kindI = new int[kinds];
     foreach (int layer in layers)
     {
-      var writer = new Writer(layer, maxVertices, chunks);
-      for (int cell = 0; cell < BakedDraw.Cells; cell++)
-        for (int g = 0; g < use.Length; g++)
+      int vCount = 0, iCount = 0;
+      void Close()
+      {
+        if (vCount == 0)
+          return;
+        bool wide = vCount > ushort.MaxValue;
+        chunks.Add(new ProxyChunk { Layer = layer, VertexCount = vCount, IndexCount = iCount, Stride = layout.Stride, Wide = wide });
+        for (int g = 0; g < kinds; g++)
         {
-          var ki = zone.Kinds[g];
-          var parts = use[g];
-          if (parts.Count == 0 || ki.Kind.UnityLayer != layer)
+          if (kindV[g] == 0)
             continue;
-          for (int i = ki.CellStart[cell]; i < ki.CellStart[cell + 1]; i++)
-            foreach (var part in parts)
-            {
-              writer.Add(part.Shape!, part.LocalIndex < 0 ? ki.Root[i] : ki.Locals[part.LocalIndex][i], ox, oz);
-              built.KindCovered[g] = true;
-              built.PartsMerged++;
-            }
+          built.KindVertices[g] += kindV[g];
+          built.KindBytes[g] += kindV[g] * (long)layout.Stride + kindI[g] * (wide ? 4L : 2L);
+          kindV[g] = kindI[g] = 0;
         }
-      writer.Close();
+        vCount = iCount = 0;
+      }
+      Walk(zone, use, layer, (int g, ProxyShape shape, in Matrix4x4 m) =>
+      {
+        built.KindCovered[g] = true;
+        built.PartsMerged++;
+        int nv = shape.Vertices.Length, ni = shape.Indices.Length;
+        if (nv == 0 || ni == 0 || !HasInverse(m))
+          return;
+        if (vCount > 0 && vCount + nv > maxVertices)
+          Close();
+        vCount += nv;
+        iCount += ni;
+        kindV[g] += nv;
+        kindI[g] += ni;
+      });
+      Close();
     }
     built.Chunks = chunks.ToArray();
     foreach (var c in built.Chunks)
@@ -386,9 +462,72 @@ internal static class ProxyMerge
       built.Triangles += c.Triangles;
       built.Bytes += c.Bytes;
     }
-    built.Ms = (Stopwatch.GetTimestamp() - started) * 1000.0 / Stopwatch.Frequency;
+    built.PlanMs = (Stopwatch.GetTimestamp() - started) * 1000.0 / Stopwatch.Frequency;
     return built;
   }
+
+  /// <summary>
+  /// Step two: moves every vertex and packs each chunk into its store (<see cref="ProxyChunk.Store"/>, set by the caller for every chunk of the plan). The same
+  /// walk as the plan, so the chunks come out as it counted. Returns false when <paramref name="cancelled"/> said so before a chunk was written (the chunks
+  /// written so far stay in their stores; the rest are untouched): the caller then lets go of the stores.
+  /// </summary>
+  internal static bool Write(BuiltZone zone, bool near, BakedShadows policy, ProxyBuilt built, Func<bool>? cancelled = null)
+  {
+    long started = Stopwatch.GetTimestamp();
+    var layout = built.Layout ?? throw new InvalidOperationException("the plan has no layout");
+    int max = built.MaxVertices;
+    float ox = zone.Zx * 64f, oz = zone.Zz * 64f;
+    var layers = new SortedSet<int>();
+    var use = UseOf(zone, near, policy, layers);
+    var scratch = new Scratch();
+    int next = 0;
+    bool stopped = false;
+    foreach (int layer in layers)
+    {
+      void Flush()
+      {
+        if (scratch.VCount == 0 || stopped)
+        {
+          scratch.Reset();
+          return;
+        }
+        if (cancelled != null && cancelled())
+        {
+          stopped = true;
+          scratch.Reset();
+          return;
+        }
+        var chunk = built.Chunks[next++];
+        if (chunk.Layer != layer || chunk.VertexCount != scratch.VCount || chunk.IndexCount != scratch.ICount)
+          throw new InvalidOperationException($"the merge wrote a chunk of {scratch.VCount} vertices and {scratch.ICount} indices where the plan counted {chunk.VertexCount} and {chunk.IndexCount}");
+        scratch.WriteTo(chunk, layout);
+        scratch.Reset();
+      }
+      scratch.Reset();
+      Walk(zone, use, layer, (int g, ProxyShape shape, in Matrix4x4 m) =>
+      {
+        int nv = shape.Vertices.Length, ni = shape.Indices.Length;
+        if (stopped || nv == 0 || ni == 0 || !HasInverse(m))
+          return;
+        if (scratch.VCount > 0 && scratch.VCount + nv > max)
+          Flush();
+        if (!stopped)
+          scratch.Add(shape, m, ox, oz);
+      });
+      Flush();
+    }
+    if (!stopped && next != built.Chunks.Length)
+      throw new InvalidOperationException($"the merge wrote {next} chunks where the plan counted {built.Chunks.Length}");
+    built.WriteMs = (Stopwatch.GetTimestamp() - started) * 1000.0 / Stopwatch.Frequency;
+    return !stopped;
+  }
+
+  /// <summary>The determinant of a matrix's 3 x 3.</summary>
+  private static float Determinant3(in Matrix4x4 m) =>
+    m.m00 * (m.m11 * m.m22 - m.m12 * m.m21) + m.m01 * (m.m12 * m.m20 - m.m10 * m.m22) + m.m02 * (m.m10 * m.m21 - m.m11 * m.m20);
+
+  /// <summary>Whether <see cref="Transform"/> takes a matrix: its 3 x 3 has an inverse.</summary>
+  internal static bool HasInverse(in Matrix4x4 m) => Math.Abs(Determinant3(m)) > 1e-18f;
 
   /// <summary>
   /// A shape moved by a matrix: positions by the matrix, less the zone's origin on x and z; normals by the inverse transpose of its 3 x 3 (its
@@ -431,30 +570,31 @@ internal static class ProxyMerge
     return true;
   }
 
-  // The chunk being filled; closes it, and starts the next, when the next mesh would take it past the vertex cap.
-  private sealed class Writer(int layer, int maxVertices, List<ProxyChunk> into)
+  // The chunk being filled in float arrays (reused from chunk to chunk), until Write packs it into its store.
+  private sealed class Scratch
   {
     private Vector3[] vertices = [], normals = [];
     private int[] indices = [];
-    private int vCount, iCount;
+    internal int VCount, ICount;
     private float minX, minY, minZ, maxX, maxY, maxZ;
+
+    internal void Reset()
+    {
+      VCount = ICount = 0;
+    }
 
     internal void Add(ProxyShape shape, in Matrix4x4 m, float ox, float oz)
     {
       int nv = shape.Vertices.Length, ni = shape.Indices.Length;
-      if (nv == 0 || ni == 0)
-        return;
-      if (vCount > 0 && vCount + nv > maxVertices)
-        Close();
-      Reserve(vCount + nv, iCount + ni);
-      if (!Transform(shape, m, ox, oz, vertices, normals, vCount, indices, iCount))
-        return;
-      if (vCount == 0)
+      Reserve(VCount + nv, ICount + ni);
+      if (!Transform(shape, m, ox, oz, vertices, normals, VCount, indices, ICount))
+        throw new InvalidOperationException("a matrix with an inverse in the plan has none in the write");
+      if (VCount == 0)
       {
         minX = minY = minZ = float.MaxValue;
         maxX = maxY = maxZ = float.MinValue;
       }
-      for (int k = vCount; k < vCount + nv; k++)
+      for (int k = VCount; k < VCount + nv; k++)
       {
         var p = vertices[k];
         if (p.x < minX) minX = p.x;
@@ -464,8 +604,8 @@ internal static class ProxyMerge
         if (p.y > maxY) maxY = p.y;
         if (p.z > maxZ) maxZ = p.z;
       }
-      vCount += nv;
-      iCount += ni;
+      VCount += nv;
+      ICount += ni;
     }
 
     private void Reserve(int v, int i)
@@ -480,21 +620,18 @@ internal static class ProxyMerge
         Array.Resize(ref indices, Math.Max(i, Math.Max(3072, indices.Length * 2)));
     }
 
-    internal void Close()
+    // packs the chunk into the store the caller gave it
+    internal void WriteTo(ProxyChunk chunk, VertexLayout layout)
     {
-      if (vCount == 0)
-        return;
-      var chunk = new ProxyChunk
-      {
-        Layer = layer, VertexCount = vCount, IndexCount = iCount,
-        Vertices = new Vector3[vCount], Normals = new Vector3[vCount], Indices = new int[iCount],
-        MinX = minX, MinY = minY, MinZ = minZ, MaxX = maxX, MaxY = maxY, MaxZ = maxZ,
-      };
-      Array.Copy(vertices, chunk.Vertices, vCount);
-      Array.Copy(normals, chunk.Normals, vCount);
-      Array.Copy(indices, chunk.Indices, iCount);
-      into.Add(chunk);
-      vCount = iCount = 0;
+      var store = chunk.Store ?? throw new InvalidOperationException("a chunk has no store");
+      chunk.MinX = minX; chunk.MinY = minY; chunk.MinZ = minZ;
+      chunk.MaxX = maxX; chunk.MaxY = maxY; chunk.MaxZ = maxZ;
+      store.Open(layout, VCount, ICount, chunk.Wide, out var vertexBytes, out var indexBytes);
+      VertexPacker.Pack(layout, new VertexSource(vertices, normals), VCount, vertexBytes);
+      VertexPacker.PackIndices(indices, ICount, chunk.Wide, indexBytes);
+      var min = new Vector3(minX, minY, minZ);
+      var max = new Vector3(maxX, maxY, maxZ);
+      store.Close(new Bounds((min + max) * 0.5f, max - min), VCount, ICount);
     }
   }
 }

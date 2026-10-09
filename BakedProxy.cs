@@ -30,6 +30,7 @@ internal static class BakedProxy
   internal static readonly ProxyBook Book = new()
   {
     Settle = BakedMeshShapes.Settle,
+    NewStore = _ => new MeshDataStore(),
     Upload = Upload,
     Free = FreeMesh,
     Draw = DrawChunk,
@@ -184,41 +185,38 @@ internal static class BakedProxy
 
   // ---- the meshes ---------------------------------------------------------------------------------------------------------------------
 
-  // The chunk's numbers become a mesh, which is uploaded and loses its CPU copy; false if it cannot be made.
+  // The chunk's store (a MeshData a worker has written into) becomes a mesh: the mesh takes its memory without a copy, the bounds are set by hand, and the mesh is
+  // uploaded and loses its CPU copy. The book times this whole call; apart from the three lines of Params it is what runs on the main thread. False if it cannot be made.
   private static bool Upload(ProxyChunk c, ZoneProxy zp)
   {
-    if (material == null || c.Vertices == null || c.Normals == null || c.Indices == null)
+    if (material == null || c.Store is not MeshDataStore store)
       return false;
-    var mesh = new Mesh { name = "BC shadow proxy", indexFormat = IndexFormat.UInt32 };
+    var mesh = new Mesh { name = "BC shadow proxy" };
     try
     {
-      mesh.SetVertices(c.Vertices, 0, c.VertexCount);
-      mesh.SetNormals(c.Normals, 0, c.VertexCount);
-      mesh.SetIndices(c.Indices, 0, c.IndexCount, MeshTopology.Triangles, 0, false);
-      var min = new Vector3(c.MinX, c.MinY, c.MinZ);
-      var max = new Vector3(c.MaxX, c.MaxY, c.MaxZ);
-      mesh.bounds = new Bounds((min + max) * 0.5f, max - min);
+      store.ApplyTo(mesh);
+      mesh.bounds = store.Bounds;
       mesh.UploadMeshData(true);
-      float ox = zp.Zone.Zx * 64f, oz = zp.Zone.Zz * 64f;
-      c.Params = new RenderParams(material)
-      {
-        layer = c.Layer,
-        shadowCastingMode = ShadowCastingMode.ShadowsOnly,
-        receiveShadows = false,
-        lightProbeUsage = LightProbeUsage.Off,
-        reflectionProbeUsage = ReflectionProbeUsage.Off,
-        motionVectorMode = MotionVectorGenerationMode.ForceNoMotion,
-        worldBounds = new Bounds((min + max) * 0.5f + new Vector3(ox, 0f, oz), max - min),
-      };
     }
     catch (Exception)
     {
       UnityEngine.Object.Destroy(mesh);
       throw;
     }
+    c.Store = null;
     c.Mesh = mesh;
-    c.Vertices = c.Normals = null;
-    c.Indices = null;
+    var min = new Vector3(c.MinX, c.MinY, c.MinZ);
+    var max = new Vector3(c.MaxX, c.MaxY, c.MaxZ);
+    c.Params = new RenderParams(material)
+    {
+      layer = c.Layer,
+      shadowCastingMode = ShadowCastingMode.ShadowsOnly,
+      receiveShadows = false,
+      lightProbeUsage = LightProbeUsage.Off,
+      reflectionProbeUsage = ReflectionProbeUsage.Off,
+      motionVectorMode = MotionVectorGenerationMode.ForceNoMotion,
+      worldBounds = new Bounds((min + max) * 0.5f + new Vector3(zp.Zone.Zx * 64f, 0f, zp.Zone.Zz * 64f), max - min),
+    };
     return true;
   }
 

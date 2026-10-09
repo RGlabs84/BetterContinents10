@@ -13,21 +13,41 @@ namespace BetterContinents;
 //
 // Every zone in the draw ring that the camera's shadows can reach gets, in time, up to two proxies (ProxyMerge): the far one, made of each
 // piece's last level of detail, and the near one, made of its first, which a zone within one zone of the camera's has as well and draws instead.
-// Both are made lazily and a few at a time: the parts' shapes are settled on the main thread (BakedMeshShapes), a worker merges, and the
-// main thread makes the meshes a few milliseconds a frame. A zone's instances are told to stop casting (BuiltZone.ProxyCover) only for the kinds
+// Both are made lazily and a few at a time: the parts' shapes are settled (BakedMeshShapes), a worker plans the merge (which chunks, how big), the main
+// thread gives each chunk a store (a writable MeshData), a worker moves the vertices and packs them into the stores, and the main thread then applies a
+// store to a mesh and uploads it, a few milliseconds a frame (ProxyBuild lists the stages and who may touch what). A zone's instances are told to stop casting (BuiltZone.ProxyCover) only for the kinds
 // every ready proxy of it covers, and a proxy is never taken away before a drawing job that knows it is gone has been adopted: no instance is
 // ever without a shadow, and for a few frames it may have two.
 //
 // This class is the bookkeeping, free of the engine: what makes a mesh, destroys one, draws one and settles a part are delegates (BakedProxy
 // supplies them), so that tools/placement-tests runs it.
 
-/// <summary>What a worker leaves of one merge.</summary>
+/// <summary>
+/// What the workers leave of one merge, in stages. A worker counts the chunks (Planning, then Planned); the main thread gives every chunk a store (the memory it is
+/// written into) and starts the second job; a worker moves and packs the vertices (Writing, then Done). A stage is written last by whoever ends it, and read by
+/// the main thread only; the stores are the main thread's to make and to release, and it releases them only while no worker is in the build (<see cref="Quiet"/>).
+/// </summary>
 internal sealed class ProxyBuild
 {
-  /// <summary>0 running, 1 done, 2 failed.</summary>
+  internal const int Planning = 0, Done = 1, Failed = 2, Planned = 3, Writing = 4;
   internal volatile int Stage;
+  /// <summary>Set by the main thread when nobody wants the result any more: a worker that has not started does not, one that is writing stops at the next chunk.</summary>
+  internal volatile bool Abandoned;
+  /// <summary>The plan, from Planned on; its chunks hold the stores from the start of Writing, and the numbers once Done.</summary>
   internal ProxyBuilt? Built;
   internal Exception? Error;
+  /// <summary>1 while the build holds one of the book's merge slots (ProxyBook.MaxBuilds): given back once, by whoever ends the build.</summary>
+  internal int SlotHeld = 1;
+
+  /// <summary>No worker is touching the plan or the stores now (the build may be waiting for the main thread).</summary>
+  internal bool Quiet
+  {
+    get
+    {
+      int stage = Stage;
+      return stage == Planned || stage == Done || stage == Failed;
+    }
+  }
 }
 
 /// <summary>One of a zone's two proxies: the near one (first level of detail) or the far one (last).</summary>
@@ -42,6 +62,8 @@ internal sealed class ProxyVariant(bool near)
   internal int Uploaded;
   /// <summary>Per entry of the zone's Kinds, whether this proxy holds a part of it.</summary>
   internal bool[]? Covered;
+  /// <summary>Per entry of the zone's Kinds: the vertices and graphics memory (bytes) this proxy spends on its parts (for bc_bake stats).</summary>
+  internal long[]? KindVertices, KindBytes;
   /// <summary>The proxy is drawn once BakedDraw.ProxyAdopted reaches this: another proxy of the zone is drawn until a job that knows the coverage this one
   /// narrows has been adopted. 0 for the first proxy of a zone to be ready.</summary>
   internal int ActiveAt;
@@ -121,22 +143,34 @@ internal sealed class ProxyBook
   internal const float Linger = 4f;
   /// <summary>How many merges run on workers at once.</summary>
   internal const int MaxBuilds = 2;
-  /// <summary>The main thread's milliseconds a frame: settling shapes, and making meshes (one mesh at least a frame, whatever it costs).</summary>
+  /// <summary>
+  /// The main thread's milliseconds a frame: settling shapes, and making meshes. A mesh is a single apply of a worker-written MeshData and an upload, whose
+  /// cost the engine cannot promise to keep under the budget by construction, so one mesh a frame is made whatever it costs (bc_bake stats shows the worst).
+  /// </summary>
   internal const double ShapeBudgetMs = 1.5, UploadBudgetMs = 2.0;
   /// <summary>The graphics memory the near proxies may take together (the default of NearBudget); a near proxy that would take it past is not made (the far one stands).</summary>
   internal const long NearBudgetBytes = 320L << 20;
+
   /// <summary>A far proxy is dropped when its zone is this much farther than the shadows reach (metres): so that a zone at the edge does not come and go.</summary>
   internal const float DropMargin = 64f;
 
   internal long NearBudget = NearBudgetBytes;
+  /// <summary>How long Reset waits for the workers of builds it abandoned (milliseconds) before leaving them to the next tick.</summary>
+  internal int OrphanWaitMs = 2000;
 
   // ---- what the engine supplies --------------------------------------------------------------------------------------------------
 
   internal Action<Action> Work = job => ThreadPool.QueueUserWorkItem(_ => job());
   /// <summary>Settles a part's shadow shape (RenderPart.ProxyState and Shape); true once it is settled (it may take frames: a read back from the GPU).</summary>
   internal Func<RenderPart, bool> Settle = _ => true;
-  /// <summary>Makes a chunk's mesh and how it is drawn, and lets go of its numbers; false if it cannot.</summary>
-  internal Func<ProxyChunk, ZoneProxy, bool> Upload = (_, _) => true;
+  /// <summary>Main thread: the store a worker writes a planned chunk into (the engine's is a writable MeshData; the default, byte arrays). May throw.</summary>
+  internal Func<ProxyChunk, ChunkStore> NewStore = _ => new ByteStore();
+  /// <summary>Makes a chunk's mesh and how it is drawn from its store, which it hands on (sets the chunk's Store to null); false if it cannot.</summary>
+  internal Func<ProxyChunk, ZoneProxy, bool> Upload = (chunk, _) =>
+  {
+    chunk.Store = null;
+    return true;
+  };
   internal Action<ProxyChunk> Free = _ => { };
   internal Action<ProxyChunk, Matrix4x4> Draw = (_, _) => { };
 
@@ -151,6 +185,8 @@ internal sealed class ProxyBook
 
   private readonly List<ZoneProxy> live = [];
   private readonly List<Retired> retired = [];
+  // builds nobody wants any more whose workers had not finished: their stores are released when they have
+  private readonly List<ProxyBuild> orphans = [];
   private readonly List<ZoneProxy> pickZones = [];
   private readonly List<ProxyVariant> pickVariants = [];
   private int building;
@@ -160,7 +196,7 @@ internal sealed class ProxyBook
 
   // statistics
   private int builds, uploads, failures, budgetSkips, drawsLastFrame;
-  private double buildMsSum, buildMsMax, uploadMsSum, uploadMsMax;
+  private double buildMsSum, buildMsMax, planMsSum, writeMsSum, uploadMsSum, uploadMsMax, applyMsMax;
   private double frameUploadMs;
 
   internal IReadOnlyList<ZoneProxy> Zones => live;
@@ -173,6 +209,7 @@ internal sealed class ProxyBook
   internal void Tick(in ProxyFrame f)
   {
     now = f.Now;
+    DrainOrphans();
     if (f.Hidden)
     {
       // nothing is drawn: what was taken back goes at once
@@ -335,24 +372,51 @@ internal sealed class ProxyBook
       v.Build = build;
       v.State = ProxyVariant.Building;
       Interlocked.Increment(ref building);
-      Work(() =>
-      {
-        try
-        {
-          build.Built = ProxyMerge.Merge(zone, near, shadows);
-          build.Stage = 1;
-        }
-        catch (Exception e)
-        {
-          build.Error = e;
-          build.Stage = 2;
-        }
-        finally
-        {
-          Interlocked.Decrement(ref building);
-        }
-      });
+      Work(() => PlanJob(build, zone, near, shadows));
     }
+  }
+
+  // worker: which chunks the merge will make (no vertex is moved)
+  private void PlanJob(ProxyBuild build, BuiltZone zone, bool near, BakedShadows shadows)
+  {
+    try
+    {
+      if (!build.Abandoned)
+      {
+        build.Built = ProxyMerge.Plan(zone, near, shadows, ProxyMerge.Layout);
+        build.Stage = ProxyBuild.Planned;
+        return;
+      }
+      build.Stage = ProxyBuild.Failed;
+    }
+    catch (Exception e)
+    {
+      build.Error = e;
+      build.Stage = ProxyBuild.Failed;
+    }
+    ReleaseSlot(build);
+  }
+
+  // worker: moves the vertices and packs them into the chunks' stores
+  private void WriteJob(ProxyBuild build, BuiltZone zone, bool near, BakedShadows shadows)
+  {
+    try
+    {
+      bool ok = !build.Abandoned && ProxyMerge.Write(zone, near, shadows, build.Built!, () => build.Abandoned);
+      build.Stage = ok ? ProxyBuild.Done : ProxyBuild.Failed;
+    }
+    catch (Exception e)
+    {
+      build.Error = e;
+      build.Stage = ProxyBuild.Failed;
+    }
+    ReleaseSlot(build);
+  }
+
+  private void ReleaseSlot(ProxyBuild build)
+  {
+    if (Interlocked.Exchange(ref build.SlotHeld, 0) == 1)
+      Interlocked.Decrement(ref building);
   }
 
   private void PollBuilds()
@@ -360,36 +424,127 @@ internal sealed class ProxyBook
     foreach (var zp in live)
       foreach (var v in zp.Both)
       {
-        if (v.State != ProxyVariant.Building || v.Build == null || v.Build.Stage == 0)
+        if (v.State != ProxyVariant.Building || v.Build == null)
           continue;
         var build = v.Build;
-        v.Build = null;
-        if (build.Stage == 2)
+        int stage = build.Stage;
+        if (stage == ProxyBuild.Planned)
         {
-          Fail(v, build.Error?.Message ?? "the merge failed");
-          if (build.Error != null)
-            BetterContinents.LogError($"baked placements: the shadow proxy of zone {zp.Zone.Zx},{zp.Zone.Zz} could not be made: {build.Error}");
-          continue;
+          // the write starts now; a worker that is quick (or the tests', which run at once) may be done before this ends
+          Prepare(zp, v, build);
+          if (v.State != ProxyVariant.Building || v.Build != build)
+            continue;
+          stage = build.Stage;
         }
-        var built = build.Built!;
-        builds++;
-        buildMsSum += built.Ms;
-        buildMsMax = Math.Max(buildMsMax, built.Ms);
-        if (v.Near && LiveBytes(true) + built.Bytes > NearBudget)
+        switch (stage)
         {
-          budgetSkips++;
-          Fail(v, "the near proxies' memory budget");
-          continue;
+          case ProxyBuild.Failed:
+            v.Build = null;
+            ReleaseBuild(build);
+            Fail(v, build.Error?.Message ?? "the merge failed");
+            if (build.Error != null)
+              BetterContinents.LogError($"baked placements: the shadow proxy of zone {zp.Zone.Zx},{zp.Zone.Zz} could not be made: {build.Error}");
+            break;
+          case ProxyBuild.Done:
+            v.Build = null;
+            Accept(zp, v, build);
+            break;
         }
-        v.Chunks = built.Chunks;
-        v.Covered = built.KindCovered;
-        v.Vertices = built.Vertices;
-        v.Triangles = built.Triangles;
-        v.Bytes = built.Bytes;
-        v.Uploaded = 0;
-        v.State = built.Chunks.Length == 0 ? ProxyVariant.Ready : ProxyVariant.Uploading;
-        if (v.State == ProxyVariant.Ready)
-          BecameReady(zp, v);
+      }
+  }
+
+  // main thread: the plan is in. The near proxies' memory budget is checked on it, every chunk is given its store, and the write starts.
+  private void Prepare(ZoneProxy zp, ProxyVariant v, ProxyBuild build)
+  {
+    var built = build.Built!;
+    if (v.Near && LiveBytes(true) + built.Bytes > NearBudget)
+    {
+      budgetSkips++;
+      v.Build = null;
+      ReleaseBuild(build);
+      Fail(v, "the near proxies' memory budget");
+      return;
+    }
+    try
+    {
+      foreach (var chunk in built.Chunks)
+        chunk.Store = NewStore(chunk);
+    }
+    catch (Exception e)
+    {
+      v.Build = null;
+      ReleaseBuild(build);
+      Fail(v, "the memory for a mesh could not be made");
+      BetterContinents.LogError($"baked placements: the shadow proxy of zone {zp.Zone.Zx},{zp.Zone.Zz} could not get its memory: {e}");
+      return;
+    }
+    // what the proxy will take counts against the budget from now on
+    v.Vertices = built.Vertices;
+    v.Triangles = built.Triangles;
+    v.Bytes = built.Bytes;
+    build.Stage = ProxyBuild.Writing;
+    var zone = zp.Zone;
+    bool near = v.Near;
+    var shadows = zp.Policy;
+    Work(() => WriteJob(build, zone, near, shadows));
+  }
+
+  // main thread: the chunks are written
+  private void Accept(ZoneProxy zp, ProxyVariant v, ProxyBuild build)
+  {
+    var built = build.Built!;
+    builds++;
+    buildMsSum += built.Ms;
+    planMsSum += built.PlanMs;
+    writeMsSum += built.WriteMs;
+    buildMsMax = Math.Max(buildMsMax, built.Ms);
+    v.Chunks = built.Chunks;
+    v.Covered = built.KindCovered;
+    v.KindVertices = built.KindVertices;
+    v.KindBytes = built.KindBytes;
+    v.Vertices = built.Vertices;
+    v.Triangles = built.Triangles;
+    v.Bytes = built.Bytes;
+    v.Uploaded = 0;
+    v.State = built.Chunks.Length == 0 ? ProxyVariant.Ready : ProxyVariant.Uploading;
+    if (v.State == ProxyVariant.Ready)
+      BecameReady(zp, v);
+  }
+
+  // main thread, a build no variant holds any more: its stores go (it is not in a worker's hands) and its slot is given back
+  private void ReleaseBuild(ProxyBuild build)
+  {
+    if (build.Built != null)
+      foreach (var chunk in build.Built.Chunks)
+      {
+        chunk.Store?.Release();
+        chunk.Store = null;
+      }
+    ReleaseSlot(build);
+  }
+
+  // main thread: a variant's build is not wanted (its zone left, it was taken back, a world ended). A worker may be in it: it is told to stop, and the
+  // build is released once it has.
+  private void Abandon(ProxyVariant v)
+  {
+    var build = v.Build;
+    v.Build = null;
+    if (build == null)
+      return;
+    build.Abandoned = true;
+    if (build.Quiet)
+      ReleaseBuild(build);
+    else
+      orphans.Add(build);
+  }
+
+  private void DrainOrphans()
+  {
+    for (int i = orphans.Count - 1; i >= 0; i--)
+      if (orphans[i].Quiet)
+      {
+        ReleaseBuild(orphans[i]);
+        orphans.RemoveAt(i);
       }
   }
 
@@ -433,6 +588,7 @@ internal sealed class ProxyBook
         v.Uploaded++;
         uploads++;
         uploadMsSum += ms;
+        applyMsMax = Math.Max(applyMsMax, ms);
         frameUploadMs += ms;
       }
       if (v.State == ProxyVariant.Uploading && v.Uploaded == v.Chunks.Length)
@@ -451,19 +607,22 @@ internal sealed class ProxyBook
       FreeChunk(chunk);
     v.Chunks = [];
     v.Covered = null;
+    v.KindVertices = v.KindBytes = null;
+    v.Vertices = v.Triangles = v.Bytes = 0;
     v.Uploaded = 0;
-    v.Build = null;
+    Abandon(v);
     v.State = ProxyVariant.Failed;
     v.FailedWhy = why;
   }
 
+  // main thread, a chunk no worker is writing: its store and its mesh go
   private void FreeChunk(ProxyChunk chunk)
   {
+    chunk.Store?.Release();
+    chunk.Store = null;
     if (chunk.Live)
       Free(chunk);
     chunk.Live = false;
-    chunk.Vertices = chunk.Normals = null;
-    chunk.Indices = null;
   }
 
   // ---- coverage ----------------------------------------------------------------------------------------------------------------------
@@ -570,7 +729,8 @@ internal sealed class ProxyBook
     }
     v.Chunks = [];
     v.Covered = null;
-    v.Build = null;
+    v.KindVertices = v.KindBytes = null;
+    Abandon(v);
     v.Uploaded = 0;
     v.Vertices = v.Triangles = v.Bytes = 0;
     v.FailedWhy = null;
@@ -604,13 +764,22 @@ internal sealed class ProxyBook
           FreeChunk(chunk);
         v.Chunks = [];
         v.State = ProxyVariant.None;
-        v.Build = null;
+        Abandon(v);
       }
     }
     live.Clear();
     FreeRetired(true);
     ringVersion = -1;
     BakedDraw.ProxyVersion++;
+    // a worker may still be writing into a store: it is told to stop, and given a moment (a chunk takes milliseconds) before the stores are let go; whatever
+    // is still running then is let go of by the next tick
+    var wait = Stopwatch.StartNew();
+    DrainOrphans();
+    while (orphans.Count > 0 && wait.ElapsedMilliseconds < OrphanWaitMs)
+    {
+      Thread.Sleep(1);
+      DrainOrphans();
+    }
   }
 
   // ---- drawing -----------------------------------------------------------------------------------------------------------------------
@@ -676,7 +845,7 @@ internal sealed class ProxyBook
     long bytes = 0;
     foreach (var zp in live)
       foreach (var v in zp.Both)
-        if ((v.State == ProxyVariant.Uploading || v.State == ProxyVariant.Ready) && (!nearOnly || v.Near))
+        if ((v.State == ProxyVariant.Building || v.State == ProxyVariant.Uploading || v.State == ProxyVariant.Ready) && (!nearOnly || v.Near))
           bytes += v.Bytes;
     foreach (var r in retired)
       foreach (var chunk in r.Chunks)
@@ -693,6 +862,9 @@ internal sealed class ProxyBook
     n.BuildMaxMs = buildMsMax;
     n.UploadAverageMs = uploads == 0 ? 0 : uploadMsSum / uploads;
     n.UploadMaxFrameMs = uploadMsMax;
+    n.ApplyMaxMs = applyMsMax;
+    n.PlanMsTotal = planMsSum;
+    n.WriteMsTotal = writeMsSum;
     foreach (var zp in live)
     {
       if (zp.AnyReady)
@@ -723,7 +895,7 @@ internal struct ProxyNumbers
 {
   internal int ZonesInRing, ZonesTracked, ZonesWithProxy, Near, Far, Waiting, FailedNow, Retiring, Builds, Uploads, Failures, BudgetSkips, Draws;
   internal long Triangles, Vertices, Bytes, RetiringBytes;
-  internal double BuildAverageMs, BuildMaxMs, UploadAverageMs, UploadMaxFrameMs;
+  internal double BuildAverageMs, BuildMaxMs, UploadAverageMs, UploadMaxFrameMs, ApplyMaxMs, PlanMsTotal, WriteMsTotal;
 
   internal readonly string Line()
   {
@@ -738,7 +910,8 @@ internal struct ProxyNumbers
   {
     var c = CultureInfo.InvariantCulture;
     return string.Format(c,
-      "Shadow proxy cost: building (worker) {0:0.0} ms a proxy on average, {1:0.0} ms at most ({2:N0} built); making meshes (main thread) {3:0.00} ms a mesh on average, {4:0.00} ms a frame at most ({5:N0} meshes).",
-      BuildAverageMs, BuildMaxMs, Builds, UploadAverageMs, UploadMaxFrameMs, Uploads);
+      "Shadow proxy cost: on workers, planning and writing a proxy {0:0.0} ms on average, {1:0.0} ms at most ({2:N0} built; {3:0.0} s planning and {4:0.0} s writing in all); " +
+      "on the main thread, applying and uploading a mesh {5:0.00} ms on average, {6:0.00} ms the worst single mesh, {7:0.00} ms a frame at most ({8:N0} meshes).",
+      BuildAverageMs, BuildMaxMs, Builds, PlanMsTotal / 1000.0, WriteMsTotal / 1000.0, UploadAverageMs, ApplyMaxMs, UploadMaxFrameMs, Uploads);
   }
 }
