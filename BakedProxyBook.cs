@@ -578,7 +578,7 @@ internal sealed class ProxyBook
           BetterContinents.LogError($"baked placements: a shadow proxy mesh could not be made: {e}");
           ok = false;
         }
-        double ms = (Stopwatch.GetTimestamp() - t0) * 1000.0 / Stopwatch.Frequency;
+        double ms = chunk.ApplyMs > 0 ? chunk.ApplyMs : (Stopwatch.GetTimestamp() - t0) * 1000.0 / Stopwatch.Frequency;
         any = true;
         if (!ok)
         {

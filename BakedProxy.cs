@@ -191,11 +191,12 @@ internal static class BakedProxy
   // ---- the meshes ---------------------------------------------------------------------------------------------------------------------
 
   // The chunk's store (a MeshData a worker has written into) becomes a mesh: the mesh takes its memory without a copy, the bounds are set by hand, and the mesh is
-  // uploaded and loses its CPU copy. The book times this whole call; apart from the three lines of Params it is what runs on the main thread. False if it cannot be made.
+  // uploaded and loses its CPU copy. The timed part (ProxyChunk.ApplyMs) is exactly new Mesh, the apply, the bounds and the upload. False if it cannot be made.
   private static bool Upload(ProxyChunk c, ZoneProxy zp)
   {
     if (material == null || c.Store is not MeshDataStore store)
       return false;
+    long t0 = Stopwatch.GetTimestamp();
     var mesh = new Mesh { name = "BC shadow proxy" };
     try
     {
@@ -208,6 +209,8 @@ internal static class BakedProxy
       UnityEngine.Object.Destroy(mesh);
       throw;
     }
+    // what bc_bake stats shows as the cost of a mesh is these four calls and nothing else
+    c.ApplyMs = (Stopwatch.GetTimestamp() - t0) * 1000.0 / Stopwatch.Frequency;
     c.Store = null;
     c.Mesh = mesh;
     var min = new Vector3(c.MinX, c.MinY, c.MinZ);

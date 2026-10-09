@@ -324,6 +324,8 @@ internal sealed class ProxyChunk
   internal Mesh? Mesh;
   internal RenderParams Params;
   internal bool Live;
+  /// <summary>Main thread: the milliseconds the engine spent on exactly the apply of the store to a new mesh, the bounds and the upload (0: not measured, the caller times the call).</summary>
+  internal double ApplyMs;
 
   internal int Triangles => IndexCount / 3;
   /// <summary>Graphics memory (bytes): a vertex's stride, and two or four bytes an index.</summary>
