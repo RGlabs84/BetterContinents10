@@ -1194,4 +1194,46 @@ internal static partial class Tests
     var three = ProxyMerge.Plan(ProxyPlanZone(out _, out _, walls: 3, beams: 0, fan: 32_000), true, BakedShadows.All, compact);
     C(three.Chunks.Length == 2 && three.Chunks[0].VertexCount == 64_004 && three.Chunks[1].VertexCount == 32_002 && three.Chunks.All(c => !c.Wide), "three meshes of 32,002 vertices: two share a chunk, the third has the next");
   }
+
+  // ---- the numbers bc_bake stats prints -------------------------------------------------------------------------------------------------------
+
+  private static void ProxyStatsTest()
+  {
+    Section("proxy: the numbers in bc_bake stats");
+    BakedDraw.ProxyAdopted = BakedDraw.ProxyVersion;
+    // eight kinds of different sizes in one zone, the biggest first by bytes
+    var kinds = Enumerable.Range(1, 8).Select(i =>
+    {
+      var piece = ClientKit.NoLods("kind" + i, 1f);
+      ProxyKit.Take(piece.Parts[0], ProxyKit.Fan(i * 10));
+      return ClientKit.Kind("kind" + i, piece);
+    }).ToArray();
+    var records = Enumerable.Range(0, 8).Select(i => (i, 1.0 + i * 5, 0.0, 1.0, 0.0, (Vector3?)null)).ToArray();
+    var zone = BakedZoneBuild.Build(ClientKit.Zone(0, 0, records), kinds, 1);
+    var fake = new ProxyKit.Fake();
+    fake.Book.Upload = (c, _) =>
+    {
+      System.Threading.Thread.Sleep(c.VertexCount > 100 ? 4 : 0);
+      ProxyKit.Fake.Consume(c);
+      return true;
+    };
+    for (int i = 0; i < 3; i++)
+      fake.Book.Tick(ProxyKit.Frame([zone], 1, Vector3.zero));
+    var n = fake.Book.Numbers(1);
+    C(n.Near == 1 && n.Far == 1, "(a near and a far proxy are ready)");
+    C(n.NearBytes > 0 && n.FarBytes > 0 && n.NearBytes + n.FarBytes == n.Bytes && n.RetiringBytes == 0, "graphics memory is split into near and far");
+    C(n.TopKinds.Length == 6, $"the six kinds with the most proxy memory are listed ({n.TopKinds.Length})");
+    // kind i has i * 10 triangles in 12 + 10 (i - 1) vertices, and is merged in both the near and the far proxy (no LOD to switch)
+    C(n.TopKinds.Select(k => k.Name).SequenceEqual(["kind8", "kind7", "kind6", "kind5", "kind4", "kind3"]) && n.TopKinds.Zip(n.TopKinds.Skip(1), (a, b) => a.Bytes > b.Bytes).All(x => x),
+      $"...the biggest first ({string.Join(", ", n.TopKinds.Select(k => k.Name))})");
+    var k8 = n.TopKinds[0];
+    C(k8.Vertices == 2 * 82 && k8.Bytes == 2 * (82L * 12 + 80 * 3 * 2), $"...with its vertices and bytes over both proxies ({k8.Vertices} vertices, {k8.Bytes} bytes)");
+    var line = n.KindsLine();
+    C(line.StartsWith("Shadow proxy memory by kind") && line.Contains("kind8") && line.Contains("MB") && line.Contains("vertices") && !line.Contains("kind2"), $"the line says it ({line})");
+    C(n.Line().Contains("MB near") && n.Line().Contains("MB far"), "the proxies line gives the near and far memory");
+    C(n.ApplyMaxMs >= 3.5 && n.UploadMaxFrameMs >= n.ApplyMaxMs && n.UploadAverageMs <= n.ApplyMaxMs && n.TimeLine().Contains("worst single mesh"), $"the worst single apply is kept ({n.ApplyMaxMs:0.0} ms)");
+    C(n.PlanMsTotal >= 0 && n.WriteMsTotal >= 0 && n.TimeLine().Contains("on workers") && n.TimeLine().Contains("on the main thread"), "the worker time and the main thread's are told apart");
+    var none = new ProxyKit.Fake().Book.Numbers(0);
+    C(none.KindsLine().Contains("none yet"), "with no proxy ready the kinds line says so");
+  }
 }

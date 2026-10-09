@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
+using System.Linq;
 using System.Threading;
 using UnityEngine;
 
@@ -865,6 +866,7 @@ internal sealed class ProxyBook
     n.ApplyMaxMs = applyMsMax;
     n.PlanMsTotal = planMsSum;
     n.WriteMsTotal = writeMsSum;
+    var kinds = new Dictionary<string, (long Bytes, long Vertices)>();
     foreach (var zp in live)
     {
       if (zp.AnyReady)
@@ -877,6 +879,16 @@ internal sealed class ProxyBook
           n.Triangles += v.Triangles;
           n.Vertices += v.Vertices;
           n.Bytes += v.Bytes;
+          if (v.Near) n.NearBytes += v.Bytes; else n.FarBytes += v.Bytes;
+          if (v.KindBytes != null && v.KindVertices != null)
+            for (int g = 0; g < v.KindBytes.Length && g < zp.Zone.Kinds.Length; g++)
+            {
+              if (v.KindBytes[g] == 0)
+                continue;
+              string name = zp.Zone.Kinds[g].Kind.Name;
+              kinds.TryGetValue(name, out var had);
+              kinds[name] = (had.Bytes + v.KindBytes[g], had.Vertices + v.KindVertices[g]);
+            }
         }
         else if (v.State == ProxyVariant.Failed)
           n.FailedNow++;
@@ -887,6 +899,7 @@ internal sealed class ProxyBook
     foreach (var r in retired)
       foreach (var chunk in r.Chunks)
         n.RetiringBytes += chunk.Bytes;
+    n.TopKinds = kinds.OrderByDescending(k => k.Value.Bytes).ThenBy(k => k.Key, StringComparer.Ordinal).Take(6).Select(k => (k.Key, k.Value.Bytes, k.Value.Vertices)).ToArray();
     return n;
   }
 }
@@ -894,16 +907,30 @@ internal sealed class ProxyBook
 internal struct ProxyNumbers
 {
   internal int ZonesInRing, ZonesTracked, ZonesWithProxy, Near, Far, Waiting, FailedNow, Retiring, Builds, Uploads, Failures, BudgetSkips, Draws;
-  internal long Triangles, Vertices, Bytes, RetiringBytes;
+  internal long Triangles, Vertices, Bytes, RetiringBytes, NearBytes, FarBytes;
+  /// <summary>The kinds whose parts take the most graphics memory in the proxies that are ready (name, bytes, vertices), the biggest first, at most 6.</summary>
+  internal (string Name, long Bytes, long Vertices)[] TopKinds;
   internal double BuildAverageMs, BuildMaxMs, UploadAverageMs, UploadMaxFrameMs, ApplyMaxMs, PlanMsTotal, WriteMsTotal;
 
   internal readonly string Line()
   {
     var c = CultureInfo.InvariantCulture;
     return string.Format(c,
-      "Shadow proxies: {0} of {1} ring zones have one ({2} near, from the pieces' full detail; {3} far, from their last level), {4:N0} triangles in {5:N0} vertices, {6:0.0} MB of graphics memory; " +
-      "{7:N0} proxy draws last frame; {8} waiting, {9} failed now ({10} ever, {11} near ones over the memory budget), {12} being taken back.",
-      ZonesWithProxy, ZonesInRing, Near, Far, Triangles, Vertices, Bytes / 1048576.0, Draws, Waiting, FailedNow, Failures, BudgetSkips, Retiring);
+      "Shadow proxies: {0} of {1} ring zones have one ({2} near, from the pieces' full detail; {3} far, from their last level), {4:N0} triangles in {5:N0} vertices, " +
+      "{6:0.0} MB of graphics memory ({7:0.0} MB near, {8:0.0} MB far; a further {13:0.0} MB being taken back); " +
+      "{9:N0} proxy draws last frame; {10} waiting, {11} failed now ({12} ever, {14} near ones over the memory budget), {15} being taken back.",
+      ZonesWithProxy, ZonesInRing, Near, Far, Triangles, Vertices, Bytes / 1048576.0, NearBytes / 1048576.0, FarBytes / 1048576.0, Draws, Waiting, FailedNow, Failures,
+      RetiringBytes / 1048576.0, BudgetSkips, Retiring);
+  }
+
+  /// <summary>The kinds that hold the most proxy memory: where it goes.</summary>
+  internal readonly string KindsLine()
+  {
+    var c = CultureInfo.InvariantCulture;
+    if (TopKinds == null || TopKinds.Length == 0)
+      return "Shadow proxy memory by kind: none yet.";
+    return "Shadow proxy memory by kind (most first): " +
+           string.Join(", ", TopKinds.Select(k => string.Format(c, "{0} {1:0.0} MB ({2:N0} vertices)", k.Name, k.Bytes / 1048576.0, k.Vertices))) + ".";
   }
 
   internal readonly string TimeLine()

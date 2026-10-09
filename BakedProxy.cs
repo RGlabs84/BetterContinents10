@@ -275,6 +275,7 @@ internal static class BakedProxy
     }
     var n = Book.Numbers(zonesInRing);
     say(n.Line());
+    say(n.KindsLine());
     say(n.TimeLine());
     say($"Shadow proxies reach {reach:0} m (the shadow distance and {ReachMargin:0}); material " +
         (material != null ? $"\"{material.name}\" (shader \"{material.shader.name}\")" : "not made yet") + ".");
