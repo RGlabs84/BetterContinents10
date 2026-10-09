@@ -36,11 +36,18 @@
     Distance, Draw Scale, Detail Scale, Shadows, Light Distance, Light Count (how many baked lights
     burn: the nearest 24 by default; the rest are drawn unlit), Light Shadows (how many of them cast
     shadows: 4), Seat Distance, Tints and Diagnostics.
-  - A world with baked pieces needs 0.10.4 or later: an older Better Continents, or the game alone,
-    opens it without its layer, and its baked pieces are neither drawn nor solid there until 0.10.4
-    opens it again.
+  - Shadows of baked pieces. Near you, a zone's shadow-casting pieces are merged into a few shadow-only shapes, built in
+    the background on the other processor cores; the pieces you see are drawn as before, and the shadows look the same.
+    Farther out, each zone's or slab's shadows are drawn on their own, so a light or shadow band redraws only what it
+    reaches. In the busiest view of a test town of 33 blueprint buildings the frame rate went from 38 to 63 fps, with
+    about 350 MB of graphics memory for those shadows (measured on one machine).
+  - A world with baked pieces needs 0.10.4 or later: an older Better Continents opens it as a world
+    without Better Continents (vanilla terrain), and the game alone without its layer; either way its
+    baked pieces are neither drawn nor solid there. The settings and the layer stay in the world's files,
+    and 0.10.4 reads them again.
   - New guide: Baked buildings, the easy guide (BetterContinents-Baking-Guide.pdf, GPL-3.0), in this
     package.
+  - Updated AI doc to v0.10.4.
 - v0.10.3
   - Maps up to 16,384 x 16,384 pixels. Pictures are read a few rows at a time and kept as tiles: a
     server making a world from five 16,384 px maps peaked at 1.80 GB of memory, where 0.10.2 needed

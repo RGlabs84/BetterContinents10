@@ -21,6 +21,7 @@ Whether you want to import a real-world map of Earth, recreate Middle-earth, scu
 * 🍄 **Nothing that gives items is baked.** Bushes, mushrooms, flax and planted crops stay the game's own.
 * 🏘️ **Town files.** A `placements.bcp` that a town compiler wrote, put in the maps folder, builds its towns into a new world. `bc_bake load` brings a newer file into a running world and keeps what players put in chests and stations.
 * 🛡️ **Safe in a crash.** Every bake writes its undo file before it changes anything. A crash or a cut save is finished or taken back at the next load, and no piece is ever lost or doubled.
+* 🌑 **Fast shadows.** Near you, the shadows of baked pieces come from a few merged shadow-only shapes per zone, built in the background on your other cores, and they look the same. In the busiest view of a test town of 33 blueprint buildings, 38 fps became 63 fps (measured on one machine).
 * ⚙️ **New settings** in `[10 BetterContinents.BakedPlacements]`: how far baked pieces are drawn and in how much detail, their shadows, and how many baked lights burn and cast shadows. Each player sets their own.
 
 ## Before you update
@@ -32,7 +33,7 @@ Whether you want to import a real-world map of Earth, recreate Middle-earth, scu
   * a world made with **fine heights**: 0.10.0 to 0.10.2 can't read it and give it vanilla terrain.
   * a world read at a **Heightmap Amount above 5** opens in older versions without the high-terrain rules: on ground higher than 3,000 m, a player counts as being inside a dungeon. A world whose `High Terrain` is On or Off opens in them as a world without Better Continents.
   * a **compact** world can't be read by 0.9 (it gets vanilla terrain); every 0.10 version reads it.
-* 🧱 **A world with baked pieces needs 0.10.4 or later.** An older Better Continents, or the game alone, opens it without its layer: baked pieces are neither drawn nor solid there (they come back when 0.10.4 opens the world again). Before you remove Better Continents from a world, run `bc_bake unbake world confirm` in it.
+* 🧱 **A world with baked pieces needs 0.10.4 or later.** An older Better Continents opens it as a world without Better Continents (vanilla terrain), and the game alone opens it without its layer: either way baked pieces are neither drawn nor solid there. The world's settings and layer stay in its files, and 0.10.4 reads them again. Before you remove Better Continents from a world, run `bc_bake unbake world confirm` in it.
 * ⬆️ **Coming from 0.9.x?** Worlds you already have keep generating as they did under 0.9.4; only worlds made with 0.10 get the new behaviour. [What changes and what does not](#upgrading-from-09).
 
 <details>
@@ -415,7 +416,7 @@ For deep dives, tutorials, and configuration references:
 * 📕 **The Better Continents Guide for 0.10.x:** `BetterContinents-Guide.pdf`, included in this package, with a clickable table of contents.
 * 📗 **Export & Import, the easy guide, for 0.10.x:** `BetterContinents-Export-Guide.pdf`, included in this package: illustrated, step-by-step instructions written for first-timers: exporting a world, editing the pictures, cutting and pasting between worlds, Biome precision, and making new worlds from an export.
 * 🧱 **Baked buildings, the easy guide, for 0.10.x:** `BetterContinents-Baking-Guide.pdf`, included in this package: baking a base or a town, undo and unbake, town files, servers and the settings, step by step.
-* 🤖 **Map-making, a skill for AI agents, for 0.10.x:** `BetterContinents-AI-Skill.pdf`, included in this package: hand it to an AI agent (Claude, Gemini or another) and it learns the whole map-making craft for Valheim 1.0: what the game demands of a map, how to make one read as natural geography, the generator and checker toolkit (attached inside the PDF), world export and import, and the traps.
+* 🤖 **Map-making, a skill for AI agents, for 0.10.x:** `BetterContinents-AI-Skill.pdf`, included in this package: hand it to an AI agent (Claude, Gemini or another) and it learns the whole map-making craft for Valheim 1.0: what the game demands of a map, how to make one read as natural geography, the generator and checker toolkit (attached inside the PDF), world export and import, baked buildings and town files (with a `placements.bcp` writer and checker), and the traps.
 * 🎨 **Colour scheme:** `BetterContinents.gpl` (a palette for Krita and GIMP with every biome and alt-biome colour) and `altbiome-palette.png` (a printable colour chart), included in this package.
 * 🚀 **Setup & Quick Start**, ❓ **FAQ**, and a chapter for every image map and every setting — all in the same guide, with a clickable table of contents. The older online docs by Jere Kuusela describe Better Continents 0.7.x (no Valheim 1.0 Deep North, no lava map, no alt-biome planting, no export); everything in them is in the PDF, updated for Valheim 1.0.
 * 🌿 [Alt biomes in Better Continents](https://github.com/RGlabs84/BetterContinents10/blob/main/ALTBIOMES.md) — planting alt biomes with colours: the legend syntax, the colour scheme, the quota rule, the commands and the log lines, and what a world laid out to its World Size changes.
