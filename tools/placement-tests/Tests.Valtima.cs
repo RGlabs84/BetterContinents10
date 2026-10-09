@@ -1,6 +1,6 @@
 // Added by Wubarrk on 2026-10-07 for baked placements (0.10.4).
 //
-// VALtima's real placements.bcp (spec 2.7): every value the independent reader (~/valheim-testbed/bc-0104/measure/bcpread.py) found, and every
+// VALtima's real placements.bcp (spec 2.7): every value the independent reader (~/WubarrkCODING/BetterContinents10/.work/bc-0104/measure/bcpread.py) found, and every
 // record's place, turn, scale and id against the digest an independent Python decoder wrote (valtima_digest.py, fixtures/valtima-records.tsv).
 using System;
 using System.Collections.Generic;

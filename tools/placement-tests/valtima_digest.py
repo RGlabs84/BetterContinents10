@@ -6,7 +6,7 @@
 #   "<palette> <x> <z> <y> <yaw> <sx> <sy> <sz> <id>\n"
 # with x, z the world position (zone corner + u16 / 1024), y metres (mm / 1000), yaw degrees, the scales (x1000 -> 1 when the record has none)
 # and the id (0 when none), formatted %.6f, %.6f, %.6f, %.6f, %.3f x 3 and %d. Tests.Valtima.cs computes the same text from BC's reader
-# and compares: two readers written apart (this one follows the format as the spec lays it out, as ~/valheim-testbed/bc-0104/measure/bcpread.py
+# and compares: two readers written apart (this one follows the format as the spec lays it out, as ~/WubarrkCODING/BetterContinents10/.work/bc-0104/measure/bcpread.py
 # does) agree on every record's place, turn, scale and id.
 #
 # Usage: valtima_digest.py <placements.bcp> [out.tsv]      (run with: ulimit -v 4000000; nice -n 10 python3 ...)

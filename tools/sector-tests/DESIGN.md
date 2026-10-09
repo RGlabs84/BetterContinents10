@@ -254,7 +254,7 @@ and harmless.
   and which objects count as beyond; a wide save an older version wrote over (the portals' chunk, chunk (0, 0)): warned about, with the numbers;
   a patch that cannot be taken off; a wide save whose patches cannot be installed (not loaded: the game's load error, the menu's error, the log);
   the five calls that reach `WorldSectors` (by IL) and the two patches on the game's load (bound, and run).
-* Checked by mutation (scratch copy, `~/valheim-testbed/bc-16k/sectorsfix-rig/mut/`): 54 mutants of what this stream added or changed (the conversion: `LoadedChunks`
+* Checked by mutation (scratch copy, `~/WubarrkCODING/BetterContinents10/.work/bc-16k/sectorsfix-rig/mut/`): 54 mutants of what this stream added or changed (the conversion: `LoadedChunks`
   and its helpers, 18; the setting and the marker, 16; fail closed and switching off, 6; the calls that reach `WorldSectors` and its two patches, 8; and the
   six that the review's tests lens found alive: its B5, B6, C4, D12, D13, D15, while its E3, E4, E6 and W1-W6 are L2, L3, L1 and G1-G7 here) were made one at a
   time on a scratch copy of the committed tree, built and run through the suite: **all 54 fail it** (`mut/results.txt`, with each mutant's edit in `mut/mutants.py`;
@@ -262,7 +262,7 @@ and harmless.
   (`StopAfterRefusal` needs Unity's coroutines: the rig saw it), the New World screen's own path to a preset file (`WorldPatch`: its call is checked), and
   the refusal to take the patches off on the game's own Mono.
 
-### The first stream's rig (`~/valheim-testbed/bc-16k/sectors`, the Steam dedicated server, BepInEx, the probe `BCServerProbe`), as reviewed
+### The first stream's rig (`~/WubarrkCODING/BetterContinents10/.work/bc-16k/sectors`, the Steam dedicated server, BepInEx, the probe `BCServerProbe`), as reviewed
 * a vanilla-size Better Continents world made by 0.10.2, loaded and changed (every 5th object touched) by 0.10.2 and by this build:
   **all 15 files byte for byte the same** (9 chunk files, `.chunks`, `.fwl2`, `.db2`, `.ok`, `BetterContinents` and `BetterContinents.old`). The
   same with the wide sectors switched on and off again by the probe before the world loads (all ten hooks patched and unpatched under HarmonyX on
@@ -292,7 +292,7 @@ and harmless.
   it is filled; the alt-biome grid of that size is most of the 540 MB over a vanilla-size world's 1,550 MB. `ZDOMan.LoadChunks` 57 ms for 21,976
   objects, `GetSaveClonePerChunk` 23-27 ms (3-4 ms in the game's sectors), a mid-session save of that world 0.23 s.
 
-### This stream's rig (`~/valheim-testbed/bc-16k/sectorsfix-rig`, 2026-10-07, the fix build)
+### This stream's rig (`~/WubarrkCODING/BetterContinents10/.work/bc-16k/sectorsfix-rig`, 2026-10-07, the fix build)
 The Steam dedicated server (read only), BepInEx and the probe `BCServerProbe` (this stream added `BCPROBE_BREAK`, and the world's marker in the probe's
 settings line), port 2504, each run through `heavy.sh` (8G), with the DLL the committed tree's last full test run built (`dist/plugins/BetterContinents.dll`, md5
 `39c2c49e5a96...`). The scripts are `s1.sh` to `s4.sh`, `sfinal.sh` and `analyze3.sh` there; every folder a run left is in `after/<label>`.

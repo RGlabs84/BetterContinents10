@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # Added by Wubarrk on 2026-10-07 for baked placements (0.10.4).
 #
-# The look of a record under instancing, transcribed from section 2.5 of the build spec (~/valheim-testbed/bc-0104/BUILD-SPEC-0104-BAKE.md), not
+# The look of a record under instancing, transcribed from section 2.5 of the build spec (~/WubarrkCODING/BetterContinents10/.work/bc-0104/BUILD-SPEC-0104-BAKE.md), not
 # from BakedFormat.cs. The spec's words, which this follows:
 #   h  = FNV-1a 32 over the record's decoded anchor point in world mm, computed in double precision, as three little-endian i32
 #        (round(x * 1000), round(y * 1000), round(z * 1000)).
