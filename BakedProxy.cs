@@ -21,7 +21,8 @@ namespace BetterContinents;
 // so the proxy casts from both sides whatever the texture's alpha is. The vertices are the pieces' own, positions and normals only.
 //
 // The switch: the environment variable BC_SHADOW_PROXIES=0 starts the game with no proxy, and BakedProxy.Enabled turns them off and on in a running
-// game (a test driver reaches it by reflection); there is no setting for it.
+// game (a test driver reaches it by reflection); there is no setting for it. BC_SHADOW_PROXY_FORMAT=plain makes the proxies' vertices three floats
+// each in place of the compact 12 bytes (ProxyMerge.Layout), to tell a problem of the format from one of the proxies.
 
 internal static class BakedProxy
 {
@@ -280,7 +281,8 @@ internal static class BakedProxy
     say(n.Line());
     say(n.KindsLine());
     say(n.TimeLine());
-    say($"Shadow proxies reach {reach:0} m (the shadow distance and {ReachMargin:0}); material " +
+    say($"Shadow proxies reach {reach:0} m (the shadow distance and {ReachMargin:0}); vertices " +
+        (ProxyMerge.PlainFormat ? "plain: three floats each (BC_SHADOW_PROXY_FORMAT=plain)" : "compact: 12 bytes") + "; material " +
         (material != null ? $"\"{material.name}\" (shader \"{material.shader.name}\")" : "not made yet") + ".");
     foreach (var line in BakedMeshShapes.ExclusionLines())
       say(line);
