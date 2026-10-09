@@ -483,11 +483,25 @@ internal static class ProxyMerge
   {
     long started = Stopwatch.GetTimestamp();
     var layout = built.Layout ?? throw new InvalidOperationException("the plan has no layout");
-    int max = built.MaxVertices;
     float ox = zone.Zx * 64f, oz = zone.Zz * 64f;
     var layers = new SortedSet<int>();
     var use = UseOf(zone, near, policy, layers);
-    var scratch = new Scratch();
+    var scratch = Scratch.Rent();
+    try
+    {
+      bool finished = WriteChunks(zone, use, layers, built, layout, scratch, ox, oz, cancelled);
+      built.WriteMs = (Stopwatch.GetTimestamp() - started) * 1000.0 / Stopwatch.Frequency;
+      return finished;
+    }
+    finally
+    {
+      Scratch.Return(scratch);
+    }
+  }
+
+  private static bool WriteChunks(BuiltZone zone, List<RenderPart>[] use, SortedSet<int> layers, ProxyBuilt built, VertexLayout layout, Scratch scratch, float ox, float oz, Func<bool>? cancelled)
+  {
+    int max = built.MaxVertices;
     int next = 0;
     bool stopped = false;
     foreach (int layer in layers)
@@ -526,7 +540,6 @@ internal static class ProxyMerge
     }
     if (!stopped && next != built.Chunks.Length)
       throw new InvalidOperationException($"the merge wrote {next} chunks where the plan counted {built.Chunks.Length}");
-    built.WriteMs = (Stopwatch.GetTimestamp() - started) * 1000.0 / Stopwatch.Frequency;
     return !stopped;
   }
 
@@ -578,9 +591,32 @@ internal static class ProxyMerge
     return true;
   }
 
-  // The chunk being filled in float arrays (reused from chunk to chunk), until Write packs it into its store.
+  // The chunk being filled in float arrays (reused from chunk to chunk, and from write to write: a few megabytes each that would otherwise be garbage for every
+  // proxy), until Write packs it into its store.
   private sealed class Scratch
   {
+    private static readonly Stack<Scratch> Pool = new();
+
+    internal static Scratch Rent()
+    {
+      lock (Pool)
+        if (Pool.Count > 0)
+        {
+          var s = Pool.Pop();
+          s.Reset();
+          return s;
+        }
+      return new Scratch();
+    }
+
+    internal static void Return(Scratch scratch)
+    {
+      scratch.Reset();
+      lock (Pool)
+        if (Pool.Count < 4)
+          Pool.Push(scratch);
+    }
+
     private Vector3[] vertices = [], normals = [];
     private int[] indices = [];
     internal int VCount, ICount;
