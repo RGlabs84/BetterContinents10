@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-10-07 for baked placements (0.10.4).
+// Added by Wubarrk on 2026-10-07 for baked placements (0.10.4), and on 2026-10-13 for the 0.10.5 bake fixes.
 //
 // Offline checks of the in-game bake's journal (BakeJournal.cs): the file's format written and read back field for field, every kind
 // of damage refused by name, the folder on disk (atomic writes, states, the numbers, what is kept), and the registry entry an
@@ -250,6 +250,18 @@ internal static partial class Tests
     C(BakeJournal.FolderFor(root, "", 5).EndsWith("world-5") && BakeJournal.FolderFor(root, "A", 1) != BakeJournal.FolderFor(root, "A", 2), "an empty name is 'world', and two worlds with one name keep apart");
     var journal = new BakeJournal(folder);
     C(journal.Numbers().Count == 0 && journal.Pending().Count == 0 && journal.NextNumber(1) == 1 && journal.GetState(1) == null, "a folder that does not exist yet holds nothing");
+
+    // A renamed world finds the folder it made under its old name (by uid); a folder for the new name wins; another uid never matches.
+    var renamedRoot = Path.Combine(Work, "bakes-renamed");
+    var oldFolder = BakeJournal.FolderFor(renamedRoot, "Old Name", 77L);
+    Directory.CreateDirectory(oldFolder);
+    File.WriteAllText(Path.Combine(oldFolder, "op-3.bcj"), "x");
+    C(BakeJournal.FolderFor(renamedRoot, "New Name", 77L) == oldFolder, "a renamed world finds its old folder by uid");
+    C(BakeJournal.FolderFor(renamedRoot, "New Name", 78L).EndsWith("New Name-78") && BakeJournal.FolderFor(renamedRoot, "New Name", 7L).EndsWith("New Name-7"), "and no other uid does, not even one that is the tail of it");
+    var newFolder = Path.Combine(renamedRoot, "bakes", "New Name-77");
+    Directory.CreateDirectory(newFolder);
+    C(BakeJournal.FolderFor(renamedRoot, "New Name", 77L) == newFolder && BakeJournal.FolderFor(renamedRoot, "Old Name", 77L) == oldFolder, "a folder for the current name wins when both exist");
+    C(BakeJournal.FolderFor(Path.Combine(Work, "bakes-none"), "Any", 5L).EndsWith("Any-5"), "with no bakes folder at all, the folder for the current name");
 
     var data = BakeRichJournal();
     journal.Write(data);

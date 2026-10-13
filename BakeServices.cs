@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-10-07 for baked placements (0.10.4).
+// Added by Wubarrk on 2026-10-07 for baked placements (0.10.4), and on 2026-10-13 for the 0.10.5 bake fixes.
 
 using System;
 using System.Collections.Generic;
@@ -62,8 +62,17 @@ internal static class BakeRuntime
     if (world == null)
       return null;
     var root = Path.Combine(Utils.GetSaveDataPath(FileHelpers.FileSource.Local), "BetterContinents");
-    return new BakeJournal(BakeJournal.FolderFor(root, world.m_worldName, world.m_uid));
+    var folder = BakeJournal.FolderFor(root, world.m_worldName, world.m_uid);
+    // A renamed world keeps the folder of its old name (FolderFor): say so once, so that nobody looks for the files under the new one.
+    if (folder != _announcedFolder && Path.GetFileName(folder) != BakeJournal.SafeName(world.m_worldName) + "-" + world.m_uid.ToString(System.Globalization.CultureInfo.InvariantCulture))
+    {
+      _announcedFolder = folder;
+      BetterContinents.Log($"bc_bake: this world was renamed; its undo files are still in {folder}.");
+    }
+    return new BakeJournal(folder);
   }
+
+  private static string? _announcedFolder;
 
   // The context of a command in the running game.
   internal static BakeContext? Context(Action<string> say, BakeWho who, Action<int, BakeState>? ended = null)
