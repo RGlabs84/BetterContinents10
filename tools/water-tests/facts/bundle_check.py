@@ -7,7 +7,7 @@
 
 What it requires of bcwater:
   - the shaders BetterContinents/Water and BetterContinents/WaterProbe;
-  - every property of the game's Custom/Water (names and types, from shader_state.txt) on BetterContinents/Water;
+  - every property of the game's Custom/Water (names, types and defaults, from shader_state.txt) on BetterContinents/Water;
   - the two sub-shaders of Water, LOD 250 and LOD 200, each with a GrabPass `_BackgroundTex`;
   - in every non-grab pass of every shader: Direct3D 11 programs (vertex 15/16 and pixel 17/18), OpenGL Core programs (6/7/8) and Vulkan programs (25);
   - in every pass of the LOD 250 sub-shader: Direct3D 11 hull (21) and domain (22) programs (the OpenGL Core hull and domain are inside its program text).
@@ -28,7 +28,7 @@ PROPTYPE = {0: "Color", 1: "Vector", 2: "Float", 3: "Range", 4: "Texture"}
 
 
 def game_properties():
-    """name -> type of the game's Custom/Water properties, from shader_state.txt."""
+    """name -> (type, default values, texture default) of the game's Custom/Water properties, from shader_state.txt."""
     out, inside = {}, False
     for line in open(STATE):
         if line.startswith("--- properties"):
@@ -36,9 +36,9 @@ def game_properties():
         elif line.startswith("--- keywords"):
             break
         elif inside:
-            m = re.match(r"\s+(_\w+)\s+(\w+)\s+flags", line)
+            m = re.match(r"\s+(_\w+)\s+(\w+)\s+flags \d+ default \[([^\]]*)\] tex '([^']*)'", line)
             if m:
-                out[m.group(1)] = m.group(2)
+                out[m.group(1)] = (m.group(2), [float(v) for v in m.group(3).split(",")], m.group(4))
     return out
 
 
@@ -94,10 +94,19 @@ def check(bundle):
             bad.append(f"the shader {name} is not in the bundle (it has {sorted(seen)})")
     water = seen.get("BetterContinents/Water")
     if water is not None:
-        props = {p.m_Name: PROPTYPE.get(p.m_Type, p.m_Type) for p in water.m_PropInfo.m_Props}
-        for name, typ in game_properties().items():
-            if props.get(name) != typ:
-                bad.append(f"BetterContinents/Water: property {name} is {props.get(name)}, Custom/Water has {typ}")
+        props = {p.m_Name: p for p in water.m_PropInfo.m_Props}
+        for name, (typ, default, tex) in game_properties().items():
+            p = props.get(name)
+            if p is None or PROPTYPE.get(p.m_Type, p.m_Type) != typ:
+                bad.append(f"BetterContinents/Water: property {name} is {None if p is None else PROPTYPE.get(p.m_Type, p.m_Type)}, Custom/Water has {typ}")
+                continue
+            mine = [getattr(p, f"m_DefValue_{i}_") for i in range(4)]
+            if typ != "Texture" and any(abs(a - b) > 1e-5 for a, b in zip(mine, default)):
+                bad.append(f"BetterContinents/Water: property {name} defaults to {mine}, Custom/Water to {default}")
+            if typ == "Texture":
+                want_name, _, want_dim = tex.partition(" dim ")
+                if (p.m_DefTexture.m_DefaultName or "") != want_name or str(p.m_DefTexture.m_TexDim) != want_dim:
+                    bad.append(f"BetterContinents/Water: texture {name} defaults to {p.m_DefTexture.m_DefaultName!r} (dimension {p.m_DefTexture.m_TexDim}), Custom/Water to {want_name!r} (dimension {want_dim})")
         lods = sorted(ss.m_LOD for ss in water.m_SubShaders)
         if lods != [200, 250]:
             bad.append(f"BetterContinents/Water: sub-shader LODs are {lods}, expected [200, 250]")

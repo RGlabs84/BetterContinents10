@@ -39,7 +39,7 @@ Shader "BetterContinents/Water"
         [MaterialToggle] _IsLod ("Is lod", Float) = 0
         _VisibleMaxDistance ("Lod distance", Float) = 0
         _WaterEdge ("World water edge", Float) = 9100
-        [Header(Ashlands Settings)] [Space(10)] _CurlTex ("Curl Noise", 3D) = "white" {}
+        [Header(Ashlands Settings)] [Space(10)] _CurlTex ("Curl Noise", 3D) = "white{}" {}
         _BubbleTexture ("Bubble Texture", 2D) = "white" {}
         _AshlandsDistance ("Distance", Float) = 12000
         _AshlandsYOffset ("Y Offset", Float) = 4000
@@ -66,7 +66,7 @@ Shader "BetterContinents/Water"
         Offset 0, 10
         Stencil { Ref 2 Comp NotEqual }
         CGPROGRAM
-        #pragma surface BCSurf BCNone vertex:BCVert tessellate:BCTess noforwardadd noambient novertexlights nolightmap nodynlightmap nodirlightmap noshadow noshadowmask nofog exclude_path:deferred exclude_path:prepass
+        #pragma surface BCSurf BCNone vertex:BCVert tessellate:BCTess noforwardadd noambient novertexlights nolightmap nodynlightmap nodirlightmap noshadow noshadowmask nofog nometa exclude_path:deferred exclude_path:prepass
         #pragma target 4.6
         #pragma multi_compile __ TESSELATION_ON
         #define BC_WATER_PREPASS
@@ -82,7 +82,7 @@ Shader "BetterContinents/Water"
         Offset 0, 10
         Stencil { Ref 2 Comp NotEqual }
         CGPROGRAM
-        #pragma surface BCSurf BCStd vertex:BCVert tessellate:BCTess finalcolor:BCFin alpha:fade nofog nolightmap nodynlightmap nodirlightmap noshadowmask exclude_path:deferred exclude_path:prepass
+        #pragma surface BCSurf BCStd vertex:BCVert tessellate:BCTess finalcolor:BCFin alpha:fade nofog nometa nolightmap nodynlightmap nodirlightmap noshadowmask exclude_path:deferred exclude_path:prepass
         #pragma target 4.6
         #pragma multi_compile __ TESSELATION_ON
         #define BC_WATER_TESS
@@ -106,7 +106,7 @@ Shader "BetterContinents/Water"
         Offset 0, 10
         Stencil { Ref 2 Comp NotEqual }
         CGPROGRAM
-        #pragma surface BCSurf BCNone vertex:BCVert noforwardadd noambient novertexlights nolightmap nodynlightmap nodirlightmap noshadow noshadowmask nofog exclude_path:deferred exclude_path:prepass
+        #pragma surface BCSurf BCNone vertex:BCVert noforwardadd noambient novertexlights nolightmap nodynlightmap nodirlightmap noshadow noshadowmask nofog nometa exclude_path:deferred exclude_path:prepass
         #pragma target 3.5
         #define BC_WATER_PREPASS
         #include "BCWaterSurface.hlsl"
@@ -119,7 +119,7 @@ Shader "BetterContinents/Water"
         Offset 0, 10
         Stencil { Ref 2 Comp NotEqual }
         CGPROGRAM
-        #pragma surface BCSurf BCStd vertex:BCVert finalcolor:BCFin alpha:fade nofog nolightmap nodynlightmap nodirlightmap noshadowmask exclude_path:deferred exclude_path:prepass
+        #pragma surface BCSurf BCStd vertex:BCVert finalcolor:BCFin alpha:fade nofog nometa nolightmap nodynlightmap nodirlightmap noshadowmask exclude_path:deferred exclude_path:prepass
         #pragma target 3.5
         #define BC_BRDF BRDF3_Unity_PBS
         #include "BCWaterSurface.hlsl"
