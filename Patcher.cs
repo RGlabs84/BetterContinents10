@@ -1,4 +1,4 @@
-﻿// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and alt-biome planting (0.8.1), and on 2026-09-24 for world export and import (0.9.0), and on 2026-09-25 for version-agnostic wording (0.9.1), and on 2026-09-29 for Expand World Data biomes (0.9.3), and on 2026-10-04 for the vegetation twin guard and the unifying refactor (0.10.0), and on 2026-10-06 for 16k worlds (0.10.3), and on 2026-10-07 for baked placements (0.10.4).
+﻿// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and alt-biome planting (0.8.1), and on 2026-09-24 for world export and import (0.9.0), and on 2026-09-25 for version-agnostic wording (0.9.1), and on 2026-09-29 for Expand World Data biomes (0.9.3), and on 2026-10-04 for the vegetation twin guard and the unifying refactor (0.10.0), and on 2026-10-06 for 16k worlds (0.10.3), and on 2026-10-07 for baked placements (0.10.4), and on 2026-10-13 for BC's own water (0.10.5).
 
 using System;
 using System.Collections;
@@ -40,7 +40,9 @@ public partial class BetterContinents
     // above (GetBiome, IsAshlands, IsAshlands without a heat map) can leave already-queried cells
     // returning their pre-patch answer for the rest of the session unless we clear the caches here.
     ClearWorldGeneratorBiomeCaches();
-    // The water's colours follow the hot sea the patches above make (AshlandsWater).
+    // BC's own sea: the field it is drawn and felt from is built again for the world as it is now (SeaPatches), and the water's colours follow
+    // the hot sea the patches above make (AshlandsWater).
+    SeaPatches.Refresh();
     AshlandsWater.Refresh();
     // EnvMan's Deep North weather test reads the biome map at the camera's x and z exactly when IsDeepnorth
     // reads the biome map at all (the IsDeepnorth toggle); every other world keeps vanilla's (x, height) call. A
@@ -354,6 +356,19 @@ public partial class BetterContinents
         typeof(SpawnSystemPatch), nameof(SpawnSystemPatch.UpdateSpawnListEnable), HookKind.Prefix),
       new Hook(() => AccessTools.Method(typeof(SpawnSystem), nameof(SpawnSystem.UpdateSpawnList)), "SpawnSystem.UpdateSpawnList",
         typeof(SpawnSystemPatch), nameof(SpawnSystemPatch.UpdateSpawnListDisable), HookKind.Postfix)),
+    // BC's own sea (SeaPatches): the waves that boats, swimmers and fish feel follow the world's own Deep North instead of the game's circle, the
+    // way the water BC draws does. Both run the game's code until the sea field is ready, and are on while the world's sea is a candidate for
+    // BC's own (a client's Own Water setting only decides what it draws). After the world size: the field is built from the layout's IsDeepnorth.
+    new("WorldGenerator.DeepNorthWaveFade (BC's sea)",
+      SeaPatches.Candidate,
+      new Hook(() => AccessTools.Method(typeof(WorldGenerator), nameof(WorldGenerator.DeepNorthWaveFade), [typeof(float), typeof(float)]),
+        "WorldGenerator.DeepNorthWaveFade(float,float)", typeof(SeaPatches), nameof(SeaPatches.DeepNorthWaveFadePrefix), HookKind.Prefix))
+    { ViaProcessor = true, FailureMessage = "Could not patch WorldGenerator.DeepNorthWaveFade, so boats and fish feel the game's calm sea: " },
+    new("WaterVolume.CalcWave (BC's sea)",
+      SeaPatches.Candidate,
+      new Hook(SeaPatches.CalcWaveTarget, "WaterVolume.CalcWave(Vector3,float,Vector4,float,float,float)", typeof(SeaPatches),
+        nameof(SeaPatches.CalcWavePrefix), HookKind.Prefix))
+    { ViaProcessor = true, FailureMessage = "Could not patch WaterVolume.CalcWave, so boats and fish feel the game's waves: " },
   ];
 
   // The layer's two toggles (spec 4.2, 7.4, 8.1): they follow the world's baked layer, not its maps, so a GameTerrain world has them too.

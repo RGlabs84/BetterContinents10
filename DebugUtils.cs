@@ -1,4 +1,4 @@
-﻿// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and alt-biome planting (0.8.1), and on 2026-09-24 for world export and import (0.9.0), and on 2026-09-29 for Expand World Data biomes (0.9.3), and on 2026-10-04 for the unifying refactor and the vegetation twin guard (0.10.0), and on 2026-10-06 for 16k worlds (0.10.3), and on 2026-10-07 for baked placements (0.10.4).
+﻿// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and alt-biome planting (0.8.1), and on 2026-09-24 for world export and import (0.9.0), and on 2026-09-29 for Expand World Data biomes (0.9.3), and on 2026-10-04 for the unifying refactor and the vegetation twin guard (0.10.0), and on 2026-10-06 for 16k worlds (0.10.3), and on 2026-10-07 for baked placements (0.10.4), and on 2026-10-13 for BC's own water (0.10.5).
 
 using System;
 using System.Collections.Generic;
@@ -53,6 +53,8 @@ public partial class DebugUtils
         VegetationTwinCommands.Register();
         // bc_bake: the in-game bake. Read-only words run anywhere; the rest runs where the world is (bc_bake server ... for admins).
         BakeCommands.Register();
+        // bc_water: whether BC's own sea is on and why; read-only for any player.
+        WaterCommands.Register();
         rootCommand = new Command("bc", "Better Continents", "Better Continents command").Subcommands(bc =>
         {
             bc.AddCommand("info", "Dump Info", "Prints current settings to console", _ =>
@@ -176,6 +178,7 @@ public partial class DebugUtils
             AddAltBiomeCommands(bc);
             AddExportCommands(bc);
             AddBakeCommands(bc);
+            AddWaterCommands(bc);
 
             bc.AddGroup("g", "Global", "Global settings, get more info with 'bc g help'",
                 group =>

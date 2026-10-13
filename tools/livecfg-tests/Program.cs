@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-09-24 for world export and import (0.9.0), and on 2026-09-27 for map mod compatibility (0.9.2), and modified on 2026-10-04 for the unifying refactor (0.10.0), and on 2026-10-06 for 16k worlds (0.10.3), and on 2026-10-07 for baked placements (0.10.4).
+// Added by Wubarrk on 2026-09-24 for world export and import (0.9.0), and on 2026-09-27 for map mod compatibility (0.9.2), and modified on 2026-10-04 for the unifying refactor (0.10.0), and on 2026-10-06 for 16k worlds (0.10.3), and on 2026-10-07 for baked placements (0.10.4), and on 2026-10-13 for BC's own water (0.10.5).
 
 // Offline checks of Better Continents 0.9.0's live config (LiveConfig), its RPC package, the export gate and the
 // configured export defaults. Loads the real pre-ILRepack BetterContinents.dll, the game's assemblies and BepInEx.
@@ -388,6 +388,13 @@ internal static class Program
     // Every Better Continents world since the twin guard (0.9.4: with a vegetation map only).
     if (on) r.Add("ZoneSystem.PlaceVegetation (vegetation map, twin guard)");
     if (on && s.HasSpawnMap) r.Add("SpawnSystem.UpdateSpawnList");
+    // BC's own sea (0.10.5, SeaPatches.Candidate): a world BC shapes whose Deep North or hot sea may differ from the game's circles. These random
+    // settings are all of the legacy kind (Version 0), which is never laid out to a size of its own: the layout branch is water-tests'.
+    if (on && !s.GameTerrain && (s.HasBiomeMap || (s.HasHeatMap && s.HeatMapScale > 0f) || !BC.LayoutGeometry(s).IsVanilla || BC.ExpandWorldSizeSizes))
+    {
+      r.Add("WorldGenerator.DeepNorthWaveFade (BC's sea)");
+      r.Add("WaterVolume.CalcWave (BC's sea)");
+    }
     return r;
   }
 

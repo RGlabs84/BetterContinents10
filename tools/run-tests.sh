@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Added by Wubarrk on 2026-10-04 for the unifying refactor and the vegetation twin guard (0.10.0), and modified on 2026-10-06 for the Forest Scale default (0.10.2) and for 16k worlds (0.10.3), and on 2026-10-07 for baked placements (0.10.4).
+# Added by Wubarrk on 2026-10-04 for the unifying refactor and the vegetation twin guard (0.10.0), and modified on 2026-10-06 for the Forest Scale default (0.10.2) and for 16k worlds (0.10.3), and on 2026-10-07 for baked placements (0.10.4), and on 2026-10-13 for BC's own water (0.10.5).
 #
 # Builds the plugin (Release) and runs every offline suite against it, one after another, memory-capped and niced:
 #   golden-tests      the reference recordings (tools/golden-tests/golden): any difference fails
@@ -31,6 +31,10 @@
 #                     world's settings (DataKeys 70 and 71, a 0.10.3 reader's stop), edits, merges and patches, and the tests each slice adds
 #                     (Tests.<Slice>.cs: every static method named *Test of the partial class Tests runs). "dotnet run -c Release -- <part of a
 #                     test's name>" runs some
+#   water-tests       BC's own sea: the waves against the game's CalcWave and the shader's weights, the sea field (exact distances against brute force,
+#                     the same bytes whatever the threads, the sampler, the world's own rules with the layout patched for real, the red mask,
+#                     whether the world's sea is the game's, the cost of a field for VALtima's size), and the two felt toggles on the game's
+#                     methods (the candidate worlds, what the prefixes answer, the field's life, other mods' patches on the waves)
 # Usage: tools/run-tests.sh [suite ...]   (default: all). Exit code 1 when the build or any suite fails.
 set -u
 cd "$(dirname "$0")/.."
@@ -40,7 +44,7 @@ export DOTNET_ROOT="${DOTNET_ROOT:-$HOME/.dotnet}"
 export DOTNET_GCHeapHardLimit="${DOTNET_GCHeapHardLimit:-0xC0000000}"
 logs="$(mktemp -d "${TMPDIR:-/tmp}/bc-tests-XXXXXX")"
 suites=("$@")
-[ ${#suites[@]} -eq 0 ] && suites=(golden-tests altbiome-harness export-tests import-tests livecfg-tests ewd-tests twin-tests size-tests sector-tests tile-tests zone-tests high-tests placement-tests)
+[ ${#suites[@]} -eq 0 ] && suites=(golden-tests altbiome-harness export-tests import-tests livecfg-tests ewd-tests twin-tests size-tests sector-tests tile-tests zone-tests high-tests placement-tests water-tests)
 
 echo "== building the plugin"
 if ! nice -n 10 dotnet build -c Release BetterContinents.csproj > "$logs/build.log" 2>&1; then
