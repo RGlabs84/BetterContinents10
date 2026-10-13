@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-10-07 for 16k worlds (0.10.3).
+// Added by Wubarrk on 2026-10-07 for 16k worlds (0.10.3), and on 2026-10-07 for baked placements (0.10.4).
 
 using System;
 using System.Collections.Generic;
@@ -107,7 +107,7 @@ internal static class AshlandsWater
           FarDone.Remove(water!);
   }
 
-  private static bool Active => BetterContinents.Settings is { EnabledForThisWorld: true } && WorldGenerator.instance != null;
+  private static bool Active => BetterContinents.Settings is { ShapesWorld: true } && WorldGenerator.instance != null;
 
   private static void Apply(WaterVolume volume)
   {

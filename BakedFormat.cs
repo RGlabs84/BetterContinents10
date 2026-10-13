@@ -61,8 +61,11 @@ internal enum PaletteFlags : byte
   Protect = 4,
   LOD0Only = 8,
   NoCopyLight = 16,
+  // BC: a compiler marks a consumable kind (a Pickable, PickableItem, ItemDrop or Plant) as scenery: the client draws its records like any Static
+  // or Copy, and nothing places them as real objects (BakedConsumables). Only on role Static or Copy; no effect on a prefab that is no consumable.
+  Decor = 32,
   // Every bit this version knows.
-  All = 31,
+  All = 63,
 }
 
 [Flags]
@@ -818,7 +821,40 @@ internal sealed class PaletteEntry : IEquatable<PaletteEntry>
   // The prefab that names the entry (its first candidate).
   public string Name => Candidates[0].Name;
   public bool Protected => (Flags & PaletteFlags.Protect) != 0;
+  // The compiler's mark (flag 32) that this entry is scenery even when its prefab is a consumable. It counts on role Static or Copy only: the reader
+  // refuses it on a Live or Seat entry, and an entry made in memory with that mix is not decor (it stays what it was before the flag).
+  public bool IsDecor => (Flags & PaletteFlags.Decor) != 0 && (Role == BakedRole.Static || Role == BakedRole.Copy);
   public bool HasTint => Tint.Length > 0;
+
+  private double reach = -1.0;
+
+  // How far from a record's point, level, in m at scale 1, the colliders this entry has in the layer's data reach: the farthest corner of its
+  // boxes from the point, or a trunk's. A bound, never less than the truth (BakedPlacements.SurfaceHeight leaves out the records a line is
+  // farther from); a record scaled up reaches that many times as far.
+  public double ColliderReach
+  {
+    get
+    {
+      if (reach >= 0.0)
+        return reach;
+      var anchor = Candidates[0].Anchor;
+      double far = 0.0;
+      if (Collision == BakedCollision.Boxes)
+      {
+        foreach (var box in Boxes)
+        {
+          var c = box.Centre - anchor;
+          var size = box.Size;
+          double centre = Math.Sqrt((double)c.x * c.x + (double)c.y * c.y + (double)c.z * c.z);
+          double half = 0.5 * Math.Sqrt((double)size.x * size.x + (double)size.y * size.y + (double)size.z * size.z);
+          far = Math.Max(far, centre + half);
+        }
+      }
+      else if (Collision == BakedCollision.Trunk)
+        far = Math.Sqrt((double)anchor.x * anchor.x + (double)anchor.y * anchor.y + (double)anchor.z * anchor.z) + 0.5;
+      return reach = far;
+    }
+  }
 
   public bool TryGetTag(string key, out Tag tag)
   {
@@ -1424,10 +1460,14 @@ internal sealed class ZoneData
     return n == 0 ? null : at;
   }
 
+  private bool positionsBuilt;
+
   private void BuildPositions()
   {
-    if (rotationAt != null || scaleAt != null || idAt != null || sourceAt != null || seedAt != null || Count == 0)
+    // Once, also when no record has a run (every Positions is then null): a zone of plain records is not scanned again at every Record(k).
+    if (positionsBuilt || Count == 0)
       return;
+    positionsBuilt = true;
     rotationAt = Positions(Flags, RecordFlags.FullRotation);
     scaleAt = Positions(Flags, RecordFlags.Scale);
     idAt = Positions(Flags, RecordFlags.Id);
@@ -1638,6 +1678,9 @@ internal static class BakedCodec
         throw new BakedFormatException($"its layer is {layer} (0 to 31)", r.Where);
       if ((flags & ~(int)PaletteFlags.All) != 0)
         throw new BakedFormatException($"made by a newer Better Continents or tool: palette flag bit {LowestBit(flags & ~(int)PaletteFlags.All)}", r.Where);
+      // Decor (flag 32) is the compiler's word that a consumable kind is scenery: it means something on a drawn role only.
+      if ((flags & (int)PaletteFlags.Decor) != 0 && (role == (int)BakedRole.Live || role == (int)BakedRole.Seat))
+        throw new BakedFormatException($"it is marked decor (flag 32), which only a Static or Copy entry can be, and its role is {(BakedRole)role}", r.Where);
       Box[]? boxes = null;
       if (collision == (int)BakedCollision.Boxes)
       {
@@ -1676,6 +1719,29 @@ internal static class BakedCodec
     return palette;
   }
 
+  // What a palette entry must be for the file to hold it; throws BakedFormatException naming the entry otherwise.
+  public static void Validate(PaletteEntry entry, string where)
+  {
+    if (entry.Candidates.Length < 1 || entry.Candidates.Length > 8)
+      throw new BakedFormatException($"it has {entry.Candidates.Length} candidates (1 to 8)", where);
+    if (entry.Layer > 31)
+      throw new BakedFormatException($"its layer is {entry.Layer} (0 to 31)", where);
+    if ((entry.Flags & ~PaletteFlags.All) != 0)
+      throw new BakedFormatException("it has a flag format 1 does not know", where);
+    if ((entry.Flags & PaletteFlags.Decor) != 0 && (entry.Role == BakedRole.Live || entry.Role == BakedRole.Seat))
+      throw new BakedFormatException($"it is marked decor (flag 32), which only a Static or Copy entry can be, and its role is {entry.Role}", where);
+    if (entry.Boxes.Length > 255 || entry.Tags.Length > 255)
+      throw new BakedFormatException("it has over 255 boxes or tags", where);
+    foreach (var c in entry.Candidates)
+      if (!BakedFormat.IsWritable(c.Name))
+        throw new BakedFormatException($"the prefab name '{c.Name}' is over 255 characters or has one outside ASCII, which the format cannot hold", where);
+    if (!BakedFormat.IsWritable(entry.Tint) || !BakedFormat.IsWritable(entry.TintFilter))
+      throw new BakedFormatException("its tint or material filter is over 255 characters or has one outside ASCII", where);
+    foreach (var tag in entry.Tags)
+      if (!BakedFormat.IsWritable(tag.Key) || (tag.Type == TagType.String && !BakedFormat.IsWritable(tag.Text)))
+        throw new BakedFormatException($"the tag '{tag.Key}' is over 255 characters or has one outside ASCII", where);
+  }
+
   public static void WritePalette(BakedWriter w, IReadOnlyList<PaletteEntry> palette)
   {
     if (palette.Count > BakedFormat.MaxPalette)
@@ -1683,15 +1749,7 @@ internal static class BakedCodec
     for (int e = 0; e < palette.Count; e++)
     {
       var entry = palette[e];
-      string where = "palette entry " + e + " (" + entry.Name + ")";
-      if (entry.Candidates.Length < 1 || entry.Candidates.Length > 8)
-        throw new BakedFormatException($"it has {entry.Candidates.Length} candidates (1 to 8)", where);
-      if (entry.Layer > 31)
-        throw new BakedFormatException($"its layer is {entry.Layer} (0 to 31)", where);
-      if ((entry.Flags & ~PaletteFlags.All) != 0)
-        throw new BakedFormatException("it has a flag format 1 does not know", where);
-      if (entry.Boxes.Length > 255 || entry.Tags.Length > 255)
-        throw new BakedFormatException("it has over 255 boxes or tags", where);
+      Validate(entry, "palette entry " + e + " (" + entry.Name + ")");
       w.U8(entry.Candidates.Length);
       foreach (var c in entry.Candidates)
       {

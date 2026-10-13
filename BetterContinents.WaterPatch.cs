@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-10-04 for the unifying refactor (0.10.0).
+// Added by Wubarrk on 2026-10-04 for the unifying refactor (0.10.0), and on 2026-10-07 for baked placements (0.10.4).
 
 using System;
 using HarmonyLib;
@@ -48,7 +48,7 @@ public partial class BetterContinents
     // patches it, and none of them should be able to invalidate an enumerator.
     private static void Postfix(Heightmap __instance)
     {
-      if (!Settings.EnabledForThisWorld)
+      if (!Settings.ShapesWorld)
         return;
       var volumes = WaterVolume.Instances;
       for (int i = 0; i < volumes.Count; i++)

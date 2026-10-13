@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-10-06 for 16k worlds (0.10.3).
+// Added by Wubarrk on 2026-10-06 for 16k worlds (0.10.3), and on 2026-10-07 for baked placements (0.10.4).
 
 using System;
 using System.Collections;
@@ -130,8 +130,9 @@ internal static class WorldSectors
   private static float Reach(WorldGeometry? size) => size != null && size.TotalRadius > 0f && !float.IsNaN(size.TotalRadius) ? size.TotalRadius : 0f;
 
   // How far out a world has objects: its own size, or Expand World Size's when that has sent one and is larger.
+  // A world that keeps the game's own terrain (GameTerrain) has the game's own size, whatever its settings' sizes hold.
   internal static float Reach(BetterContinents.BetterContinentsSettings settings, WorldGeometry? expandWorldSize) =>
-    Math.Max(Reach(settings.OwnGeometry), Reach(expandWorldSize));
+    Math.Max(Reach(settings.GameTerrain ? WorldGeometry.Vanilla : settings.OwnGeometry), Reach(expandWorldSize));
 
   // This machine's Wide Sectors setting; Auto where the config is not bound (the offline suites, which can also set it).
   internal static WideSectorsMode Mode => ModeOverride ?? BetterContinents.ConfigWideSectors?.Value ?? WideSectorsMode.Auto;

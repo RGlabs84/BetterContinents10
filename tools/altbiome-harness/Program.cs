@@ -171,7 +171,7 @@ internal static class H
     Work = Path.Combine(AppContext.BaseDirectory, "work-" + Environment.ProcessId);
     Directory.CreateDirectory(Work);
     AltBiomesJson = Environment.GetEnvironmentVariable("ALTBIOMES_JSON")
-                    ?? "/home/rohan/WubarrkCODING/BetterContinents-TestMaps/altbiomes/altbiomes_1.0.15_full.json";
+                    ?? "/home/rohan/WubarrkCODING/BetterContinents10/.work/BetterContinents-TestMaps/altbiomes/altbiomes_1.0.15_full.json";
 
     // The config entries Better Continents reads outside Awake, bound with the defaults BetterContinents.cs declares.
     Config = new BepInEx.Configuration.ConfigFile(Path.Combine(Work, "harness.cfg"), true);

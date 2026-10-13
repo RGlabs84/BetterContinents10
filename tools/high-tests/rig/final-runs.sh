@@ -3,7 +3,7 @@
 #
 # The server runs behind the report of the High Terrain work, one after the other with the same DLL; one heavy job (cap 6G; the steps together take about ten minutes):
 #   ~/valheim-testbed/heavy.sh 6G hfz-final tools/high-tests/rig/final-runs.sh <DLL of the code under test> <DLL of the 0.10.2 build> [prefix [step ...]]
-# The rig (RIG, by default ~/valheim-testbed/bc-16k/highfix-rig) is a copy of ~/valheim-testbed/bc-16k/template with run.sh, hf_run.sh and probe/ of this folder
+# The rig (RIG, by default ~/WubarrkCODING/BetterContinents10/.work/bc-16k/highfix-rig) is a copy of ~/WubarrkCODING/BetterContinents10/.work/bc-16k/template with run.sh, hf_run.sh and probe/ of this folder
 # added, and maps/ holding high.png (make_heightmap.py) and the point and zone lists of maps/ of this folder. Each run is a world made new, in the rig's saves/, under
 # the prefix (default hfz): out/<prefix>-<run>/ holds what the probe wrote, out/<prefix>-compare.txt what compare_runs.py made of it.
 # Steps (all of them by default):
@@ -16,7 +16,7 @@ set -u
 HERE="$(dirname "$(realpath "$0")")"
 DLL="$(realpath "${1:?the DLL under test}")"; BASE="$(realpath "${2:?the 0.10.2 DLL}")"; P="${3:-hfz}"; shift 3 2>/dev/null || shift $#
 STEPS=("$@"); [ ${#STEPS[@]} -gt 0 ] || STEPS=(high vanilla none noise)
-RIG="${RIG:-$HOME/valheim-testbed/bc-16k/highfix-rig}"
+RIG="${RIG:-$HOME/WubarrkCODING/BetterContinents10/.work/bc-16k/highfix-rig}"
 cd "$RIG" || exit 1
 E="BCPROBE_HIGH=1 BCPROBE_HIGHPTS=$PWD/maps/high-pts.tsv BCPROBE_POINTS=$PWD/maps/high-points.tsv BCPROBE_TOWNS=$PWD/maps/high-zones.tsv"
 W="${P^}"   # the worlds' names: hfz -> Hfz

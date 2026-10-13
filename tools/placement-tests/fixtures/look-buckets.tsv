@@ -1,0 +1,4 @@
+# look-buckets.tsv: made by look_digest.py from VALtima's placements.bcp (md5 e9d8f303b2e582d5ddf668a5be1dae3a, 702700 records). kind, records, the 8 buckets (seed mod 8),
+# sha256 of the seeds (one line a record, in the file's order), sha256 of the variant words of slots 0 to 2.
+ALL 702700 88117 87877 87633 88095 87482 87963 87694 87839 d7aee4d734273221e18c766006b6b861dff1c4dbf7f2d801e5117a58f0b4cc8d 85b843e5943588db5143ba8371267e132879ebf23be1d10458d7f4372c0bb984
+Piece_grausten_floor_2x2 40159 5097 4999 4986 5035 5160 5057 4924 4901 c4cb8d43198ef8e199eaa65838727b15cb5481eda5efff7ac0a06ce619e8adc6 c0895662f1299f5d29f46c4a5f6b44fa981b19a5f41b7679da8c532f663385f8

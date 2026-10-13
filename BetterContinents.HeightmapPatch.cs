@@ -1,4 +1,4 @@
-// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0), and on 2026-09-24 for world export and import (0.9.0), and on 2026-09-29 for Expand World Data biomes (0.9.3), and on 2026-10-04 for the unifying refactor (0.10.0).
+// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0), and on 2026-09-24 for world export and import (0.9.0), and on 2026-09-29 for Expand World Data biomes (0.9.3), and on 2026-10-04 for the unifying refactor (0.10.0), and on 2026-10-07 for baked placements (0.10.4).
 
 using System;
 using System.Collections.Generic;
@@ -104,7 +104,7 @@ public partial class BetterContinents
   // The configured precision where it applies: 0 unless Better Continents is on for the world, at most the world's
   // limit (BiomePrecisionGrid.MaxFor).
   internal static int EffectiveBiomePrecision(BetterContinentsSettings settings) =>
-    settings.EnabledForThisWorld ? Mathf.Clamp(settings.BiomePrecision, 0, BiomePrecisionGrid.MaxFor(settings)) : 0;
+    settings.ShapesWorld ? Mathf.Clamp(settings.BiomePrecision, 0, BiomePrecisionGrid.MaxFor(settings)) : 0;
 
   // Valheim 1.0 stores biome sectors (biome plus alt biome data) in the corner array instead of
   // plain biomes. Sectors for points where the world data doesn't match the Better Continents biome,

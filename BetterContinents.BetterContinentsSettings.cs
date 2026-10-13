@@ -71,11 +71,23 @@ public partial class BetterContinents
     // the layer is a swap of this reference and the world saves the layer it has. Null in a world without one.
     internal volatile BakedLayer? Layer;
     public bool HasLayer => Layer != null;
+    // A copy of these settings with another layer, which is not a layer of the active world (a preset saved from a running world keeps the
+    // compiler's records only). The maps and everything else are the same objects.
+    internal BetterContinentsSettings WithLayer(BakedLayer? layer)
+    {
+      var copy = (BetterContinentsSettings)MemberwiseClone();
+      copy.Layer = layer;
+      copy.LayerSentApart = false;
+      copy.LayerBytesAsRead = null;
+      copy.LayerError = null;
+      return copy;
+    }
     // Set when the settings package of a world with a layer was read: the layer is sent apart, and has not come yet when Layer is null.
     internal bool LayerSentApart;
-    // Set when the layer in the world's settings could not be read: the world load then stops (BakedLayerStore), as it does for an alt-biome
-    // map that cannot be read.
+    // Set when the layer in the world's settings could not be read: the world load then stops (AltBiomeControl.BeforeVerifyBiomeData), as it
+    // does for an alt-biome map that cannot be read. Its bytes are kept as they were, and saved back unchanged (Serialize).
     internal string? LayerError;
+    private byte[]? LayerBytesAsRead;
     // The world's terrain is the game's own (spec 4): a world made without Better Continents' maps, or with Better Continents off for it,
     // that carries a layer. Its settings hold nothing but this, a wide-sectors flag and the layer.
     public bool GameTerrain;
@@ -242,6 +254,32 @@ public partial class BetterContinents
       foreach (var kind in MapKind.LoadOrder)
         kind.Load(this, c, dir, lean);
       AltBiomes = AltBiomeSettings.FromConfig(c);
+      ReadLayerFile(dir);
+    }
+
+    // The file a Directory holds the world's baked layer in (a compiler's, or a world export's: WorldExport writes it beside the maps).
+    internal const string LayerFileName = "placements.bcp";
+
+    // 0.10.4: placements.bcp in the Directory is the new world's baked layer. It is checked (BakedLayer.Read) and kept byte for byte. A file
+    // that cannot be read makes a world without its layer, and an error line says which file and what is wrong; `bc_bake load` adds one later.
+    private void ReadLayerFile(string dir)
+    {
+      Layer = null;
+      if (string.IsNullOrEmpty(dir))
+        return;
+      var path = Path.Combine(dir, LayerFileName);
+      if (!File.Exists(path))
+        return;
+      try
+      {
+        var bytes = File.ReadAllBytes(path);
+        Layer = BakedLayer.Read(bytes, bytes.Length);
+        Log($"Baked layer: {path}: revision {Layer.Revision}, {Layer.Placements:N0} records in {Layer.Zones.Count:N0} zones");
+      }
+      catch (Exception e) when (e is BakedFormatException || e is IOException || e is UnauthorizedAccessException)
+      {
+        LogError($"The baked layer {path} cannot be read ({e.Message}): the world is made without it. 'bc_bake load' adds a layer to a world later.");
+      }
     }
 
     // Compact Maps as a new world reads it (SettingsSchema.CompactMaps): On makes the world compact now, in the newest settings version only
@@ -416,7 +454,16 @@ public partial class BetterContinents
     {
       output ??= Log;
 
-      if (EnabledForThisWorld)
+      if (EnabledForThisWorld && GameTerrain)
+      {
+        // Nothing else in its settings means anything: its terrain, biomes, vegetation and locations are the game's own.
+        output($"Version {Version}");
+        output("Game terrain: this world keeps the game's own terrain, biomes, vegetation and locations; Better Continents carries only its baked placements here");
+        if (WideSectors)
+          output("Wide sectors: every zone out to 65504 m has a sector and save chunks of its own, where the game gives everything past 16.4 km one shared sector");
+        DumpLayer(output);
+      }
+      else if (EnabledForThisWorld)
       {
         output($"Version {Version}");
         output($"Continent size {ContinentSize}");
@@ -578,11 +625,29 @@ public partial class BetterContinents
           output($"Altbiomemap unreadable by this build ({AltBiomeMapBlockAsRead.Length} bytes, kept unchanged, not planted)");
         else output($"Altbiomemap disabled");
         EffectiveAltBiomes.Dump(output, AltBiomes == null);
+        DumpLayer(output);
       }
       else
       {
         output($"DISABLED");
       }
+    }
+
+    // The baked layer, when there is one (or was meant to be): what it holds and where it came from.
+    private void DumpLayer(Action<string> output)
+    {
+      if (Layer is { } layer)
+      {
+        output($"Baked layer: revision {layer.Revision}, {layer.Placements:N0} records in {layer.Zones.Count:N0} zones, {layer.Palette.Count:N0} palette entries, {layer.Length:N0} bytes, made by {layer.Producer}");
+        if (layer.Ground.Any)
+          output($"Baked ground in {layer.Ground.Count:N0} zones");
+        var sources = layer.RecordsBySource();
+        output("Baked records: " + string.Join(", ", sources.Select(kv => kv.Key == 0 ? $"{kv.Value:N0} from the compiler's file" : $"{kv.Value:N0} from bake {kv.Key}")));
+      }
+      else if (LayerError != null)
+        output($"Baked layer unreadable by this build ({LayerBytesAsRead?.Length:N0} bytes, kept unchanged, not drawn): {LayerError}");
+      else if (LayerSentApart)
+        output("Baked layer: sent apart, not here yet");
     }
 
 

@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-10-04 for the unifying refactor (0.10.0), and modified on 2026-10-06 for 16k worlds (0.10.3).
+// Added by Wubarrk on 2026-10-04 for the unifying refactor (0.10.0), and modified on 2026-10-06 for 16k worlds (0.10.3), and on 2026-10-07 for baked placements (0.10.4).
 
 using System;
 using System.Collections;
@@ -521,7 +521,38 @@ internal static class ZoneRegen
       kind |= ZoneReset.Kind.Piece;
     if (zdo.GetBool(ZDOVars.s_tamed))
       kind |= ZoneReset.Kind.Tamed;
+    // A piece of a baked layer, whatever its id (a u32 that may be 0): the key being there is what says so. So is the mark of an orphan, a
+    // piece the layer left standing because it holds items (BakedReconcile): a reset does not empty it either.
+    if (zdo.GetInt(BakedKeys.Id, out _) || zdo.GetString(BakedKeys.Orphan, out var orphan) && orphan.Length > 0)
+      kind |= ZoneReset.Kind.Baked;
     return kind;
+  }
+
+  /// <summary>The objects of the world whose position is in the zone, found the way a zone's objects are found everywhere here (the
+  /// reset, BakedServer's seeding, BakedReconcile): from the zone's sector list and its portals, each by its own position. A zone's
+  /// sector list also holds what the game files under it for want of a sector: with the game's own sectors, everything beyond 256 zones
+  /// out (ZoneSystem.SectorToIndex files all of that under sector 0, which is also zone (-256, -256)); with WorldSectors', what is
+  /// beyond 1024 zones. So each position is looked at.</summary>
+  internal static List<ZDO> ZdosIn(ZDOMan man, Vector2s zone)
+  {
+    var result = new List<ZDO>();
+    var index = ZoneSystem.SectorToIndex(zone);
+    var list = man.m_objectsBySector[index.Sector];
+    if (list != null)
+      for (int i = 0; i < list.Count; i++)
+      {
+        var zdo = list[i];
+        if (zdo != null && zdo.IsValid() && ZoneSystem.GetZone(zdo.GetPosition()) == zone)
+          result.Add(zdo);
+      }
+    if (man.m_portalObjects.TryGetValue(index, out var portals))
+      for (int i = 0; i < portals.Count; i++)
+      {
+        var zdo = portals[i];
+        if (zdo != null && zdo.IsValid() && ZoneSystem.GetZone(zdo.GetPosition()) == zone)
+          result.Add(zdo);
+      }
+    return result;
   }
 
   /// <summary>How many zones around each player connected from another machine are kept: the near simulation distance of their
@@ -671,30 +702,8 @@ internal static class ZoneRegen
       return result;
     }
 
-    // The objects whose position is in the zone. A zone's sector list also holds what the game files under it for want of a
-    // sector: with the game's own sectors, everything beyond 256 zones out (ZoneSystem.SectorToIndex files all of that
-    // under sector 0, which is also zone (-256, -256)); with WorldSectors', what is beyond 1024 zones. So each position is looked at.
-    private List<ZDO> ZdosIn(Vector2s zone)
-    {
-      var result = new List<ZDO>();
-      var index = ZoneSystem.SectorToIndex(zone);
-      var list = man.m_objectsBySector[index.Sector];
-      if (list != null)
-        for (int i = 0; i < list.Count; i++)
-        {
-          var zdo = list[i];
-          if (zdo != null && zdo.IsValid() && ZoneSystem.GetZone(zdo.GetPosition()) == zone)
-            result.Add(zdo);
-        }
-      if (man.m_portalObjects.TryGetValue(index, out var portals))
-        for (int i = 0; i < portals.Count; i++)
-        {
-          var zdo = portals[i];
-          if (zdo != null && zdo.IsValid() && ZoneSystem.GetZone(zdo.GetPosition()) == zone)
-            result.Add(zdo);
-        }
-      return result;
-    }
+    // The objects whose position is in the zone (ZoneRegen.ZdosIn).
+    private List<ZDO> ZdosIn(Vector2s zone) => ZoneRegen.ZdosIn(man, zone);
 
     public List<ZoneReset.Obj> ObjectsIn(Vector2s zone)
     {

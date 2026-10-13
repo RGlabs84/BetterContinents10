@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-10-06 for 16k worlds (0.10.3).
+// Added by Wubarrk on 2026-10-06 for 16k worlds (0.10.3), and on 2026-10-07 for baked placements (0.10.4).
 
 using System;
 using System.Collections.Generic;
@@ -15,7 +15,7 @@ public partial class BetterContinents
   // biome map (which IsDeepnorth then reads), and on a high world, where the camera's height itself puts the game's test
   // inside the Deep North's circle from about 8000 m, wherever it is.
   internal static bool DeepNorthWeatherUsesZ(BetterContinentsSettings settings) =>
-    settings.EnabledForThisWorld && (settings.HasBiomeMap || HighTerrain.Wanted(settings));
+    settings.ShapesWorld && (settings.HasBiomeMap || HighTerrain.Wanted(settings));
 
   // DynamicPatch's first step: the state the patched game code reads, then each group on or off. One that fails is logged and the
   // others go on: the world loads either way, as vanilla's heights would. It comes first, and nothing in it depends on another

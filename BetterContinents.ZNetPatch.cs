@@ -1,4 +1,4 @@
-﻿// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and alt-biome planting (0.8.1), and on 2026-09-24 for world export and import (0.9.0), and on 2026-10-06 for 16k worlds (0.10.3).
+﻿// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and alt-biome planting (0.8.1), and on 2026-09-24 for world export and import (0.9.0), and on 2026-10-06 for 16k worlds (0.10.3), and on 2026-10-07 for baked placements (0.10.4).
 
 using System;
 using System.Collections;
@@ -62,6 +62,8 @@ public partial class BetterContinents
             LiveConfig.ClearServerValues();
             // Wide Sectors: a machine that runs the world (server) decides for it; a client follows the settings the server sends.
             WorldSectors.SessionStarts(server);
+            // The baked layer: nothing of the last session's is current (a client's has none until the server's arrives).
+            BakedTransfer.SessionStarts(server);
             if (server)
             {
                 var settings = ResolveWorldSettingsPath(world);
@@ -227,10 +229,15 @@ public partial class BetterContinents
                 return id;
             }
 
-            private static List<string> GetCacheList() =>
-                Directory.Exists(WorldCachePath)
-                    ? Directory.GetFiles(WorldCachePath, "*.bc").Select(f => Path.GetFileNameWithoutExtension(f).ToLower()).ToList()
+            // 0.10.4: the ids of both kinds of file, the settings packages (.bc) and the baked layers (.bcl); a layer unused for 30 days goes
+            // at the first handshake of a session (BakedCache). Ids are SHA-512 prefixes, so the two kinds never collide.
+            private static List<string> GetCacheList()
+            {
+                BakedCache.PruneOnce();
+                return Directory.Exists(WorldCachePath)
+                    ? Directory.GetFiles(WorldCachePath, "*.bc").Select(f => Path.GetFileNameWithoutExtension(f).ToLower()).Concat(BakedCache.Ids()).ToList()
                     : Enumerable.Empty<string>().ToList();
+            }
 
             public static ZPackage SerializeCacheList()
             {
@@ -300,7 +307,10 @@ public partial class BetterContinents
             public string version;
             public ZPackage worldCache;
 #nullable enable
+            // Stage 0 of the join answered: the client has the settings (the flag keeps its old name).
             public bool readyForPeerInfo;
+            // 0.10.4: what the transfer of the baked layer keeps of this client (stage 1, pushes).
+            public BakedTransfer.LayerClient layer = null!;
 
             public override string ToString() => $"{id} ({player})";
         }
@@ -319,19 +329,34 @@ public partial class BetterContinents
             {
                 var bcClientInfo = new BCClientInfo { peer = peer, readyForPeerInfo = false };
                 ClientInfo.Add(bcClientInfo);
+                // 0.10.4: the transfer of the baked layer keeps its own record of the client (BakedTransfer).
+                bcClientInfo.layer = new BakedTransfer.LayerClient("(connecting)", new BakedTransfer.ZRpcLink(peer.m_rpc),
+                    reason => DisconnectForLayer(peer, reason));
+                BakedTransfer.Clients.Add(bcClientInfo.layer);
+                BakedTransfer.RegisterServer(peer.m_rpc, bcClientInfo.layer);
                 peer.m_rpc.Register("BetterContinentsServerHandshake", (ZRpc rpc, string clientVersion, ZPackage worldCache) =>
                 {
                     Log($"Receiving new client version {clientVersion}");
                     // We check this when sending settings (if we have a BC world loaded, otherwise it doesn't matter)
                     bcClientInfo.version = clientVersion;
                     bcClientInfo.worldCache = worldCache;
+                    bcClientInfo.layer.Version = clientVersion;
+                    bcClientInfo.layer.CachedIds = ReadCachedIds(worldCache);
                 });
 
-                peer.m_rpc.Register("BetterContinentsReady", (ZRpc rpc, int stage) =>
+                // Stage 0 (the settings) and stage 1 (the baked layer) of the join; a client older than 0.10.4 sends no stage at all.
+                peer.m_rpc.Register(BakedTransfer.RpcReady, (ZRpc rpc, int stage) =>
                 {
-                    Log($"Client is ready for PeerInfo");
-                    // We wait for this flag before continuing after sending the world settings, allowing the client to behave asynchronously on its end
-                    bcClientInfo.readyForPeerInfo = true;
+                    if (stage == 0)
+                    {
+                        Log($"Client is ready for PeerInfo");
+                        // We wait for this flag before continuing after sending the world settings, allowing the client to behave asynchronously on its end
+                        bcClientInfo.readyForPeerInfo = true;
+                    }
+                    else
+                    {
+                        BakedTransfer.OnReady(bcClientInfo.layer, stage);
+                    }
                 });
 
                 // 0.8.1: after applying the server's alt-biome placement, the client reports its hashes, so a
@@ -408,7 +433,74 @@ public partial class BetterContinents
                         __instance.StartCoroutine(ReceivedSettings(peer));
                     }
                 });
+
+                // 0.10.4: the world's baked layer, sent after the settings (cache, download, pushes), and the settings again when a world
+                // that was not a Better Continents world became one while this client was in it.
+                BakedTransfer.RegisterClient(peer.m_rpc, new BakedTransfer.ZRpcLink(peer.m_rpc), reason => FailForLayer(peer, reason));
+                peer.m_rpc.Register(BakedTransfer.RpcSettingsUpdate, (ZRpc rpc, ZPackage settings) =>
+                    __instance.StartCoroutine(ReceivedSettingsUpdate(settings)));
             }
+        }
+
+        // The ids in a client's handshake list (settings packages and baked layers), read from a copy: the list is read once, in order, by
+        // WorldCache.CacheItemExists, which settings use.
+        private static HashSet<string> ReadCachedIds(ZPackage worldCache)
+        {
+            var ids = new HashSet<string>();
+            try
+            {
+                var copy = new ZPackage(worldCache.GetArray());
+                int count = copy.ReadInt();
+                for (int i = 0; i < count; i++)
+                    ids.Add(copy.ReadString());
+            }
+            catch (Exception e)
+            {
+                Log($"A client's cache list could not be read ({e.Message}): it gets what it needs sent.");
+            }
+            return ids;
+        }
+
+        // A client's baked layer could not be sent, or did not answer: the same ending as a settings transfer that times out.
+        private static void DisconnectForLayer(ZNetPeer peer, string reason)
+        {
+            Log(reason);
+            peer.m_rpc.Invoke("Error", (int)ZNet.ConnectionStatus.ErrorConnectFailed);
+            ZNet.instance.Disconnect(peer);
+        }
+
+        // The baked layer from the server could not be read or arrived damaged: this client leaves, with the reason on its screen.
+        private static void FailForLayer(ZNetPeer peer, string reason)
+        {
+            LastConnectionError = reason;
+            LogError(reason);
+            ZNet.m_connectionStatus = ZNet.ConnectionStatus.ErrorConnectFailed;
+            ZNet.instance.Disconnect(peer);
+        }
+
+        // 4.3: the server's settings, sent again to every client whose join was over when a world with no maps of Better Continents' own
+        // became a Better Continents world (the baked layer is not in the package: this client keeps the one it has).
+        private static IEnumerator ReceivedSettingsUpdate(ZPackage received)
+        {
+            var loadingTask = Task.Run(() =>
+            {
+                var settings = BetterContinentsSettings.Load(received);
+                var id = WorldCache.Add(received);
+                return (settings, id);
+            });
+            yield return new WaitUntil(() => loadingTask.IsCompleted);
+            if (loadingTask.IsFaulted)
+            {
+                LogError($"The server's new world settings could not be read ({loadingTask.Exception.GetBaseException().Message}); this client keeps the ones it has.");
+                yield break;
+            }
+            var layer = BakedLayerStore.Current;
+            Settings = loadingTask.Result.settings;
+            Settings.Layer = layer;
+            WorldCache.CurrentId = loadingTask.Result.id;
+            DynamicPatch();
+            Settings.Dump();
+            Log("Using the server's new world settings.");
         }
 
         private static IEnumerator LoadFromCache(ZNetPeer peer, string id)
@@ -551,7 +643,10 @@ public partial class BetterContinents
         {
             var bcClientInfo = ClientInfo.FirstOrDefault(c => c.peer == peer);
             if (bcClientInfo != null)
+            {
                 ClientInfo.Remove(bcClientInfo);
+                BakedTransfer.Clients.Remove(bcClientInfo.layer);
+            }
             // A client leaving its server stops following the server's export settings.
             if (!__instance.IsServer() && peer != null && peer.m_server)
                 LiveConfig.ClearServerValues();
@@ -636,7 +731,7 @@ public partial class BetterContinents
         // Puts this connection's send rate back to vanilla once the transfer ends, times out, or is abandoned. Safe
         // to call even if the peer disconnected mid-transfer: its connection is simply gone, which is not an error,
         // so any exception here is only logged (at Unity's Log level, not Warning/Error).
-        private static void RestoreSteamSendRate(ZRpc rpc, string why)
+        internal static void RestoreSteamSendRate(ZRpc rpc, string why)
         {
             try
             {
@@ -649,15 +744,46 @@ public partial class BetterContinents
             }
         }
 
+        // Settings Transfer Rate (see above) for one transfer that is about to start: the setting is logged with what the transfer will take
+        // at best, and a Steam connection is raised to the rate (the caller restores it with RestoreSteamSendRate). True when the rate was
+        // raised. `what` is what is sent ("settings", "baked pieces"), for the log. The settings and the baked layer both go through it.
+        internal static bool RaiseSendRate(ZRpc rpc, string what, int length)
+        {
+            var transferRate = ConfigSettingsTransferRate?.Value ?? TransferRate.Default;
+            int? rateBytesPerSecond = TransferRate.BytesPerSecond(transferRate);
+            Log($"Settings transfer rate: {TransferRate.Describe(transferRate)} (server setting)");
+            // The send loop moves one 128 KiB chunk a frame (about 4 MB/s at most), whatever the rate: what a world of
+            // this size will take at the best, so a server's log says why a player is still downloading.
+            double bytesPerSecond = Math.Min(rateBytesPerSecond ?? VanillaSteamSendRate, 4_000_000);
+            Log($"The {length / 1048576.0:F1} MB of {what} take about {length / bytesPerSecond:F0} s to send at that rate.");
+            bool rateRaised = false;
+            if (rateBytesPerSecond.HasValue)
+            {
+                if (rpc.GetSocket() is ZSteamSocket)
+                {
+                    try
+                    {
+                        rateRaised = TrySetSteamSendRate(rpc.GetSocket(), rateBytesPerSecond.Value);
+                        if (!rateRaised)
+                            Log("Could not raise the Steam send rate for this connection; sending at Valheim's own rate.");
+                    }
+                    catch (Exception e)
+                    {
+                        LogWarning($"Could not raise the Steam send rate for this connection ({e.Message}); sending at Valheim's own rate.");
+                    }
+                }
+                else if (!LoggedPlayFabTransferRateNotice)
+                {
+                    // Not spammed per connection: a crossplay server would otherwise log this on every join.
+                    LoggedPlayFabTransferRateNotice = true;
+                    Log("Settings Transfer Rate cannot be raised on this connection (not Steam, e.g. PlayFab/crossplay); sending at Valheim's own rate.");
+                }
+            }
+            return rateRaised;
+        }
+
         private static IEnumerator SendSettings(ZRpc rpc, ZPackage pkg, Action call_RPC_PeerInfo)
         {
-            static byte[] ArraySlice(byte[] source, int offset, int length)
-            {
-                byte[] target = new byte[length];
-                Buffer.BlockCopy(source, offset, target, 0, length);
-                return target;
-            }
-
             var peer = ZNet.instance.GetPeer(rpc);
             if (peer == null)
             {
@@ -676,6 +802,7 @@ public partial class BetterContinents
                 var refPos = pkg.ReadVector3();
                 bcClientInfo.player = pkg.ReadString();
                 pkg.SetPos(startPos);
+                bcClientInfo.layer.Name = bcClientInfo.ToString();
                 Log($"Registered client {bcClientInfo} is connecting");
             }
             else
@@ -735,76 +862,24 @@ public partial class BetterContinents
                     Log($"Sending settings package header for {settingsLength} byte stream");
                     rpc.Invoke("BetterContinentsConfigStart", settingsLength, GetHashCode(settingsData, settingsLength));
 
-                    const int SendChunkSize = 128 * 1024;
-
                     // Settings Transfer Rate: read only here, on the sending side. See TrySetSteamSendRate above.
-                    var transferRate = ConfigSettingsTransferRate?.Value ?? TransferRate.Default;
-                    int? rateBytesPerSecond = TransferRate.BytesPerSecond(transferRate);
-                    Log($"Settings transfer rate: {TransferRate.Describe(transferRate)} (server setting)");
-                    // The send loop below moves one 128 KiB chunk a frame (about 4 MB/s at most), whatever the rate: what a world of
-                    // this size will take at the best, so a server's log says why a player is still downloading.
-                    double bytesPerSecond = Math.Min(rateBytesPerSecond ?? VanillaSteamSendRate, 4_000_000);
-                    Log($"The {settingsLength / 1048576.0:F1} MB of settings take about {settingsLength / bytesPerSecond:F0} s to send at that rate.");
-                    bool rateRaised = false;
-                    if (rateBytesPerSecond.HasValue)
-                    {
-                        if (rpc.GetSocket() is ZSteamSocket)
-                        {
-                            try
-                            {
-                                rateRaised = TrySetSteamSendRate(rpc.GetSocket(), rateBytesPerSecond.Value);
-                                if (!rateRaised)
-                                    Log("Could not raise the Steam send rate for this connection; sending at Valheim's own rate.");
-                            }
-                            catch (Exception e)
-                            {
-                                LogWarning($"Could not raise the Steam send rate for this connection ({e.Message}); sending at Valheim's own rate.");
-                            }
-                        }
-                        else if (!LoggedPlayFabTransferRateNotice)
-                        {
-                            // Not spammed per connection: a crossplay server would otherwise log this on every join.
-                            LoggedPlayFabTransferRateNotice = true;
-                            Log("Settings Transfer Rate cannot be raised on this connection (not Steam, e.g. PlayFab/crossplay); sending at Valheim's own rate.");
-                        }
-                    }
+                    bool rateRaised = RaiseSendRate(rpc, "settings", settingsLength);
                     float transferStartedAt = Time.realtimeSinceStartup;
-                    int nextProgressLogAt = Mathf.Max(settingsLength / 10, 1);
 
-                    for (int sentBytes = 0; sentBytes < settingsLength;)
+                    // The loop the baked layer goes through as well (BakedTransfer.SendPackets): one chunk a frame, up to two in flight, 30 s
+                    // for a chunk to find room.
+                    var sent = new BakedTransfer.SendResult();
+                    var sending = BakedTransfer.SendPackets(new BakedTransfer.ZRpcLink(rpc), settingsData, settingsLength, "BetterContinentsConfigPacket", "", sent);
+                    while (sending.MoveNext())
+                        yield return null;
+                    if (sent.TimedOut)
                     {
-                        int packetSize = Mathf.Min(settingsLength - sentBytes, SendChunkSize);
-                        var packet = ArraySlice(settingsData, sentBytes, packetSize);
-                        rpc.Invoke("BetterContinentsConfigPacket", sentBytes, GetHashCode(packet),
-                            new ZPackage(packet));
-                        // Make sure to flush or we will saturate the queue...
-                        try
-                        {
-                            rpc.GetSocket().Flush();
-                        }
-                        catch (NotImplementedException)
-                        {
-                            // ZPlayFabSocket doesn't implement it and throws instead
-                        }
-
-                        sentBytes += packetSize;
-                        if (sentBytes >= nextProgressLogAt || sentBytes == settingsLength)
-                        {
-                            Log($"Sent {sentBytes} of {settingsLength} bytes");
-                            nextProgressLogAt += Mathf.Max(settingsLength / 10, 1);
-                        }
-                        float timeout = Time.time + 30;
-                        // Keep up to two chunks in flight (Steam's own send buffer is 512 KiB) instead of draining to one.
-                        yield return new WaitUntil(() => rpc.GetSocket().GetSendQueueSize() < 2 * SendChunkSize || Time.time > timeout);
-                        if (Time.time > timeout)
-                        {
-                            Log($"Timed out sending config to client {bcClientInfo} after 30 seconds, disconnecting them");
-                            if (rateRaised)
-                                RestoreSteamSendRate(rpc, "transfer timed out");
-                            peer.m_rpc.Invoke("Error", (int)ZNet.ConnectionStatus.ErrorConnectFailed);
-                            ZNet.instance.Disconnect(peer);
-                            yield break;
-                        }
+                        Log($"Timed out sending config to client {bcClientInfo} after 30 seconds, disconnecting them");
+                        if (rateRaised)
+                            RestoreSteamSendRate(rpc, "transfer timed out");
+                        peer.m_rpc.Invoke("Error", (int)ZNet.ConnectionStatus.ErrorConnectFailed);
+                        ZNet.instance.Disconnect(peer);
+                        yield break;
                     }
                     if (rateRaised)
                         RestoreSteamSendRate(rpc, "transfer done");
@@ -812,6 +887,19 @@ public partial class BetterContinents
                     Log($"Settings sent: {settingsLength} bytes in {transferSeconds:F1} s ({settingsLength / transferSeconds / 1024f:F0} KB/s)");
                 }
                 yield return new WaitUntil(() => bcClientInfo.readyForPeerInfo || !peer.m_socket.IsConnected());
+
+                // 0.10.4, stage 1 of the join: the world's baked layer, from the client's cache or sent now. A client that leaves meanwhile ends
+                // the join; one that cannot be sent it in time has been disconnected.
+                var layer = BakedLayerStore.Current;
+                if (layer != null && peer.m_socket.IsConnected())
+                {
+                    var stage = new BakedTransfer.StageResult();
+                    var staging = BakedTransfer.JoinStage(bcClientInfo.layer, layer, stage);
+                    while (staging.MoveNext())
+                        yield return null;
+                    if (stage.Failed)
+                        yield break;
+                }
 
                 // Nothing about sectors or alt biomes is sent by vanilla: each peer computes its own. Send ours so
                 // the client uses the server's placement and can report whether its sector grid agrees.
@@ -823,6 +911,9 @@ public partial class BetterContinents
                 }
             }
 
+            // The join is over: pushes of the baked layer reach this client from now.
+            if (bcClientInfo != null)
+                BakedTransfer.JoinFinished(bcClientInfo.layer);
             call_RPC_PeerInfo();
         }
 
@@ -868,6 +959,10 @@ public partial class BetterContinents
             else
             {
                 Log($"World doesn't use Better Continents, skipping version check and sync");
+                // (A Better Continents client in it still hears of a later conversion of the world: its join is over.)
+                var client = ClientInfo.FirstOrDefault(c => c.peer == peer);
+                if (client != null)
+                    client.layer.JoinDone = true;
                 call_RPC_PeerInfo();
             }
         }

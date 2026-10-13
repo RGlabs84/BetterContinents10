@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-10-04 for the unifying refactor (0.10.0).
+// Added by Wubarrk on 2026-10-04 for the unifying refactor (0.10.0), and modified on 2026-10-07 for baked placements (0.10.4).
 //
 // Offline checks of zone regeneration (ZoneReset.cs, ZoneRegen.cs): the rules for what protects a zone and what is never
 // destroyed, which zones a plan resets and in what order, the work against a made-up world (what is destroyed, in what order,
@@ -13,6 +13,7 @@
 // Program.Review.cs has what the last review asked for: strays after their group, a save's turns taken once, strays the game
 // generated, the drain flushed zone by zone, and an error before the work. Program.Polish.cs has what the polish round asked for: a save
 // between a second request and the work of the run that took its place, and the counts when the game generates a stray before its turn.
+// Program.Baked.cs has the pieces of a baked layer (Kind.Baked): they survive a reset, do not keep their zone from it, and seeding skips what stands.
 
 using System;
 using System.Collections.Generic;
@@ -124,6 +125,7 @@ internal static partial class Program
       HardenTests();
       ReviewTests();
       PolishTests();
+      BakedTests();
     }
     finally
     {

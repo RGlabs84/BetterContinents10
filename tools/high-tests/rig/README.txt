@@ -14,7 +14,7 @@ READING THE GAME AND THE MAPS (Python 3; UnityPy for the bundle, numpy and Pillo
   results/            read_envman.txt and valtima_crop.txt hold what those two printed in their last run
 
 THE HEADLESS SERVER RIG
-  The rig is ~/valheim-testbed/bc-16k/<name>/, made from ~/valheim-testbed/bc-16k/template (its profile/, fake-home.sh and port file) with these files added:
+  The rig is ~/WubarrkCODING/BetterContinents10/.work/bc-16k/<name>/, made from ~/WubarrkCODING/BetterContinents10/.work/bc-16k/template (its profile/, fake-home.sh and port file) with these files added:
     run.sh          one server run: boots the world $WORLD from profile/ (BepInEx, Better Continents, the probe) with saves/ of its own; output in out/<label>/
     hf_run.sh       one run with the config it needs: hf_run.sh <label> <world> <seed> <dll> <amount> <mode> <heightmap file | none> [VAR=value ...]. Builds the
                     probe, puts <dll> in the profile, writes World Size 8000, Edge Size 500, Heightmap Override All on and the amount, High Terrain mode and map it

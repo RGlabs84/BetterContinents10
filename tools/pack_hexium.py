@@ -1,17 +1,19 @@
 """Build the Hexium upload zip for a tagged release.
 
-The zip holds HexiumDist's package files, the built DLL, the three PDFs with their GPL-3.0 text
-(the Better Continents Guide, Export & Import, the easy guide, and Map-making: a skill for AI agents), the alt-biome colour scheme (the
+The zip holds HexiumDist's package files, the built DLL, the four PDFs with their GPL-3.0 text
+(the Better Continents Guide, Export & Import, the easy guide, Baked buildings, the easy guide, and Map-making: a skill for AI agents), the alt-biome colour scheme (the
 Krita/GIMP palette and the printable chart from palettes/), and the exact source of the release:
 LGPL-2.1 section 4 wants the source to travel with the DLL.
 
 Before running: build the mod, copy the DLL to HexiumDist/plugins/, put the guide at
-HexiumDist/BetterContinents-Guide.pdf, the export guide at HexiumDist/BetterContinents-Export-Guide.pdf and the AI
-skill at HexiumDist/BetterContinents-AI-Skill.pdf (or pass their paths), and tag the release commit. The export guide
-is built by BetterContinents-Guide/export-guide/build_export_guide.py, the AI skill by
+HexiumDist/BetterContinents-Guide.pdf, the export guide at HexiumDist/BetterContinents-Export-Guide.pdf, the AI
+skill at HexiumDist/BetterContinents-AI-Skill.pdf and the baking guide at HexiumDist/BetterContinents-Baking-Guide.pdf
+(or pass their paths), and tag the release commit. The export guide is built by
+BetterContinents-Guide/export-guide/build_export_guide.py, the baking guide by
+BetterContinents-Guide/baking-guide/build_baking_guide.py (0.10.4), the AI skill by
 BetterContinents-TestMaps/ai-skill/build_ai_skill_pdf.py.
 
-Usage: python3 tools/pack_hexium.py v0.9.0 [path/to/BetterContinents-Guide.pdf [path/to/BetterContinents-Export-Guide.pdf [path/to/BetterContinents-AI-Skill.pdf]]]
+Usage: python3 tools/pack_hexium.py v0.9.0 [path/to/BetterContinents-Guide.pdf [path/to/BetterContinents-Export-Guide.pdf [path/to/BetterContinents-AI-Skill.pdf [path/to/BetterContinents-Baking-Guide.pdf]]]]
 
 A branch or commit works in place of the tag, for a pre-release package to test before tagging.
 """
@@ -29,7 +31,8 @@ tag = sys.argv[1]
 pdf = pathlib.Path(sys.argv[2]) if len(sys.argv) > 2 else DIST / 'BetterContinents-Guide.pdf'
 export_pdf = pathlib.Path(sys.argv[3]) if len(sys.argv) > 3 else DIST / 'BetterContinents-Export-Guide.pdf'
 skill_pdf = pathlib.Path(sys.argv[4]) if len(sys.argv) > 4 else DIST / 'BetterContinents-AI-Skill.pdf'
-for need in (pdf, export_pdf, skill_pdf):
+baking_pdf = pathlib.Path(sys.argv[5]) if len(sys.argv) > 5 else DIST / 'BetterContinents-Baking-Guide.pdf'
+for need in (pdf, export_pdf, skill_pdf, baking_pdf):
     if not need.is_file():
         sys.exit(f'{need} not found: build it and put it there, or pass its path (usage: top of tools/pack_hexium.py)')
 version = json.loads((DIST / 'manifest.json').read_text(encoding='utf-8'))['version_number']
@@ -53,6 +56,7 @@ members['plugins/BetterContinents.dll'] = (DIST / 'plugins/BetterContinents.dll'
 members['BetterContinents-Guide.pdf'] = pdf.read_bytes()
 members['BetterContinents-Export-Guide.pdf'] = export_pdf.read_bytes()
 members['BetterContinents-AI-Skill.pdf'] = skill_pdf.read_bytes()
+members['BetterContinents-Baking-Guide.pdf'] = baking_pdf.read_bytes()
 members['BetterContinents.gpl'] = (REPO / 'palettes/BetterContinents.gpl').read_bytes()
 members['altbiome-palette.png'] = (REPO / 'palettes/altbiome-palette.png').read_bytes()
 members['BetterContinents-source.zip'] = source

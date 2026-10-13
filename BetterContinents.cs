@@ -140,7 +140,7 @@ public partial class BetterContinents : BaseUnityPlugin
     // Size and Edge Size (BetterContinentsSettings.MapsSpanWorldSize); for any other world vanilla's, as always.
     internal static WorldGeometry MapGeometry(BetterContinentsSettings settings) =>
         ExpandWorldSizeGeometry
-        ?? (settings.EnabledForThisWorld && settings.MapsSpanWorldSize && settings.OwnGeometry is { } own ? own : WorldGeometry.Vanilla);
+        ?? (settings.ShapesWorld && settings.MapsSpanWorldSize && settings.OwnGeometry is { } own ? own : WorldGeometry.Vanilla);
 
     // Whether Expand World Size sizes the world: it is installed, or has sent its size.
     internal static bool ExpandWorldSizeSizes => EWS.Installed || ExpandWorldSizeGeometry != null;
@@ -150,7 +150,7 @@ public partial class BetterContinents : BaseUnityPlugin
     // Size and Edge Size, as its maps do (BetterContinentsSettings.LayoutFollowsWorldSize), unless Expand World Size is
     // installed, which lays out the world itself. Any other world keeps vanilla's layout, as always.
     internal static WorldGeometry LayoutGeometry(BetterContinentsSettings settings) =>
-        !ExpandWorldSizeSizes && settings.EnabledForThisWorld && settings.LayoutFollowsWorldSize && settings.OwnGeometry is { } own
+        !ExpandWorldSizeSizes && settings.ShapesWorld && settings.LayoutFollowsWorldSize && settings.OwnGeometry is { } own
             ? own
             : WorldGeometry.Vanilla;
 
@@ -159,7 +159,7 @@ public partial class BetterContinents : BaseUnityPlugin
     internal static void NoteExpandWorldSizeStretch()
     {
         var stretch = WorldSizeHelper.ExpandWorldSizeStretch;
-        if (!Settings.EnabledForThisWorld)
+        if (!Settings.ShapesWorld)
         {
             ExpandWorldSizeStretchNote = null;
             return;
@@ -178,7 +178,7 @@ public partial class BetterContinents : BaseUnityPlugin
     {
         NoteExpandWorldSizeStretch();
         var geometry = MapGeometry(Settings);
-        if (ExpandWorldSizeGeometry is { } ews && Settings.EnabledForThisWorld && Settings.MapsSpanWorldSize
+        if (ExpandWorldSizeGeometry is { } ews && Settings.ShapesWorld && Settings.MapsSpanWorldSize
             && Settings.OwnGeometry is { } own && !own.SameAs(ews))
         {
             var note = $"World Size: Expand World Size sets the world's size ({ews}), so the maps span {ews.TotalSize} m, not this world's {own.TotalSize} m ({own}).";
@@ -258,7 +258,7 @@ public partial class BetterContinents : BaseUnityPlugin
 
     public static bool AllowDebugActions => ZNet.instance
                                             && ZNet.instance.IsServer()
-                                            && Settings.EnabledForThisWorld
+                                            && Settings.ShapesWorld
                                             && ConfigDebugModeEnabled.Value;
 
     public static BetterContinentsSettings Settings = new();

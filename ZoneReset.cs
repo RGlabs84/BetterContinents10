@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-10-04 for the unifying refactor (0.10.0), and modified on 2026-10-06 for 16k worlds (0.10.3).
+// Added by Wubarrk on 2026-10-04 for the unifying refactor (0.10.0), and modified on 2026-10-06 for 16k worlds (0.10.3), and on 2026-10-07 for baked placements (0.10.4).
 
 using System;
 using System.Collections;
@@ -33,6 +33,10 @@ namespace BetterContinents;
 //     only in the compiler's TCData (TerrainComp.Save), and nothing there has a creator. A compiler with one edited or painted
 //     vertex is ground work (Kind.Ground, TerrainBorder.HasEdits), and protects like a piece. A crop is protected through its
 //     field: the grown crop has no creator (Plant.Grow makes it from its own prefab, Plant.cs:181-213) but stands on cultivated ground.
+//   - The pieces of a baked layer stay (Kind.Baked: an object with bc_bake_id, seeded by BakedServer). A town zone of a layer is a zone
+//     like the rest: its statics are the layer's records, which a reset never touches, and its live pieces (doors, stations, what an
+//     in-game bake adopted) survive and are not seeded again when the zone generates. A bake id does not keep a zone from being reset
+//     (a piece the layer seeded has no creator); the creator that a piece an in-game bake adopted keeps protects, as on any piece.
 //   - A zone within one zone (3 x 3) of any of those is not reset at all, so a base keeps its surroundings.
 //   - The player at this keyboard is the exception: debug mode is about the ground under their feet, so their own zones reset
 //     around them (they are never destroyed). A player connected from another machine keeps the zones their client has loaded:
@@ -135,6 +139,11 @@ internal static class ZoneReset
     Tamed = 32,
     /// <summary>A zone's terrain compiler with an edited or painted vertex: a field, a path, a road, levelled or dug ground.</summary>
     Ground = 64,
+    /// <summary>A live piece of a baked layer (it has bc_bake_id): a door or station a compiler's file put there, or a piece an in-game
+    /// bake adopted. The layer owns it, so a reset never destroys it (a zone that generates again does not seed what stands), but it
+    /// does not keep its zone from being reset: seeded pieces have no creator, and a creator one has (an adopted piece keeps its own)
+    /// protects as Piece does.</summary>
+    Baked = 128,
   }
 
   internal static class Rules
@@ -150,7 +159,7 @@ internal static class ZoneReset
       || ((kind & Kind.Player) != 0 && ((kind & Kind.Local) == 0 || (kind & Kind.Interior) != 0));
 
     /// <summary>Whether an object is never destroyed, in a zone that is reset.</summary>
-    internal static bool Survives(Kind kind) => (kind & (Kind.Player | Kind.Piece | Kind.Tombstone | Kind.Tamed | Kind.Ground)) != 0;
+    internal static bool Survives(Kind kind) => (kind & (Kind.Player | Kind.Piece | Kind.Tombstone | Kind.Tamed | Kind.Ground | Kind.Baked)) != 0;
 
     /// <summary>How far around a player connected from another machine zones are kept: the near simulation distance of their
     /// game (the square it keeps loaded), and never less than a piece's.</summary>

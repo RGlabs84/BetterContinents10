@@ -1,6 +1,6 @@
 #!/bin/bash
 # Added by Wubarrk on 2026-10-06 for 16k worlds (0.10.3).
-# Better Continents 0.10.3 (16k worlds) headless test rig, 2026-10-06. One copy per work stream under ~/valheim-testbed/bc-16k/
+# Better Continents 0.10.3 (16k worlds) headless test rig, 2026-10-06. One copy per work stream under ~/WubarrkCODING/BetterContinents10/.work/bc-16k/
 # (sectors, high, maps, export), each with its own port (file "port") and its own saves. Runs the Steam-installed Linux
 # dedicated server IN PLACE (read only) with BepInEx injected by doorstop from profile/ (BepInEx core, Better Continents, and
 # BCServerProbe: see probe/BCServerProbe/Plugin.cs). Saves go to saves/, HOME is a throwaway (fake-home.sh).

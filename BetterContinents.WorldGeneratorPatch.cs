@@ -1,4 +1,4 @@
-﻿// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0), and on 2026-10-04 for the unifying refactor (0.10.0), and on 2026-10-06 for 16k worlds (0.10.3).
+﻿// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0), and on 2026-10-04 for the unifying refactor (0.10.0), and on 2026-10-06 for 16k worlds (0.10.3), and on 2026-10-07 for baked placements (0.10.4).
 
 using System.Collections.Generic;
 using System.Linq;
@@ -44,7 +44,7 @@ public partial class BetterContinents
         [HarmonyPrefix, HarmonyPatch(nameof(WorldGenerator.Initialize))]
         private static void InitializePrefix(World world)
         {
-            if (Settings.EnabledForThisWorld && !world.m_menu && Settings.ForestFactorOverrideAllTrees && ZoneSystem.instance != null)
+            if (Settings.ShapesWorld && !world.m_menu && Settings.ForestFactorOverrideAllTrees && ZoneSystem.instance != null)
             {
                 foreach (var v in ZoneSystem.instance.m_vegetation)
                 {
@@ -57,7 +57,7 @@ public partial class BetterContinents
                 }
             }
 
-            if (Settings.EnabledForThisWorld)
+            if (Settings.ShapesWorld)
             {
                 currentSeed = world.m_seed;
                 ApplyNoiseSettings();

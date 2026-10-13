@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-09-24 for world export and import (0.9.0), and modified on 2026-10-04 for the unifying refactor (0.10.0), and on 2026-10-06 for 16k worlds (0.10.3).
+// Added by Wubarrk on 2026-09-24 for world export and import (0.9.0), and modified on 2026-10-04 for the unifying refactor (0.10.0), and on 2026-10-06 for 16k worlds (0.10.3), and on 2026-10-07 for baked placements (0.10.4).
 
 using System;
 using System.Collections.Generic;
@@ -107,6 +107,7 @@ internal static class Program
       Tests.ConfigAndReadme(work);
       TerrainTest.Run();
       EndToEnd.Run(work);
+      LayerExport.Run(work);
       FineTest.Run(work);
       // Past the usual sizes: BCEXPORT_BIG=8192 (or 16384) runs the whole export there, with its memory measured.
       if (int.TryParse(Environment.GetEnvironmentVariable("BCEXPORT_BIG"), out var big) && big > 0)

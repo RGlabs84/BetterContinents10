@@ -28,7 +28,8 @@ internal static class BakedLayerStore
     settings.Layer = next;
     if (ReferenceEquals(old, next))
       return;
-    Changed?.Invoke(old, next, changed);
+    // Each subscriber on its own: one that throws is logged, and the others (and the API's event) still hear of the change.
+    BakedApi.Each(Changed, handler => handler(old, next, changed), "A handler of the baked layer store threw");
     BakedApi.RaiseLayerChanged();
   }
 }

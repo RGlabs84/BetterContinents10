@@ -17,7 +17,7 @@ import sys
 import numpy as np
 
 here = os.path.dirname(os.path.abspath(__file__))
-for candidate in (os.environ.get('FINE_REF'), os.path.join(here, '..'), os.path.join(here, '..', '..'), '/home/rohan/valheim-testbed/bc-16k/fine'):
+for candidate in (os.environ.get('FINE_REF'), os.path.join(here, '..'), os.path.join(here, '..', '..'), '/home/rohan/WubarrkCODING/BetterContinents10/.work/bc-16k/fine'):
     if candidate and os.path.exists(os.path.join(candidate, 'fine_ref.py')):
         sys.path.insert(0, candidate)
         break

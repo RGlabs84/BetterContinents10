@@ -1,4 +1,4 @@
-﻿// Modified by Wubarrk on 2026-10-04 for the unifying refactor (0.10.0), and on 2026-10-06 for 16k worlds (0.10.3).
+﻿// Modified by Wubarrk on 2026-10-04 for the unifying refactor (0.10.0), and on 2026-10-06 for 16k worlds (0.10.3), and on 2026-10-07 for baked placements (0.10.4).
 
 using System;
 using System.Collections;
@@ -135,6 +135,12 @@ public partial class DebugUtils
 
             if (commandType == CommandType.Group)
             {
+                // A world that keeps the game's own terrain has no map or setting for the commands of the tree to change.
+                if (parent == null && hasArgs && BetterContinents.Settings.GameTerrain && ChangesTerrainSettings(args))
+                {
+                    Console.instance.Print("This world keeps the game's own terrain; Better Continents carries only its baked placements here.");
+                    return true;
+                }
                 // "bc h help", as every group's description says, lists the group like "bc h".
                 if (!hasArgs || args == "help")
                 {
@@ -188,6 +194,20 @@ public partial class DebugUtils
             }
 
             return true;
+        }
+
+        // The commands of the bc tree that load or change a map or a setting: their results could not be saved in a GameTerrain world's settings
+        // (which hold nothing but the layer), and nothing would read them.
+        private static readonly HashSet<string> TerrainCommands = ["reload", "g", "h", "r", "b", "terrain", "l", "paint", "lava", "moss", "vegetation", "spawn", "heat", "fo", "st", "hl"];
+
+        private static bool ChangesTerrainSettings(string args)
+        {
+            var words = args.Split([' '], StringSplitOptions.RemoveEmptyEntries);
+            if (words.Length == 0)
+                return false;
+            if (TerrainCommands.Contains(words[0]))
+                return true;
+            return words[0] == "ab" && words.Length > 1 && (words[1] == "set" || words[1] == "clear" || words[1] == "reroll" || words[1] == "rebuild");
         }
 
         // The text typed after a value's name as a value of its type: the plain types by StringToTypeConverters, an enum by the name of one of its

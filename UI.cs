@@ -1,4 +1,4 @@
-﻿// Modified by Wubarrk on 2026-09-24 for world export and import (0.9.0).
+﻿// Modified by Wubarrk on 2026-09-24 for world export and import (0.9.0), and on 2026-10-07 for baked placements (0.10.4).
 
 using System;
 using System.Collections.Generic;
@@ -68,7 +68,7 @@ public static class UI
           {
           if (Menu.IsVisible() || Game.instance && Game.instance.WaitingForRespawn())
           {
-            if (BetterContinents.Settings.EnabledForThisWorld)
+            if (BetterContinents.Settings.ShapesWorld)
             {
               DisplayMessage($"<color=#808080><size=20><b>{ModInfo.Name} v{ModInfo.Version}</b>: <color=green>ENABLED</color> for this world</size></color>");
             }
