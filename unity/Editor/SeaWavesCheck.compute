@@ -1,0 +1,46 @@
+// Added by Wubarrk on 2026-10-13 for BC's own water (0.10.5).
+// The GPU side of the build's wave check (SeaWavesCheck.cs): BCSeaWaveOne and BCSeaWaves from SeaWaves.hlsl / SeaField.hlsl, the very code the water
+// shader runs, evaluated for a list of cases; SeaWavesCheck.cs compares the results with the C# side.
+
+#pragma kernel WaveCases
+#pragma kernel FieldCases
+
+#define BC_SEA_COMPUTE_CHECK
+#include "SeaField.hlsl"
+#include "SeaWaves.hlsl"
+
+struct WaveCase
+{
+    float2 xz;
+    float depth;
+    float time;
+    float4 wind;
+    float waveFactor;
+    float w;
+};
+
+int _Count;
+StructuredBuffer<WaveCase> _Cases;
+RWStructuredBuffer<float> _Out;
+
+[numthreads(64, 1, 1)]
+void WaveCases(uint3 id : SV_DispatchThreadID)
+{
+    if ((int)id.x >= _Count)
+        return;
+    WaveCase c = _Cases[id.x];
+    _Out[id.x] = BCSeaWaveOne(c.xz, c.depth, c.wind, c.time, c.waveFactor, c.w);
+}
+
+StructuredBuffer<float2> _Points;
+RWStructuredBuffer<float> _OutCalm;
+RWStructuredBuffer<float> _OutW;
+
+[numthreads(64, 1, 1)]
+void FieldCases(uint3 id : SV_DispatchThreadID)
+{
+    if ((int)id.x >= _Count)
+        return;
+    _OutCalm[id.x] = BCSeaCalmMetres(_Points[id.x]);
+    _OutW[id.x] = BCSeaWaves(_Points[id.x]);
+}
