@@ -1,4 +1,4 @@
-# Added by Wubarrk on 2026-10-07 for BC's own water (0.10.4): output of shader_state.py against Valheim 1.0.17's SoftRef bundle eb7a4308 (Custom/Water).
+# Added by Wubarrk on 2026-10-07 for BC's own water (0.10.4), and on 2026-10-13 for BC's own water (0.10.5): output of shader_state.py against Valheim 1.0.17's SoftRef bundle eb7a4308 (Custom/Water). Rerun 2026-10-13 with the texture dimensions (_CurlTex is a 3D texture, the others 2D).
 === Custom/Water (path_id -1220688799747046602), fallback 'Diffuse', custom editor ''
 --- properties
   _ColorTop                    Color    flags 0 default [1.0, 1.0, 1.0, 1.0] tex '' attrs [] desc 'Color top'
@@ -6,11 +6,11 @@
   _ColorBottomShallow          Color    flags 0 default [1.0, 1.0, 1.0, 1.0] tex '' attrs [] desc 'Color bottom shallow'
   _Glossiness                  Range    flags 0 default [0.5, 0.0, 1.0, 0.0] tex '' attrs [] desc 'Smoothness'
   _Metallic                    Range    flags 0 default [0.0, 0.0, 1.0, 0.0] tex '' attrs [] desc 'Metallic'
-  _FoamTex                     Texture  flags 0 default [0.0, 0.0, 0.0, 0.0] tex 'white' attrs [] desc 'Foam'
-  _FoamHighTex                 Texture  flags 0 default [0.0, 0.0, 0.0, 0.0] tex 'white' attrs [] desc 'Foam high'
-  _RandomFoamTex               Texture  flags 0 default [0.0, 0.0, 0.0, 0.0] tex 'white' attrs [] desc 'Random Foam'
-  _Normal                      Texture  flags 0 default [0.0, 0.0, 0.0, 0.0] tex 'bump' attrs [] desc 'Normalmap'
-  _NormalFine                  Texture  flags 0 default [0.0, 0.0, 0.0, 0.0] tex 'bump' attrs [] desc 'NormalFine'
+  _FoamTex                     Texture  flags 0 default [0.0, 0.0, 0.0, 0.0] tex 'white dim 2' attrs [] desc 'Foam'
+  _FoamHighTex                 Texture  flags 0 default [0.0, 0.0, 0.0, 0.0] tex 'white dim 2' attrs [] desc 'Foam high'
+  _RandomFoamTex               Texture  flags 0 default [0.0, 0.0, 0.0, 0.0] tex 'white dim 2' attrs [] desc 'Random Foam'
+  _Normal                      Texture  flags 0 default [0.0, 0.0, 0.0, 0.0] tex 'bump dim 2' attrs [] desc 'Normalmap'
+  _NormalFine                  Texture  flags 0 default [0.0, 0.0, 0.0, 0.0] tex 'bump dim 2' attrs [] desc 'NormalFine'
   _NormalPower                 Range    flags 0 default [1.0, 0.0, 5.0, 0.0] tex '' attrs [] desc 'NormalPower'
   _NormalScale                 Float    flags 0 default [1.0, 0.0, 0.0, 0.0] tex '' attrs [] desc 'NormalScale'
   _WaveVel                     Float    flags 0 default [1.0, 0.0, 0.0, 0.0] tex '' attrs [] desc 'WaveVel'
@@ -25,8 +25,8 @@
   _IsLod                       Float    flags 0 default [0.0, 0.0, 0.0, 0.0] tex '' attrs ['MaterialToggle'] desc 'Is lod'
   _VisibleMaxDistance          Float    flags 0 default [0.0, 0.0, 0.0, 0.0] tex '' attrs [] desc 'Lod distance'
   _WaterEdge                   Float    flags 0 default [9100.0, 0.0, 0.0, 0.0] tex '' attrs [] desc 'World water edge'
-  _CurlTex                     Texture  flags 0 default [0.0, 0.0, 0.0, 0.0] tex 'white{}' attrs ['Header(Ashlands Settings)', 'Space(10)'] desc 'Curl Noise'
-  _BubbleTexture               Texture  flags 0 default [0.0, 0.0, 0.0, 0.0] tex 'white' attrs [] desc 'Bubble Texture'
+  _CurlTex                     Texture  flags 0 default [0.0, 0.0, 0.0, 0.0] tex 'white{} dim 3' attrs ['Header(Ashlands Settings)', 'Space(10)'] desc 'Curl Noise'
+  _BubbleTexture               Texture  flags 0 default [0.0, 0.0, 0.0, 0.0] tex 'white dim 2' attrs [] desc 'Bubble Texture'
   _AshlandsDistance            Float    flags 0 default [12000.0, 0.0, 0.0, 0.0] tex '' attrs [] desc 'Distance'
   _AshlandsYOffset             Float    flags 0 default [4000.0, 0.0, 0.0, 0.0] tex '' attrs [] desc 'Y Offset'
   _AshlandsSurfaceColor        Color    flags 0 default [1.0, 1.0, 1.0, 1.0] tex '' attrs [] desc 'Surface Color'

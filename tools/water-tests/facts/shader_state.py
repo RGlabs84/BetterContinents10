@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Added by Wubarrk on 2026-10-07 for BC's own water (0.10.4).
+# Added by Wubarrk on 2026-10-07 for BC's own water (0.10.4), and on 2026-10-13 for BC's own water (0.10.5).
 """W0: print the render state of the game's Custom/Water shader (bundle eb7a4308): sub-shaders, LODs, tags, passes, the GrabPass,
 blend, ZWrite, ZTest, cull, stencil, offsets, keywords per program and the property list with its defaults.
 
@@ -43,6 +43,9 @@ def dump():
         for p in pf.m_PropInfo.m_Props:
             default = [round(getattr(p, f"m_DefValue_{i}_"), 6) for i in range(4)] if hasattr(p, "m_DefValue_0_") else None
             tex = getattr(p.m_DefTexture, "m_DefaultName", None) if getattr(p, "m_DefTexture", None) is not None else None
+            dim = getattr(p.m_DefTexture, "m_TexDim", None) if getattr(p, "m_DefTexture", None) is not None else None
+            if p.m_Type == 4:
+                tex = f"{tex} dim {dim}"
             print(f"  {p.m_Name:28s} {PROPTYPE.get(p.m_Type, p.m_Type):8s} flags {p.m_Flags} default {default} tex {tex!r} attrs {list(p.m_Attributes) if p.m_Attributes else []} desc {p.m_Description!r}")
         keywords = list(pf.m_KeywordNames)
         print("--- keywords", keywords)
