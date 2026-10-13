@@ -284,13 +284,18 @@ internal static class Program
   static void SectionNumbers()
   {
     Section("config section numbering");
-    // ConfigHelpers numbers groups in declaration order; the Export group must come tenth (09), after AltBiomes (08), and the baked
-    // placements group eleventh (10): sections only ever go last.
+    // ConfigHelpers numbers groups in declaration order; the Export group must come tenth (09), after AltBiomes (08), the baked
+    // placements group eleventh (10) and BC's own water twelfth (11): sections only ever go last.
     // Every setting is declared in SettingsSchema (since the unifying refactor), group by group in file order.
     var groups = SettingsSchema.Groups.Select(g => g.Name).ToList();
-    C(groups.Count == 11 && groups[8] == "BetterContinents.AltBiomes" && groups[9] == "BetterContinents.Export" && groups[10] == "BetterContinents.BakedPlacements",
-      $"Awake declares 11 groups, baked placements last: {string.Join(", ", groups.Select((g, i) => $"{i:00} {g}"))}");
+    C(groups.Count == 12 && groups[8] == "BetterContinents.AltBiomes" && groups[9] == "BetterContinents.Export" && groups[10] == "BetterContinents.BakedPlacements"
+      && groups[11] == "BetterContinents.Water",
+      $"Awake declares 12 groups, the water last: {string.Join(", ", groups.Select((g, i) => $"{i:00} {g}"))}");
     C(SettingsSchema.BakedDrawDistance.Section == "10 BetterContinents.BakedPlacements", $"the baked placements settings are in section '{SettingsSchema.BakedDrawDistance.Section}'");
+    C(SettingsSchema.OwnWater.Section == "11 BetterContinents.Water" && SettingsSchema.SoftFarSea.Section == "11 BetterContinents.Water"
+      && SettingsSchema.OwnWater.Scope == SettingScope.Live && SettingsSchema.SoftFarSea.Scope == SettingScope.Live
+      && SettingsSchema.OwnWater.Default && SettingsSchema.SoftFarSea.Default && !SettingsSchema.OwnWater.ReadsIntoSettings && !SettingsSchema.SoftFarSea.ReadsIntoSettings,
+      "Own Water and Soft Far Sea are live settings in section '11 BetterContinents.Water', both on, and part of no world's settings");
     var path = Path.Combine(Path.GetTempPath(), "bc-sections-" + Environment.ProcessId + ".cfg");
     try
     {

@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-10-04 for the unifying refactor (0.10.0), and modified on 2026-10-06 for the Forest Scale default (0.10.2), and on 2026-10-06 for 16k worlds (0.10.3), and on 2026-10-07 for baked placements (0.10.4).
+// Added by Wubarrk on 2026-10-04 for the unifying refactor (0.10.0), and modified on 2026-10-06 for the Forest Scale default (0.10.2), and on 2026-10-06 for 16k worlds (0.10.3), and on 2026-10-07 for baked placements (0.10.4), and on 2026-10-13 for BC's own water (0.10.5).
 
 using System;
 using System.Collections.Generic;
@@ -285,6 +285,10 @@ internal static class SettingsSchema
   public static readonly SettingDef<string> BakedTints = S("Tints", "Override the colours that a baked layer tints its pieces with: name=r,g,b pairs separated by semicolons, by the tint's name in the layer (a town's clay walls may be plaster, brick, sandstone and marble), for example \"plaster=1.65,1.58,1.48; brick=1.25,0.72,0.56\". Each colour multiplies the clay's grey texture (1 keeps it). Empty: the layer's own colours. Applies at once", SettingScope.Live, "", e => BakedSettings.Tints = e);
   public static readonly SettingDef<bool> BakedDiagnostics = S("Diagnostics", "Writes, once for each kind of baked piece, the materials it is drawn with (shader, texture, colour) to the log", SettingScope.Live, false, e => BakedSettings.Diagnostics = e);
 
+  // ---- 11 Water (every setting here is read while the game runs; the client's drawing of the sea, the plan's 8.2) -----------------------------
+  public static readonly SettingDef<bool> OwnWater = S("Own Water", "Draws the sea with Better Continents' own water in worlds whose sea is not the game's: waves out to the world's edge, calm only in its own Deep North, and the Ashlands' red where its hot sea is. Off: the game's water, with the red set zone by zone as earlier versions of Better Continents did; boats still float on the world's waves. If this graphics device cannot run Better Continents' water, or another mod has replaced the game's water shader, the game's water is drawn too, and the log says why. A vanilla-size world without maps, and a world that keeps the game's own terrain, always have the game's water. Applies at once", SettingScope.Live, true, e => SeaSettings.OwnWater = e);
+  public static readonly SettingDef<bool> SoftFarSea = S("Soft Far Sea", "With Own Water: the far sea past the loaded zones takes the depth of the sea under it, so that it looks like the near water where they meet (no light and dark strips seen from high up). Off: the far sea is drawn as deep sea everywhere, as the game draws it. Applies at once", SettingScope.Live, true, e => SeaSettings.SoftFarSea = e);
+
   /// <summary>BetterContinents.cfg, section by section, in order.</summary>
   public static readonly SettingGroup[] Groups =
   [
@@ -299,8 +303,10 @@ internal static class SettingsSchema
     // Every value of these two is still read at the same moments as before: AltBiomes when a world is created, Export live.
     new("BetterContinents.AltBiomes", AltBiomemapFile, AltBiomeMode, AltBiomeGrid, AltBiomeSeed, AltBiomeChance, AltBiomeAmount, AltBiomeEdgeScale, AltBiomeDistanceScale, AltBiomeMinThickness, AltBiomeMeanHeight, AltBiomeFixNeighbourCheck, AltBiomeOverrides),
     new("BetterContinents.Export", ExportHud, ExportAllowed, ExportHudKey, ExportWindowKey, ExportSize, ExportHeightmapAmount, ExportSeaLevel, ExportLargestSize),
-    // The client's drawing of baked placements, all read live. The water work (U6) adds its own section after this one.
+    // The client's drawing of baked placements, all read live.
     new("BetterContinents.BakedPlacements", BakedDrawDistance, BakedDrawScale, BakedDetailScale, BakedShadowMode, BakedLightDistance, BakedSeatDistance, BakedLightCount, BakedLightShadows, BakedTints, BakedDiagnostics),
+    // The client's drawing of the sea (BC's own water), read live. No world data goes with it: a world's settings bytes do not change.
+    new("BetterContinents.Water", OwnWater, SoftFarSea),
   ];
 
   public static IEnumerable<SettingDef> All => Groups.SelectMany(g => g.Settings);
