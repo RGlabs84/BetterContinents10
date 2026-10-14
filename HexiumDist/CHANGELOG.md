@@ -7,9 +7,9 @@
     the world's own Deep North, and the Ashlands' red only where the world's own hot sea is. It looks like
     the game's water (the same colours, glare and foam), and it needs no new world data: an existing world
     gets it the moment it loads, and nothing is made again.
-  - Boats, swimmers and fish feel the waves that are drawn, on every machine and on a dedicated server
+  - Boats, swimmers and anything that floats feel the waves that are drawn, on every machine and on a dedicated server
     (drawn and felt waves agree to within 4 mm in the tests). Waves are real geometry in the zones that are
-    loaded; the far plane beyond them, about 150 m out, is flat with the game's ripple texture, as in the
+    loaded; the far plane beyond them, about 130 m out, is flat with the game's ripple texture, as in the
     game. A storm gives a real swell with whitecaps where the game's far sea stays flat.
   - Two new settings in [11 BetterContinents.Water], each player's own and applied at once: Own Water
     (off: the game's water, with the colours of 0.10.3) and Soft Far Sea (the far sea takes the depth
@@ -18,19 +18,19 @@
     player sees the game's water and the world is unchanged for everyone else. `bc_water` says whether
     Better Continents' own sea is on and why; with Debug Mode, `bc water force on|off` and `bc water probe`
     compare it with the game's water.
-  - `bc genloc` makes the world's locations again where the game's own `genloc` does nothing: after
-    Better Continents skipped the automatic run, or when a run that threw left the game's slot taken. It
-    says what it found, runs the game's own generation, reports what changed, and sends the new location
-    icons to the players. Locations that are placed stay. It runs on the machine that runs the world and
-    needs `devcommands`, as the other `bc` commands do (Debug Mode turns it on). `bc genloc alt` passes to
-    the game's alt-biome branch.
+  - `bc genloc` runs the game's location generation again with a report: what it found, what changed,
+    and the new location icons sent to the players. When a run that threw left the game's own `genloc`
+    stuck (it does nothing while its slot is taken), `bc genloc` frees it first. Locations that are
+    placed stay. It runs on the machine that runs the world and needs `devcommands`, as the other `bc`
+    commands do (Debug Mode turns it on). `bc genloc alt` passes to the game's alt-biome branch.
   - Lakes above the sea (experimental). Valheim has one water level, so every lake in the mountains is a dry hollow.
     A world can now carry a list of lakes, each with its own water height: Better Continents puts the
-    game's own water in them, so you swim, sail, fish and see them on the minimap and the large map,
+    game's own water in them, so you swim, sail and see them on the minimap and the large map,
     and boats feel the lake's waves. Each lake fills its basin up to its level; lakes are built as you
-    come near and dropped behind you, a few milliseconds a frame. Lakes follow the world's rules: no
-    waves in the calm Deep North, red and hot where the world's hot sea is, and Better Continents'
-    own water is drawn on them when it is on. This is Tarn, the mod by Raven Iron (Wubarrk and
+    come near and dropped behind you, a few milliseconds a frame. Lakes are written to follow the
+    world's rules (no waves in the calm Deep North, red and hot where the world's hot sea is; this is
+    how the code works and has not been seen in a game yet), and Better Continents' own water is
+    drawn on them when it is on. This is Tarn, the mod by Raven Iron (Wubarrk and
     NomadicWar), brought into Better Continents by Wubarrk.
   - The lake list is `lakes.txt` in the maps folder (one lake a line: name; x; z; level; the box the lake
     may fill; depth; Tarn's own format, so a map maker's file works as it is; `tarn-lakes.txt` is read

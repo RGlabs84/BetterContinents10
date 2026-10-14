@@ -419,7 +419,9 @@ internal static class LakeCommands
     s.ReplaceLakes(next);
     int sent = Seams.Push(next);
     LakeTransfer.LakesChanged?.Invoke(next);
-    output($"{lake.Name}: {outcome.Message}. Saved with the world at its next save; sent to {sent} player{(sent == 1 ? "" : "s")}.");
+    // the spill's sentence begins with the name it tried; the world's next free name replaces it
+    var said = outcome.Message.StartsWith(outcome.Lake.Name + ": ", StringComparison.Ordinal) ? outcome.Message.Substring(outcome.Lake.Name.Length + 2) : outcome.Message;
+    output($"{lake.Name}: {said}. Saved with the world at its next save; sent to {sent} player{(sent == 1 ? "" : "s")}.");
     foreach (var warning in Guards([lake]))
       output("bc_lake " + word + ": " + warning);
   }
