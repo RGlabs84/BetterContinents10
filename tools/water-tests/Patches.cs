@@ -30,6 +30,7 @@ internal static partial class Program
       PrefixTests();
       LifeTests();
       ForeignTests();
+      DrawTests();
     }
     finally
     {
@@ -267,6 +268,11 @@ internal static partial class Program
     var harmony = new Harmony("water-tests.life");
     BC.HarmonyInstance = harmony;
     var ews = EWS.Installed;
+    // The small world's sea is not the game's only if its layout is patched: the field asks the game's own functions.
+    var layout = LayoutGroup();
+    var layoutSize = new WorldGeometry(2000f, 100f);
+    WorldSizeHelper.Layout.Assume(layoutSize);
+    layout.Update(harmony, layoutSize);
     try
     {
       EWS.Installed = false;
@@ -290,14 +296,48 @@ internal static partial class Program
       Check(field != null && field.Hot != null && field.Radius == 2100f && field.Size == 525,
         $"for a client: both channels, over the world's edge (2100 m): {field}");
       Check(CapturingLogHandler.Since(mark).Any(l => l.Contains("the sea field is ready")), "and says so in the log");
-      Check(SeaPatches.Snapshot.State.StartsWith("on"), $"state: {SeaPatches.Snapshot.State}");
+      Check(SeaPatches.Snapshot.State == "on" && !field!.SameAsGame, $"its Deep North and hot sea are not the game's, so BC's sea is on ({SeaPatches.Snapshot.State})");
+
+      // A client field built before the ground's heights can be asked makes its depth grid when they can (the world generator is made while the
+      // world loads, after DynamicPatch).
+      Check(SeaPatches.DepthPending && field!.Depth == null, "a client's field built without the generator waits for the ground's heights to make its depth grid");
+      SeaPatches.StartDepth(null);
+      Check(field.Depth == null && SeaPatches.DepthPending, "with no world generator it goes on waiting");
+      SeaPatches.StartDepth((x, z) => 30f - 0.001f * x);
+      var depthWatch = System.Diagnostics.Stopwatch.StartNew();
+      while (field.Depth == null && depthWatch.ElapsedMilliseconds < 30000)
+        Thread.Sleep(20);
+      Check(field.Depth != null && !SeaPatches.DepthPending && field.DepthSize > 60, $"and once they can, it is made on a worker ({field.DepthSize} x {field.DepthSize})");
 
       SeaPatches.Refresh();
       Check(SeaField.Current == null, "the next refresh drops it again (the game's values apply until the new one is ready)");
 
+      // Expand World Size's size can arrive after the field was started: the field is started again for the new edge.
+      Check(!SeaPatches.RadiusMoved(small), "a field whose edge is the world's edge is left alone");
+      var ewsSize = BC.ExpandWorldSizeGeometry;
+      try
+      {
+        SeaPatches.Refresh();
+        SeaPatches.Start(small, true);
+        Check(WaitForField(60000) && SeaField.Current!.Radius == 2100f, "the field is built for the settings' edge (2100 m)");
+        BC.ExpandWorldSizeGeometry = new WorldGeometry(3000f, 200f);
+        mark = CapturingLogHandler.Mark();
+        Check(SeaPatches.RadiusMoved(small) && SeaField.Current == null && SeaPatches.Snapshot.Pending
+              && CapturingLogHandler.Since(mark).Any(l => l.Contains("the world's edge is now +-3200 m")),
+          "Expand World Size sends 3200 m: the field is dropped, asked for again, and the log says why");
+        SeaPatches.Start(small, true);
+        Check(WaitForField(60000) && SeaField.Current!.Radius == 3200f && !SeaPatches.RadiusMoved(small), "and the new one covers 3200 m, and is then left alone");
+      }
+      finally
+      {
+        BC.ExpandWorldSizeGeometry = ewsSize;
+      }
+      SeaPatches.Refresh();
+
       // A server asks for the calm half only.
       SeaPatches.Start(small, false);
-      Check(WaitForField(60000) && SeaField.Current!.Hot == null && SeaField.Current.Calm.Length == 525 * 525, "a server's field has no hot channel");
+      Check(WaitForField(60000) && SeaField.Current!.Hot == null && SeaField.Current.Calm.Length == 525 * 525 && !SeaPatches.DepthPending,
+        "a server's field has no hot channel, and no depth grid to wait for");
       SeaField.Current = null;
 
       // A refresh stops a build in flight: its field is never published.
@@ -337,6 +377,9 @@ internal static partial class Program
     {
       EWS.Installed = ews;
       SeaField.Current = null;
+      layout.Update(harmony, WorldGeometry.Vanilla);
+      harmony.UnpatchAll(harmony.Id);
+      WorldSizeHelper.Layout.Assume(WorldGeometry.Vanilla);
     }
   }
 

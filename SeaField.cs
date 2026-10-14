@@ -93,8 +93,9 @@ internal sealed class SeaField
   /// <summary>Both: the world's sea is the game's, and nothing is swapped.</summary>
   public bool SameAsGame => CalmSameAsGame && HotSameAsGame;
 
-  /// <summary>The far sea's depth grid (R8); null where none was built.</summary>
-  public byte[]? Depth;
+  /// <summary>The far sea's depth grid (R8); null where none was built (yet: it can come after the field, when the ground's heights could not
+  /// be asked at first). It is assigned last, so a reader that sees it sees its size and origin.</summary>
+  public volatile byte[]? Depth;
   public int DepthSize;
   public float DepthOriginX, DepthOriginZ;
   public const float DepthSpacing = 64f;
@@ -294,7 +295,7 @@ internal sealed class SeaField
       }
     }
     if (hot && input.Height is { } height)
-      BuildDepth(field, height, radius, workers, stop);
+      field.BuildDepth(height, workers, stop);
     watch.Stop();
     field.BuildMs = watch.ElapsedMilliseconds;
     return field;
@@ -305,18 +306,18 @@ internal sealed class SeaField
   private static byte Metres(int d2, double spacing, int cap) =>
     (byte)Math.Min(cap, Math.Max(0.0, Math.Floor((Math.Sqrt(d2) - 0.5) * spacing + 0.5)));
 
-  // The depth grid: one texel per zone corner (the corners of the 64 m zones lie at 32 m plus a multiple of 64).
-  private static void BuildDepth(SeaField field, Func<float, float, float> height, float radius, int workers, CancellationToken stop)
+  /// <summary>The depth grid: one texel per zone corner (the corners of the 64 m zones lie at 32 m plus a multiple of 64), on workers. It is part
+  /// of the build when the ground's heights can be asked, and otherwise made when they can (SeaPatches.Tick). Throws OperationCanceledException
+  /// when stopped.</summary>
+  public void BuildDepth(Func<float, float, float> height, int workers, CancellationToken stop)
   {
-    int first = (int)Math.Floor((-radius - 32.0) / DepthSpacing), last = (int)Math.Ceiling((radius - 32.0) / DepthSpacing);
+    int first = (int)Math.Floor((-Radius - 32.0) / DepthSpacing), last = (int)Math.Ceiling((Radius - 32.0) / DepthSpacing);
     int m = last - first + 1;
-    field.DepthSize = m;
-    field.DepthOriginX = field.DepthOriginZ = (float)(32.0 + DepthSpacing * first);
+    float originX = (float)(32.0 + DepthSpacing * first);
     var depth = new byte[(long)m * m];
-    float originX = field.DepthOriginX, originZ = field.DepthOriginZ;
     ForBands(m, workers, stop, j =>
     {
-      float z = originZ + DepthSpacing * j;
+      float z = originX + DepthSpacing * j;
       for (int i = 0; i < m; i++)
       {
         float h = height(originX + DepthSpacing * i, z);
@@ -324,7 +325,9 @@ internal sealed class SeaField
         depth[(long)j * m + i] = (byte)Mathf.Clamp(Mathf.FloorToInt(d * 255f + 0.5f), 0, 255);
       }
     });
-    field.Depth = depth;
+    DepthSize = m;
+    DepthOriginX = DepthOriginZ = originX;
+    Depth = depth;
   }
 
   // The squared distance, in texels, from every texel to the nearest texel that is a feature: one whose mask bits, masked by `bit`, equal

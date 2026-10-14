@@ -346,10 +346,9 @@ public partial class BetterContinents : BaseUnityPlugin
         FlushWorkerLog();
         // Reloads BetterContinents.cfg on the main thread once a change on disk has settled.
         LiveConfig.Update();
-        // BC's own sea: the field that DynamicPatch asked for starts to build (SeaPatches).
-        SeaPatches.Tick();
-        // The far sea's colours, where it is now (AshlandsWater).
-        AshlandsWater.Tick();
+        // BC's own sea: the field that DynamicPatch asked for starts to build, and the game's water surfaces take Better Continents' shader or give it
+        // back (SeaDraw); the far sea's colours of the game's own water, where it is now (AshlandsWater).
+        SeaDraw.Tick();
     }
 
     // One line at startup that says whether the 0.8.1 world-generation fixes are bound, so a server log shows it

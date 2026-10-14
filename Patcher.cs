@@ -40,10 +40,9 @@ public partial class BetterContinents
     // above (GetBiome, IsAshlands, IsAshlands without a heat map) can leave already-queried cells
     // returning their pre-patch answer for the rest of the session unless we clear the caches here.
     ClearWorldGeneratorBiomeCaches();
-    // BC's own sea: the field it is drawn and felt from is built again for the world as it is now (SeaPatches), and the water's colours follow
-    // the hot sea the patches above make (AshlandsWater).
-    SeaPatches.Refresh();
-    AshlandsWater.Refresh();
+    // BC's own sea: the field it is drawn and felt from is built again for the world as it is now (SeaPatches), what draws the water is looked at
+    // again (SeaDraw), and the colours of the game's water follow the hot sea the patches above make (AshlandsWater, the fallback).
+    SeaDraw.Refresh();
     // EnvMan's Deep North weather test reads the biome map at the camera's x and z exactly when IsDeepnorth
     // reads the biome map at all (the IsDeepnorth toggle); every other world keeps vanilla's (x, height) call. A
     // high world asks at x and z too: the game's (x, height) is inside the Deep North's circle once the camera is

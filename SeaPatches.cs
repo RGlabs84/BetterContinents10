@@ -106,6 +106,10 @@ internal static class SeaPatches
   private static bool waterStarted;
   private static string state = "no world";
   private static string? failure;
+  // A client's field was built before the ground's heights could be asked (the world generator is made while the world loads, after DynamicPatch):
+  // its depth grid is made when they can be.
+  private static bool depthPending;
+  private static int builtWorkers;
 
   /// <summary>DynamicPatch, after the toggles: the world, or its settings, changed. A build in flight stops, the field is dropped (the game's
   /// values apply until the new one is ready), and a new one is started on the next frame (Tick) if the world's sea is a candidate. Engine-free.</summary>
@@ -116,6 +120,7 @@ internal static class SeaPatches
     build = null;
     SeaField.Current = null;
     failure = null;
+    depthPending = false;
     var settings = BetterContinents.Settings;
     pending = Candidate(settings);
     state = pending ? "the field is waiting to be built" : "off: " + Why(settings);
@@ -126,19 +131,71 @@ internal static class SeaPatches
   /// <summary>Every frame (BetterContinents.Update): starts the build that Refresh asked for.</summary>
   internal static void Tick()
   {
-    if (!pending)
+    if (depthPending)
+      StartDepth(null);
+    if (!pending && !RadiusMoved(BetterContinents.Settings))
       return;
     var net = ZNet.instance;
     bool dedicated = net != null && net.IsDedicated();
     if (dedicated && !waterStarted)
       return;
-    pending = false;
     Start(BetterContinents.Settings, !dedicated && SystemInfo.graphicsDeviceType != GraphicsDeviceType.Null);
+  }
+
+  // The radius the field in flight, or ready, was started for.
+  private static float builtRadius;
+
+  /// <summary>Expand World Size sends its size after a world's settings are loaded (BetterContinents.SetSize), which can be after DynamicPatch: a
+  /// field started for the radius the settings alone gave covers the wrong edge. When the world's edge is not what the field was started for, it is
+  /// started again (as Refresh does). True when it was.</summary>
+  internal static bool RadiusMoved(BetterContinentsSettings settings)
+  {
+    if (pending || (build == null && SeaField.Current == null) || !Candidate(settings))
+      return false;
+    if (SeaField.ClampRadius(FieldRadius(settings)) == builtRadius)
+      return false;
+    Log($"Water: the world's edge is now +-{FieldRadius(settings):0} m (it was +-{builtRadius:0} m when the sea field was started): the field is built again.");
+    Refresh();
+    return true;
+  }
+
+  /// <summary>Whether the field is waiting for the ground's heights to make its depth grid.</summary>
+  internal static bool DepthPending => depthPending;
+
+  /// <summary>Makes the depth grid of a ready client field once the ground's heights can be asked (the world generator exists), on a worker.
+  /// height: the heights to ask (the offline tests'); null is the world generator's.</summary>
+  internal static void StartDepth(Func<float, float, float>? height)
+  {
+    var field = SeaField.Current;
+    var source = build;
+    if (field == null || source == null || field.Hot == null || field.Depth != null)
+      return;
+    height ??= WorldGenerator.instance is { } generator ? generator.GetHeight : null;
+    if (height == null)
+      return;
+    depthPending = false;
+    int workers = builtWorkers;
+    Task.Run(() =>
+    {
+      try
+      {
+        field.BuildDepth(height, workers, source.Token);
+        Log($"Water: the far sea's depth grid is ready: {field.DepthSize} x {field.DepthSize} texels of {SeaField.DepthSpacing:0} m.");
+      }
+      catch (OperationCanceledException)
+      {
+      }
+      catch (Exception e)
+      {
+        LogError($"Water: making the far sea's depth grid failed ({e.GetType().Name}: {e.Message}); the far sea is drawn as the game draws it.");
+      }
+    });
   }
 
   /// <summary>Builds the field now, on a worker (Tick's work, for the offline tests too).</summary>
   internal static void Start(BetterContinentsSettings settings, bool hot)
   {
+    pending = false;
     SeaFieldInput input;
     try
     {
@@ -149,6 +206,8 @@ internal static class SeaPatches
       Fail(e);
       return;
     }
+    builtRadius = SeaField.ClampRadius(input.Radius);
+    builtWorkers = input.Workers;
     var source = new CancellationTokenSource();
     build = source;
     int mine = Volatile.Read(ref generation);
@@ -161,6 +220,7 @@ internal static class SeaPatches
         if (source.IsCancellationRequested || Volatile.Read(ref generation) != mine)
           return;
         SeaField.Current = field;
+        depthPending = hot && field.Depth == null && !field.SameAsGame;
         state = field.SameAsGame ? "on, but this world's sea is the game's own" : field.CalmSameAsGame ? "on (the hot sea only differs from the game's)" : "on";
         Log($"Water: the sea field is ready: {field}. {field.CalmShare:P1} of the world is Deep North, {(field.Hot != null ? $"{field.HotShare:P1} is hot sea, " : "")}"
           + $"its Deep North {(field.CalmSameAsGame ? "is" : "is not")} the game's circle{(field.Hot != null ? $" and its hot sea {(field.HotSameAsGame ? "is" : "is not")} the game's ring" : "")}"

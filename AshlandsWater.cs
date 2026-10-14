@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-10-07 for 16k worlds (0.10.3), and on 2026-10-07 for baked placements (0.10.4).
+// Added by Wubarrk on 2026-10-07 for 16k worlds (0.10.3), and on 2026-10-07 for baked placements (0.10.4), and on 2026-10-13 for BC's own water (0.10.5).
 
 using System;
 using System.Collections.Generic;
@@ -28,9 +28,14 @@ namespace BetterContinents;
 // is not the game's ring is drawn in steps of a zone (64 m), softened by that share, and the far sea takes one blend for
 // all the sea around it.
 //
-// The shader's other ring, the calm sea of the Deep North, sets the height of the waves it draws and cannot be moved:
-// WorldGenerator.DeepNorthWaveFade, which floats boats and fish on those waves, is left as the game's to match it
-// (Patcher, WorldSizePatch).
+// The shader's other ring, the calm sea of the Deep North, sets the height of the waves it draws and cannot be moved: with the game's shader,
+// WorldGenerator.DeepNorthWaveFade is the game's to match it. (0.10.5: where the world's sea is not the game's, the waves boats feel follow the
+// world's own Deep North, SeaPatches, and the waves a client draws follow it too when it draws Better Continents' own water, SeaDraw.)
+//
+// This is the fallback of Better Continents' own water (0.10.5, SeaDraw): a client that draws the game's water, because Own Water is off, the
+// water shader did not load or does not run on its graphics device, or another mod replaced the game's water shader, gets these colours as in
+// 0.10.3. Where SeaDraw draws a renderer with Better Continents' shader, which works out the red per pixel from the sea field, the renderer's
+// colours are the material's own (the "share < 0" path below) and nothing is set here.
 internal static class AshlandsWater
 {
   // Points per side of a zone's water surface (a narrow canal is still met: 7 m apart on 64 m).
@@ -51,10 +56,13 @@ internal static class AshlandsWater
   private static int generation;
   private static readonly Dictionary<Water, (Vector3 At, int Generation)> FarDone = [];
 
+  // After the other mods' postfixes on it (Graphics Overdrive sets its dials on the material in one), so that Better Continents' own water takes the
+  // material as they left it.
   [HarmonyPatch(typeof(WaterVolume), "Start")]
   private static class WaterVolumeStart
   {
     [HarmonyPostfix]
+    [HarmonyPriority(Priority.Last)]
     private static void Postfix(WaterVolume __instance)
     {
       if (Headless)
@@ -63,9 +71,15 @@ internal static class AshlandsWater
       if (Volumes.Count % 256 == 255)
         Prune();
       Volumes.Add(__instance);
+      // Better Continents' own water, when it is on, takes the surface now; its colours are then the material's own.
+      SeaDraw.Adopt(__instance);
       Apply(__instance);
     }
   }
+
+  /// <summary>The water surfaces that have started (some may have gone since: check for null). For SeaDraw, which swaps those that were alive when
+  /// Better Continents' own water turned on.</summary>
+  internal static List<WaterVolume> Alive => Volumes;
 
   /// <summary>DynamicPatch: a world was loaded or left, or its settings changed. After the patches are switched, as the
   /// hot sea is what they make it.</summary>
@@ -117,7 +131,7 @@ internal static class AshlandsWater
     if (material == null || !material.HasProperty(Gpu.HotColours[0]))
       return;
     float share = -1f;
-    if (Active)
+    if (Active && !SeaDraw.Draws(surface))
     {
       var bounds = surface.bounds;
       var points = new List<Vector2>(Samples * Samples);
@@ -146,7 +160,7 @@ internal static class AshlandsWater
     if (material == null || !material.HasProperty(Gpu.HotColours[0]))
       return;
     float share = -1f;
-    if (Active)
+    if (Active && !SeaDraw.Draws(surface))
     {
       var points = new List<Vector2>(FarRadii.Length * FarDirections);
       foreach (var r in FarRadii)

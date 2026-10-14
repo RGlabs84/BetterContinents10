@@ -1,4 +1,4 @@
-﻿<!-- Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and alt-biome planting (0.8.1), and on 2026-09-24 for world export and import (0.9.0). -->
+﻿<!-- Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and alt-biome planting (0.8.1), and on 2026-09-24 for world export and import (0.9.0), and on 2026-10-13 for BC's own water (0.10.5). -->
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>net4.8</TargetFramework>
@@ -7,7 +7,7 @@
     <nullable>enable</nullable>
     <!-- tools/ holds separate programs (the offline alt-biome harness, the Hexium packer). Without this the SDK
          would compile their sources into the mod and offer their build output as reference candidates. -->
-    <DefaultItemExcludes>$(DefaultItemExcludes);tools/**</DefaultItemExcludes>
+    <DefaultItemExcludes>$(DefaultItemExcludes);tools/**;unity/**</DefaultItemExcludes>
   </PropertyGroup>
   <Target Name="CopyDLL" AfterTargets="ILRepacker">
     <MakeDir Directories="$(ProjectDir)dist/plugins" />
@@ -105,6 +105,9 @@
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="assets\BCAssets\AssetBundles\StandaloneWindows\bcassets" />
+    <!-- BC's own water (0.10.5): the shader bundle built from unity/ (tools/build-water.sh). Embedded once it exists, so that the mod builds without it:
+         with none, the sea falls back to the game's water (SeaDraw). The logical name does not end as bcassets does (GameUtils.GetAssetBundleFromResources). -->
+    <EmbeddedResource Include="assets\BCWater\bcwater" LogicalName="BetterContinents.bcwater" Condition="Exists('assets\BCWater\bcwater')" />
     <!-- The mod's emblem (the package icon), shown in the New World screen's Better Continents panel (Presets.Emblem). -->
     <EmbeddedResource Include="icon.png" LogicalName="BetterContinents.icon.png" />
     <EmbeddedResource Include="assets\BCAssets\Presets\Continents.BetterContinents" />

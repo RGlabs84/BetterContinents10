@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-10-07 for baked placements (0.10.4).
+// Added by Wubarrk on 2026-10-07 for baked placements (0.10.4), and modified on 2026-10-13 for BC's own water (0.10.5).
 //
 // The rest of the client renderer's offline checks (slice C): the ground paint a layer's zones put into the terrain's base mask, the placeholder of
 // the zone hold, the settings of section 10, and the small distance helper of the lit copies.
@@ -99,8 +99,9 @@ internal static partial class Tests
   {
     Section("client: the settings of section 10");
     var groups = SettingsSchema.Groups;
-    var group = groups[^1];
-    C(group.Name == "BetterContinents.BakedPlacements" && groups.Length >= 11, "the baked placements group is the last one declared");
+    // The section is the eleventh (10); BC's own water (0.10.5) goes after it, as sections only ever go last.
+    var group = groups.Single(g => g.Name == "BetterContinents.BakedPlacements");
+    C(Array.IndexOf(groups, group) == 10 && groups.Length >= 11, "the baked placements group is the eleventh declared (10)");
     C(groups.Take(10).Select(g => g.Name).Last() == "BetterContinents.Export", "the groups before it keep their places (Export is still the tenth, 09)");
     var keys = group.Settings.Select(s => s.Key).ToArray();
     C(keys.SequenceEqual(["Draw Distance", "Draw Scale", "Detail Scale", "Shadows", "Light Distance", "Seat Distance", "Light Count", "Light Shadows", "Tints", "Diagnostics"]), "Draw Distance, Draw Scale, Detail Scale, Shadows, Light Distance, Seat Distance, Light Count, Light Shadows, Tints and Diagnostics: " + string.Join(", ", keys));

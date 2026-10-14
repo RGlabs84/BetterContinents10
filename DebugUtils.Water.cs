@@ -36,7 +36,7 @@ internal static class WaterCommands
         var words = text.Split([' '], StringSplitOptions.RemoveEmptyEntries);
         if (words.Length == 0)
         {
-            SeaPatches.Report(output);
+            SeaDraw.Report(output);
             return;
         }
         if (!string.Equals(words[0], "force", StringComparison.OrdinalIgnoreCase))

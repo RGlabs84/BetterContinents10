@@ -210,6 +210,23 @@ internal static partial class Program
     var h8 = SeaField.Build(withHeight, true, CancellationToken.None);
     Check(h1.Depth != null && h8.Depth != null && h1.Depth.SequenceEqual(h8.Depth) && h1.DepthSize == h8.DepthSize && h1.DepthOriginX == h8.DepthOriginX,
       "the depth grid is the same on one worker as on eight");
+    // The depth grid: a texel per zone corner (32 m plus a multiple of 64), covering the world, each the zone water's own rule.
+    bool corners = (h1.DepthOriginX - 32f) % 64f == 0f && h1.DepthOriginX <= -h1.Radius && h1.DepthOriginX + 64f * (h1.DepthSize - 1) >= h1.Radius
+                   && h1.DepthOriginX > -h1.Radius - 64f;
+    bool rule = true;
+    for (int j = 0; j < h1.DepthSize; j += 3)
+      for (int i = 0; i < h1.DepthSize; i += 2)
+      {
+        float h = withHeight.Height(h1.DepthOriginX + 64f * i, h1.DepthOriginZ + 64f * j);
+        rule &= h1.Depth[j * h1.DepthSize + i] == (byte)Math.Floor(Math.Min(Math.Max((30.0 - h) / 10.0, 0.0), 1.0) * 255.0 + 0.5);
+      }
+    Check(corners && rule, $"the depth grid has a texel at each zone corner, from 64 m outside the world's edge to 64 m past it ({h1.DepthSize} x {h1.DepthSize} from {h1.DepthOriginX}), each clamp01((30 - height) / 10)");
+    // Made later, when the heights can be asked, it is the same grid.
+    var late = SeaField.Build(Blob(n, deep, hot, 2), true, CancellationToken.None);
+    Check(late.Depth == null && late.DepthSize == 0, "a field built without heights has no depth grid yet");
+    late.BuildDepth(withHeight.Height, 5, CancellationToken.None);
+    Check(late.Depth != null && late.Depth.SequenceEqual(h1.Depth) && late.DepthSize == h1.DepthSize && late.DepthOriginX == h1.DepthOriginX && late.DepthOriginZ == h1.DepthOriginZ,
+      "and made afterwards it is the grid the build would have made");
 
     // A stop ends the build with OperationCanceledException, and nothing is left running.
     using var stop = new CancellationTokenSource();
