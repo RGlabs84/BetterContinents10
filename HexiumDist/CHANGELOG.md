@@ -1,3 +1,69 @@
+- v0.10.5
+  - Waves out to the edge of a big world. The game draws its calm Deep North sea and its red Ashlands sea
+    from two circles of a 10 km world, written into its water shader, so on a bigger world the sea
+    past those circles was calm and the far sea looked flat. In a world that Better Continents shapes and
+    whose sea is not the game's (a big world, or one with its own Deep North or Ashlands), the sea is now
+    drawn by Better Continents' own water: waves and white crests out to the world's edge, calm only in
+    the world's own Deep North, and the Ashlands' red only where the world's own hot sea is. It looks like
+    the game's water (the same colours, glare and foam), and it needs no new world data: an existing world
+    gets it the moment it loads, and nothing is made again.
+  - Boats, swimmers and fish feel the waves that are drawn, on every machine and on a dedicated server
+    (drawn and felt waves agree to within 4 mm in the tests). Waves are real geometry in the zones that are
+    loaded; the far plane beyond them, about 150 m out, is flat with the game's ripple texture, as in the
+    game. A storm gives a real swell with whitecaps where the game's far sea stays flat.
+  - Two new settings in [11 BetterContinents.Water], each player's own and applied at once: Own Water
+    (off: the game's water, with the colours of 0.10.3) and Soft Far Sea (the far sea takes the depth
+    of the sea under it, so the near and far water meet without light and dark strips seen from high up).
+    If a graphics device cannot run the water, or another mod has replaced the game's water shader, that
+    player sees the game's water and the world is unchanged for everyone else. `bc_water` says whether
+    Better Continents' own sea is on and why; with Debug Mode, `bc water force on|off` and `bc water probe`
+    compare it with the game's water.
+  - `bc genloc` makes the world's locations again where the game's own `genloc` does nothing: after
+    Better Continents skipped the automatic run, or when a run that threw left the game's slot taken. It
+    says what it found, runs the game's own generation, reports what changed, and sends the new location
+    icons to the players. Locations that are placed stay. It runs on the machine that runs the world and
+    needs `devcommands`, as the other `bc` commands do (Debug Mode turns it on). `bc genloc alt` passes to
+    the game's alt-biome branch.
+  - Lakes above the sea (experimental). Valheim has one water level, so every lake in the mountains is a dry hollow.
+    A world can now carry a list of lakes, each with its own water height: Better Continents puts the
+    game's own water in them, so you swim, sail, fish and see them on the minimap and the large map,
+    and boats feel the lake's waves. Each lake fills its basin up to its level; lakes are built as you
+    come near and dropped behind you, a few milliseconds a frame. Lakes follow the world's rules: no
+    waves in the calm Deep North, red and hot where the world's hot sea is, and Better Continents'
+    own water is drawn on them when it is on. This is Tarn, the mod by Raven Iron (Wubarrk and
+    NomadicWar), brought into Better Continents by Wubarrk.
+  - The lake list is `lakes.txt` in the maps folder (one lake a line: name; x; z; level; the box the lake
+    may fill; depth; Tarn's own format, so a map maker's file works as it is; `tarn-lakes.txt` is read
+    too). It is saved with the world, sent to every player, carried by export and import and `.bcworld`
+    files, and a dedicated server builds no water of its own. In game, `bc_lake here` fills the hollow you
+    stand in up to just under its spill point, `bc_lake at <x> <z>` does it anywhere, `bc_lake list`,
+    `info`, `remove`, `depth` (how deep lakes look; one value for the world, sized so that boats and
+    swimmers feel the waves they see), `load`, `import`, `export` and `regen`. The words that replace or
+    remove data (`load`, `import`, `remove all`, `regen`, and writing over a file) need `confirm` and
+    keep a backup of what they replace; on a server the words that change lakes need an admin.
+  - Clearing (experimental). A map maker's `clearmask.bin` (a bitmask over the ground, Tarn's `.clear` file) keeps trees,
+    rocks, bushes and pickable debris off marked ground, such as roads and lake beds; only what would
+    have stood on a marked spot is left out, everything else is placed as before. It acts on zones that
+    are generated after it exists, so make a new world or regenerate those zones. `bc_lake mask at`,
+    `load` and `export` look at it and change it.
+  - Everything that comes from Tarn (lakes, clearing, the `bc_lake` commands and the import of Tarn's
+    files) is experimental for now: it works in the tests and on test worlds, but details may still
+    change, so try it on a copy of a world first.
+  - A world from Tarn: Better Continents reads Tarn's own files (`BepInEx/config/Tarn/<world>.txt` and
+    `.clear`) once, when the world has no lakes or mask yet, and keeps them in the world; Tarn's folder is
+    never written to. If the Tarn mod itself is also installed, Better Continents' lakes and clearing step
+    aside and say so, and nothing is lost.
+  - New settings in [12 BetterContinents.Lakes]: Lake Depth Scale (a world setting), Lake Build Range,
+    Lake Build Budget, Lake Sound and Lakes On Map (each player's own, applied at once).
+  - A world with lakes or a clearing mask needs 0.10.5 or later: an older Better Continents opens it as
+    a world without Better Continents (vanilla terrain). The settings stay in the world's files.
+  - New guide: Water and lakes, the easy guide (BetterContinents-Water-Guide.pdf, GPL-3.0), in this
+    package.
+  - Baked buildings: a painted zone you teleport to now gets its paint at once (a road in a zone without
+    pieces stayed bare until you walked to another zone); `bc_bake load` with no file now prints a
+    `confirm` line that can be typed back as it stands; and `bc_bake undo` finds its undo files in a
+    world that was renamed.
+  - Updated AI doc to v0.10.5.
 - v0.10.4
   - Baked buildings. A bake takes the pieces players built within a circle or a box and makes them part
     of the world's layer: every player's game draws them, solid to walk on, and none of them is a game
