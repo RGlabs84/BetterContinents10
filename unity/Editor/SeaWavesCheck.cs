@@ -208,10 +208,15 @@ public static class SeaWavesCheck
                 double refW = 1.0 - Math.Min(Math.Max(refCalm * 0.005, 0.0), 1.0);
                 worstCalm = Math.Max(worstCalm, Math.Abs(gpuCalm[i] - refCalm));
                 worstW = Math.Max(worstW, Math.Abs(gpuW[i] - refW));
-                if (Math.Abs(gpuCalm[i] - refCalm) > 2e-4 || Math.Abs(gpuW[i] - refW) > 1e-6 || double.IsNaN(gpuW[i]))
+                // The reference is exact (double); the GPU rounds the texel coordinate t = (x - origin) * invSpacing - 0.5 in float32, so its error is a couple
+                // of ulps of t times the steepest slope (this test field is random bytes: up to 255 per texel). That is the budget, plus 1e-5 m for the rest.
+                double tBig = Math.Max(Math.Abs((points[i].x - originX) / spacing), Math.Abs((points[i].y - originZ) / spacing)) + 1.0;
+                double calmBudget = 255.0 * tBig * 2.4e-7 + 1e-5;
+                double wBudget = calmBudget * 0.005 + 1e-7;
+                if (Math.Abs(gpuCalm[i] - refCalm) > calmBudget || Math.Abs(gpuW[i] - refW) > wBudget || double.IsNaN(gpuW[i]))
                     throw new Exception($"[BCWater] field check failed at ({points[i].x}, {points[i].y}): GPU calm {gpuCalm[i]:R} W {gpuW[i]:R}, reference calm {refCalm:R} W {refW:R}");
             }
-            log.AppendLine($"field: {count} points on a {n} x {n} field (inside and beyond its edge); greatest difference {worstCalm:E2} m of calm distance, {worstW:E2} in W (allowed 2e-4 m, 1e-6)");
+            log.AppendLine($"field: {count} points on a {n} x {n} field (inside and beyond its edge); greatest difference {worstCalm:E2} m of calm distance, {worstW:E2} in W (allowed: a per-case float32 budget, about 255 x t x 2.4e-7 m)");
             log.AppendLine("field: the GPU was checked against the transcription of SeaField.cs's layout (the C# suites check SeaField.Waves against the same transcription)");
         }
         finally

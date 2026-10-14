@@ -19,14 +19,19 @@
 #ifndef BC_SEA_FIELD_INCLUDED
 #define BC_SEA_FIELD_INCLUDED
 
-Texture2D<float4> _BCSeaField;
 float4 _BCSeaRect;
-Texture2D<float4> _BCSeaDepth;
 float4 _BCSeaDepthRect;
 float _BCSeaSoft;
 
-#ifndef BC_SEA_COMPUTE_CHECK
-SamplerState sampler_linear_clamp;
+// The compute check reads the field with Load. The shaders use sampler2D and tex2Dlod at a texel's centre instead: Unity's surface-shader parser does not
+// know Texture2D, and a point-filtered, clamped texture sampled at a texel's centre returns that texel's bytes exactly, which is what Load returns.
+#ifdef BC_SEA_COMPUTE_CHECK
+Texture2D<float4> _BCSeaField;
+#define BC_SEA_TEXEL(ix, iz) _BCSeaField.Load(int3((ix), (iz), 0))
+#else
+sampler2D _BCSeaField;
+sampler2D _BCSeaDepth;
+#define BC_SEA_TEXEL(ix, iz) tex2Dlod(_BCSeaField, float4((((ix) + 0.5) / _BCSeaRect.w), (((iz) + 0.5) / _BCSeaRect.w), 0.0, 0.0))
 #endif
 
 // The width of the calm sea's ramp and of the hot sea's edge, in metres (the game's: 200 and 25).
@@ -39,15 +44,16 @@ bool BCSeaFieldReady()
 }
 
 // A unorm8 channel as its byte, 0 .. 255 (exact: the texture stores bytes).
-float BCSeaByte(float v)
+float2 BCSeaByte(float2 v)
 {
     return floor(v * 255.0 + 0.5);
 }
 
-// The calm distance in metres at xz: four Loads, bilinear between the four nearest texel centres by SeaField.CalmAt's arithmetic (SeaField.cs, "Waves(x, z)"):
+// The field at xz as bytes, (R = hot + 128, G = calm): four texel reads, bilinear between the four nearest texel centres by SeaField.CalmAt's arithmetic
+// (SeaField.cs, "Waves(x, z)"), per channel:
 //   u = (x - originX) * invSpacing - 0.5, clamped to -1 .. N; iu = floor(u); tx = u - iu; the two texel columns clamped to 0 .. N-1 (the border texels apply);
-//   a = c00 + (c10 - c00) * tx; b = c01 + (c11 - c01) * tx; calm = a + (b - a) * tz.
-float BCSeaCalmMetres(float2 xz)
+//   a = c00 + (c10 - c00) * tx; b = c01 + (c11 - c01) * tx; value = a + (b - a) * tz.
+float2 BCSeaBilinear(float2 xz)
 {
     float2 t = (xz - _BCSeaRect.xy) * _BCSeaRect.z - 0.5;
     t = clamp(t, -1.0, _BCSeaRect.w);
@@ -56,13 +62,19 @@ float BCSeaCalmMetres(float2 xz)
     int last = (int)_BCSeaRect.w - 1;
     int2 i0 = clamp((int2)fl, 0, last);
     int2 i1 = clamp((int2)fl + 1, 0, last);
-    float c00 = BCSeaByte(_BCSeaField.Load(int3(i0.x, i0.y, 0)).g);
-    float c10 = BCSeaByte(_BCSeaField.Load(int3(i1.x, i0.y, 0)).g);
-    float c01 = BCSeaByte(_BCSeaField.Load(int3(i0.x, i1.y, 0)).g);
-    float c11 = BCSeaByte(_BCSeaField.Load(int3(i1.x, i1.y, 0)).g);
-    float a = c00 + (c10 - c00) * fr.x;
-    float b = c01 + (c11 - c01) * fr.x;
+    float2 c00 = BCSeaByte(BC_SEA_TEXEL(i0.x, i0.y).rg);
+    float2 c10 = BCSeaByte(BC_SEA_TEXEL(i1.x, i0.y).rg);
+    float2 c01 = BCSeaByte(BC_SEA_TEXEL(i0.x, i1.y).rg);
+    float2 c11 = BCSeaByte(BC_SEA_TEXEL(i1.x, i1.y).rg);
+    float2 a = c00 + (c10 - c00) * fr.x;
+    float2 b = c01 + (c11 - c01) * fr.x;
     return a + (b - a) * fr.y;
+}
+
+// The calm distance in metres at xz (the G channel of the above).
+float BCSeaCalmMetres(float2 xz)
+{
+    return BCSeaBilinear(xz).y;
 }
 
 // The game's own Deep North: 1 - WorldGenerator.DeepNorthWaveFade(x, z).
@@ -88,13 +100,12 @@ float BCGameHotRing(float2 xz)
 }
 
 #ifndef BC_SEA_COMPUTE_CHECK
-// The red ring at xz, 0 .. 1 (1 = hot sea): clamp01(0.5 + hot / 25), the game's 25 m edge centred on the border; a hardware bilinear read of R.
+// The red ring at xz, 0 .. 1 (1 = hot sea): clamp01(0.5 + hot / 25), the game's 25 m edge centred on the border; the same bilinear read of R as the calm distance's (the field is point-filtered).
 float BCSeaHotRing(float2 xz)
 {
     if (!BCSeaFieldReady())
         return BCGameHotRing(xz);
-    float2 uv = (xz - _BCSeaRect.xy) * (_BCSeaRect.z / _BCSeaRect.w);
-    float hot = _BCSeaField.SampleLevel(sampler_linear_clamp, uv, 0).r * 255.0 - 128.0;
+    float hot = BCSeaBilinear(xz).x - 128.0;
     return saturate(0.5 + hot / BC_SEA_HOT_EDGE);
 }
 
@@ -102,7 +113,7 @@ float BCSeaHotRing(float2 xz)
 float BCSeaDepth01(float2 xz)
 {
     float2 uv = ((xz - _BCSeaDepthRect.xy) * _BCSeaDepthRect.z + 0.5) / _BCSeaDepthRect.w;
-    return saturate(_BCSeaDepth.SampleLevel(sampler_linear_clamp, uv, 0).r);
+    return saturate(tex2Dlod(_BCSeaDepth, float4(uv, 0.0, 0.0)).r);
 }
 #endif
 

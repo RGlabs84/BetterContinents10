@@ -21,7 +21,8 @@ public static class BuildBcWater
     private const string Folder = "Assets/BCWater";
     private const string WaterPath = Folder + "/BetterContinentsWater.shader";
     private const string ProbePath = Folder + "/BetterContinentsWaterProbe.shader";
-    private const string OutputFolder = "Build/BCWater";
+    // Not named like the bundle: the bundle build writes a manifest bundle called after this folder (lower-cased), which would overwrite a bundle called bcwater.
+    private const string OutputFolder = "Build/Out";
 
     // the 33 properties of the game's Custom/Water (libs-Tools WATER-SHADER-FACTS.md, section 2): the game and other mods write them by name
     private static readonly string[] Properties =

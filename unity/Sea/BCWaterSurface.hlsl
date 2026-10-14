@@ -65,19 +65,18 @@ struct Input
 #ifndef BC_WATER_PREPASS
     float2 uv_MainTex;
     float4 screenPos;
-    float crest;
+    float4 color : COLOR;              // .w = the crest (the game's does the same: its COLOR0.w), written by BCVert
 #endif
     float3 worldPos;
 };
 
-void BCVert(inout appdata_full v, out Input o)
+// One parameter: a surface shader with tessellation calls its vertex function (in the domain stage) with the vertex alone. The crest goes to the
+// vertex colour's alpha, which the stages interpolate, and the surface function reads it back from Input.color.
+void BCVert(inout appdata_full v)
 {
-    UNITY_INITIALIZE_OUTPUT(Input, o);
     float crest;
     BCWaterDisplace(v.vertex, v.normal, v.texcoord.xy, crest);
-#ifndef BC_WATER_PREPASS
-    o.crest = crest;
-#endif
+    v.color = float4(1.0, 1.0, 1.0, crest);
 }
 
 #ifdef BC_WATER_TESS
@@ -191,8 +190,9 @@ void BCSurf(Input IN, inout SurfaceOutputStandard o)
     float randomFoam = 5.0 * windIntensity * depth * tex2D(_RandomFoamTex, xz * 0.03 + wobble).x;
     c = lerp(c, foam.rgb, randomFoam * foam.a);
     float gloss = _Glossiness * (1.0 - randomFoam);
-    float crest2 = IN.crest * IN.crest;
-    float crest3 = crest2 * IN.crest;
+    float crest = IN.color.w;
+    float crest2 = crest * crest;
+    float crest3 = crest2 * crest;
     float shore = depth * min(shoreA, min(1.0 - shoreB + 1.5 * crest2, 1.0));
     c = lerp(c, foam.rgb, 8.0 * shore * foam.a * tex2D(_FoamTex, xz * 0.1 + wobble).x);
     c = lerp(c, top, crest2);

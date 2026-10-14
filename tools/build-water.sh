@@ -105,8 +105,8 @@ else
 fi
 
 LOG="$PROJ/Logs/build-water.log"
-mkdir -p "$PROJ/Logs" "$PROJ/Build/BCWater"
-rm -f "$PROJ/Build/BCWater/bcwater"
+mkdir -p "$PROJ/Logs" "$PROJ/Build/Out"
+rm -f "$PROJ/Build/Out/bcwater"
 STATUS=0
 unity run "$PROJ" --timeout 3000 -- -executeMethod BuildBcWater.Build -logFile "$LOG" || STATUS=$?
 echo "---- [BCWater] lines of $LOG"
@@ -119,7 +119,7 @@ if [ "$STATUS" -ne 0 ] || [ -n "$BAD" ]; then
   exit 1
 fi
 
-BUNDLE="$PROJ/Build/BCWater/bcwater"
+BUNDLE="$PROJ/Build/Out/bcwater"
 [ -s "$BUNDLE" ] || { echo "the bundle $BUNDLE is missing or empty"; exit 1; }
 "$PY" "$FACTS/bundle_check.py" "$BUNDLE"
 
