@@ -1,4 +1,4 @@
-// Modified by Wubarrk on 2026-09-22 for alt-biome planting (0.8.1), and on 2026-09-24 for world export and import (0.9.0), and on 2026-10-04 for the unifying refactor (0.10.0), and on 2026-10-06 for 16k worlds (0.10.3), and on 2026-10-07 for baked placements (0.10.4).
+// Modified by Wubarrk on 2026-09-22 for alt-biome planting (0.8.1), and on 2026-09-24 for world export and import (0.9.0), and on 2026-10-04 for the unifying refactor (0.10.0), and on 2026-10-06 for 16k worlds (0.10.3), and on 2026-10-07 for baked placements (0.10.4), and on 2026-10-13 for lakes and clearing (0.10.5).
 
 using System;
 using System.Collections.Generic;
@@ -103,6 +103,11 @@ public partial class BetterContinents
     // carries a layer). Written before Placements. 72 and up are for the water work (U6): whichever branch merges second takes the next free
     // number, written explicitly as these are.
     GameTerrain = 71,
+    // 0.10.5 (72, 73): the world's lakes (Tarn's list, LakeSet.ToBlock) and its clearing mask (Tarn's bitmask, ClearMask.ToBlock), each one length-prefixed
+    // blob whose first int32 is its format version. Written after every key above, only by a world that has them; an older Better Continents stops at 72
+    // ("Unknown feature") and treats the world as vanilla, as it does for the baked layer.
+    Lakes = 72,
+    Clearing = 73,
   }
   public partial class BetterContinentsSettings
   {

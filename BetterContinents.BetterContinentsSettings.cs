@@ -1,4 +1,4 @@
-﻿// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and alt-biome planting (0.8.1), and on 2026-09-24 for world export and import (0.9.0), and on 2026-09-29 for Expand World Data biomes (0.9.3), and on 2026-10-02 for export folders used as the Directory (0.9.4), and on 2026-10-04 for the unifying refactor (0.10.0), and on 2026-10-06 for 16k worlds (0.10.3), and on 2026-10-07 for baked placements (0.10.4).
+﻿// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and alt-biome planting (0.8.1), and on 2026-09-24 for world export and import (0.9.0), and on 2026-09-29 for Expand World Data biomes (0.9.3), and on 2026-10-02 for export folders used as the Directory (0.9.4), and on 2026-10-04 for the unifying refactor (0.10.0), and on 2026-10-06 for 16k worlds (0.10.3), and on 2026-10-07 for baked placements (0.10.4), and on 2026-10-13 for lakes and clearing (0.10.5).
 
 using System;
 using System.Collections.Generic;
@@ -88,6 +88,15 @@ public partial class BetterContinents
     // does for an alt-biome map that cannot be read. Its bytes are kept as they were, and saved back unchanged (Serialize).
     internal string? LayerError;
     private byte[]? LayerBytesAsRead;
+
+    // ---- lakes and clearing (0.10.5, ported from Tarn) -----------------------------------------------------------------------------
+    // The world's lakes and its clearing mask: immutable objects, each a reference swapped whole by whoever changes it (as Layer is); WithLayer's copy
+    // shares them, which is right. Null in a world without them. LakesError / ClearingError: the blob in the world's settings could not be read (a newer
+    // format, or damaged); the world then plays without lakes, or the load stops for a mask (the data agent's code, Serialize.cs).
+    internal volatile LakeSet? Lakes;
+    internal volatile ClearMask? Clearing;
+    internal string? LakesError;
+    internal string? ClearingError;
     // The world's terrain is the game's own (spec 4): a world made without Better Continents' maps, or with Better Continents off for it,
     // that carries a layer. Its settings hold nothing but this, a wide-sectors flag and the layer.
     public bool GameTerrain;
