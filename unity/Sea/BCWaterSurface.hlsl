@@ -21,6 +21,7 @@
 #include "BCWaterVertex.hlsl"
 
 // ---- properties (the same names as Custom/Water's; _NormalFine, _AshlandsDistance and _AshlandsYOffset are kept on the material but never read)
+float _BCDebug;                        // diagnosis only (0 = off): bc-autotest paints intermediate values, see the end of BCSurf
 sampler2D _MainTex;                    // never set (the game's shader has no _MainTex either); only for uv_MainTex's scale and offset
 float _Tess;
 #ifndef BC_WATER_PREPASS
@@ -220,6 +221,18 @@ void BCSurf(Input IN, inout SurfaceOutputStandard o)
     o.Occlusion = 1.0;
     o.Emission = bg * surfaceColor * (1.0 - fade);
     o.Alpha = alpha;
+    if (_BCDebug > 0.5)
+    {
+        float3 dbg = _BCDebug < 1.5 ? float3(depth, h, edgeBand)
+                   : (_BCDebug < 2.5 ? float3(m, shoreA, fade)
+                   : (_BCDebug < 3.5 ? float3(saturate(crest), saturate(crest2), saturate(randomFoam))
+                   : float3(saturate(shore), saturate((P.y - 25.0) / 10.0), saturate(abs(depthBg - eyeDepth) / 20.0))));
+        o.Albedo = 0;
+        o.Metallic = 0;
+        o.Smoothness = 0;
+        o.Emission = dbg;
+        o.Alpha = 1;
+    }
 }
 
 // The game's own fog, in place of Unity's: the colour leans towards the sun's fog colour looking at the sun; there is more fog by distance and in
