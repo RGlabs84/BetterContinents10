@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-09-24 for world export and import (0.9.0), and on 2026-09-27 for map mod compatibility (0.9.2), and modified on 2026-10-04 for the unifying refactor (0.10.0), and on 2026-10-06 for 16k worlds (0.10.3), and on 2026-10-07 for baked placements (0.10.4), and on 2026-10-13 for BC's own water (0.10.5).
+// Added by Wubarrk on 2026-09-24 for world export and import (0.9.0), and on 2026-09-27 for map mod compatibility (0.9.2), and modified on 2026-10-04 for the unifying refactor (0.10.0), and on 2026-10-06 for 16k worlds (0.10.3), and on 2026-10-07 for baked placements (0.10.4), and on 2026-10-13 for BC's own water (0.10.5), and on 2026-10-13 for lakes and clearing (0.10.5).
 
 // Offline checks of Better Continents 0.9.0's live config (LiveConfig), its RPC package, the export gate and the
 // configured export defaults. Loads the real pre-ILRepack BetterContinents.dll, the game's assemblies and BepInEx.
@@ -285,12 +285,22 @@ internal static class Program
   {
     Section("config section numbering");
     // ConfigHelpers numbers groups in declaration order; the Export group must come tenth (09), after AltBiomes (08), the baked
-    // placements group eleventh (10) and BC's own water twelfth (11): sections only ever go last.
+    // placements group eleventh (10), BC's own water twelfth (11) and the lakes thirteenth (12): sections only ever go last.
     // Every setting is declared in SettingsSchema (since the unifying refactor), group by group in file order.
     var groups = SettingsSchema.Groups.Select(g => g.Name).ToList();
-    C(groups.Count == 12 && groups[8] == "BetterContinents.AltBiomes" && groups[9] == "BetterContinents.Export" && groups[10] == "BetterContinents.BakedPlacements"
-      && groups[11] == "BetterContinents.Water",
-      $"Awake declares 12 groups, the water last: {string.Join(", ", groups.Select((g, i) => $"{i:00} {g}"))}");
+    C(groups.Count == 13 && groups[8] == "BetterContinents.AltBiomes" && groups[9] == "BetterContinents.Export" && groups[10] == "BetterContinents.BakedPlacements"
+      && groups[11] == "BetterContinents.Water" && groups[12] == "BetterContinents.Lakes",
+      $"Awake declares 13 groups, the lakes last: {string.Join(", ", groups.Select((g, i) => $"{i:00} {g}"))}");
+    var lakeGroup = SettingsSchema.Groups[12];
+    C(lakeGroup.Settings.Select(x => x.Key).SequenceEqual(["Lake Depth Scale", "Lake Build Range", "Lake Build Budget", "Lake Sound", "Lakes On Map"]) && lakeGroup.Settings.All(x => x.Section == "12 BetterContinents.Lakes"),
+      "the lakes section 12 holds Lake Depth Scale, Lake Build Range, Lake Build Budget, Lake Sound and Lakes On Map");
+    C(SettingsSchema.LakeDepthScale.Scope == SettingScope.World && SettingsSchema.LakeDepthScale.ReadsIntoSettings && SettingsSchema.LakeDepthScale.Default == 0.5f && SettingsSchema.LakeDepthScale.Limits == (0f, 3f)
+      && SettingsSchema.LakeDepthScale.ConsoleGroup == "lake" && SettingsSchema.LakeDepthScale.OnLiveChange == LiveChange.Lakes,
+      "Lake Depth Scale is the one world setting of it (0.5, 0 to 3), changed live by bc lake depth without regenerating the zones");
+    C(lakeGroup.Settings.Skip(1).All(x => x.Scope == SettingScope.Live && !x.ReadsIntoSettings && x.ConsoleGroup == null)
+      && SettingsSchema.LakeBuildRange.Default == 400f && SettingsSchema.LakeBuildRange.Limits == (150f, 2000f) && SettingsSchema.LakeBuildBudget.Default == 2f && SettingsSchema.LakeBuildBudget.Limits == (0.5f, 20f)
+      && SettingsSchema.LakeSound.Default == 0.35f && SettingsSchema.LakeSound.Limits == (0f, 1f) && SettingsSchema.LakesOnMap.Default,
+      "the other four are live (400 m, 150 to 2000; 2 ms, 0.5 to 20; 0.35, 0 to 1; on) and part of no world's settings");
     C(SettingsSchema.BakedDrawDistance.Section == "10 BetterContinents.BakedPlacements", $"the baked placements settings are in section '{SettingsSchema.BakedDrawDistance.Section}'");
     C(SettingsSchema.OwnWater.Section == "11 BetterContinents.Water" && SettingsSchema.SoftFarSea.Section == "11 BetterContinents.Water"
       && SettingsSchema.OwnWater.Scope == SettingScope.Live && SettingsSchema.SoftFarSea.Scope == SettingScope.Live

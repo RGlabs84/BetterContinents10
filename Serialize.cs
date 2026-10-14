@@ -260,7 +260,7 @@ public partial class BetterContinents
       // legacy layout, whatever Override version says (a layer there would be lost).
       if (GameTerrain)
         version = Math.Max(version, UnifiedVersion);
-      else if (version < KeyedVersion && (Layer != null || LayerSentApart || LayerBytesAsRead != null))
+      else if (version < KeyedVersion && (Layer != null || LayerSentApart || LayerBytesAsRead != null || CarriesLakeData))
         version = KeyedVersion;
       // Room for as many bytes as the last package of this kind took, so the stream does not grow by doubling.
       PackageBytes.Reserve(pkg, network ? sentLength : savedLength);
@@ -706,7 +706,7 @@ public partial class BetterContinents
     // byte as before. On disk the layer is one byte array; in the package sent to players an empty one, which says "this world has a layer, sent
     // apart" (BakedTransfer sends it on its own, so a change of the layer leaves the package, its id and every cached copy alone). A layer
     // that could not be read is saved back as it was. The biome cache's fingerprint (includeAltBiomes false) leaves them out: neither
-    // changes the biome grid it holds.
+    // changes the biome grid it holds. 0.10.5 adds the lakes and the clearing mask after them (WriteLakeKeys).
     private void WriteLayerKeys(ZPackage pkg, bool network, bool includeAltBiomes)
     {
       if (!includeAltBiomes)
@@ -725,6 +725,69 @@ public partial class BetterContinents
         }
         else
           pkg.Write(LayerBytesAsRead!);
+      }
+      WriteLakeKeys(pkg);
+    }
+
+    // Whether the settings hold lake data of any kind (a set, a mask, or a blob this build cannot read and keeps): such a world is saved in the keyed format.
+    private bool CarriesLakeData => Lakes != null || Clearing != null || LakesBlobAsRead != null || ClearingBlobAsRead != null;
+
+    // 0.10.5, after every other key: the world's lakes (DataKey.Lakes, LakeSet.ToBlock) and its clearing mask (DataKey.Clearing, ClearMask.ToBlock), each a
+    // length-prefixed blob whose first int32 is its format version. A world with neither writes neither, so it saves byte for byte as before; an older Better
+    // Continents stops at 72 ("Unknown feature") and treats the world as vanilla, as it does for the baked layer. Disk and network alike: the lakes are small
+    // and the mask is a few hundred kilobytes deflated, and a client that exports the world has them. A blob this build could not read goes back unchanged.
+    private void WriteLakeKeys(ZPackage pkg)
+    {
+      if (Lakes != null || LakesBlobAsRead != null)
+      {
+        var blob = Lakes?.ToBlock() ?? LakesBlobAsRead!;
+        pkg.Write((int)DataKey.Lakes);
+        PackageBytes.Guard(pkg, "the lakes", blob.Length);
+        pkg.Write(blob);
+      }
+      if (Clearing != null || ClearingBlobAsRead != null)
+      {
+        var blob = Clearing?.ToBlock() ?? ClearingBlobAsRead!;
+        pkg.Write((int)DataKey.Clearing);
+        PackageBytes.Guard(pkg, "the clearing mask", blob.Length);
+        pkg.Write(blob);
+      }
+    }
+
+    // The lakes' blob: kept as it is when it cannot be read (a newer format, or damaged), and the world plays without lakes (LakesError); it is saved back unchanged.
+    private void ReadLakes(byte[] blob)
+    {
+      try
+      {
+        Lakes = LakeSet.FromBlock(blob);
+        LakesBlobAsRead = null;
+        LakesError = null;
+      }
+      catch (LakeFormatException e)
+      {
+        LakesError = $"the lakes in the world's settings cannot be read ({e.Message})";
+        LogError($"Failed to read the lakes ({e.Message}). They are kept unchanged in the world's settings; the world plays without lakes.");
+        Lakes = null;
+        LakesBlobAsRead = blob;
+      }
+    }
+
+    // The clearing mask's blob, likewise; but a world whose mask cannot be read does not load (ClearingError, AltBiomeControl): zones are generated once, and one
+    // made without the mask would plant trees on every road for good.
+    private void ReadClearing(byte[] blob)
+    {
+      try
+      {
+        Clearing = ClearMask.FromBlock(blob);
+        ClearingBlobAsRead = null;
+        ClearingError = null;
+      }
+      catch (LakeFormatException e)
+      {
+        ClearingError = $"the clearing mask in the world's settings cannot be read ({e.Message})";
+        LogError($"Failed to read the clearing mask ({e.Message}). It is kept unchanged in the world's settings.");
+        Clearing = null;
+        ClearingBlobAsRead = blob;
       }
     }
 
@@ -1098,6 +1161,12 @@ public partial class BetterContinents
             break;
           case DataKey.Placements:
             ReadLayer(pkg.ReadByteArray());
+            break;
+          case DataKey.Lakes:
+            ReadLakes(pkg.ReadByteArray());
+            break;
+          case DataKey.Clearing:
+            ReadClearing(pkg.ReadByteArray());
             break;
           case DataKey.TiledMap:
             var mapKey = (DataKey)pkg.ReadInt();

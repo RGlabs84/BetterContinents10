@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-09-24 for world export and import (0.9.0), and on 2026-09-29 for Expand World Data biomes (0.9.3), and on 2026-10-02 for export folders used as the Directory (0.9.4), and modified on 2026-10-04 for the unifying refactor (0.10.0), and on 2026-10-06 for 16k worlds (0.10.3), and on 2026-10-07 for baked placements (0.10.4).
+// Added by Wubarrk on 2026-09-24 for world export and import (0.9.0), and on 2026-09-29 for Expand World Data biomes (0.9.3), and on 2026-10-02 for export folders used as the Directory (0.9.4), and modified on 2026-10-04 for the unifying refactor (0.10.0), and on 2026-10-06 for 16k worlds (0.10.3), and on 2026-10-07 for baked placements (0.10.4), and on 2026-10-13 for lakes and clearing (0.10.5).
 
 using System;
 using System.Collections;
@@ -945,6 +945,9 @@ public static class WorldExport
     private bool LocationsWritten, AltBiomesWritten, HeatWritten, ForestWritten, HeightsWritten;
     // The loaded world's baked layer, written as placements.bcp (LayerPass).
     private BakedLayer? LayerExported;
+    // The loaded world's lakes and clearing mask, written as lakes.txt and clearmask.bin (LakePass).
+    private LakeSet? LakesExported;
+    private ClearMask? ClearingExported;
     // The fine heights file (heightmap-fine.png), when it was written: the bits its bytes use, and how many pixels have a fine byte
     // that is not 0.
     private int FineBitsWritten;
@@ -1054,6 +1057,9 @@ public static class WorldExport
       // Before the preset, which is built from this folder: it takes the layer with the maps.
       foreach (var step in LayerPass())
         yield return step;
+      // And the lakes and the clearing mask, which it takes the same way.
+      foreach (var step in LakePass())
+        yield return step;
       // The settings lines first: the preset is built from them, and export.cfg, written after it, says how it went.
       var config = ConfigLines();
       foreach (var step in PresetPass(config))
@@ -1085,6 +1091,10 @@ public static class WorldExport
       if (O.Sources)
         t += 0.5;
       if (Settings.Layer != null)
+        t += 0.05;
+      if (Settings.Lakes is { IsEmpty: false })
+        t += 0.01;
+      if (Settings.Clearing != null)
         t += 0.05;
       if (MakesPreset)
         t += W(0.8, 0.2);
@@ -2428,6 +2438,41 @@ public static class WorldExport
       LayerExported = layer;
     }
 
+    // ---- lakes.txt and clearmask.bin ---------------------------------------------------------------------------
+
+    // The loaded world's lakes and clearing mask at the top of the folder, beside the maps, in Tarn's formats: a world made from the folder, by any of the three
+    // ways, has the same ones (BetterContinentsSettings.ReadLakeFiles reads them with the maps), and Tarn reads them too. The lake lines hold the numbers in the
+    // round-trip form, so the new world's lakes are the same to the last bit. A client that exports a server's world has both: they are in its settings.
+    private IEnumerable LakePass()
+    {
+      var lakes = Settings.Lakes is { IsEmpty: false } set ? set : null;
+      var mask = Settings.Clearing;
+      if (lakes == null && mask == null)
+        yield break;
+      Begin("Writing the lakes and the clearing mask", (lakes != null ? 0.01 : 0) + (mask != null ? 0.05 : 0));
+      var tasks = new List<System.Threading.Tasks.Task>();
+      if (lakes != null)
+      {
+        var path = Path.Combine(Dir, LakeFiles.LakesFileName);
+        Tracked.Add(path);
+        tasks.Add(Task.Run(() => LakeFiles.WriteLakes(path, lakes)));
+      }
+      if (mask != null)
+      {
+        var path = Path.Combine(Dir, LakeFiles.ClearFileName);
+        Tracked.Add(path);
+        tasks.Add(Task.Run(() => LakeFiles.WriteClearing(path, mask)));
+      }
+      foreach (var step in Await(Task.WhenAll(tasks), () => 50f, needsWorld: false))
+        yield return step;
+      if (lakes != null)
+        Written.Add(LakeFiles.LakesFileName);
+      if (mask != null)
+        Written.Add(LakeFiles.ClearFileName);
+      LakesExported = lakes;
+      ClearingExported = mask;
+    }
+
     // ---- export.cfg, README.txt, manifest.json -----------------------------------------------------------------
 
     private IEnumerable TextPass(List<string> config)
@@ -2557,6 +2602,9 @@ public static class WorldExport
       l.Add("## Only NEW worlds use these settings. A world that exists keeps the maps it was created with.");
       if (LayerExported != null)
         l.Add($"## {BetterContinentsSettings.LayerFileName} in this folder is the world's baked layer: a new world made from this folder, in any of these ways, has the same layer.");
+      if (LakesExported != null || ClearingExported != null)
+        l.Add($"## {(LakesExported != null ? LakeFiles.LakesFileName : "")}{(LakesExported != null && ClearingExported != null ? " and " : "")}{(ClearingExported != null ? LakeFiles.ClearFileName : "")} in this folder "
+          + $"{(LakesExported != null && ClearingExported != null ? "are" : "is")} the world's {(LakesExported != null && ClearingExported != null ? "lakes and clearing mask" : LakesExported != null ? "lakes" : "clearing mask")}, in Tarn's formats: a new world made from this folder, in any of these ways, has the same.");
       return l;
     }
 
@@ -2646,6 +2694,9 @@ public static class WorldExport
 
       if (HeatWritten)
         Key(SettingsSchema.HeatmapScale, F(O.HeatScale), "heat = pixel / 65535 * scale; Ashlands where it is above 0.");
+
+      if (LakesExported != null)
+        Key(SettingsSchema.LakeDepthScale, F(LakesExported.DepthScale), "As the loaded world: how deep the game's water shader takes its lakes to be (lakes.txt holds the lakes, not this).");
 
       Key(SettingsSchema.SelectedPreset, "From Config", "Makes the new-world preset \"From Config\", i.e. these settings. Anything else creates the world without them.");
 
@@ -2740,6 +2791,8 @@ public static class WorldExport
       Entry("vegetationmap.png", "This world's own vegetation map: which plants may grow where (vegetationmap.txt).");
       Entry("spawnmap.png", "This world's own spawn map: which creatures may appear where (spawnmap.txt).");
       Entry("placements.bcp", "The loaded world's baked layer: the buildings baked into it, its ground and paint, and the record of who baked what. A world made from this folder has it too.");
+      Entry(LakeFiles.LakesFileName, "The loaded world's lakes, one a line (name;x;z;level;minX;minZ;maxX;maxZ;depth; heights are absolute, the sea is 30), in Tarn's format. A world made from this folder has them too.");
+      Entry(LakeFiles.ClearFileName, "The loaded world's clearing mask, in Tarn's .clear format (TARNCLR1, a size, a half-extent, then a bit a pixel, north first): the ground where no tree, rock or bush grows. A world made from this folder has it too.");
       if (Written.Any(x => x.StartsWith("sources/")))
         l.Add($"  {"sources/".PadRight(w)} The loaded world's own Better Continents maps as its settings keep them (not loaded).");
       l.Add($"  {"export.cfg".PadRight(w)} The settings that load this folder (way C). It keeps the world's Biome precision ({EffectiveBiomePrecision(Settings)}):");
@@ -2884,6 +2937,21 @@ public static class WorldExport
             { "zones", LayerExported.Zones.Count },
             { "bytes", LayerExported.Length },
             { "producer", LayerExported.Producer },
+          } },
+        { "lakes", LakesExported == null ? null : new WorldExportJson.Obj
+          {
+            { "file", LakeFiles.LakesFileName },
+            { "count", LakesExported.Lakes.Count },
+            { "depthScale", LakesExported.DepthScale },
+            { "format", "name;x;z;level;minX;minZ;maxX;maxZ;depth, one lake a line, absolute heights (the sea is at 30 m); Tarn's" },
+          } },
+        { "clearing", ClearingExported == null ? null : new WorldExportJson.Obj
+          {
+            { "file", LakeFiles.ClearFileName },
+            { "size", ClearingExported.Size },
+            { "extent", ClearingExported.Extent },
+            { "km2", Math.Round(ClearingExported.Km2, 3) },
+            { "format", "TARNCLR1, int32 size, float32 half-extent, size x size bits (row 0 the north edge, high bit first); Tarn's" },
           } },
         { "import", $"bc_import {ImportArg}" },
         { "files", files },

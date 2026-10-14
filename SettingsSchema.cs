@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-10-04 for the unifying refactor (0.10.0), and modified on 2026-10-06 for the Forest Scale default (0.10.2), and on 2026-10-06 for 16k worlds (0.10.3), and on 2026-10-07 for baked placements (0.10.4), and on 2026-10-13 for BC's own water (0.10.5).
+// Added by Wubarrk on 2026-10-04 for the unifying refactor (0.10.0), and modified on 2026-10-06 for the Forest Scale default (0.10.2), and on 2026-10-06 for 16k worlds (0.10.3), and on 2026-10-07 for baked placements (0.10.4), and on 2026-10-13 for BC's own water (0.10.5), and on 2026-10-13 for lakes and clearing (0.10.5).
 
 using System;
 using System.Collections.Generic;
@@ -35,6 +35,9 @@ internal enum LiveChange
   /// placement is made again for the height limit they lift, and the zones are generated again; the loaded terrain, the noise and the minimap are
   /// left as they are (HighTerrain.ModeChanged).</summary>
   Rules,
+  /// <summary>The lake depth scale: the lake set is swapped for one with the new scale and sent to the players (LakeCommands.SetDepthScale); no zone, noise or
+  /// minimap is touched.</summary>
+  Lakes,
 }
 
 /// <summary>One setting, declared once: its config section, key, type, default, range and description; for a world
@@ -132,7 +135,7 @@ internal static class SettingsSchema
   public static readonly SettingDef<bool> DebugMode = S("Debug Mode", "For editing a world's settings live with the bc commands. In a world that uses Better Continents, on the machine that runs it (single player or the host), it turns devcommands on when you spawn, shows \"Better Continents Debug Mode Enabled!\" at the top left, and adds a Better Continents button to the Esc menu and the large map that opens the settings window (Alt+F8 there does the same). Leave it off for a world you play.", SettingScope.Local, false, e => ConfigDebugModeEnabled = e);
   public static readonly SettingDef<string> DebugResetCommand = S("Debug Reset Command", "Empty (the default): Better Continents regenerates the zones itself after a change made with the bc commands and on 'bc regen'. Every generated zone is reset, and generates again with the current settings when somebody comes near, except zones within one zone of something a player built or worked on (a field, a path, levelled ground), a tombstone, a player connected from another machine (as far as their game keeps zones loaded around them), or you inside a dungeon. A location that reaches into one of those zones is kept whole. Players, what players built, tombstones and tamed animals are never removed. A console command written here (for example zones_reset start) runs instead.", SettingScope.Local, "", e => ConfigDebugResetCommand = e);
   public static readonly SettingDef<string> OverrideVersion = S("Override version", "Empty (the default): every world is saved in its own settings version (one older than 11 as 11), and a new world gets the newest (12, made by 0.10). A number here saves every world in that version instead, and a new world made From Config gets it when it is 11 or more: 11 makes worlds as Better Continents 0.9 did. For testing only: a world saved in an older version than its own loses what its version added.", SettingScope.World, "", e => ConfigOverrideVersion = e);
-  public static readonly SettingDef<string> Directory = S("Directory", "A folder of maps, each loaded by its standard name: heightmap.png, biomemap.png, terrainmap.png, locationmap.png, roughmap.png, forestmap.png, heatmap.png, paintmap.png, lavamap.png, mossmap.png, vegetationmap.png, spawnmap.png, altbiomemap.png (and the legends beside them). When it is set, the map file settings are not used. A folder with an export.cfg in it (a world export) also brings the settings in that file, which win over this one.", SettingScope.World, "", e => ConfigMapSourceDir = e);
+  public static readonly SettingDef<string> Directory = S("Directory", "A folder of maps, each loaded by its standard name: heightmap.png, biomemap.png, terrainmap.png, locationmap.png, roughmap.png, forestmap.png, heatmap.png, paintmap.png, lavamap.png, mossmap.png, vegetationmap.png, spawnmap.png, altbiomemap.png (and the legends beside them), and lakes.txt and clearmask.bin (a world's lakes and its mask of ground kept free of trees, rocks and bushes, in Tarn's formats; tarn-lakes.txt and tarn-clear.bin are taken when those are missing). When it is set, the map file settings are not used. A folder with an export.cfg in it (a world export) also brings the settings in that file, which win over this one.", SettingScope.World, "", e => ConfigMapSourceDir = e);
 
   // ---- 01 Global ------------------------------------------------------------------------------------------------------
   public static readonly SettingDef<bool> SkipDefaultLocations = new("Skip Default Locations", "Skips the default location placement. Spawn temple and location map are still placed.", SettingScope.World, false, e => ConfigSkipDefaultLocations = e)
@@ -289,6 +292,18 @@ internal static class SettingsSchema
   public static readonly SettingDef<bool> OwnWater = S("Own Water", "Draws the sea with Better Continents' own water in worlds whose sea is not the game's: waves out to the world's edge, calm only in its own Deep North, and the Ashlands' red where its hot sea is. Off: the game's water, with the red set zone by zone as earlier versions of Better Continents did; boats still float on the world's waves. If this graphics device cannot run Better Continents' water, or another mod has replaced the game's water shader, the game's water is drawn too, and the log says why. A vanilla-size world without maps, and a world that keeps the game's own terrain, always have the game's water. Applies at once", SettingScope.Live, true, e => SeaSettings.OwnWater = e);
   public static readonly SettingDef<bool> SoftFarSea = S("Soft Far Sea", "With Own Water: the far sea past the loaded zones takes the depth of the sea under it, so that it looks like the near water where they meet (no light and dark strips seen from high up). Off: the far sea is drawn as deep sea everywhere, as the game draws it. Applies at once", SettingScope.Live, true, e => SeaSettings.SoftFarSea = e);
 
+  // ---- 12 Lakes (lakes above the sea and a mask of ground kept clear of plants, ported from Tarn) -------------------------------------------------------
+  // Lake Depth Scale is the one world setting here: a new world copies it, and the world's own is kept in its lake set. The rest are read while the game runs.
+  public static readonly SettingDef<float> LakeDepthScale = new("Lake Depth Scale", "How deep the game's water shader takes a lake to be, as a share of its real depth, for the lakes of a new world: the game's water colour, foam and wave size all follow depth (full colour and full waves at 10 m), so lower is calmer and greener and higher bluer and rougher. It also sizes the waves that boats and swimmers feel in a lake, so every player of a world shares the one value, which is kept with the world's lakes; 'bc_lake depth' changes it in a running world. 0.5 is the value the lakes of Raven Iron's Tarn were tuned with. A new world takes this when it is made (From Config, bc_import, or a Directory's export.cfg) and keeps it", SettingScope.World, LakeSet.DefaultDepthScale, e => LakeSettings.DepthScale = e)
+  { Range = R(0f, LakeSet.MaxDepthScale), Get = s => s.EffectiveLakeDepthScale, Set = (s, v) => s.LakeDepthScale = v, ConsoleGroup = "lake", ConsoleName = "depth", ConsoleLabel = "Lake depth scale", OnLiveChange = LiveChange.Lakes };
+  public static readonly SettingDef<float> LakeBuildRange = new("Lake Build Range", "Lakes within this many metres of you are built (their water and the places you can swim in it), and dropped again 150 m further out. Applies at once", SettingScope.Live, 400f, e => LakeSettings.BuildRange = e)
+  { Range = R(150f, 2000f) };
+  public static readonly SettingDef<float> LakeBuildBudget = new("Lake Build Budget", "Milliseconds a frame that this machine spends making the water objects of lakes. Applies at once", SettingScope.Live, 2f, e => LakeSettings.BuildBudgetMs = e)
+  { Range = R(0.5f, 20f) };
+  public static readonly SettingDef<float> LakeSound = new("Lake Sound", "Volume of the water sound near a lake (the game's ocean loop, quieter). 0 = off. Applies at once", SettingScope.Live, 0.35f, e => LakeSettings.SoundVolume = e)
+  { Range = R(0f, 1f) };
+  public static readonly SettingDef<bool> LakesOnMap = S("Lakes On Map", "Draws a world's lakes on the large map and the minimap. The map is drawn again when the lakes change; a lake taken out stays on the picture until it is. Applies at once", SettingScope.Live, true, e => LakeSettings.OnMap = e);
+
   /// <summary>BetterContinents.cfg, section by section, in order.</summary>
   public static readonly SettingGroup[] Groups =
   [
@@ -307,6 +322,8 @@ internal static class SettingsSchema
     new("BetterContinents.BakedPlacements", BakedDrawDistance, BakedDrawScale, BakedDetailScale, BakedShadowMode, BakedLightDistance, BakedSeatDistance, BakedLightCount, BakedLightShadows, BakedTints, BakedDiagnostics),
     // The client's drawing of the sea (BC's own water), read live. No world data goes with it: a world's settings bytes do not change.
     new("BetterContinents.Water", OwnWater, SoftFarSea),
+    // Lakes and the clearing mask (ported from Tarn): the depth scale a new world copies, and the client's drawing and building of lakes, read live.
+    new("BetterContinents.Lakes", LakeDepthScale, LakeBuildRange, LakeBuildBudget, LakeSound, LakesOnMap),
   ];
 
   public static IEnumerable<SettingDef> All => Groups.SelectMany(g => g.Settings);

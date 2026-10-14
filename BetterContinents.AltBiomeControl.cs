@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-09-22 for alt-biome planting (0.8.1), and on 2026-09-25 for version-agnostic wording (0.9.1), and on 2026-09-29 for Expand World Data biomes (0.9.3), and modified on 2026-10-04 for the unifying refactor (0.10.0), and on 2026-10-06 and 2026-10-07 for 16k worlds (0.10.3), and on 2026-10-07 for baked placements (0.10.4).
+// Added by Wubarrk on 2026-09-22 for alt-biome planting (0.8.1), and on 2026-09-25 for version-agnostic wording (0.9.1), and on 2026-09-29 for Expand World Data biomes (0.9.3), and modified on 2026-10-04 for the unifying refactor (0.10.0), and on 2026-10-06 and 2026-10-07 for 16k worlds (0.10.3), and on 2026-10-07 for baked placements (0.10.4), and on 2026-10-13 for lakes and clearing (0.10.5).
 
 using System;
 using System.Collections;
@@ -165,6 +165,10 @@ public partial class BetterContinents
       // A baked layer the settings could not read would leave every baked building out of the world: that stops the load too.
       if (Settings.EnabledForThisWorld && Settings.LayerError != null)
         throw FailLoad("reading the baked layer", new System.IO.InvalidDataException(Settings.LayerError));
+      // Likewise a clearing mask: zones are generated once, and one made without it would plant trees on every road for good. The machine that runs the
+      // world opens the mask's bits now, so that a damaged one stops the load here and not in the middle of a zone.
+      if (Settings.EnabledForThisWorld && (Settings.ClearingError ?? ClearVegetation.OpenAtLoad(Settings)) is { } clearingError)
+        throw FailLoad("reading the clearing mask", new System.IO.InvalidDataException(clearingError));
     }
 
     internal static void AfterVerifyBiomeData(World world) => OnBiomeDataReady(world, "world load");
@@ -1346,6 +1350,8 @@ public partial class BetterContinents
         ? "The alt-biome map stored in the world's Better Continents settings is damaged: restore the settings from a backup (the previous save's copy ends in .old)."
         : e is System.IO.InvalidDataException && Settings.LayerError != null
         ? "The baked layer stored in the world's Better Continents settings cannot be read: it may have been made by a newer Better Continents (update it), or be damaged (restore the settings from a backup; the previous save's copy ends in .old). It is kept as it is, so nothing is lost."
+        : e is System.IO.InvalidDataException && Settings.ClearingError != null
+        ? "The clearing mask stored in the world's Better Continents settings cannot be read: it may have been made by a newer Better Continents (update it), or be damaged (restore the settings from a backup; the previous save's copy ends in .old). It is kept as it is, so nothing is lost."
         : "This is a Better Continents error: please report it with this log.";
       var message = $"Better Continents: {what} failed for world '{world}': {cause.Message}. "
                     + "The world load was stopped so that no zone is generated with the wrong alt biomes. " + advice;

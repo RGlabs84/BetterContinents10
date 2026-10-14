@@ -104,8 +104,9 @@ internal static partial class Tests
       if (File.Exists(Path.Combine(dir.FullName, "BetterContinents.csproj")))
       {
         places.Add(Path.Combine(dir.FullName, "HexiumDist", name));
+        // A worktree under the main checkout's .work/ (the main checkout's HexiumDist holds the zips), or a sibling of a checkout named BetterContinents10.
+        places.Add(Path.Combine(dir.Parent.Parent.FullName, "HexiumDist", name));
         places.Add(Path.Combine(dir.Parent.FullName, "BetterContinents10", "HexiumDist", name));
-        places.Add(Path.Combine(dir.Parent.Parent.FullName, "BetterContinents10", "HexiumDist", name));
         break;
       }
     var zip = places.FirstOrDefault(File.Exists);
