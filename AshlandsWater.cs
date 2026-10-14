@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-10-07 for 16k worlds (0.10.3), and on 2026-10-07 for baked placements (0.10.4), and on 2026-10-13 for BC's own water (0.10.5).
+// Added by Wubarrk on 2026-10-07 for 16k worlds (0.10.3), and on 2026-10-07 for baked placements (0.10.4), and on 2026-10-13 for BC's own water (0.10.5), and on 2026-10-13 for lakes and clearing (0.10.5).
 
 using System;
 using System.Collections.Generic;
@@ -74,6 +74,10 @@ internal static class AshlandsWater
     private static void Postfix(WaterVolume __instance)
     {
       if (Headless)
+        return;
+      // The lakes' swim boxes are water you touch, not water drawn: they share a tile's surface, which this works out for the tile (a box would take 81 height samples
+      // of its own on the main thread as it starts, and a lake has hundreds).
+      if (LakeWater.IsCollisionOnly(__instance))
         return;
       // Surfaces go with their zones: the ones destroyed since are dropped now and then.
       if (Volumes.Count % 256 == 255)

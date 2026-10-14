@@ -34,6 +34,8 @@ public partial class BetterContinents
       toggle.Update(Settings);
     UpdateLayerToggles();
     UpdateClearingToggles();
+    // The world's lakes (LakeWater.Toggles.cs): the water volumes' patches and the map's.
+    UpdateLakeToggles();
     // The sectors a world past the game's 16 km gets: its own, out to 65 km (WorldSectors).
     WorldSectors.Update(HarmonyInstance, Settings, ExpandWorldSizeGeometry);
     // WorldGenerator caches GetBiome/GetBiomeArea results per grid cell for the lifetime of the
@@ -445,7 +447,7 @@ public partial class BetterContinents
   // The toggles these settings want on, by name (the offline tests compare it with the rules as they were written
   // out one by one before the unifying refactor).
   internal static IEnumerable<string> WantedToggles(BetterContinentsSettings settings) =>
-    new[] { BiomeColor, BiomeColorAfterTerritories }.Concat(TogglesBeforeWorldSize).Concat(TogglesAfterWorldSize).Concat(LayerToggles).Concat(ClearingToggles).Concat(HighTerrainToggles)
+    new[] { BiomeColor, BiomeColorAfterTerritories }.Concat(TogglesBeforeWorldSize).Concat(TogglesAfterWorldSize).Concat(LayerToggles).Concat(ClearingToggles).Concat(HighTerrainToggles).Concat(LakeToggles)
       .Where(t => t.Wanted(settings)).Select(t => t.Name);
 
   // ---- the three that are more than on or off -------------------------------------------------------------------------

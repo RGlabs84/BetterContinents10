@@ -87,12 +87,17 @@ internal static class LakeCommands
     public static Action<string> RemoteCommand = line => ZNet.instance.RemoteCommand(line);
 
     // ---- the lake engine (agent B) -----------------------------------------------------------------------------------------------------------------
-    // PLACEHOLDERS, until the engine is merged: `here` and `at` call LakeSpill's entry point (a small `internal static` in LakeSpill.cs that B publishes), which finds the
-    // hollow, closes the lake under the builder's own sampling and answers with the lake; `list` and `info` ask which lakes are built and how the water stands.
-    public static Func<float, float, float, float, HereOutcome> Spill = (x, z, radius, margin) => HereOutcome.NotAvailable;
-    // "built", "building", "not built" or "failed: ...": null when the engine says nothing (it is not in this build).
-    public static Func<Lake, string?> BuiltState = _ => null;
-    public static Func<IEnumerable<string>>? EngineInfo = null;
+    // `here` and `at` call LakeSpill's entry point, which finds the hollow, closes the lake under the builder's own sampling and answers with the lake; `list` and `info` ask which
+    // lakes are built and how the water stands.
+    public static Func<float, float, float, float, HereOutcome> Spill = (x, z, radius, margin) =>
+    {
+      var r = LakeSpill.Here(WorldGenerator.instance.GetHeight, x, z, radius, margin, ZoneSystem.instance != null ? ZoneSystem.instance.m_waterLevel : 30f,
+        name => BC.Settings.Lakes?.Lakes.Any(l => l.Name == name) == true);
+      return new HereOutcome(r.Lake, r.Message);
+    };
+    // "built", "building", "not built" or "failed: ...": null when the engine says nothing.
+    public static Func<Lake, string?> BuiltState = LakeStreamer.StateOf;
+    public static Func<IEnumerable<string>>? EngineInfo = () => { var lines = new List<string>(); LakeStreamer.Report(lines.Add); return lines; };
   }
 
   // What the spill answers: the lake to add (null when there is none) and the words to say, a refusal included.
@@ -194,6 +199,7 @@ internal static class LakeCommands
   private static void Help(Action<string> output)
   {
     output(LakeCommandLine.Usage);
+    output("bc_lake is EXPERIMENTAL for now (lakes and clearing come from the Tarn mod): try it on a copy of a world first.");
     output("bc_lake: a world's lakes sit at their own height above the sea, drawn with the game's water, swimmable and sailable, and on the map; its clearing mask keeps trees, rocks and bushes off the ground it marks (roads, lake beds). Lakes and clearing come from Raven Iron's Tarn.");
     output("bc_lake info | list [n]            the lakes and the mask in words; the n nearest lakes (default 10).");
     output("bc_lake here [radius] [margin]      fills the hollow you stand in, up to just under its spill point (Tarn's `here`); `at <x> <z> ...` does it at a place.");
@@ -225,6 +231,7 @@ internal static class LakeCommands
   private static void Info(Action<string> output)
   {
     var s = BC.Settings;
+    output("bc_lake info: lakes and clearing are experimental for now (they come from the Tarn mod): try them on a copy of a world first.");
     if (TarnCompat.Installed)
       output("bc_lake info: " + TarnCompat.Message + " The world's lakes and mask are kept and saved with it.");
     if (!s.EnabledForThisWorld)

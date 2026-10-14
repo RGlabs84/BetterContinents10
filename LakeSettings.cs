@@ -7,8 +7,7 @@ namespace BetterContinents;
 
 /// <summary>The bound entries of the settings of section 12 (SettingsSchema.Lakes...), set when the config is bound (Awake), and where the lake engine (LakeStreamer, LakeBuild,
 /// LakeSound, LakeMap) reads the live ones: null where the config is not bound (the offline suites, a dedicated server's early frames), and then the defaults of the schema
-/// give a value all the same. The member names and meanings are the lake engine's own (agent B wrote the same holder in LakeWater.cs: this one has all of its members and
-/// DepthScale besides, so one of the two copies goes when the branches meet).</summary>
+/// give a value all the same. The member names and meanings are the lake engine's own.</summary>
 internal static class LakeSettings
 {
   /// <summary>The config's Lake Depth Scale: what a new world copies. The world's own value is kept with its lakes (LakeSet.DepthScale).</summary>

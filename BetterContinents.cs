@@ -359,6 +359,8 @@ public partial class BetterContinents : BaseUnityPlugin
         // BC's own sea: the field that DynamicPatch asked for starts to build, and the game's water surfaces take Better Continents' shader or give it
         // back (SeaDraw); the far sea's colours of the game's own water, where it is now (AshlandsWater).
         SeaDraw.Tick();
+        // The world's lakes: their shapes on a worker, their tiles and boxes as the player comes near, the map and the sound (LakeStreamer).
+        LakeStreamer.Tick();
         // A forced genloc (bc genloc) that is running: has its slot emptied, or died, or the world gone (Genloc).
         Genloc.Tick();
     }
