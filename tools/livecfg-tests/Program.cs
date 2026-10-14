@@ -295,8 +295,8 @@ internal static class Program
     C(lakeGroup.Settings.Select(x => x.Key).SequenceEqual(["Lake Depth Scale", "Lake Build Range", "Lake Build Budget", "Lake Sound", "Lakes On Map"]) && lakeGroup.Settings.All(x => x.Section == "12 BetterContinents.Lakes"),
       "the lakes section 12 holds Lake Depth Scale, Lake Build Range, Lake Build Budget, Lake Sound and Lakes On Map");
     C(SettingsSchema.LakeDepthScale.Scope == SettingScope.World && SettingsSchema.LakeDepthScale.ReadsIntoSettings && SettingsSchema.LakeDepthScale.Default == 0.5f && SettingsSchema.LakeDepthScale.Limits == (0f, 3f)
-      && SettingsSchema.LakeDepthScale.ConsoleGroup == "lake" && SettingsSchema.LakeDepthScale.OnLiveChange == LiveChange.Lakes,
-      "Lake Depth Scale is the one world setting of it (0.5, 0 to 3), changed live by bc lake depth without regenerating the zones");
+      && SettingsSchema.LakeDepthScale.ConsoleGroup == null,
+      "Lake Depth Scale is the one world setting of it (0.5, 0 to 3); a running world's is changed by bc_lake depth, not by a bc console group (that would regenerate the zones)");
     C(lakeGroup.Settings.Skip(1).All(x => x.Scope == SettingScope.Live && !x.ReadsIntoSettings && x.ConsoleGroup == null)
       && SettingsSchema.LakeBuildRange.Default == 400f && SettingsSchema.LakeBuildRange.Limits == (150f, 2000f) && SettingsSchema.LakeBuildBudget.Default == 2f && SettingsSchema.LakeBuildBudget.Limits == (0.5f, 20f)
       && SettingsSchema.LakeSound.Default == 0.35f && SettingsSchema.LakeSound.Limits == (0f, 1f) && SettingsSchema.LakesOnMap.Default,

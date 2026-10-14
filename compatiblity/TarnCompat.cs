@@ -19,9 +19,12 @@ public static class TarnCompat
   // What a player is told, on the screen and by the commands that would change the world's lakes or its mask.
   internal const string Message = "Better Continents' lakes are off while the Tarn mod is installed. Remove Tarn to use Better Continents' own.";
 
+  // Whether the Tarn plugin was loaded: BepInEx's plugin list, as EWS asks it for Expand World Size (the stand-in of the offline tests, where the list cannot exist).
+  internal static Func<bool> Detect = () => Chainloader.PluginInfos.ContainsKey(GUID);
+
   public static void Run()
   {
-    Installed = Chainloader.PluginInfos.ContainsKey(GUID);
+    Installed = Detect();
     if (Installed)
       BetterContinents.Log("The Tarn mod is installed: Better Continents' lakes and clearing are off while it is (the data is kept).");
   }

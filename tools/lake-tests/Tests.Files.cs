@@ -158,6 +158,24 @@ internal static partial class Tests
     }
   }
 
+  // A shareable .bcworld file is the settings package as a client holds it: it carries the lakes and the mask with no line of its own.
+  private static void ShareFileTest()
+  {
+    Section("files: a .bcworld share file carries the lakes and the mask");
+    var world = World(SampleLakes(), SampleMask());
+    var package = SettingsBytes(world, true);
+    // (The cache folder is the run's own from here on: its getter needs the game's save path, so the old value is not read back.)
+    {
+      BC.ZNetPatch.WorldCache.WorldCachePath = NewDir("share-cache");
+      var export = WorldCacheShare.WriteExportFiles(package, "Test World", "seed", NewDir("share-out"));
+      C(File.ReadAllBytes(export.FilePath).SequenceEqual(package) && !File.ReadAllText(export.SidecarPath).Contains("lake", StringComparison.OrdinalIgnoreCase), "the .bcworld file is the package byte for byte, and its sidecar needs no line about lakes");
+      var imported = WorldCacheShare.ImportPath(export.FilePath, out var error);
+      C(error == null && imported.Count == 1 && imported[0].Imported, "a player imports it: " + string.Join(" | ", imported.Select(i => i.Describe())));
+      var read = BC.ZNetPatch.WorldCache.LoadCacheSettings(export.Id);
+      C(read.HasLakes && read.Lakes.Lakes.SequenceEqual(world.Lakes.Lakes) && read.Clearing != null && read.Clearing.ToBlock().SequenceEqual(world.Clearing.ToBlock()), "and the cached settings have the same lakes and the same mask");
+    }
+  }
+
   // ---- Tarn's own folder: read once, never written -------------------------------------------------------------------------------------------------
 
   private static void TarnImportTest()

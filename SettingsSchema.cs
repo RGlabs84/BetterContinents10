@@ -35,9 +35,6 @@ internal enum LiveChange
   /// placement is made again for the height limit they lift, and the zones are generated again; the loaded terrain, the noise and the minimap are
   /// left as they are (HighTerrain.ModeChanged).</summary>
   Rules,
-  /// <summary>The lake depth scale: the lake set is swapped for one with the new scale and sent to the players (LakeCommands.SetDepthScale); no zone, noise or
-  /// minimap is touched.</summary>
-  Lakes,
 }
 
 /// <summary>One setting, declared once: its config section, key, type, default, range and description; for a world
@@ -294,13 +291,13 @@ internal static class SettingsSchema
 
   // ---- 12 Lakes (lakes above the sea and a mask of ground kept clear of plants, ported from Tarn) -------------------------------------------------------
   // Lake Depth Scale is the one world setting here: a new world copies it, and the world's own is kept in its lake set. The rest are read while the game runs.
-  public static readonly SettingDef<float> LakeDepthScale = new("Lake Depth Scale", "How deep the game's water shader takes a lake to be, as a share of its real depth, for the lakes of a new world: the game's water colour, foam and wave size all follow depth (full colour and full waves at 10 m), so lower is calmer and greener and higher bluer and rougher. It also sizes the waves that boats and swimmers feel in a lake, so every player of a world shares the one value, which is kept with the world's lakes; 'bc_lake depth' changes it in a running world. 0.5 is the value the lakes of Raven Iron's Tarn were tuned with. A new world takes this when it is made (From Config, bc_import, or a Directory's export.cfg) and keeps it", SettingScope.World, LakeSet.DefaultDepthScale, e => LakeSettings.DepthScale = e)
-  { Range = R(0f, LakeSet.MaxDepthScale), Get = s => s.EffectiveLakeDepthScale, Set = (s, v) => s.LakeDepthScale = v, ConsoleGroup = "lake", ConsoleName = "depth", ConsoleLabel = "Lake depth scale", OnLiveChange = LiveChange.Lakes };
+  public static readonly SettingDef<float> LakeDepthScale = new("Lake Depth Scale", "How deep the game's water shader takes a lake to be, as a share of its real depth, for the lakes of a new world: the game's water colour, foam and wave size all follow depth (full colour and full waves at 10 m), so lower is calmer and greener and higher bluer and rougher. It also sizes the waves that boats and swimmers feel in a lake, so every player of a world shares the one value, which is kept with the world's lakes; 'bc_lake depth' changes it in a running world (the lake set is swapped and sent to the players; no zone is regenerated). 0.5 is the value the lakes of Raven Iron's Tarn were tuned with. A new world takes this when it is made (From Config, bc_import, or a Directory's export.cfg) and keeps it", SettingScope.World, LakeSet.DefaultDepthScale, e => LakeSettings.DepthScale = e)
+  { Range = R(0f, LakeSet.MaxDepthScale), Get = s => s.EffectiveLakeDepthScale, Set = (s, v) => s.LakeDepthScale = v };
   public static readonly SettingDef<float> LakeBuildRange = new("Lake Build Range", "Lakes within this many metres of you are built (their water and the places you can swim in it), and dropped again 150 m further out. Applies at once", SettingScope.Live, 400f, e => LakeSettings.BuildRange = e)
   { Range = R(150f, 2000f) };
-  public static readonly SettingDef<float> LakeBuildBudget = new("Lake Build Budget", "Milliseconds a frame that this machine spends making the water objects of lakes. Applies at once", SettingScope.Live, 2f, e => LakeSettings.BuildBudgetMs = e)
+  public static readonly SettingDef<float> LakeBuildBudget = new("Lake Build Budget", "Milliseconds a frame that this machine spends making the water objects of lakes. Applies at once", SettingScope.Live, 2f, e => LakeSettings.BuildBudget = e)
   { Range = R(0.5f, 20f) };
-  public static readonly SettingDef<float> LakeSound = new("Lake Sound", "Volume of the water sound near a lake (the game's ocean loop, quieter). 0 = off. Applies at once", SettingScope.Live, 0.35f, e => LakeSettings.SoundVolume = e)
+  public static readonly SettingDef<float> LakeSound = new("Lake Sound", "Volume of the water sound near a lake (the game's ocean loop, quieter). 0 = off. Applies at once", SettingScope.Live, 0.35f, e => LakeSettings.Sound = e)
   { Range = R(0f, 1f) };
   public static readonly SettingDef<bool> LakesOnMap = S("Lakes On Map", "Draws a world's lakes on the large map and the minimap. The map is drawn again when the lakes change; a lake taken out stays on the picture until it is. Applies at once", SettingScope.Live, true, e => LakeSettings.OnMap = e);
 

@@ -473,3 +473,68 @@ internal static partial class Tests
     }
   }
 }
+
+internal static partial class Tests
+{
+  // ---- the Tarn mod installed ----------------------------------------------------------------------------------------------------------------------
+
+  private static void TarnPresentTest()
+  {
+    Section("Tarn: the standalone mod installed beside Better Continents (BUILD-SPEC-TARN.md 5.3)");
+    // BepInEx's plugin list cannot exist outside the game: Detect is the seam. A stub plugin under Tarn's GUID is "in the list" for the second half.
+    var plugins = new HashSet<string>();
+    var detectOld = TarnCompat.Detect;
+    TarnCompat.Detect = () => plugins.Contains(TarnCompat.GUID);
+    TarnCompat.Run();
+    C(!TarnCompat.Installed && TarnCompat.Refusal == null, "without it nothing is stepped aside");
+    // A stub registered in the plugin list under Tarn's GUID.
+    plugins.Add(TarnCompat.GUID);
+    var shown = new List<string>();
+    var showOld = TarnCompat.Show;
+    try
+    {
+      var log = LogHandler.During(TarnCompat.Run);
+      C(TarnCompat.Installed && TarnCompat.Refusal == TarnCompat.Message && log.Any(l => l.Contains("The Tarn mod is installed") && l.Contains("the data is kept")), "with Tarn's GUID in the plugin list it is found, and the log says so: " + string.Join(" | ", log));
+      C(TarnCompat.Message == "Better Continents' lakes are off while the Tarn mod is installed. Remove Tarn to use Better Continents' own.", "the message is the spec's");
+      // The data is kept, the toggles are off.
+      var world = World(SampleLakes(), SampleMask());
+      var bytes = SettingsBytes(world, false);
+      C(!BC.WantedToggles(world).Contains("ZoneSystem.InsideClearArea, clearing mask") && BC.BetterContinentsSettings.Load(new ZPackage(bytes)).HasLakes && SettingsBytes(BC.BetterContinentsSettings.Load(new ZPackage(bytes)), false).SequenceEqual(bytes),
+        "the clearing toggle is off, and the lakes and the mask are still read, kept and saved as they were");
+      var lines = new List<string>();
+      world.Dump(lines.Add);
+      C(lines.Any(l => l.Contains("Lakes and clearing: off, the Tarn mod is installed")), "bc info says so");
+      // One message a session, when a player is in a world that carries something.
+      TarnCompat.ForgetTold();
+      TarnCompat.Show = text =>
+      {
+        shown.Add(text);
+        return true;
+      };
+      C(!TarnCompat.TellOnce(World()) && shown.Count == 0, "a world with no lakes and no mask hears nothing");
+      var off = World(SampleLakes(), null);
+      off.EnabledForThisWorld = false;
+      C(!TarnCompat.TellOnce(off) && shown.Count == 0, "nor does the main menu's");
+      C(TarnCompat.TellOnce(world) && shown.SequenceEqual([TarnCompat.Message]), "a world with lakes or a mask is told on the screen");
+      C(!TarnCompat.TellOnce(world) && shown.Count == 1, "once per session");
+      TarnCompat.ForgetTold();
+      TarnCompat.Show = _ => false;
+      C(!TarnCompat.TellOnce(world), "when there is no screen to show it on, nothing is said, and it is tried again at the next spawn");
+      TarnCompat.Show = text =>
+      {
+        shown.Add(text);
+        return true;
+      };
+      C(TarnCompat.TellOnce(World(null, SampleMask())) && shown.Count == 2, "a world with only a mask is told too");
+    }
+    finally
+    {
+      plugins.Remove(TarnCompat.GUID);
+      TarnCompat.Run();
+      TarnCompat.Detect = detectOld;
+      TarnCompat.Show = showOld;
+      TarnCompat.ForgetTold();
+    }
+    C(!TarnCompat.Installed && !TarnCompat.TellOnce(World(SampleLakes())), "without Tarn it is never told");
+  }
+}

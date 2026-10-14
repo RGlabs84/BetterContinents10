@@ -448,6 +448,8 @@ public partial class BetterContinents
                 BakedTransfer.RegisterClient(peer.m_rpc, new BakedTransfer.ZRpcLink(peer.m_rpc), reason => FailForLayer(peer, reason));
                 peer.m_rpc.Register(BakedTransfer.RpcSettingsUpdate, (ZRpc rpc, ZPackage settings) =>
                     __instance.StartCoroutine(ReceivedSettingsUpdate(settings)));
+                // 0.10.5: the world's lakes, pushed when a command on the machine that runs the world changes them (LakeTransfer).
+                LakeTransfer.RegisterClient(peer.m_rpc);
             }
         }
 

@@ -300,6 +300,59 @@ internal static partial class Tests
     C(RefusesLake(() => ClearMask.FromBlock(short1).Verify(), "") , "bits that end too soon");
   }
 
+  // What the mask costs (BUILD-SPEC-TARN.md 4.3 test 14, 4.5): Covers over millions of lookups, and a 16384 x 16384 mask (the largest) read, packed, sent and opened.
+  private static void MaskCostTest()
+  {
+    Section("clearing: cost");
+    var rng = new System.Random(3);
+    var bits = RandomRoads(rng, 4096, 400, 40);
+    var file = new byte[16 + bits.Length];
+    System.Text.Encoding.ASCII.GetBytes("TARNCLR1").CopyTo(file, 0);
+    BitConverter.GetBytes(4096).CopyTo(file, 8);
+    BitConverter.GetBytes(10500f).CopyTo(file, 12);
+    bits.CopyTo(file, 16);
+    var mask = ClearMask.FromTarnFile(file);
+    const int N = 5_000_000;
+    var xs = new float[1 << 16];
+    var zs = new float[1 << 16];
+    for (int i = 0; i < xs.Length; i++)
+    {
+      xs[i] = RandomFloat(rng, 10500);
+      zs[i] = RandomFloat(rng, 10500);
+    }
+    int covered = 0;
+    var watch = System.Diagnostics.Stopwatch.StartNew();
+    for (int i = 0; i < N; i++)
+      covered += mask.Covers(xs[i & 0xFFFF], zs[i & 0xFFFF]) ? 1 : 0;
+    double ns = watch.Elapsed.TotalMilliseconds * 1e6 / N;
+    System.Console.WriteLine($"   Covers: {ns:0.0} ns a lookup over {N:N0} random points of a 4096 x 4096 mask ({covered:N0} covered); a zone asks 500 to 3,000 times");
+    C(ns < 2000, $"a lookup takes {ns:0.0} ns (under 2,000)");
+
+    watch.Restart();
+    var big = new byte[16 + ClearMask.RawLengthOf(ClearMask.MaxSize)];
+    System.Text.Encoding.ASCII.GetBytes("TARNCLR1").CopyTo(big, 0);
+    BitConverter.GetBytes(ClearMask.MaxSize).CopyTo(big, 8);
+    BitConverter.GetBytes(10500f).CopyTo(big, 12);
+    var roads = RandomRoads(rng, ClearMask.MaxSize, 4000, 400);
+    roads.CopyTo(big, 16);
+    double made = watch.Elapsed.TotalSeconds;
+    watch.Restart();
+    var bigMask = ClearMask.FromTarnFile(big);
+    double read = watch.Elapsed.TotalSeconds;
+    watch.Restart();
+    var blob = bigMask.ToBlock();
+    double packed = watch.Elapsed.TotalSeconds;
+    watch.Restart();
+    var client = ClearMask.FromBlock(blob);
+    double header = watch.Elapsed.TotalSeconds;
+    watch.Restart();
+    client.Verify();
+    double opened = watch.Elapsed.TotalSeconds;
+    System.Console.WriteLine($"   16384 x 16384: file {big.Length / 1048576.0:0.0} MB, read {read * 1000:0} ms, packed to {blob.Length / 1024.0:N0} KB in {packed:0.0} s, a client's header read {header * 1000:0} ms, opened {opened * 1000:0} ms, {bigMask.Km2:0.0} km2");
+    C(blob.Length < 16 * 1024 * 1024 && client.Decoded && client.ToTarnFile().SequenceEqual(big), "the largest mask (4,000 random roads: far noisier than a real one) packs under 16 MB, and opens to the very bytes");
+    C(!ClearMask.FromBlock(blob).Decoded, "a client holds only the packed blob until it asks for the bits");
+  }
+
   // ---- the mask against Tarn's area test -----------------------------------------------------------------------------------------------------------
 
   private readonly record struct Area(float X, float Z, float R);
