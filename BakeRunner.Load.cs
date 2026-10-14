@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-10-07 for baked placements (0.10.4).
+// Added by Wubarrk on 2026-10-07 for baked placements (0.10.4), and on 2026-10-13 for the 0.10.5 bake fixes.
 
 using System;
 using System.Collections;
@@ -18,7 +18,9 @@ internal static partial class BakeRunner
   // sections replace the layer's; every in-game record stays; the palette is rebuilt. The layer as it was is kept in the undo folder first
   // (layer-r<revision>.bcp), so that loading that file goes back. No undo file and no state: the new layer replaces the old in one step, and a
   // save writes whichever is current; the Live pieces follow by the reconciliation, which also runs at every world load.
-  internal static IEnumerator Load(BakeContext ctx, string label, byte[] bytes, BakeWords words)
+  // `label` is the file's name for the messages; `typed` is what the player wrote after 'load' (null: nothing, so the Directory's own file), so that the
+  // dry run's 'confirm' line can be typed back and names the same file (a bare name would be read relative to the game's folder).
+  internal static IEnumerator Load(BakeContext ctx, string label, byte[] bytes, BakeWords words, string? typed)
   {
     var say = ctx.Say;
     var layer = ctx.Layer;
@@ -52,7 +54,7 @@ internal static partial class BakeRunner
       long incoming = file.RecordsOfSource(0), inGameInFile = file.Placements - incoming;
       long current = layer.RecordsOfSource(0);
       long staying = layer.Records - current;
-      var echo = $"load {label}" + (words.Convert ? " convert" : "");
+      var echo = "load" + (typed != null ? " " + typed : "") + (words.Convert ? " convert" : "");
       var lines = new List<string>
       {
         $"bc_bake {echo}: a dry run, nothing changes. 'bc_bake {echo} confirm' loads it.",
