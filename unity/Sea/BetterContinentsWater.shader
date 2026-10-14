@@ -5,7 +5,7 @@
 //   - two sub-shaders: LOD 250 with distance tessellation (the game's Tessellation setting on) and LOD 200 without it;
 //   - queue Transparent-100 (2900), a GrabPass "_BackgroundTex", a depth prepass (ZWrite On, ColorMask 0) and the colour pass
 //     (ZWrite Off, alpha-blended: Blend SrcAlpha OneMinusSrcAlpha, extra lights SrcAlpha One);
-//   - in every pass: ZTest LEqual, Cull Back, Offset 0 10 and Stencil Ref 2 Comp NotEqual (the ship's water mask keeps a hull dry).
+//   - in every pass: ZTest LEqual, Cull Back, Offset 0 10 (the colour passes 0 5, so that they stay nearer than the prepass) and Stencil Ref 2 Comp NotEqual (the ship's water mask keeps a hull dry).
 // What differs from the game's: waves out to the world's edge and the calm only in the world's own Deep North, and the Ashlands red where the
 // world's hot sea is, both read from the sea field (SeaField.hlsl); with Soft Far Sea, the far sea takes the depth of the sea under it.
 // BC's inputs are global (_BCSeaField, _BCSeaRect, _BCSeaDepth, _BCSeaDepthRect, _BCSeaSoft), so no material changes but its shader.
@@ -79,7 +79,7 @@ Shader "BetterContinents/Water"
         ZWrite Off
         ColorMask RGB
         Cull Back
-        Offset 0, 10
+        Offset 0, 5
         Stencil { Ref 2 Comp NotEqual }
         CGPROGRAM
         #pragma surface BCSurf BCStd vertex:BCVert tessellate:BCTess finalcolor:BCFin alpha:fade nofog nometa noshadow nolightmap nodynlightmap nodirlightmap noshadowmask exclude_path:deferred exclude_path:prepass
@@ -116,7 +116,7 @@ Shader "BetterContinents/Water"
         ZWrite Off
         ColorMask RGB
         Cull Back
-        Offset 0, 10
+        Offset 0, 5
         Stencil { Ref 2 Comp NotEqual }
         CGPROGRAM
         #pragma surface BCSurf BCStd vertex:BCVert finalcolor:BCFin alpha:fade nofog nometa noshadow nolightmap nodynlightmap nodirlightmap noshadowmask exclude_path:deferred exclude_path:prepass

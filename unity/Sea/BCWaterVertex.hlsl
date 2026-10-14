@@ -29,11 +29,12 @@ float BCWaterHeight(float2 xz, float depth, float w)
     float4 wind1 = globalWind ? _GlobalWind1 : float4(1.0, 0.0, 0.0, 0.0);
     float4 wind2 = globalWind ? _GlobalWind2 : float4(1.0, 0.0, 0.0, 0.0);
     float alpha = globalWind ? _GlobalWindAlpha : 0.0;
-    float a = BCSeaWaveOne(xz, depth, wind1, _WaterTime, 1.0, w);
+    BC_PRECISE float a = BCSeaWaveOne(xz, depth, wind1, _WaterTime, 1.0, w);
     if (alpha == 0.0)
         return a;
-    float b = BCSeaWaveOne(xz, depth, wind2, _WaterTime, 1.0, w);
-    return a + (b - a) * alpha;
+    BC_PRECISE float b = BCSeaWaveOne(xz, depth, wind2, _WaterTime, 1.0, w);
+    BC_PRECISE float h = a + (b - a) * alpha;
+    return h;
 }
 
 // Moves a vertex of the zone water (object space) to its wave height and sets its normal, as the game's vertex stage does:
@@ -50,9 +51,10 @@ void BCWaterDisplace(inout float4 vertex, inout float3 normal, float2 uv, out fl
     float nearFade = 1.0 - saturate((distance(xz, _NetRefPos.xz) - (_VisibleMaxDistance - 20.0)) / 20.0);
     float depth = lerp(lerp(_depth[3], _depth[2], uv.x), lerp(_depth[0], _depth[1], uv.x), uv.y);
     float w = BCSeaWaves(xz);
-    float h0 = BCWaterHeight(xz, depth, w);
+    BC_PRECISE float h0 = BCWaterHeight(xz, depth, w);
     float edge = saturate((length(xz) - _WaterEdge) * 0.02);
-    vertex.y = h0 * nearFade + vertex.y - 500.0 * (edge * edge * (3.0 - 2.0 * edge));
+    BC_PRECISE float y = h0 * nearFade + vertex.y - 500.0 * (edge * edge * (3.0 - 2.0 * edge));
+    vertex.y = y;
 #ifndef BC_WATER_PREPASS
     // the height 0.5 m east, north, west and south, with this vertex's own W
     float hE = BCWaterHeight(xz + float2(0.5, 0.0), depth, w);
