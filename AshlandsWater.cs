@@ -2,6 +2,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using HarmonyLib;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -36,6 +37,13 @@ namespace BetterContinents;
 // water shader did not load or does not run on its graphics device, or another mod replaced the game's water shader, gets these colours as in
 // 0.10.3. Where SeaDraw draws a renderer with Better Continents' shader, which works out the red per pixel from the sea field, the renderer's
 // colours are the material's own (the "share < 0" path below) and nothing is set here.
+//
+// No bubbles (0.10.5, the user: "loose the bubbles they look terrible", "no red sea poisoning"). The game's shader thinks everything beyond its
+// ring is Ashlands and draws a layer of large pale bubble patches over it, from the material's _BubbleTexture (saturate(saturate(tex(xz * 0.2).y
+// - (1 - m)) - (1 - tex(xz * 0.0067).z)), so a black texture gives exactly 0). On a world Better Continents shapes, the renderers it manages here
+// (the same ones it sets colours on) get a black _BubbleTexture in their property block; BC's own shader draws no bubbles at all. A vanilla world
+// keeps the game's look, bubbles included: nothing is set there, and a renderer that was given the black texture and is let go (the world left,
+// BC's shader took it over) is given its material's own back.
 internal static class AshlandsWater
 {
   // Points per side of a zone's water surface (a narrow canal is still met: 7 m apart on 64 m).
@@ -93,12 +101,22 @@ internal static class AshlandsWater
       Apply(volume);
   }
 
+  // Whether the world was one Better Continents shapes (with its generator made) at the last Tick.
+  private static bool wasActive;
+
   /// <summary>Every frame (BetterContinents.Update): the far sea, where it is now.</summary>
   internal static void Tick()
   {
     var far = Water.Instances;
     if (far.Count == 0 || Headless)
       return;
+    // The world generator is made after DynamicPatch: the renderers are looked at again (colours, bubbles) when the world becomes one BC manages
+    // here, or stops being one.
+    if (Active != wasActive)
+    {
+      wasActive = !wasActive;
+      Refresh();
+    }
     foreach (var water in far)
     {
       if (water == null)
@@ -123,6 +141,59 @@ internal static class AshlandsWater
 
   private static bool Active => BetterContinents.Settings is { ShapesWorld: true } && WorldGenerator.instance != null;
 
+  /// <summary>What this fallback puts in a renderer's property block. Managed: the world is one Better Continents shapes and the renderer is not
+  /// drawn with Better Continents' own shader. Colours: the colour blend (a zone's water only where the world's hot sea and the game's ring disagree;
+  /// the far sea always, for its block is never cleared). BlackBubbles: no bubble layer.</summary>
+  internal readonly record struct BlockPlan(bool Managed, bool Colours, bool BlackBubbles);
+
+  /// <summary>The plan for a renderer. share: the hot share of the sea it draws, or -1 where the game's ring says the same as the world's.</summary>
+  internal static BlockPlan Plan(bool active, bool drawnByBc, bool far, float share) =>
+    active && !drawnByBc ? new BlockPlan(true, far || share >= 0f, true) : new BlockPlan(false, far, false);
+
+  /// <summary>The writing side of a MaterialPropertyBlock, so that what goes in it can be checked without the engine.</summary>
+  internal interface IBlockWriter
+  {
+    void SetColor(int id, Color value);
+    void SetTexture(int id, Texture? value);
+  }
+
+  /// <summary>Fills a block as the plan says. Colours: the plain and Ashlands colours as they are (share below 0: the game's own) or both set to one
+  /// blend of them. Bubbles: black when the plan says so; otherwise the material's own texture when the renderer was given the black one before
+  /// (restoreBubbles), or nothing.</summary>
+  internal static void Fill(IBlockWriter block, BlockPlan plan, float share, Color[] plain, Color[] hot, int[] plainIds, int[] hotIds,
+    int bubbleId, Texture? black, Texture? own, bool restoreBubbles)
+  {
+    if (plan.Colours)
+      for (int i = 0; i < plainIds.Length; i++)
+      {
+        if (share < 0f)
+        {
+          block.SetColor(plainIds[i], plain[i]);
+          block.SetColor(hotIds[i], hot[i]);
+        }
+        else
+        {
+          var colour = Color.Lerp(plain[i], hot[i], share);
+          block.SetColor(plainIds[i], colour);
+          block.SetColor(hotIds[i], colour);
+        }
+      }
+    if (plan.BlackBubbles)
+      block.SetTexture(bubbleId, black);
+    else if (restoreBubbles)
+      block.SetTexture(bubbleId, own);
+  }
+
+  private sealed class Writer(MaterialPropertyBlock block) : IBlockWriter
+  {
+    public void SetColor(int id, Color value) => block.SetColor(id, value);
+    public void SetTexture(int id, Texture? value)
+    {
+      if (value != null)
+        block.SetTexture(id, value);
+    }
+  }
+
   private static void Apply(WaterVolume volume)
   {
     if (Headless || volume == null || volume.m_waterSurface is not { } surface)
@@ -131,7 +202,8 @@ internal static class AshlandsWater
     if (material == null || !material.HasProperty(Gpu.HotColours[0]))
       return;
     float share = -1f;
-    if (Active && !SeaDraw.Draws(surface))
+    bool active = Active, drawn = SeaDraw.Draws(surface);
+    if (active && !drawn)
     {
       var bounds = surface.bounds;
       var points = new List<Vector2>(Samples * Samples);
@@ -140,15 +212,18 @@ internal static class AshlandsWater
         points.Add(new Vector2(bounds.min.x + bounds.size.x * (i + 0.5f) / Samples, bounds.min.z + bounds.size.z * (j + 0.5f) / Samples));
       share = HotShare(points, volume.transform.position.y);
     }
-    if (share < 0f)
+    var plan = Plan(active, drawn, far: false, share);
+    if (!plan.Managed)
     {
-      // The game's colours and mask. Nothing else sets a property block on a zone's water (the game sets its values on the
-      // material itself).
+      // The game's colours, mask and bubbles. Nothing else sets a property block on a zone's water (the game sets its values on the material
+      // itself).
       if (Gpu.Changed.Remove(surface))
         surface.SetPropertyBlock(null);
       return;
     }
-    SetColours(surface, material, share);
+    // Nothing else is in a zone's block: it is made afresh.
+    Gpu.Block.Clear();
+    SetBlock(surface, material, plan, share, restoreBubbles: false);
     Gpu.Changed.Add(surface);
   }
 
@@ -160,7 +235,8 @@ internal static class AshlandsWater
     if (material == null || !material.HasProperty(Gpu.HotColours[0]))
       return;
     float share = -1f;
-    if (Active && !SeaDraw.Draws(surface))
+    bool drawn = SeaDraw.Draws(surface);
+    if (Active && !drawn)
     {
       var points = new List<Vector2>(FarRadii.Length * FarDirections);
       foreach (var r in FarRadii)
@@ -171,31 +247,24 @@ internal static class AshlandsWater
         }
       share = HotShare(points, at.y);
     }
-    // The block also holds the game's _VisibleMaxDistance (Water.ApplySettings), so it is never cleared: the game's own
-    // colours are set back instead, and the shader's mask decides again.
-    SetColours(surface, material, share);
+    var plan = Plan(Active, drawn, far: true, share);
+    // The block also holds the game's _VisibleMaxDistance (Water.ApplySettings), so it is never cleared: it is read, and the game's own
+    // colours are set back instead, and the shader's mask decides again; the bubbles go back to the material's own texture.
+    surface.GetPropertyBlock(Gpu.Block);
+    bool restore = !plan.BlackBubbles && Gpu.Changed.Remove(surface);
+    SetBlock(surface, material, plan, share, restore);
+    if (plan.BlackBubbles)
+      Gpu.Changed.Add(surface);
   }
 
-  private static void SetColours(MeshRenderer surface, Material material, float share)
+  // Sets a renderer's block as the plan says (the zone's block was cleared by the caller; the far sea's was read, for it holds more).
+  private static void SetBlock(MeshRenderer surface, Material material, BlockPlan plan, float share, bool restoreBubbles)
   {
-    var block = Gpu.Block;
-    surface.GetPropertyBlock(block);
-    for (int i = 0; i < Gpu.PlainColours.Length; i++)
-    {
-      Color plain = material.GetColor(Gpu.PlainColours[i]), hot = material.GetColor(Gpu.HotColours[i]);
-      if (share < 0f)
-      {
-        block.SetColor(Gpu.PlainColours[i], plain);
-        block.SetColor(Gpu.HotColours[i], hot);
-      }
-      else
-      {
-        var colour = Color.Lerp(plain, hot, share);
-        block.SetColor(Gpu.PlainColours[i], colour);
-        block.SetColor(Gpu.HotColours[i], colour);
-      }
-    }
-    surface.SetPropertyBlock(block);
+    var colours = Gpu.PlainColours.Select(id => material.GetColor(id)).ToArray();
+    var hots = Gpu.HotColours.Select(id => material.GetColor(id)).ToArray();
+    Fill(new Writer(Gpu.Block), plan, share, colours, hots, Gpu.PlainColours, Gpu.HotColours, Gpu.BubbleTexture, Texture2D.blackTexture,
+      material.HasProperty(Gpu.BubbleTexture) ? material.GetTexture(Gpu.BubbleTexture) : null, restoreBubbles);
+    surface.SetPropertyBlock(Gpu.Block);
   }
 
   /// <summary>The share of the sea among the points that is hot by the world's rule, or -1 where the game's ring already says
@@ -255,8 +324,9 @@ internal static class AshlandsWater
       Shader.PropertyToID("_AshlandsColorTop"), Shader.PropertyToID("_AshlandsColorBottom"), Shader.PropertyToID("_AshlandsColorBottomShallow"),
       Shader.PropertyToID("_AshlandsSurfaceColor"), Shader.PropertyToID("_AshlandsFoamColor"),
     ];
+    internal static readonly int BubbleTexture = Shader.PropertyToID("_BubbleTexture");
     internal static readonly MaterialPropertyBlock Block = new();
-    // The zone surfaces whose colours are set, so they can be given back.
+    // The surfaces whose block is set (a zone's water: colours and/or black bubbles; the far sea: black bubbles), so they can be given back.
     internal static readonly HashSet<Renderer> Changed = [];
   }
 }

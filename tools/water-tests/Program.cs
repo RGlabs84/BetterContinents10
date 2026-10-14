@@ -6,6 +6,7 @@
 //   Field.cs    SeaField: the grid, the exact distances against brute force, deterministic bytes (two builds, parallel against one worker), the
 //               sampler against a transcription of the shader's arithmetic, the world's own rules (the layout patched for real) against the scaled
 //               formula, the hot sea's mask, the same-as-game test, and what a field for a big world costs.
+//   Draw.cs, Bubbles.cs  SeaDraw's causes, bc water force and probe, and the property blocks of the fallback (no bubble layer).
 //   Patches.cs  SeaPatches: which worlds are candidates, the two felt toggles on the game's methods (installed, removed, the game's values before
 //               the field is ready), the field's life, other mods' patches on the waves.
 // "dotnet run -c Release -- <part of a section's name>" runs some of them; -v prints every check.
@@ -79,6 +80,7 @@ internal static partial class Program
     WaveTests();
     FieldTests();
     PatchTests();
+    BubbleTests();
     System.Console.WriteLine($"water-tests: {checks - failures}/{checks} checks passed");
     return failures == 0 ? 0 : 1;
   }
