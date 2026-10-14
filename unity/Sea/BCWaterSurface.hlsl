@@ -184,7 +184,7 @@ void BCSurf(Input IN, inout SurfaceOutputStandard o)
     float3 surfaceColor = lerp(_SurfaceColor.rgb, _AshlandsSurfaceColor.rgb, m);
     float4 foam = lerp(_FoamColor, _AshlandsFoamColor, m);
 
-    // foam: random patches from the wind, along the shore, on the crests, the Ashlands' bubbles
+    // foam: random patches from the wind, along the shore, on the crests, (the Ashlands' bubble layer is left out, see below)
     float windIntensity = lerp(_GlobalWind1.w, _GlobalWind2.w, _GlobalWindAlpha);
     float2 wobble = 0.005 * float2(sin(_Time.x * 20.0 + P.x), sin(_Time.x * 30.0 + P.z));
     float randomFoam = 5.0 * windIntensity * depth * tex2D(_RandomFoamTex, xz * 0.03 + wobble).x;
@@ -197,12 +197,8 @@ void BCSurf(Input IN, inout SurfaceOutputStandard o)
     c = lerp(c, foam.rgb, 8.0 * shore * foam.a * tex2D(_FoamTex, xz * 0.1 + wobble).x);
     c = lerp(c, top, crest2);
     c = lerp(c, float3(0.9, 0.9, 0.9), crest3);
-    float2 bubbleA = tex2D(_BubbleTexture, xz * 0.2).xy;
-    float bubbleB = tex2D(_BubbleTexture, xz * 0.00666666683).z;
-    float bubble = saturate(saturate(bubbleA.y - (1.0 - m)) - (1.0 - bubbleB));
-    float phase = frac(bubble * 50.0 + _Time.y);
-    bubble = saturate(bubble * ((1.0 - phase) * (bubbleA.x + phase - 1.0)));
-    c = lerp(c, foam.rgb, bubble);
+    // The game draws a layer of large bubble patches on its Ashlands sea (the _BubbleTexture property, kept on the material). Better Continents leaves it
+    // out on purpose (the user, 2026-10-13: they look terrible): the hot sea is red, with the same foam and waves as any sea.
 
     // the world's edge: foam over the last 200 m
     float edgeBand = BCSmooth(saturate((fromCentre - (_WaterEdge - 200.0)) / 200.0));
