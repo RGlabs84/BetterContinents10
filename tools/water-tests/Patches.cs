@@ -31,11 +31,13 @@ internal static partial class Program
       LifeTests();
       ForeignTests();
       DrawTests();
+      ForceTests();
+      ProbeTests();
     }
     finally
     {
       SeaField.Current = null;
-      SeaPatches.Forced = null;
+      SeaPatches.ForcedOn = false;
       SeaWaves.Clock = null;
       BC.Settings = settings;
       BC.HarmonyInstance = harmony;
@@ -75,12 +77,15 @@ internal static partial class Program
       Check(SeaPatches.Candidate(World()) && !SeaPatches.Candidate(World(enabled: false)) && !SeaPatches.Candidate(gameTerrain),
         "with Expand World Size installed every world BC shapes is");
       EWS.Installed = false;
-      SeaPatches.Forced = true;
+      SeaPatches.ForcedOn = true;
       Check(SeaPatches.Candidate(World()) && !SeaPatches.Candidate(gameTerrain) && !SeaPatches.Candidate(World(enabled: false)),
         "'bc water force on' makes a world BC shapes a candidate, and no other");
-      SeaPatches.Forced = false;
-      Check(!SeaPatches.Candidate(World(12, 20000f, 500f)), "'bc water force off' makes none");
-      SeaPatches.Forced = null;
+      Check(BC.WantedToggles(World()).Count(n => n.EndsWith("(BC's sea)")) == 2, "and the felt toggles are wanted for it (they run the game's code where its Deep North is the game's)");
+      SeaPatches.ForcedOn = false;
+      Check(!SeaPatches.Candidate(World()) && SeaPatches.Candidate(World(12, 20000f, 500f)), "'bc water force off' gives the rules back: a vanilla-size world is no candidate, a laid-out one is");
+      SeaPatches.ForcedOn = true;
+      Check(SeaPatches.Why(World()).Contains("forced on"), "a forced world says so");
+      SeaPatches.ForcedOn = false;
       Check(SeaPatches.Why(World(12, 20000f, 500f)).Contains("laid out") && SeaPatches.Why(biome).Contains("biome map")
             && SeaPatches.Why(World()).Contains("game's own sea") && SeaPatches.Why(gameTerrain).Contains("game's own terrain"),
         "and each says why in words");
@@ -89,7 +94,7 @@ internal static partial class Program
     {
       EWS.Installed = ews;
       BC.ExpandWorldSizeGeometry = ewsSize;
-      SeaPatches.Forced = null;
+      SeaPatches.ForcedOn = false;
     }
   }
 

@@ -40,6 +40,8 @@ internal static class SeaDraw
 {
   internal const string ShaderName = "BetterContinents/Water";
   internal const string GameShaderName = "Custom/Water";
+  // The replacement shader of 'bc water probe' (SeaProbe), in the same bundle.
+  internal const string ProbeShaderName = "BetterContinents/WaterProbe";
   // The bundle's name among the DLL's resources (csproj: LogicalName); it must not end as bcassets does (GameUtils.GetAssetBundleFromResources).
   internal const string BundleResource = "BetterContinents.bcwater";
 
@@ -87,7 +89,7 @@ internal static class SeaDraw
 
   private static bool bundleTried;
   private static AssetBundle? bundle;
-  private static Shader? bcShader, gameShader;
+  private static Shader? bcShader, gameShader, probeShader;
   private static string? bundleError;
 
   private static SeaField? uploadedFor;
@@ -108,6 +110,34 @@ internal static class SeaDraw
       WaterDepth = Shader.PropertyToID("_depth");
   }
 
+  /// <summary>Whether BC's own sea is drawn now (its shader is on the sea, its textures are up).</summary>
+  internal static bool On => on;
+
+  /// <summary>The probe's replacement shader (BetterContinents/WaterProbe, from the same bundle), loading the bundle if need be; null with the reason
+  /// when this machine draws nothing, the bundle is missing or does not load, or the shader does not run here.</summary>
+  internal static Shader? ProbeShader(out string? why)
+  {
+    why = null;
+    if (Headless)
+    {
+      why = NoGraphics;
+      return null;
+    }
+    if (!EnsureShader(out why))
+      return null;
+    if (probeShader == null)
+    {
+      why = $"the water bundle holds no shader named {ProbeShaderName}";
+      return null;
+    }
+    if (!probeShader.isSupported)
+    {
+      why = "the probe shader is not supported on this graphics device";
+      return null;
+    }
+    return probeShader;
+  }
+
   /// <summary>Whether BC's shader draws this renderer's water now (AshlandsWater then leaves its colours alone).</summary>
   internal static bool Draws(Renderer? renderer) => renderer != null && Swapped.ContainsKey(renderer);
 
@@ -121,18 +151,19 @@ internal static class SeaDraw
   private static bool Quiet(string why) => why == NoGraphics || why == NotReady || why == GameSea || why == GameSeaAnyway || why == NoHot;
 
   private static string? WhyNot(SeaField? field) =>
-    Cause(Headless, field, SeaPatches.Snapshot.Pending || SeaPatches.Snapshot.Building, SeaSettings.OwnWater is { Value: false }, blocked);
+    Cause(Headless, field, SeaPatches.Snapshot.Pending || SeaPatches.Snapshot.Building, SeaSettings.OwnWater is { Value: false }, blocked, SeaPatches.ForcedOn);
 
   /// <summary>Why the game's water is drawn instead of BC's, or null when nothing but the bundle and the textures stands in the way. Pure, for
   /// the offline tests. Quiet causes first: nothing to draw (no graphics, no field yet, a world whose sea is the game's), then the ones a player
   /// or another mod chose.</summary>
-  internal static string? Cause(bool headless, SeaField? field, bool fieldComing, bool ownWaterOff, string? blockedBy)
+  internal static string? Cause(bool headless, SeaField? field, bool fieldComing, bool ownWaterOff, string? blockedBy, bool forced = false)
   {
     if (headless)
       return NoGraphics;
     if (field == null)
       return fieldComing ? NotReady : GameSea;
-    if (field.SameAsGame)
+    // 'bc water force on' draws BC's shader where the world's sea is the game's own, to compare the two at the same places.
+    if (field.SameAsGame && !forced)
       return GameSeaAnyway;
     if (field.Hot == null)
       return NoHot;
@@ -349,7 +380,9 @@ internal static class SeaDraw
       bundleError = "the water bundle could not be loaded (Unity refused it)";
       return;
     }
-    bcShader = bundle.LoadAllAssets<Shader>().FirstOrDefault(s => s.name == ShaderName);
+    var shaders = bundle.LoadAllAssets<Shader>();
+    probeShader = shaders.FirstOrDefault(s => s.name == ProbeShaderName);
+    bcShader = shaders.FirstOrDefault(s => s.name == ShaderName);
     if (bcShader == null)
       bundleError = $"the water bundle holds no shader named {ShaderName}";
     else

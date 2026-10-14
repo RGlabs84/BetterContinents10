@@ -30,23 +30,25 @@ namespace BetterContinents;
 // Neither follows Own Water: that is a client's choice of what to draw (SeaDraw), and boats still float on the world's waves when it is off.
 internal static class SeaPatches
 {
-  // 'bc water force on|off' (Debug Mode): BC's sea in a world where it would be off (the parity check), or off in one where it would be on.
-  // Null: as the rules say.
-  internal static bool? Forced;
+  // 'bc water force on' (Debug Mode): BC's sea in a world where it would be off, for the parity check (a vanilla-size world without maps is no
+  // candidate; a world whose field equals the game's is swapped nothing), so that BC's shader can be compared with the game's at the same places. The
+  // world counts as a candidate, the field is built from its rules and SeaDraw draws BC's shader even when the field is the game's own; the felt side
+  // stays as it is (the game's, in that case). Not saved and not a setting: 'force off' gives back the rules, and leaving the world resets it (Refresh).
+  internal static bool ForcedOn;
 
   /// <summary>Whether BC's sea is a candidate for a world: BC shapes the world, together with any of a laid-out world whose World Size is not
-  /// vanilla's (made since 0.10), a heat map with a scale above 0, a biome map, or Expand World Size installed. A vanilla-size world without
-  /// maps, and a world that keeps the game's terrain, are none, so no field is built for them.</summary>
+  /// vanilla's (made since 0.10), a heat map with a scale above 0, a biome map, or Expand World Size installed (or 'bc water force on'). A
+  /// vanilla-size world without maps, and a world that keeps the game's terrain, are none, so no field is built for them.</summary>
   internal static bool Candidate(BetterContinentsSettings s) =>
-    s.ShapesWorld && (Forced ?? (s.HasBiomeMap || (s.HasHeatMap && s.HeatMapScale > 0f) || !LayoutGeometry(s).IsVanilla || ExpandWorldSizeSizes));
+    s.ShapesWorld && (ForcedOn || s.HasBiomeMap || (s.HasHeatMap && s.HeatMapScale > 0f) || !LayoutGeometry(s).IsVanilla || ExpandWorldSizeSizes);
 
   /// <summary>Why a world's sea is, or is not, a candidate, in words.</summary>
   internal static string Why(BetterContinentsSettings s)
   {
     if (!s.ShapesWorld)
       return s.EnabledForThisWorld ? "this world keeps the game's own terrain" : "Better Continents is off for this world, or no world is loaded";
-    if (Forced is { } forced)
-      return forced ? "forced on ('bc water force')" : "forced off ('bc water force')";
+    if (ForcedOn)
+      return "forced on ('bc water force on')";
     var reasons = new List<string>();
     if (s.HasBiomeMap) reasons.Add("a biome map");
     if (s.HasHeatMap && s.HeatMapScale > 0f) reasons.Add("a heat map");
@@ -122,6 +124,9 @@ internal static class SeaPatches
     failure = null;
     depthPending = false;
     var settings = BetterContinents.Settings;
+    // Leaving the world (the main menu, a world BC does not shape) ends the force.
+    if (!settings.ShapesWorld)
+      ForcedOn = false;
     pending = Candidate(settings);
     state = pending ? "the field is waiting to be built" : "off: " + Why(settings);
     if (pending)
@@ -222,8 +227,9 @@ internal static class SeaPatches
         if (source.IsCancellationRequested || Volatile.Read(ref generation) != mine)
           return;
         SeaField.Current = field;
-        depthPending = hot && field.Depth == null && !field.SameAsGame;
-        state = field.SameAsGame ? "on, but this world's sea is the game's own" : field.CalmSameAsGame ? "on (the hot sea only differs from the game's)" : "on";
+        depthPending = hot && field.Depth == null && (!field.SameAsGame || ForcedOn);
+        state = field.SameAsGame ? (ForcedOn ? "on (forced: this world's sea is the game's own, and BC's shader is drawn all the same)" : "on, but this world's sea is the game's own")
+          : field.CalmSameAsGame ? "on (the hot sea only differs from the game's)" : "on";
         Log($"Water: the sea field is ready: {field}. {field.CalmShare:P1} of the world is Deep North, {(field.Hot != null ? $"{field.HotShare:P1} is hot sea, " : "")}"
           + $"its Deep North {(field.CalmSameAsGame ? "is" : "is not")} the game's circle{(field.Hot != null ? $" and its hot sea {(field.HotSameAsGame ? "is" : "is not")} the game's ring" : "")}"
           + (field.SameAsGame ? ", so the game's own sea stays." : "."));
@@ -328,6 +334,9 @@ internal static class SeaPatches
   internal static void Report(Action<string> output)
   {
     var settings = BetterContinents.Settings;
+    if (ForcedOn)
+      output("Water: FORCE IS ON ('bc water force on'): BC's sea is a candidate here whatever the world's rules say, and BC's shader is drawn even where the field is the game's own; "
+        + "the felt waves stay as they are. 'bc water force off' (or leaving the world) gives back the rules.");
     output($"Water: BC's sea is {(Candidate(settings) ? "a candidate" : "not a candidate")} for this world ({Why(settings)}).");
     output($"Water: the sea field: {state}.");
     var field = SeaField.Current;
