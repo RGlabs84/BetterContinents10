@@ -117,6 +117,9 @@ internal static partial class Tests
         if (j < 32 && rig4.Cleared[i * 64 + j]) sea = false;
     C(m4 > 0 && sea && rig4.Height.Where((h, k) => k % 64 < 32).All(h => h == 20f), "a lake beside the sea paints none of the sea's pixels");
 
+    // the point stands at the rim of a pit the map samples at one pixel only, four pixels from the point: the lowest pixel of the lake's window starts the flood
+    var rig6 = new MapRig(64, 10f, (x, z) => Math.Abs(x - 95f) < 1f && Math.Abs(z - 5f) < 1f ? 40f : 70f);
+    C(rig6.Paint(new Lake("w", 20f, 0f, 60f, -150f, -100f, 150f, 100f, 5f)) == 1 && rig6.Painted == 1, "no pixel under the level within two of the point: the window's lowest pixel is painted");
     // the point may sit a pixel off the lowest ground (the 5 x 5 search)
     var rig5 = new MapRig(64, 10f, (x, z) => (Math.Abs(x - 20f) < 10f && Math.Abs(z) < 10f) ? 70f : 40f);
     C(rig5.Paint(new Lake("p", 20f, 0f, 60f, -200f, -200f, 200f, 200f, 5f)) > 100, "a point on a pixel of high ground starts from the lowest pixel within two");

@@ -19,7 +19,7 @@ namespace BetterContinents;
 internal static class LakeMapPaint
 {
   /// <summary>Paints one lake into a map of size x size pixels of pixelSize metres (pixel (row i, column j) is centred at x = (j - size/2) x px + px/2, z likewise with i).
-  /// get/set: the height of the pixel k = i x size + j; clear: the forest mask of it. The flood starts at the lowest pixel within 2 of the lake's point, inside its box (plus 2
+  /// get/set: the height of the pixel k = i x size + j; clear: the forest mask of it. The flood starts at the lowest pixel within 2 of the lake's point (else the lowest of the lake's window), inside its box (plus 2
   /// pixels), over pixels under the lake's level and not under the sea; each gets the height of a sea as deep as the lake there (at least 1 m) and no forest. Returns the
   /// pixels painted (0: the lake is smaller than a pixel).</summary>
   public static int Paint(Lake lake, int size, float pixelSize, float sea, Func<int, float> get, Action<int, float> set, Action<int> clear)
@@ -48,7 +48,23 @@ internal static class LakeMapPaint
         }
       }
     if (!(best < lake.Level))
-      return 0;
+    {
+      // Nothing under the level within two pixels of the point (it may stand at the rim of a pit the pixels sample badly): the lowest pixel of the lake's own window.
+      // Changed from Tarn, whose point is the deepest one.
+      for (int i = i0; i <= i1; i++)
+        for (int j = j0; j <= j1; j++)
+        {
+          float v = get(i * size + j);
+          if (v < best)
+          {
+            best = v;
+            sj = j;
+            si = i;
+          }
+        }
+      if (!(best < lake.Level))
+        return 0;
+    }
     int w = j1 - j0 + 1, h = i1 - i0 + 1;
     var seen = new bool[w * h];
     var stack = new Stack<int>();

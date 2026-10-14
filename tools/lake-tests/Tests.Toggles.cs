@@ -140,4 +140,41 @@ internal static partial class Tests
     C(LakeWater.DepthsOf(box, 0f).All(d => d == 0f) && LakeWater.DepthsOf(tile, 0f).All(d => d == 0f), "and scale 0 makes the water as shallow as the shader knows");
     C(LakeSet.DefaultDepthScale == 0.5f, "the default Lake Depth Scale is 0.5, Tarn's");
   }
+
+  // The game's members the lake code touches, read from the installed game's own assembly (not the publicized one the plugin was built against): they exist, with the
+  // types the plan assumes.
+  public static void GameMembersTest()
+  {
+    Section("patches: the game's members the lake code relies on, on the installed game");
+    var flags = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance;
+    void Field(Type type, string name, Type fieldType)
+    {
+      var f = type.GetField(name, flags);
+      C(f != null && f.FieldType == fieldType, $"{type.Name}.{name} is a {fieldType.Name}{(f == null ? " (missing)" : f.IsPublic ? " (public)" : " (private)")}");
+    }
+    Field(typeof(WaterVolume), "m_normalizedDepth", typeof(float[]));
+    Field(typeof(WaterVolume), "m_oneDepth", typeof(float));
+    Field(typeof(WaterVolume), "m_waterSurface", typeof(UnityEngine.MeshRenderer));
+    Field(typeof(WaterVolume), "m_heightmap", typeof(Heightmap));
+    Field(typeof(WaterVolume), "m_forceDepth", typeof(float));
+    Field(typeof(WaterVolume), "m_surfaceOffset", typeof(float));
+    Field(typeof(WaterVolume), "m_useGlobalWind", typeof(bool));
+    Field(typeof(Minimap), "m_heightTexture", typeof(UnityEngine.Texture2D));
+    Field(typeof(Minimap), "m_forestMaskTexture", typeof(UnityEngine.Texture2D));
+    Field(typeof(Minimap), "m_hasGenerated", typeof(bool));
+    Field(typeof(Minimap), "m_textureSize", typeof(int));
+    Field(typeof(Minimap), "m_pixelSize", typeof(float));
+    Field(typeof(ZoneSystem), "m_zonePrefab", typeof(UnityEngine.GameObject));
+    Field(typeof(ZoneSystem), "m_waterLevel", typeof(float));
+    C(typeof(AudioMan).GetField("m_oceanAudio", flags)?.FieldType.Name == "AudioClip" && typeof(AudioMan).GetField("m_ambientMixer", flags)?.FieldType.Name == "AudioMixerGroup", "AudioMan.m_oceanAudio is an AudioClip and m_ambientMixer an AudioMixerGroup");
+    var all = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static;
+    C(typeof(WaterVolume).GetMethod("DetectWaterDepth", all) is { } d && d.GetParameters().Length == 0 && d.ReturnType == typeof(void), "WaterVolume.DetectWaterDepth() exists");
+    C(typeof(WaterVolume).GetMethod("SetupMaterial", all) is { } m && m.GetParameters().Length == 0, "WaterVolume.SetupMaterial() exists");
+    C(typeof(WaterVolume).GetMethod("UpdateMaterials", all) is { IsPublic: true }, "WaterVolume.UpdateMaterials() is public");
+    C(typeof(Minimap).GetMethod("GenerateWorldMap", all) is { } g && g.GetParameters().Length == 0, "Minimap.GenerateWorldMap() exists");
+    C(typeof(Minimap).GetMethod("TryLoadMinimapTextureData", all) is { } t && t.ReturnType == typeof(bool), "Minimap.TryLoadMinimapTextureData(int) returns a bool");
+    C(typeof(Minimap).GetMethod("ForceRegen", all) is { IsPublic: true }, "Minimap.ForceRegen() is public");
+    C(typeof(WorldGenerator).GetMethod("IsDeepnorth", BindingFlags.Public | BindingFlags.Static) != null && typeof(WorldGenerator).GetMethod("GetAshlandsOceanGradient", BindingFlags.Public | BindingFlags.Static, null, [typeof(float), typeof(float)], null) != null,
+      "WorldGenerator.IsDeepnorth and GetAshlandsOceanGradient(float, float) are public statics");
+  }
 }

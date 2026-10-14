@@ -481,4 +481,33 @@ internal static partial class Tests
     var outside = LakeFlood.Compute((x, z) => 40f, new Lake("o", 1e9f, -1e9f, 60, -50, -50, 50, 50, 5));
     C(outside.Ok, "a point far outside its box still starts at the nearest cell");
   }
+
+  // The cost of a lake of 2 km x 2 km (250,000 cells) with a height function that costs about what the generator's does (a few microseconds a call).
+  public static void FloodCostTest()
+  {
+    Section("flood: the cost of a 2 km x 2 km lake");
+    var noise = new Noise(4242, 55f, 40f, 300f);
+    long calls = 0;
+    Func<float, float, float> costly = (x, z) =>
+    {
+      calls++;
+      // about four octaves of noise on top of the base: a few microseconds
+      float h = noise.Height(x, z);
+      return h + 0.1f * noise.Height(x * 3.1f, z * 3.1f) + 0.05f * noise.Height(x * 7.3f, z * 7.3f);
+    };
+    var lake = new Lake("big", 0, 0, 80f, -1000, -1000, 1000, 1000, 20f);
+    var watch = System.Diagnostics.Stopwatch.StartNew();
+    var shape = LakeFlood.Compute(costly, lake);
+    watch.Stop();
+    C(shape.Ok && shape.WetCells > 10000 && shape.Tiles.Length > 100, $"the lake of 2 km x 2 km floods ({(shape.Ok ? "" : shape.Failed)})");
+    C(watch.ElapsedMilliseconds < 10000, $"{watch.ElapsedMilliseconds} ms for {calls} ground samples ({shape.Nx} x {shape.Nz} cells, {shape.WetCells} wet, {shape.Tiles.Length} tiles, {shape.Boxes.Length} boxes)");
+    System.Console.WriteLine($"   flood cost: {watch.ElapsedMilliseconds} ms, {calls} samples, {shape.Tiles.Length} tiles, {shape.Boxes.Length} boxes");
+    // the same with the ground costing nothing: the flood's own part
+    var flat = new Noise(4242, 55f, 40f, 300f);
+    watch.Restart();
+    var cheap = LakeFlood.Compute(flat.Height, lake);
+    watch.Stop();
+    System.Console.WriteLine($"   flood with cheap ground: {watch.ElapsedMilliseconds} ms ({cheap.Nx} x {cheap.Nz} cells)");
+    C(cheap.Hash() == LakeFlood.Compute(flat.Height, lake).Hash(), "and the big lake gives the same shape twice");
+  }
 }

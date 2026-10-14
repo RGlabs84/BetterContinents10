@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-10-13 for BC's own water (0.10.5).
+// Added by Wubarrk on 2026-10-13 for BC's own water (0.10.5), and on 2026-10-13 for lakes and clearing (0.10.5).
 
 using System;
 using System.Collections.Generic;
@@ -112,11 +112,25 @@ internal static class SeaProbe
       BetterContinents.Log(line);
   }
 
-  private sealed class Surface(WaterVolume volume, Vector3 center, float half)
+  private sealed class Surface(WaterVolume volume, Vector3 center, float half, bool lake = false)
   {
     public readonly WaterVolume Volume = volume;
     public readonly Vector3 Center = center;
     public readonly float Half = half;
+    // A lake's tile (LakeWater): its water is felt through the swim box that holds the point, not through the tile's own volume (whose collider is off).
+    public readonly bool Lake = lake;
+
+    // The height boats and swimmers feel at a point of this water, or NaN where nothing is felt (a lake's drawn water outside its boxes).
+    public float Felt(Vector3 point)
+    {
+      if (!Lake)
+        return Volume.GetWaterSurface(point);
+      var box = LakeWater.BoxAt(point.x, point.z);
+      return box == null ? float.NaN : box.GetWaterSurface(point);
+    }
+
+    // Where the surface's water stands when flat: a zone's volume is at the sea level, a lake's at its level.
+    public float Level => Volume.transform.position.y + Volume.m_surfaceOffset;
   }
 
   private static string Measure()
@@ -139,10 +153,16 @@ internal static class SeaProbe
     for (int i = 0; i < volumes.Count; i++)
     {
       var v = volumes[i];
-      if (v == null || v.m_heightmap == null || v.m_waterSurface == null || !SeaDraw.Draws(v.m_waterSurface))
+      if (v == null || v.m_waterSurface == null || !SeaDraw.Draws(v.m_waterSurface))
+        continue;
+      // A zone's water has its terrain; a lake's tile (Better Continents' lakes) is a volume without one, which LakeWater knows. A lake's tile mesh may be a copy with
+      // triangles left out, so its centre and half width are the tile's, not its bounds'.
+      var lakeTile = v.m_heightmap == null ? LakeWater.TileOf(v) : null;
+      if (v.m_heightmap == null && lakeTile == null)
         continue;
       var bounds = v.m_waterSurface.bounds;
-      surfaces.Add(new Surface(v, bounds.center, bounds.extents.x));
+      surfaces.Add(lakeTile != null ? new Surface(v, new Vector3(lakeTile.TileX, lakeTile.Centre.y, lakeTile.TileZ), LakeDepth.MeshHalf, lake: true)
+                                    : new Surface(v, bounds.center, bounds.extents.x));
       mask |= 1 << v.m_waterSurface.gameObject.layer;
     }
     var position = main.transform.position;
@@ -151,7 +171,7 @@ internal static class SeaProbe
 
     // The places: each of the 81 on the nearest vertex of the zone water that covers it, and only where the water is drawn at full height.
     var reference = Shader.GetGlobalVector("_NetRefPos");
-    var places = new List<(Surface Surface, float X, float Z)>();
+    var places = new List<(List<Surface> Surfaces, float X, float Z)>();
     foreach (var (tx, tz) in Targets(position.x, position.z, main.transform.eulerAngles.y))
     {
       Surface? best = null;
@@ -167,6 +187,9 @@ internal static class SeaProbe
       }
       if (best == null)
         continue;
+      // The water that covers the place: the zone's and, over a lake, the lake's tile on top of it (the render sees the topmost; the draw picks which by its height).
+      var covering = surfaces.Where(s => Math.Max(Math.Abs(tx - s.Center.x), Math.Abs(tz - s.Center.z)) <= s.Half && Math.Abs(s.Center.x - best.Center.x) < 0.5f
+                                         && Math.Abs(s.Center.z - best.Center.z) < 0.5f).ToList();
       float x = SnapToVertex(tx, best.Center.x, best.Half), z = SnapToVertex(tz, best.Center.z, best.Half);
       var material = best.Volume.m_waterSurface.sharedMaterial;
       float visible = material.HasProperty("_VisibleMaxDistance") ? material.GetFloat("_VisibleMaxDistance") : 0f;
@@ -174,7 +197,7 @@ internal static class SeaProbe
       // the waves fade out over the last 20 m before _VisibleMaxDistance from the reference position; the sink starts at _WaterEdge
       if (Math.Sqrt((x - reference.x) * (x - reference.x) + (z - reference.z) * (z - reference.z)) > visible - 20f - 2f || Math.Sqrt((double)x * x + (double)z * z) > edge - 1f)
         continue;
-      places.Add((best, x, z));
+      places.Add((covering, x, z));
     }
 
     var differences = new List<double>(places.Count);
@@ -212,11 +235,12 @@ internal static class SeaProbe
       camera.depthTextureMode = DepthTextureMode.None;
       camera.targetTexture = target;
       var clocked = new HashSet<WaterVolume>();
-      foreach (var (surface, x, z) in places)
+      foreach (var (covering, x, z) in places)
       {
         // The material holds the clock it was last given; the felt height is asked on the clock of this moment.
-        if (clocked.Add(surface.Volume))
-          surface.Volume.UpdateMaterials();
+        foreach (var water in covering)
+          if (clocked.Add(water.Volume))
+            water.Volume.UpdateMaterials();
         holder.transform.SetPositionAndRotation(new Vector3(x, 500f, z), Quaternion.Euler(90f, 0f, 0f));
         camera.RenderWithShader(shader, "RenderType");
         RenderTexture.active = target;
@@ -225,7 +249,11 @@ internal static class SeaProbe
         // not zone water, or not the vertex that was aimed at: not counted
         if (pixel.a < 0.5f || Math.Abs(pixel.r - x) > 0.1f || Math.Abs(pixel.b - z) > 0.1f)
           continue;
-        float felt = surface.Volume.GetWaterSurface(new Vector3(pixel.r, pixel.g, pixel.b));
+        // Which water the pixel is: the one whose level is nearest the height drawn (a lake is above the sea, by 0.5 m at least).
+        var surface = covering.OrderBy(c => Math.Abs(c.Level - pixel.g)).First();
+        float felt = surface.Felt(new Vector3(pixel.r, pixel.g, pixel.b));
+        if (float.IsNaN(felt))
+          continue;
         differences.Add(pixel.g - felt);
       }
     }

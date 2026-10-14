@@ -464,6 +464,8 @@ internal static class LakeStreamer
           if (float.IsNaN(reach))
             reach = LakeBuild.MeshReach(template);
           LakeBuild.MakeTile(shape, t, objects, template, reach);
+          if (objects.Empty)
+            BetterContinents.Log($"Lakes: lake '{rt.Lake.Name}': its tile ({shape.Tiles[t].Tx}, {shape.Tiles[t].Tz}) has no triangle in the mask: no surface is drawn for its {shape.Tiles[t].BoxCount} box(es)");
           if (!objects.Empty && !rt.Logged)
           {
             rt.Logged = true;
@@ -525,15 +527,22 @@ internal static class LakeStreamer
     return rt == null ? (0, 0) : (rt.TilesWithWater, rt.BoxesMade);
   }
 
-  /// <summary>Drops everything the streamer made and makes it again (the tests, a command).</summary>
+  /// <summary>Drops everything the streamer made (tiles, boxes, shapes) and makes it again as the player is near (the tests, a command). The set, the patches and the
+  /// map are left as they are.</summary>
   internal static void Rebuild()
   {
-    var set = current;
-    Changed(null);
-    current = null;
-    // the next tick sees the settings' set again and starts over
-    if (set != null)
-      passTimer = 1f;
+    foreach (var rt in all)
+    {
+      rt.CancelAndClear();
+      rt.Logged = false;
+    }
+    active.Clear();
+    queue = [];
+    queueAt = 0;
+    working = null;
+    LakeWater.Clear();
+    LakeBuild.DestroyRoot();
+    passTimer = 1f;
   }
 
   /// <summary>Lines for bc_lake info: the state, the counts, the template, the cost of the last steps.</summary>

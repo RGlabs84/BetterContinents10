@@ -68,6 +68,18 @@ internal static class LakeWater
       CollisionOnly.Add(volume.Water);
   }
 
+  /// <summary>The record of a water volume that is a lake's tile (not a box), or null: the probe's.</summary>
+  internal static Volume? TileOf(WaterVolume water) => Volumes.TryGetValue(water, out var volume) && !volume.Box ? volume : null;
+
+  /// <summary>The swim box whose rectangle holds a point (the water that is felt there), or null.</summary>
+  internal static WaterVolume? BoxAt(float x, float z)
+  {
+    foreach (var volume in Volumes.Values)
+      if (volume.Box && volume.Water != null && x >= volume.MinX && x <= volume.MaxX && z >= volume.MinZ && z <= volume.MaxZ)
+        return volume.Water;
+    return null;
+  }
+
   internal static void Unregister(WaterVolume water)
   {
     Volumes.Remove(water);
