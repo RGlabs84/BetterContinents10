@@ -97,7 +97,7 @@ internal static class SeaDraw
 
   // The sea materials BC has changed, by renderer, and whether each is the far sea's.
   private static readonly Dictionary<Renderer, (Material Material, bool Far)> Swapped = [];
-  private static int restoredValues, frame;
+  private static int restoredValues, restoredDepths, frame;
   private static bool? softSet;
 
   // Unity's side, made when it is first used: DynamicPatch runs the rest of this class offline, without the engine.
@@ -502,8 +502,8 @@ internal static class SeaDraw
     return held;
   }
 
-  // Puts back any value that did not survive the change of shader (it is expected that none is lost: Unity keeps a material's values by name).
-  // The number put back, for 'bc water'.
+  // Puts back any value that did not survive the change of shader (it is expected that none of the declared ones is lost: Unity keeps a material's values by name;
+  // the zone depth array is the exception). Returns the number of declared values put back, for 'bc water'.
   private static int Restore(Material material, Held held)
   {
     int restored = 0;
@@ -515,8 +515,10 @@ internal static class SeaDraw
       if (material.HasProperty(id) && material.GetTexture(id) != value) { material.SetTexture(id, value); restored++; }
     if (held.Depth != null)
     {
+      // The zone water's four corner depths are an array the game sets and no shader declares (not the game's either); the first run in the game showed
+      // that Unity gives it up at a shader change, so it is always put back, and counted apart from the declared values.
       var now = material.GetFloatArray(Ids.WaterDepth);
-      if (now == null || now.Length != held.Depth.Length || !now.SequenceEqual(held.Depth)) { material.SetFloatArray(Ids.WaterDepth, held.Depth); restored++; }
+      if (now == null || now.Length != held.Depth.Length || !now.SequenceEqual(held.Depth)) { material.SetFloatArray(Ids.WaterDepth, held.Depth); restoredDepths++; }
     }
     return restored;
   }
@@ -554,7 +556,7 @@ internal static class SeaDraw
       int zones = Swapped.Values.Count(v => !v.Far), far = Swapped.Count - zones;
       output($"Water: drawn with {ShaderName}: {zones} zone water surface(s) and {far} far sea (LOD {bcShader?.maximumLOD}). "
         + $"Soft Far Sea is {(softSet == true ? "on" : "off")}.");
-      output($"Water: {restoredValues} material value(s) did not survive a shader change and were put back{(restoredValues == 0 ? " (none: Unity keeps them by name)" : "")}.");
+      output($"Water: {restoredValues} material value(s) did not survive a shader change and were put back{(restoredValues == 0 ? " (none: Unity keeps them by name)" : "")}; the zone depth arrays, which no shader declares, were put back {restoredDepths} time(s).");
     }
     else
     {
