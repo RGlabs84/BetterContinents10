@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Added by Wubarrk on 2026-10-04 for the unifying refactor and the vegetation twin guard (0.10.0), and modified on 2026-10-06 for the Forest Scale default (0.10.2) and for 16k worlds (0.10.3), and on 2026-10-07 for baked placements (0.10.4), and on 2026-10-13 for BC's own water (0.10.5).
+# Added by Wubarrk on 2026-10-04 for the unifying refactor and the vegetation twin guard (0.10.0), and modified on 2026-10-06 for the Forest Scale default (0.10.2) and for 16k worlds (0.10.3), and on 2026-10-07 for baked placements (0.10.4), and on 2026-10-13 for BC's own water (0.10.5), and for the forced genloc (0.10.5).
 #
 # Builds the plugin (Release) and runs every offline suite against it, one after another, memory-capped and niced:
 #   golden-tests      the reference recordings (tools/golden-tests/golden): any difference fails
@@ -35,6 +35,7 @@
 #                     the same bytes whatever the threads, the sampler, the world's own rules with the layout patched for real, the red mask,
 #                     whether the world's sea is the game's, the cost of a field for VALtima's size), and the two felt toggles on the game's
 #                     methods (the candidate worlds, what the prefixes answer, the field's life, other mods' patches on the waves)
+#                     and 'bc genloc' (the words, the refusals, a live or dead run, the counts and lines, the game's code it relies on)
 # Usage: tools/run-tests.sh [suite ...]   (default: all). Exit code 1 when the build or any suite fails.
 set -u
 cd "$(dirname "$0")/.."

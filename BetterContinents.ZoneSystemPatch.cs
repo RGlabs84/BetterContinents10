@@ -1,4 +1,4 @@
-﻿// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0), and on 2026-10-04 for the vegetation twin guard (0.10.0), and on 2026-10-04 for the unifying refactor (0.10.0), and on 2026-10-07 for baked placements (0.10.4).
+﻿// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0), and on 2026-10-04 for the vegetation twin guard (0.10.0), and on 2026-10-04 for the unifying refactor (0.10.0), and on 2026-10-07 for baked placements (0.10.4), and on 2026-10-13 for the forced genloc (0.10.5).
 
 using System;
 using System.Collections.Generic;
@@ -64,8 +64,12 @@ public partial class BetterContinents
       if (TryRegister(zones, startLoc, position, out var holder))
         Log($"Start position overriden: set to {position}");
       else
-        LogError($"The start position override was NOT applied: {position} is in zone {ZoneSystem.GetZone(position)}, which already holds "
-                 + $"{holder}, and the game keeps one location per zone, so it places the start itself. Move the start position or {holder}.");
+      {
+        var why = $"The start position override was NOT applied: {position} is in zone {ZoneSystem.GetZone(position)}, which already holds "
+                  + $"{holder}, and the game keeps one location per zone, so it places the start itself. Move the start position or {holder}.";
+        LogError(why);
+        Genloc.Note("start position: zone already holds " + holder);
+      }
     }
 
     private static void HandleLocation(ZoneSystem zones, ZoneSystem.ZoneLocation loc, BetterContinentsSettings settings, Func<float, float, float> height)
@@ -85,7 +89,10 @@ public partial class BetterContinents
         if (TryRegister(zones, loc, position, out var holder))
           Log($"Position of {loc.m_prefabName} ({++placed}/{loc.m_quantity}) overriden: set to {position}");
         else
+        {
           LogWarning($"Location map: {loc.m_prefabName} at {position} was NOT placed: its zone {ZoneSystem.GetZone(position)} already holds {holder} (the game keeps one location per zone).");
+          Genloc.Note($"location map: {loc.m_prefabName} not placed, its zone holds {holder}");
+        }
       }
     }
 
