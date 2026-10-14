@@ -210,6 +210,13 @@ internal static class LakeBuild
     foreach (var wv in objects.Volumes)
       LakeWater.Unregister(wv);
     objects.Volumes.Clear();
+    // The surface's material is an instance made for this tile (WaterVolume.SetupMaterial reads .material): destroying the renderer does not destroy it.
+    if (objects.Surface != null)
+    {
+      var material = objects.Surface.sharedMaterial;
+      if (material != null && material.name.EndsWith(" (Instance)", StringComparison.Ordinal))
+        Object.Destroy(material);
+    }
     if (objects.Holder != null)
       Object.Destroy(objects.Holder);
     if (objects.OwnMesh != null)

@@ -470,7 +470,7 @@ internal static class LakeStreamer
           {
             rt.Logged = true;
             BetterContinents.Log($"Lakes: lake '{rt.Lake.Name}' built at ({rt.Lake.X:0}, {rt.Lake.Z:0}): level {shape.Level:0.00}, {shape.AreaM2:0} m2 of water, "
-              + $"{shape.Tiles.Length} tile(s), {shape.Boxes.Length} box(es)");
+              + $"{shape.Tiles.Length} tile(s) ({shape.Tiles.Count(t => t.Full)} with the game's own mesh), {shape.Boxes.Length} box(es)");
           }
         }
         else if (objects.Boxes < shape.Tiles[t].BoxCount)

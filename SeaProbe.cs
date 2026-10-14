@@ -133,8 +133,12 @@ internal static class SeaProbe
     public float Level => Volume.transform.position.y + Volume.m_surfaceOffset;
   }
 
+  /// <summary>The places of the last probe (the phase L driver reads them): x, z, the drawn and the felt height, and the water that was felt (a zone's or a lake's tile).</summary>
+  internal static readonly List<(float X, float Z, float Drawn, float Felt, string Water)> LastPlaces = [];
+
   private static string Measure()
   {
+    LastPlaces.Clear();
     var main = Utils.GetMainCamera();
     if (main == null || WaterVolume.Instances.Count == 0)
       return Cannot("no world is loaded here");
@@ -255,6 +259,7 @@ internal static class SeaProbe
         if (float.IsNaN(felt))
           continue;
         differences.Add(pixel.g - felt);
+        LastPlaces.Add((pixel.r, pixel.b, pixel.g, felt, surface.Volume.name));
       }
     }
     finally

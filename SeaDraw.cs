@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-10-13 for BC's own water (0.10.5).
+// Added by Wubarrk on 2026-10-13 for BC's own water (0.10.5), and on 2026-10-13 for lakes and clearing (0.10.5).
 
 using System;
 using System.Collections.Generic;
@@ -107,7 +107,7 @@ internal static class SeaDraw
   {
     internal static readonly int Field = Shader.PropertyToID("_BCSeaField"), Rect = Shader.PropertyToID("_BCSeaRect"),
       Depth = Shader.PropertyToID("_BCSeaDepth"), DepthRect = Shader.PropertyToID("_BCSeaDepthRect"), Soft = Shader.PropertyToID("_BCSeaSoft"),
-      WaterDepth = Shader.PropertyToID("_depth");
+      WaterDepth = Shader.PropertyToID("_depth"), UseGlobalWind = Shader.PropertyToID("_UseGlobalWind"), IsLod = Shader.PropertyToID("_IsLod");
   }
 
   /// <summary>Whether BC's own sea is drawn now (its shader is on the sea, its textures are up).</summary>
@@ -465,7 +465,18 @@ internal static class SeaDraw
     var held = Capture(material);
     material.shader = bcShader;
     restoredValues += Restore(material, held);
+    KeepWind(material);
     Swapped[renderer] = (material, far);
+  }
+
+  // _UseGlobalWind, like the depth array, is set on a zone's water by the game's SetupMaterial (once, in Start) and declared by neither shader: a shader change that is not
+  // the first one on that material (Own Water turned off and on in the game, found by the lakes' tiles) gives it up, and the surface is drawn without its waves while boats
+  // still feel them. Every zone water that BC swaps (a lake's tile too: it is swapped as a zone's or as a far sea's, by whichever loop meets its renderer first, so the
+  // far flag does not say) has the global wind; the far sea (_IsLod 1) does not use it.
+  private static void KeepWind(Material material)
+  {
+    if (material.HasProperty(Ids.IsLod) && material.GetFloat(Ids.IsLod) < 0.5f)
+      material.SetFloat(Ids.UseGlobalWind, 1f);
   }
 
   /// <summary>Back to the game's shader on every swapped material, the textures dropped, 0.10.3's colours again.</summary>
@@ -479,6 +490,7 @@ internal static class SeaDraw
           var held = Capture(material);
           material.shader = gameShader;
           restoredValues += Restore(material, held);
+          KeepWind(material);
         }
     Swapped.Clear();
     on = false;
