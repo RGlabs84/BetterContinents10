@@ -76,6 +76,13 @@ internal sealed class ClearMask
 
   public static int RawLengthOf(int size) => (int)(((long)size * size + 7) / 8);
 
+  // The smallest a pixel may be, in metres: a mask whose pixel is smaller is refused (a mistyped half-extent). Covers looks at the pixels within a quarter of a metre of a
+  // point, so a 16384 px mask of 1 m half-extent (a pixel of 0.1 mm) would scan the whole mask for every plant. 1 cm is far under any real map (Ravenrest's is 5.13 m,
+  // a 16384 px mask of the world's 21 km is 1.28 m) and still allows the 255 px / 3 m mask (2.3 cm) the area test is checked on; at 1 cm a lookup scans 50 x 50 pixels.
+  public const float MinPixelMetres = 0.01f;
+  // The largest half-extent: 10,000 km, far past a Valheim world (65 km).
+  public const float MaxExtent = 1e7f;
+
   private static void CheckShape(long size, float extent)
   {
     if (size <= 0)
@@ -84,6 +91,11 @@ internal sealed class ClearMask
       throw new LakeFormatException($"the clearing mask is {size} pixels across, more than the {MaxSize} Better Continents takes");
     if (float.IsNaN(extent) || float.IsInfinity(extent) || extent <= 0f)
       throw new LakeFormatException($"the clearing mask's half-extent is {extent}");
+    if (extent > MaxExtent)
+      throw new LakeFormatException($"the clearing mask's half-extent is {extent} m, more than the {MaxExtent:0} m Better Continents takes");
+    float mpx = 2f * extent / size;
+    if (mpx < MinPixelMetres)
+      throw new LakeFormatException($"the clearing mask's pixels are {mpx:0.#####} m across ({size} pixels over +-{extent} m), under the {MinPixelMetres * 100:0} cm Better Continents takes: its half-extent looks mistyped (a {size} px mask needs one of at least {MinPixelMetres * size / 2:0.#} m)");
   }
 
   // ---- Tarn's file ------------------------------------------------------------------------------------------------------------------------------
@@ -219,6 +231,11 @@ internal sealed class ClearMask
       {
         decodeError = e.Message;
         throw;
+      }
+      catch (Exception e) when (e is IOException or NotSupportedException or ArgumentException or OutOfMemoryException)
+      {
+        decodeError = "the clearing mask's bits do not open (" + e.Message + ")";
+        throw new LakeFormatException(decodeError);
       }
     }
   }

@@ -103,11 +103,16 @@ internal static class LakeFiles
 
   // ---- reading and writing ------------------------------------------------------------------------------------------------------------------------
 
-  // A lakes file read: a line that does not parse is a warning that names the file and the line; the numbers of a lake that is odd are warned about and kept.
-  internal static LakeSet ReadLakes(string path)
+  // A lakes file read: a line that does not parse is a warning that names the file and the line; the numbers of a lake that is odd are warned about and kept. The
+  // warnings go to the log and, when a list is given, into it as well (the dry run of a command shows them: what the parser left out is what an admin wants to see).
+  internal static LakeSet ReadLakes(string path, List<string>? notes = null)
   {
     var lines = File.ReadAllLines(path);
-    return LakeSet.ParseLines(lines, w => BetterContinents.LogWarning($"Lakes: {path}: {w}"));
+    return LakeSet.ParseLines(lines, w =>
+    {
+      BetterContinents.LogWarning($"Lakes: {path}: {w}");
+      notes?.Add($"{Path.GetFileName(path)}: {w}");
+    });
   }
 
   // A mask file read. The 33 MB of a 16384 px mask are read once and the bits copied out of them.
@@ -122,17 +127,43 @@ internal static class LakeFiles
 
   internal static void WriteClearing(string path, ClearMask mask) => WriteFile(path, mask.ToTarnFile());
 
-  // Whole, or not at all: a file beside it, then moved over.
+  // Whole, or not at all: written beside it, then put in its place in one step (File.Replace over an existing file, so a crash leaves the old file or the new one, and
+  // never neither).
   private static void WriteFile(string path, byte[] bytes)
   {
     var dir = Path.GetDirectoryName(path);
     if (!string.IsNullOrEmpty(dir))
       Directory.CreateDirectory(dir);
     var tmp = path + ".tmp";
-    File.WriteAllBytes(tmp, bytes);
-    if (File.Exists(path))
-      File.Delete(path);
-    File.Move(tmp, path);
+    try
+    {
+      File.WriteAllBytes(tmp, bytes);
+      if (File.Exists(path))
+        File.Replace(tmp, path, null);
+      else
+        File.Move(tmp, path);
+    }
+    catch
+    {
+      try
+      {
+        File.Delete(tmp);
+      }
+      catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+      {
+        // Left where it is.
+      }
+      throw;
+    }
+  }
+
+  // A name nobody has used yet: prefix + stamp + ext, and -2, -3 ... after the stamp when it is taken (two backups in one clock tick never share a file).
+  internal static string UniquePath(string folder, string prefix, string stamp, string ext)
+  {
+    var path = Path.Combine(folder, prefix + stamp + ext);
+    for (int k = 2; File.Exists(path) || Directory.Exists(path); k++)
+      path = Path.Combine(folder, $"{prefix}{stamp}-{k}{ext}");
+    return path;
   }
 
   // ---- Tarn's own folder: an import source ----------------------------------------------------------------------------------------------------------
@@ -177,6 +208,8 @@ internal static class LakeFiles
     public ClearMask? Clearing;
     public string? LakesPath, ClearingPath;
     public readonly List<string> Problems = [];
+    // What the parser said of the lakes file (lines left out, odd lakes), as "lakes.txt: line 6: ...".
+    public readonly List<string> Notes = [];
   }
 
   // Tarn's <world>.txt and <world>.clear from a folder (BepInEx/config/Tarn by default).
@@ -187,7 +220,7 @@ internal static class LakeFiles
     if (File.Exists(lakes))
       try
       {
-        var set = ReadLakes(lakes);
+        var set = ReadLakes(lakes, read.Notes);
         if (set.IsEmpty)
           read.Problems.Add($"{lakes} holds no lake");
         else

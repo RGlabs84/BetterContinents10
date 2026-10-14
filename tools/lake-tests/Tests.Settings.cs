@@ -425,7 +425,7 @@ internal static partial class Tests
       var covered = mask.CentreOf(0, 0);
       float mpx = mask.MetresPerPixel;
       C(Ask(none, covered.X, covered.Z) && Ask(none, covered.X + mpx * 0.4f, covered.Z - mpx * 0.4f), "a spot inside a marked pixel is inside a clear area: the game's own method answers yes with no area in its list");
-      C(!Ask(none, covered.X + mpx * 3f, covered.Z) || mask.Covers(covered.X + mpx * 3f, covered.Z), "and a spot outside every marked pixel is as the mask says");
+      C(Ask(none, covered.X + mpx * 3f, covered.Z) == mask.Covers(covered.X + mpx * 3f, covered.Z), "and a spot two pixels over is as the mask says (the game's method and Covers agree)");
       var clear = mask.CentreOf(1, 36);
       C(!mask.Covers(clear.X, clear.Z) == !Ask(none, clear.X, clear.Z), "the method and Covers agree on a spot that is not marked");
       // The game's own areas (a location's) still count: the answer is the OR.

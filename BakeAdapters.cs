@@ -69,9 +69,15 @@ internal sealed class BakedConvert : IBakeConvert
 
   public void Convert() => Convert(null, null);
 
+  // The most a settings package may be to go to the players in the world in one message: Steam refuses a message over 512 KB, and a message it refuses stays at the head
+  // of that connection's queue, so every later one waits behind it. The join sends the settings in chunks of 128 KB (SendPackets); this broadcast is one message.
+  internal const int MaxBroadcastBytes = 400 * 1024;
+
   // 0.10.5: the lakes and the clearing mask go over to the converted settings (a Better Continents world that keeps the game's terrain carries them as it carries
-  // its layer), the world's own, or these when `bc_lake load ... convert` makes a vanilla world one with lakes.
-  public void Convert(LakeSet? lakes, ClearMask? clearing)
+  // its layer), the world's own, or these when `bc_lake load ... convert` makes a vanilla world one with lakes. The settings go to the players in the world in one message
+  // when they fit one (the number sent is returned); a package over MaxBroadcastBytes (a large mask) is not sent, the players in the world must join again and get it the
+  // normal way, in chunks (-1).
+  public int Convert(LakeSet? lakes, ClearMask? clearing)
   {
     var old = BetterContinents.Settings;
     var made = new BetterContinents.BetterContinentsSettings
@@ -90,8 +96,16 @@ internal sealed class BakedConvert : IBakeConvert
     var package = new ZPackage();
     // The newest format, which a world on the game's terrain is written in whatever the Override version setting says.
     made.Serialize(package, true, formatVersion: BetterContinents.BetterContinentsSettings.UnifiedVersion);
+    PackageBytes.Buffer(package, out int length);
+    if (length > MaxBroadcastBytes)
+    {
+      BetterContinents.Log($"This world keeps the game's own terrain and is a Better Continents world now; its settings are {length:N0} bytes, too many for one message to the players in it ({MaxBroadcastBytes:N0} at most), "
+        + "so they were not sent: the players in the world must leave and join again, and get them then.");
+      return -1;
+    }
     int sent = BakedTransfer.BroadcastSettings(package);
     BetterContinents.Log($"Baked pieces: this world keeps the game's own terrain and is a Better Continents world now; its settings went to {sent} player{(sent == 1 ? "" : "s")}.");
+    return sent;
   }
 }
 

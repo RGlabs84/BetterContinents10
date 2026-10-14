@@ -146,10 +146,14 @@ internal static partial class Tests
     var zero = (byte[])blob.Clone();
     BitConverter.GetBytes(0).CopyTo(zero, 0);
     C(RefusesLake(() => LakeSet.FromBlock(zero), "format number"), "and format 0");
+    // A lake with a number that is not finite (a build before this one could write it) is left out, with a word; the rest of the list reads.
     var badFloat = (byte[])blob.Clone();
     int firstFloat = 12 + 1 + Encoding(lakes[0].Name).Length;
     BitConverter.GetBytes(float.PositiveInfinity).CopyTo(badFloat, firstFloat);
-    C(RefusesLake(() => LakeSet.FromBlock(badFloat), "not finite"), "and a lake with a number that is not finite");
+    var warnings = new List<string>();
+    var dropped = LakeSet.FromBlock(badFloat, warnings.Add);
+    C(dropped.Lakes.Count == 299 && dropped.Lakes.SequenceEqual(lakes.Skip(1)) && warnings.Count == 1 && warnings[0].Contains("lake 1") && warnings[0].Contains("not finite"), "a lake with a number that is not finite is left out with a word, and the other 299 read: " + string.Join(" | ", warnings));
+    C(LogHandler.During(() => LakeSet.FromBlock(badFloat)).Any(l => l.StartsWith("[Warning]") && l.Contains("not finite")), "and the word is in the log");
     var tooMany = new LakeSet(Enumerable.Range(0, LakeSet.MaxLakes + 1).Select(i => lakes[0]).ToList(), 0.5f, 0);
     C(RefusesLake(() => tooMany.ToBlock(), "at most 5,000"), "a set over the limit is not written");
     // A non-ASCII name survives.
@@ -326,7 +330,7 @@ internal static partial class Tests
       covered += mask.Covers(xs[i & 0xFFFF], zs[i & 0xFFFF]) ? 1 : 0;
     double ns = watch.Elapsed.TotalMilliseconds * 1e6 / N;
     System.Console.WriteLine($"   Covers: {ns:0.0} ns a lookup over {N:N0} random points of a 4096 x 4096 mask ({covered:N0} covered); a zone asks 500 to 3,000 times");
-    C(ns < 2000, $"a lookup takes {ns:0.0} ns (under 2,000)");
+    C(ns < 400, $"a lookup takes {ns:0.0} ns (under 400: seven times what it is measured at on this machine)");
 
     watch.Restart();
     var big = new byte[16 + ClearMask.RawLengthOf(ClearMask.MaxSize)];

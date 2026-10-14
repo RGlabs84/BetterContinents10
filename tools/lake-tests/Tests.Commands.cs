@@ -48,10 +48,10 @@ internal static partial class Tests
     var load = LakeParse("load C:\\maps\\My Town confirm convert");
     C(load.Verb == LakeVerb.Load && load.Text == "C:\\maps\\My Town" && load.Confirm && load.Convert, "load takes a folder with spaces as typed, and the words 'confirm' and 'convert' wherever they stand");
     C(LakeParse("load").Text == null && !LakeParse("load").Confirm && LakeParse("import").Verb == LakeVerb.Import && LakeParse("import /a b convert").Convert && LakeParse("import /a b convert").Text == "/a b", "load and import: the folder is optional");
-    C(LakeParse("export /tmp/a b").Text == "/tmp/a b" && LakeParse("export").Text == null && LakeParse("export x confirm").Error != null, "export [folder]");
+    C(LakeParse("export /tmp/a b").Text == "/tmp/a b" && LakeParse("export").Text == null && LakeParse("export x confirm").Confirm && LakeParse("export x confirm").Text == "x" && !LakeParse("export x").Confirm && LakeParse("export x convert").Error != null, "export [folder] [confirm]");
     C(LakeParse("mask at 3 4").Verb == LakeVerb.MaskAt && LakeParse("mask at 3 4").X == 3f && LakeParse("mask at 3").Error != null && LakeParse("mask at 3 x").Error != null, "mask at <x> <z>");
     var maskLoad = LakeParse("mask load /tmp/a b.bin confirm");
-    C(maskLoad.Verb == LakeVerb.MaskLoad && maskLoad.Text == "/tmp/a b.bin" && maskLoad.Confirm && LakeParse("mask load").Error != null && LakeParse("mask export /x").Verb == LakeVerb.MaskExport && LakeParse("mask export").Error != null && LakeParse("mask").Error != null && LakeParse("mask frob").Error != null, "mask load <file> [confirm] | mask export <file>");
+    C(maskLoad.Verb == LakeVerb.MaskLoad && maskLoad.Text == "/tmp/a b.bin" && maskLoad.Confirm && LakeParse("mask load").Error != null && LakeParse("mask export /x").Verb == LakeVerb.MaskExport && LakeParse("mask export /x confirm").Confirm && LakeParse("mask export /x convert").Error != null && LakeParse("mask export").Error != null && LakeParse("mask").Error != null && LakeParse("mask frob").Error != null, "mask load <file> [confirm] | mask export <file>");
     var server = LakeParse("server remove all confirm");
     C(server.Verb == LakeVerb.Server && server.Text == "remove all confirm" && LakeParse("server").Error != null && LakeParse("server server info").Error != null && LakeParse("server frobnicate").Error != null && LakeParse("server list 0").Error != null, "'server' hands the rest on, and says now what the server would refuse");
     C(LakeParse("frobnicate").Error!.Contains("'frobnicate' is not understood") && LakeParse("tarn here").Error != null, "a word it does not know is said");
@@ -95,6 +95,9 @@ internal static partial class Tests
     public readonly string Save;
     public readonly List<string> Remote = [], Local = [];
     public readonly List<(LakeSet Lakes, ClearMask Mask)> Converted = [];
+    // What the conversion's broadcast answers: the number of players sent the settings, or -1 for a package too large for one message.
+    public int ConvertSent = 1;
+    public bool InsideSaves;
     public readonly List<LakeSet> Changed = [];
     public int ClearingPatched, Regenerated;
     public Func<float, float, float, float, LakeCommands.HereOutcome> Spill = (x, z, r, m) => LakeCommands.HereOutcome.NotAvailable;
@@ -122,7 +125,12 @@ internal static partial class Tests
       LakeCommands.Seams.CallerPlace = () => (0f, 0f);
       LakeCommands.Seams.Kind = () => BakeWorldKind.BetterContinents;
       LakeCommands.Seams.Peers = () => [];
-      LakeCommands.Seams.Convert = (lakes, mask) => Converted.Add((lakes, mask));
+      LakeCommands.Seams.Convert = (lakes, mask) =>
+      {
+        Converted.Add((lakes, mask));
+        return ConvertSent;
+      };
+      LakeCommands.Seams.InsideWorldSaves = _ => InsideSaves;
       LakeCommands.Seams.PatchClearing = () => ClearingPatched++;
       LakeCommands.Seams.GeneratedZones = () => Zones;
       LakeCommands.Seams.Regenerate = () => Regenerated++;
@@ -237,8 +245,8 @@ internal static partial class Tests
     var old = BC.Settings.Lakes;
     C(w.Run("remove far").Contains("removed 1 lake; 3 left"), "remove <name>: " + w.Said.FirstOrDefault());
     C(BC.Settings.Lakes.Lakes.Select(l => l.Name).SequenceEqual(["near", "lake3", "Big Lake ä"]), "the others stay, in order");
-    var backup = Path.Combine(w.Save, "lakes-before-2026-10-13-123005.txt");
-    C(File.Exists(backup) && LakeSet.ParseLines(File.ReadAllLines(backup), _ => { }).Lakes.SequenceEqual(old.Lakes), "the old list was first written to lakes-before-<time>.txt in the save folder, in Tarn's format");
+    var backup = Path.Combine(w.Save, "lakes-before-2026-10-13-123005-000.txt");
+    C(File.Exists(backup) && LakeSet.ParseLines(File.ReadAllLines(backup), _ => { }).Lakes.SequenceEqual(old.Lakes), "the old list was first written to lakes-before-<time>.txt (to the millisecond) in the save folder, in Tarn's format");
     C(w.Run("remove nothing").Contains("no lake is named 'nothing'") && w.Run("remove Big Lake ä").Contains("removed 1 lake; 2 left"), "an unknown name is said; a name with spaces and accents works");
     // remove all: a dry run
     var beforeAll = BC.Settings.Lakes;
@@ -296,16 +304,16 @@ internal static partial class Tests
     C(dry.Contains("a dry run, nothing changes") && dry.Contains("5 lakes (lakes.txt) and a clearing mask of 64 x 64 over +-32 m") && dry.Contains("the world has 4 lakes and no mask") && dry.Contains("add 'confirm'") && dry.Contains("lakes-before-<time>.txt"), "load: a dry run says what the files hold and what the world has: " + dry.Replace("\n", " | "));
     C(ReferenceEquals(BC.Settings.Lakes, oldLakes) && BC.Settings.Clearing == null && !Directory.Exists(w.Save), "and changes nothing, writes nothing");
     var lines = w.Said.Count(l => l.Contains("left out"));
-    C(lines == 0, "no problem lines for readable files");
+    C(lines == 2 && w.Said.Any(l => l.Contains("lakes.txt: line 6:")) && w.Said.Any(l => l.Contains("lakes.txt: line 8:")), "and it shows the two lines the parser left out (6 and 8), which the log has too");
     // Confirm.
     var text = w.Run("load confirm");
     C(text.Contains("loaded 5 lakes (lakes.txt) and a clearing mask of 64 x 64") && text.Contains("the lakes were sent to 1 player") && text.Contains("the mask is not sent to players"), "load confirm: " + text.Replace("\n", " | "));
     C(BC.Settings.Lakes.Lakes.Count == 5 && BC.Settings.Lakes.DepthScale == 0.5f && BC.Settings.Clearing is { Size: 64 } && w.ClearingPatched == 1 && w.Changed.Count == 1 && w.Pushes == 1, "the world has them, the clearing patch was switched, the lake engine told, the lakes pushed once");
-    var backup = Path.Combine(w.Save, "lakes-before-2026-10-13-123005.txt");
+    var backup = Path.Combine(w.Save, "lakes-before-2026-10-13-123005-000.txt");
     C(File.Exists(backup) && LakeSet.ParseLines(File.ReadAllLines(backup), _ => { }).Lakes.SequenceEqual(oldLakes.Lakes) && !Directory.GetFiles(w.Save).Any(f => f.Contains("clearmask-before")), "the old lakes were written first (there was no mask to write)");
     // Load again over a mask: it is written first.
     w.Run("load confirm");
-    C(Directory.GetFiles(w.Save).Any(f => Path.GetFileName(f) == "clearmask-before-2026-10-13-123005.bin"), "the old mask is written before a new one replaces it");
+    C(Directory.GetFiles(w.Save).Any(f => Path.GetFileName(f) == "clearmask-before-2026-10-13-123005-000.bin"), "the old mask is written before a new one replaces it");
     // Only a lakes file or only a mask in the folder.
     var onlyMask = NewDir("load-only-mask");
     File.Copy(Fixture("clear37.bin"), Path.Combine(onlyMask, "tarn-clear.bin"));
@@ -340,7 +348,7 @@ internal static partial class Tests
       var importDry = w.Run("import");
       C(importDry.Contains("bc_lake import: a dry run") && importDry.Contains("5 lakes (Raventest.txt)") && importDry.Contains("a clearing mask of 8 x 8"), "import: a dry run reads Tarn's <world>.txt and .clear: " + importDry.Replace("\n", " | "));
       w.Run("import confirm");
-      C(BC.Settings.Lakes.Lakes.Count == 5 && BC.Settings.Lakes.DepthScale == 0.8f && BC.Settings.Clearing.Size == 8, "imported, with Tarn's own depth scale (0.8)");
+      C(BC.Settings.Lakes.Lakes.Count == 5 && BC.Settings.Lakes.DepthScale == 0.5f && BC.Settings.Clearing.Size == 8, "imported; the world keeps its own depth scale (0.5), not Tarn's (0.8): see the fixes tests for a world with none");
       File.Delete(Path.Combine(tarn, "Raventest.txt"));
       File.Delete(Path.Combine(tarn, "Raventest.clear"));
       C(w.Run("import").Contains("holds no Raventest.txt or Raventest.clear"), "Tarn's files named for another world are said not to be there");
@@ -362,7 +370,7 @@ internal static partial class Tests
     C(w.Run($"export {exportDir}").Contains("wrote lakes.txt (5 lakes) and clearmask.bin (64 x 64)"), "export writes both files");
     C(LakeSet.ParseLines(File.ReadAllLines(Path.Combine(exportDir, "lakes.txt")), _ => { }).Lakes.SequenceEqual(BC.Settings.Lakes.Lakes) && File.ReadAllBytes(Path.Combine(exportDir, "clearmask.bin")).SequenceEqual(BC.Settings.Clearing.ToTarnFile()), "the world's lakes to the bit and the mask to the byte");
     w.Run("export");
-    C(Directory.GetDirectories(w.Save).Any(d => Path.GetFileName(d) == "lakes-2026-10-13-123005"), "no folder: lakes-<time> in the world's save folder");
+    C(Directory.GetDirectories(w.Save).Any(d => Path.GetFileName(d) == "lakes-2026-10-13-123005-000"), "no folder: lakes-<time> in the world's save folder");
     LakeCommands.Seams.ExportRefusal = () => "Allow Export is off on this server";
     C(w.Run("export").Contains("Allow Export is off") && w.Run("mask export x").Contains("Allow Export is off"), "export follows the server's Allow Export");
   }

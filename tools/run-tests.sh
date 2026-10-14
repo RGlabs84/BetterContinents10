@@ -40,7 +40,8 @@
 #                     transcription of Tarn's areas and the game's loop, the settings' keys 72 and 73 and what the released Better Continents does with them, the Directory's
 #                     files and Tarn's own folder, the postfix on the game's InsideClearArea, the push, the bc_lake words; and the lake engine's flood, spill and tiles
 #                     (Tests.<Part>.cs: every static method named *Test of the partial class Tests runs). The old-reader test needs the released package: BC_RELEASES names
-#                     the folder with BetterContinents-v0.10.4-hexium.zip (the main checkout's HexiumDist is looked in too)
+#                     the folder with BetterContinents-v0.10.4-hexium.zip (HexiumDist, and the main checkout's, are looked in too); when it is found this script sets
+#                     BC_REQUIRE_RELEASES=1, so that a test that then cannot find a zip fails (BC_REQUIRE_RELEASES=0 turns that off)
 # Usage: tools/run-tests.sh [suite ...]   (default: all). Exit code 1 when the build or any suite fails.
 set -u
 cd "$(dirname "$0")/.."
@@ -48,6 +49,17 @@ export PATH="$HOME/.dotnet:$PATH"
 export DOTNET_ROOT="${DOTNET_ROOT:-$HOME/.dotnet}"
 # ulimit -v breaks CoreCLR's heap reservation; a hard GC heap limit caps it instead.
 export DOTNET_GCHeapHardLimit="${DOTNET_GCHeapHardLimit:-0xC0000000}"
+# The old-reader tests need the released packages (BetterContinents-v<version>-hexium.zip): with the zips on this machine a test that cannot find one is a failure, not
+# a SKIPPED that passes. They are looked for in BC_RELEASES, this repository's HexiumDist, and (for a worktree under .work/) the main checkout's.
+if [ "${BC_REQUIRE_RELEASES:-}" != "0" ]; then
+  for d in "${BC_RELEASES:-}" HexiumDist ../../HexiumDist; do
+    if [ -n "$d" ] && [ -f "$d/BetterContinents-v0.10.4-hexium.zip" ]; then
+      export BC_RELEASES="$(cd "$d" && pwd)"
+      export BC_REQUIRE_RELEASES=1
+      break
+    fi
+  done
+fi
 logs="$(mktemp -d "${TMPDIR:-/tmp}/bc-tests-XXXXXX")"
 suites=("$@")
 [ ${#suites[@]} -eq 0 ] && suites=(golden-tests altbiome-harness export-tests import-tests livecfg-tests ewd-tests twin-tests size-tests sector-tests tile-tests zone-tests high-tests placement-tests water-tests lake-tests)

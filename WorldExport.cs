@@ -658,7 +658,7 @@ public static class WorldExport
     Path.GetFullPath(path).Replace('\\', '/').TrimEnd('/') + "/";
 
   // The save-path trap: worlds_local/<name>/ (and the legacy worlds/) belong to the game's save system.
-  private static bool InsideWorldSaves(string dir)
+  internal static bool InsideWorldSaves(string dir)
   {
     var local = Utils.GetSaveDataPath(FileHelpers.FileSource.Local);
     var target = NormalizeDir(dir);

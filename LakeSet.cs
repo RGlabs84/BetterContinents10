@@ -151,30 +151,66 @@ internal sealed class LakeSet
   // The lake lines again, the numbers in the round-trip form (Tarn's own ToLine wrote three decimals [T: Plugin.cs]; it reads this form too).
   public IEnumerable<string> ToLines() => Lakes.Select(Line);
 
-  public static string Line(Lake l) => string.Join(";", Clean(l.Name), Num(l.X), Num(l.Z), Num(l.Level), Num(l.MinX), Num(l.MinZ), Num(l.MaxX), Num(l.MaxZ), Num(l.Depth));
+  // A name that starts with '#' would be read back as a comment: it gets an underscore in front (it can only come from a blob, never from the text reader or `here`).
+  public static string Line(Lake l) => string.Join(";", Clean(l.Name) is { Length: > 0 } n && n[0] == '#' ? "_" + n : Clean(l.Name), Num(l.X), Num(l.Z), Num(l.Level), Num(l.MinX), Num(l.MinZ), Num(l.MaxX), Num(l.MaxZ), Num(l.Depth));
 
   // The file's lines: Tarn's header comment, then the lakes.
   public IEnumerable<string> ToFileLines() => new[] { FileHeader }.Concat(ToLines());
 
   public static string Num(float v) => v.ToString("R", C);
 
+  public static bool Finite(float v) => !float.IsNaN(v) && !float.IsInfinity(v);
+
+  // Whether every number of a lake is a number (a flood over NaN is nonsense, and a blob with one reads as damaged to an older build).
+  public static bool IsFinite(Lake l) => Finite(l.X) && Finite(l.Z) && Finite(l.Level) && Finite(l.MinX) && Finite(l.MinZ) && Finite(l.MaxX) && Finite(l.MaxZ) && Finite(l.Depth);
+
+  // A lake that may be added to a world by a command (`here`, `at`): finite numbers, a box with room in it, the point inside the box, a level above the sea's 30 m
+  // (a lake lower than that drains), a name the text format can carry. The reason is said when not. (The text reader is gentler: it keeps an odd lake with a warning,
+  // because a map maker may know better; a command makes the lake itself, and its numbers are the engine's.)
+  public static bool Valid(Lake l, out string why)
+  {
+    why = "";
+    if (!IsFinite(l))
+      why = "a number of the lake is not finite";
+    else if (l.MaxX <= l.MinX || l.MaxZ <= l.MinZ)
+      why = "its box is empty";
+    else if (l.X < l.MinX || l.X > l.MaxX || l.Z < l.MinZ || l.Z > l.MaxZ)
+      why = "its point is outside its box";
+    else if (l.Level < 30f)
+      why = $"its level {l.Level} m is under the sea's 30 m";
+    else if (string.IsNullOrWhiteSpace(l.Name) || Clean(l.Name).Length > MaxNameLength)
+      why = "its name is empty or longer than 64 characters";
+    return why.Length == 0;
+  }
+
   // ---- blob 72 ---------------------------------------------------------------------------------------------------------------------------------
   // int version = 1; float depthScale; int count; then per lake: string name (BinaryWriter's: UTF-8, a 7-bit length first); float x, z, level, minX, minZ,
   // maxX, maxZ, depth. The first int32 is the format version, so the settings' BlockVersionOf reads it. Exact floats: the text file's decimals are not kept.
+
+  // A name longer than this many UTF-8 bytes is not a name this reader reads (the longest a lake can have is MaxNameLength characters).
+  private const int MaxNameBytes = 1024;
 
   public byte[] ToBlock()
   {
     if (Lakes.Count > MaxLakes)
       throw new LakeFormatException($"a world holds at most {MaxLakes:N0} lakes, this set has {Lakes.Count:N0}");
-    using var ms = new MemoryStream(16 + Lakes.Count * 72);
+    if (!Finite(DepthScale))
+      throw new LakeFormatException("the depth scale is not a number");
+    // A lake with a number that is not a number is left out, with a word: written, it would make the whole list unreadable at the next start. (The commands never make
+    // one: Valid.)
+    var written = Lakes.Where(IsFinite).ToList();
+    if (written.Count != Lakes.Count)
+      BetterContinents.LogWarning($"Lakes: {Lakes.Count - written.Count} lake(s) with a number that is not finite are left out of what is saved: {string.Join(", ", Lakes.Where(l => !IsFinite(l)).Take(3).Select(l => l.Name))}");
+    using var ms = new MemoryStream(16 + written.Count * 72);
     using (var w = new BinaryWriter(ms, new UTF8Encoding(false), true))
     {
       w.Write(BlockVersion);
       w.Write(DepthScale);
-      w.Write(Lakes.Count);
-      foreach (var l in Lakes)
+      w.Write(written.Count);
+      foreach (var l in written)
       {
-        w.Write(l.Name ?? "");
+        var name = l.Name ?? "";
+        w.Write(name.Length > MaxNameLength ? name.Substring(0, MaxNameLength) : name);
         w.Write(l.X);
         w.Write(l.Z);
         w.Write(l.Level);
@@ -188,18 +224,44 @@ internal sealed class LakeSet
     return ms.ToArray();
   }
 
-  public static LakeSet FromBlock(byte[] block)
+  public static LakeSet FromBlock(byte[] block) => FromBlock(block, w => BetterContinents.LogWarning("Lakes: " + w));
+
+  // A name as BinaryWriter.Write(string) wrote it (UTF-8, a 7-bit length first), read with a bound on the length, so that a damaged length cannot make a reader allocate
+  // gigabytes (Mono's BinaryReader would).
+  private static string ReadName(BinaryReader r)
+  {
+    int length = 0, shift = 0;
+    byte b;
+    do
+    {
+      if (shift == 35)
+        throw new LakeFormatException("a lake's name has a damaged length");
+      b = r.ReadByte();
+      length |= (b & 0x7F) << shift;
+      shift += 7;
+    } while ((b & 0x80) != 0);
+    if (length < 0 || length > MaxNameBytes)
+      throw new LakeFormatException($"a lake's name says {(uint)length:N0} bytes");
+    var bytes = r.ReadBytes(length);
+    if (bytes.Length != length)
+      throw new EndOfStreamException();
+    return new UTF8Encoding(false, true).GetString(bytes);
+  }
+
+  // Anything that is wrong with the bytes is a LakeFormatException (so that the settings keep the blob and the world plays without lakes). A lake with a number that is
+  // not finite, which a build before this one could write, is left out with a word (warn), and the rest of the list reads.
+  public static LakeSet FromBlock(byte[] block, Action<string> warn)
   {
     try
     {
-      using var r = new BinaryReader(new MemoryStream(block), new UTF8Encoding(false, true));
+      using var r = new BinaryReader(new MemoryStream(block));
       int version = r.ReadInt32();
       if (version > BlockVersion)
         throw new LakeFormatException($"the lakes are format {version}, made by a newer Better Continents than this one (it reads up to {BlockVersion})");
       if (version < 1)
         throw new LakeFormatException($"the lakes' format number is {version}");
       float scale = r.ReadSingle();
-      if (float.IsNaN(scale) || float.IsInfinity(scale))
+      if (!Finite(scale))
         throw new LakeFormatException("the lakes' depth scale is not a number");
       int count = r.ReadInt32();
       if (count < 0 || count > MaxLakes)
@@ -208,30 +270,30 @@ internal sealed class LakeSet
       var v = new float[8];
       for (int i = 0; i < count; i++)
       {
-        var name = r.ReadString();
+        var name = ReadName(r);
         for (int k = 0; k < 8; k++)
-        {
           v[k] = r.ReadSingle();
-          if (float.IsNaN(v[k]) || float.IsInfinity(v[k]))
-            throw new LakeFormatException($"lake {i + 1} has a number that is not finite");
-        }
-        list.Add(new Lake(name, v[0], v[1], v[2], v[3], v[4], v[5], v[6], v[7]));
+        var lake = new Lake(name, v[0], v[1], v[2], v[3], v[4], v[5], v[6], v[7]);
+        if (IsFinite(lake))
+          list.Add(lake);
+        else
+          warn($"lake {i + 1} '{name}' has a number that is not finite: left out");
       }
       if (r.BaseStream.Position != r.BaseStream.Length)
         throw new LakeFormatException($"{r.BaseStream.Length - r.BaseStream.Position} bytes follow the last lake");
       return new LakeSet(list, scale, 0);
     }
+    catch (LakeFormatException)
+    {
+      throw;
+    }
     catch (EndOfStreamException)
     {
       throw new LakeFormatException("the lakes end too soon (the blob is cut short)");
     }
-    catch (ArgumentException e)
+    catch (Exception e)
     {
-      throw new LakeFormatException("a lake's name does not read (" + e.Message + ")");
-    }
-    catch (IOException e)
-    {
-      throw new LakeFormatException("the lakes do not read (" + e.Message + ")");
+      throw new LakeFormatException("the lakes do not read (" + e.GetType().Name + ": " + e.Message + ")");
     }
   }
 

@@ -85,6 +85,33 @@ internal static class LakeTransfer
     return new LakeSet(read.Lakes, read.DepthScale, revision);
   }
 
+  // The lakes the settings package of each joining client held when it was made. The package is made when the join starts, and a client gets no push until the join is
+  // over (minutes on a big world, the layer's stage waits up to two minutes): a lake edited meanwhile is in neither. CatchUp (called when the join is over) sends it the current set when it is
+  // not the one its package had.
+  private sealed class JoinNote
+  {
+    public LakeSet? Lakes;
+  }
+
+  private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<BakedTransfer.LayerClient, JoinNote> noted = new();
+
+  // The settings package of this client was just made (ZNetPatch, straight after Settings.Serialize, on the main thread: nothing can change the lakes between the two).
+  internal static void NoteSerialized(BakedTransfer.LayerClient client) =>
+    noted.GetValue(client, _ => new JoinNote()).Lakes = BetterContinents.Settings.Lakes;
+
+  // The join is over (BakedTransfer.JoinFinished has set JoinDone; the method is not called JoinFinished, so that a test that counts the calls of that name in the join sees one): a client whose package held other lakes than the world has now is sent the world's. Returns whether it was.
+  internal static bool CatchUp(BakedTransfer.LayerClient client)
+  {
+    bool had = noted.TryGetValue(client, out var note);
+    noted.Remove(client);
+    var current = BetterContinents.Settings.Lakes;
+    if (!had || current == null || ReferenceEquals(note!.Lakes, current) || !client.JoinDone || !client.Link.Connected)
+      return false;
+    client.Link.Invoke(RpcLakes, Pack(current));
+    BetterContinents.Log($"Lakes: {client} joined while the lakes changed; it was sent the current set (revision {current.Revision}, {current.Lakes.Count:N0} lakes)");
+    return true;
+  }
+
   // The machine that runs the world: the set, to every client whose join is over. Returns how many it went to.
   internal static int Broadcast(LakeSet set)
   {

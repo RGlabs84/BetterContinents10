@@ -388,13 +388,15 @@ public partial class BetterContinents
   ];
 
   // The clearing mask's toggle (0.10.5, ported from Tarn; ClearVegetation): it follows the world's mask, not its maps, so a GameTerrain world has it too, and it
-  // stays off while the Tarn mod is installed (TarnCompat: Tarn then does the clearing from its own files).
+  // stays off while the Tarn mod is installed (TarnCompat: Tarn then does the clearing from its own files). Its postfix runs FIRST (Priority.First, whatever order the
+  // toggles were switched in): the twin guard's postfix on the same method records every spot it lets through as placed, so a spot the mask clears must be answered
+  // before it, or a later entry of the same prefab within a metre would be skipped as the twin of a plant that is not there.
   private static readonly Toggle[] ClearingToggles =
   [
     new("ZoneSystem.InsideClearArea, clearing mask",
       s => s.EnabledForThisWorld && s.HasClearing && !TarnCompat.Installed,
       new Hook(() => AccessTools.Method(typeof(ZoneSystem), "InsideClearArea"), "ZoneSystem.InsideClearArea",
-        typeof(ClearVegetation), nameof(ClearVegetation.InsideClearAreaPostfix), HookKind.Postfix))
+        typeof(ClearVegetation), nameof(ClearVegetation.InsideClearAreaPostfix), HookKind.Postfix, Priority.First))
     { ViaProcessor = true, FailureMessage = "Could not patch ZoneSystem.InsideClearArea, so the clearing mask is off: " },
   ];
 

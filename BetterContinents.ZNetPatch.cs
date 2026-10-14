@@ -855,6 +855,8 @@ public partial class BetterContinents
 
                 var settingsPackage = new ZPackage();
                 Settings.Serialize(settingsPackage, true);
+                // The lakes this package holds: a change made while the client joins is sent to it when the join is over (LakeTransfer.CatchUp).
+                LakeTransfer.NoteSerialized(bcClientInfo.layer);
                 // The package's own buffer (0.10.3: no copy of it), hashed once (it was twice, each time over a copy).
                 var settingsData = PackageBytes.Buffer(settingsPackage, out int settingsLength);
                 string cacheId = WorldCache.PackageID(settingsData, settingsLength);
@@ -924,7 +926,10 @@ public partial class BetterContinents
 
             // The join is over: pushes of the baked layer reach this client from now.
             if (bcClientInfo != null)
+            {
                 BakedTransfer.JoinFinished(bcClientInfo.layer);
+                LakeTransfer.CatchUp(bcClientInfo.layer);
+            }
             call_RPC_PeerInfo();
         }
 

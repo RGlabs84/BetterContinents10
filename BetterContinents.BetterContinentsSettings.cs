@@ -123,6 +123,8 @@ public partial class BetterContinents
     // The depth scale changed in a running world: the lake set with the new scale (an empty one when the world had none, so that the scale is saved with the world).
     internal LakeSet SetLakeDepthScale(float scale)
     {
+      if (!LakeSet.Finite(scale) || scale < 0f || scale > LakeSet.MaxDepthScale)
+        throw new ArgumentOutOfRangeException(nameof(scale), scale, $"a depth scale is a number from 0 to {LakeSet.MaxDepthScale:0}");
       LakeDepthScale = scale;
       var set = (Lakes ?? LakeSet.Empty).WithDepthScale(scale);
       ReplaceLakes(set);

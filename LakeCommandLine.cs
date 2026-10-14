@@ -55,7 +55,7 @@ internal static class LakeCommandLine
   public const float DefaultRadius = 120f, DefaultMargin = 0.3f;
   public const float MaxRadius = 1000f, MaxMargin = 20f;
 
-  public const string Usage = "bc_lake [help | info | list [n] | here [radius] [margin] | at <x> <z> [radius] [margin] | remove <name|all> | depth [scale] | load [folder] | import [path] | export [folder] | mask at <x> <z> | mask load <file> | mask export <file> | regen | server ...]";
+  public const string Usage = "bc_lake [help | info | list [n] | here [radius] [margin] | at <x> <z> [radius] [margin] | remove <name|all> | depth [scale] | load [folder] | import [path] | export [folder] | mask at <x> <z> | mask load <file> | mask export <file> | regen | server ...]   (load, import, remove all, regen, and writing over a file need 'confirm')";
 
   private static readonly CultureInfo C = CultureInfo.InvariantCulture;
 
@@ -141,7 +141,8 @@ internal static class LakeCommandLine
       case "import":
         return new LakeCommand { Verb = LakeVerb.Import, Confirm = confirm, Convert = convert, Text = Text() };
       case "export":
-        return confirm || convert ? Fail("'export' takes no 'confirm' or 'convert'") : new LakeCommand { Verb = LakeVerb.Export, Text = Text() };
+        // 'confirm' lets it replace files that are already there (it never does without).
+        return convert ? Fail("'export' takes no 'convert'") : new LakeCommand { Verb = LakeVerb.Export, Text = Text(), Confirm = confirm };
       case "mask":
       {
         if (rest.Count == 0) return Fail("mask at <x> <z> | mask load <file> | mask export <file>");
@@ -157,7 +158,7 @@ internal static class LakeCommandLine
             return new LakeCommand { Verb = LakeVerb.MaskLoad, Text = string.Join(" ", args), Confirm = confirm, Convert = convert };
           case "export":
             if (args.Count == 0) return Fail("mask export <file>");
-            return confirm || convert ? Fail("'mask export' takes no 'confirm' or 'convert'") : new LakeCommand { Verb = LakeVerb.MaskExport, Text = string.Join(" ", args) };
+            return convert ? Fail("'mask export' takes no 'convert'") : new LakeCommand { Verb = LakeVerb.MaskExport, Text = string.Join(" ", args), Confirm = confirm };
           default:
             return Fail($"'mask {rest[0]}' is not understood: mask at <x> <z> | mask load <file> | mask export <file>");
         }

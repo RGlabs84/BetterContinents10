@@ -53,8 +53,11 @@ internal static class LakeCommands
     public static Func<BakeWorldKind> Kind = BakeRuntime.KindOfWorld;
     // Everyone connected, with the Better Continents version their handshake told (null: none): a conversion needs them all on this version.
     public static Func<IReadOnlyList<(string Name, string? Version)>> Peers = () => new BakedTransport().Peers;
-    // Makes a vanilla world a Better Continents world that keeps the game's terrain, carrying these lakes and this mask, and tells every player.
-    public static Action<LakeSet?, ClearMask?> Convert = (lakes, mask) => new BakedConvert().Convert(lakes, mask);
+    // Makes a vanilla world a Better Continents world that keeps the game's terrain, carrying these lakes and this mask, and tells every player in it: how many were
+    // sent the settings, or -1 when the package is too large for one message and they were not (BakedConvert.MaxBroadcastBytes).
+    public static Func<LakeSet?, ClearMask?, int> Convert = (lakes, mask) => new BakedConvert().Convert(lakes, mask);
+    // Whether a folder is inside the game's world saves, where a file can be taken for a world save (WorldExport refuses to write there too).
+    public static Func<string, bool> InsideWorldSaves = WorldExport.InsideWorldSaves;
     // Sends the new lakes to the players in the world; how many it went to.
     public static Func<LakeSet, int> Push = LakeTransfer.Broadcast;
     // The mask was replaced: the patch that follows it is switched.
@@ -149,8 +152,8 @@ internal static class LakeCommands
         case LakeVerb.Info: Info(output); break;
         case LakeVerb.List: List(command.Count, output); break;
         case LakeVerb.MaskAt: MaskAt(command.X!.Value, command.Z!.Value, output); break;
-        case LakeVerb.Export: Export(command.Text, output); break;
-        case LakeVerb.MaskExport: MaskExport(command.Text!, output); break;
+        case LakeVerb.Export: Export(command.Text, command.Confirm, output); break;
+        case LakeVerb.MaskExport: MaskExport(command.Text!, command.Confirm, output); break;
         case LakeVerb.Depth: Depth(command.Scale, output); break;
         case LakeVerb.Remove: Remove(command.Text!, command.Confirm, output); break;
         case LakeVerb.Here:
@@ -163,8 +166,9 @@ internal static class LakeCommands
         case LakeVerb.Regen: Regen(command.Confirm, output); break;
       }
     }
-    catch (Exception e) when (e is IOException or UnauthorizedAccessException or LakeFormatException)
+    catch (Exception e) when (e is IOException or UnauthorizedAccessException or LakeFormatException or ArgumentException or NotSupportedException or System.Security.SecurityException or OutOfMemoryException)
     {
+      // A path the system refuses, a file too large to read, a disk that is full: said, and nothing else happens.
       output($"bc_lake {command.Verb.ToString().ToLowerInvariant()}: {e.Message}");
     }
   }
@@ -398,6 +402,12 @@ internal static class LakeCommands
     }
     var set = s.Lakes ?? LakeSet.Empty.WithDepthScale(s.EffectiveLakeDepthScale);
     var lake = outcome.Lake with { Name = set.NextName() };
+    // A lake that cannot be flooded, or saved, is not added (a number that is not a number would make the whole list unreadable at the next start).
+    if (!LakeSet.Valid(lake, out var invalid))
+    {
+      output($"bc_lake {word}: the spill made a lake that cannot be used ({invalid}), so nothing was added.");
+      return;
+    }
     var next = set.Added(lake);
     s.ReplaceLakes(next);
     int sent = Seams.Push(next);
@@ -444,6 +454,8 @@ internal static class LakeCommands
     public ClearMask? Clearing;
     public string? LakesPath, ClearingPath;
     public List<string> Problems = [];
+    // What the parser said of the lakes file (lines left out, odd lakes).
+    public List<string> Notes = [];
   }
 
   private static Loaded? ReadFolder(string word, string? folder, Action<string> output)
@@ -463,7 +475,7 @@ internal static class LakeCommands
     if (LakeFiles.FindLakes(dir, out _) is { } lakesPath)
       try
       {
-        var set = LakeFiles.ReadLakes(lakesPath);
+        var set = LakeFiles.ReadLakes(lakesPath, loaded.Notes);
         if (set.IsEmpty)
           loaded.Problems.Add($"{lakesPath} holds no lake");
         else
@@ -507,7 +519,7 @@ internal static class LakeCommands
       return;
     }
     var read = LakeFiles.ReadTarn(world, folder);
-    var loaded = new Loaded { Folder = folder, Lakes = read.Lakes, Clearing = read.Clearing, LakesPath = read.LakesPath, ClearingPath = read.ClearingPath, Problems = read.Problems };
+    var loaded = new Loaded { Folder = folder, Lakes = read.Lakes, Clearing = read.Clearing, LakesPath = read.LakesPath, ClearingPath = read.ClearingPath, Problems = read.Problems, Notes = read.Notes };
     if (loaded.Lakes == null && loaded.Clearing == null && loaded.Problems.Count == 0)
     {
       output($"bc_lake import: {folder} holds no {world}.txt or {world}.clear (Tarn's files are named for the world).");
@@ -545,6 +557,11 @@ internal static class LakeCommands
   {
     foreach (var problem in loaded.Problems)
       output($"bc_lake {word}: {problem}: left out.");
+    // What the parser left out or found odd (a line with too few fields, a bad number, a lake under the sea): the dry run is where an admin wants to see it.
+    foreach (var note in loaded.Notes.Take(10))
+      output($"bc_lake {word}: {note}");
+    if (loaded.Notes.Count > 10)
+      output($"bc_lake {word}: ... and {loaded.Notes.Count - 10:N0} more such lines (the log has them all).");
     if (loaded.Lakes == null && loaded.Clearing == null)
     {
       output($"bc_lake {word}: nothing to load from {from}: " + (word == "mask load" ? "no clearing mask." : "no lakes and no clearing mask."));
@@ -572,11 +589,17 @@ internal static class LakeCommands
       has.Add(s.Clearing != null ? $"a mask of {s.Clearing.Size} x {s.Clearing.Size}" : s.ClearingError != null ? "a mask this build cannot read, which is replaced" : "no mask");
     }
     var warnings = loaded.Lakes != null ? Guards(loaded.Lakes.Lakes.ToList()) : [];
+    // The depth scale the lakes have afterwards: the world's own when it has one (a scale somebody tuned is not reset by a load or an import), else Tarn's own for Tarn's
+    // files (the look they had), else the config's.
+    float scale = s.Lakes?.DepthScale ?? (word == "import" && loaded.Lakes != null ? loaded.Lakes.DepthScale : LakeSettings.DepthScale?.Value ?? LakeSet.DefaultDepthScale);
+    string scaleWords = loaded.Lakes == null ? "" : s.Lakes != null
+      ? $" The depth scale stays the world's {Scale(scale)}" + (word == "import" && Math.Abs(loaded.Lakes.DepthScale - scale) > 1e-6f ? $" (Tarn's own is {Scale(loaded.Lakes.DepthScale)}; 'bc_lake depth {Scale(loaded.Lakes.DepthScale)}' takes it)" : "") + "."
+      : $" The depth scale will be {Scale(scale)}" + (word == "import" ? " (Tarn's own)" : " (the config's)") + ".";
     string convertWarning = "this world is not a Better Continents world. Loading makes it one: its ground, biomes, vegetation and locations stay the game's own, and Better Continents keeps the lakes with the world. "
       + "From then on every player needs the same Better Continents version as this world to join it, and an older Better Continents, or the game without it, opens it without them.";
     if (!command.Confirm)
     {
-      output($"bc_lake {word}: a dry run, nothing changes. {from} holds {string.Join(" and ", holds)}; the world has {string.Join(" and ", has)}.");
+      output($"bc_lake {word}: a dry run, nothing changes. {from} holds {string.Join(" and ", holds)}; the world has {string.Join(" and ", has)}.{scaleWords}");
       foreach (var w in warnings)
         output($"bc_lake {word}: {w}");
       if (vanilla)
@@ -585,8 +608,6 @@ internal static class LakeCommands
         output($"bc_lake {word}: add 'confirm' to load {(holds.Count > 1 ? "them" : "it")}." + (loaded.Lakes != null && s.Lakes is { IsEmpty: false } ? " The lakes you have are first written to lakes-before-<time>.txt in the world's save folder." : ""));
       return;
     }
-    // The depth scale the new lakes have: the world's own; Tarn's own, for Tarn's files; the config's for a world that has none yet.
-    float scale = word == "import" && loaded.Lakes != null ? loaded.Lakes.DepthScale : s.Lakes?.DepthScale ?? LakeSettings.DepthScale?.Value ?? LakeSet.DefaultDepthScale;
     var newLakes = loaded.Lakes?.WithDepthScale(scale);
     if (vanilla)
     {
@@ -602,9 +623,12 @@ internal static class LakeCommands
           + $" would not be able to join the converted world: every player needs Better Continents {ModInfo.Version}. Nothing is changed.");
         return;
       }
-      Seams.Convert(newLakes, loaded.Clearing);
+      int told = Seams.Convert(newLakes, loaded.Clearing);
       LakeTransfer.LakesChanged?.Invoke(BC.Settings.Lakes);
-      output($"bc_lake {word}: this world keeps the game's own terrain and is a Better Continents world now, with {string.Join(" and ", holds)}. Saved with the world at its next save; every player in it was sent the settings.");
+      output($"bc_lake {word}: this world keeps the game's own terrain and is a Better Continents world now, with {string.Join(" and ", holds)}. Saved with the world at its next save; "
+        + (told >= 0
+          ? $"{told:N0} player{(told == 1 ? "" : "s")} in it {(told == 1 ? "was" : "were")} sent the settings."
+          : "the settings are too large to send to the players already in it in one message, so they must leave and join again (a player who joins gets them in the normal way)."));
     }
     else
     {
@@ -628,7 +652,12 @@ internal static class LakeCommands
       output($"bc_lake {word}: the mask is not sent to players (only the machine that runs the world places vegetation). Zones already generated keep their plants: 'bc_lake regen' says how many it touches.");
   }
 
-  // The old lakes and mask, written before they are replaced or removed. False (and the words) when they could not be: nothing is then changed.
+  // The time a backup or an export folder is named by: to the millisecond (two commands in one second are not one stamp), and UniquePath adds -2, -3 ... when the name is
+  // still taken (a clock that stands still, a clock set back).
+  private static string Stamp() => Seams.Now().ToString("yyyy-MM-dd-HHmmss-fff", CultureInfo.InvariantCulture);
+
+  // The old lakes and mask, written before they are replaced or removed, under names nobody has used (a backup never takes the place of an earlier one). False (and the
+  // words) when they could not be written: nothing is then changed.
   private static bool Backup(Action<string> output, string word, LakeSet? lakes, ClearMask? mask)
   {
     bool someLakes = lakes is { IsEmpty: false };
@@ -638,22 +667,22 @@ internal static class LakeCommands
     {
       var folder = Seams.SaveFolder();
       Directory.CreateDirectory(folder);
-      var stamp = Seams.Now().ToString("yyyy-MM-dd-HHmmss", CultureInfo.InvariantCulture);
+      var stamp = Stamp();
       if (someLakes)
       {
-        var path = Path.Combine(folder, $"lakes-before-{stamp}.txt");
+        var path = LakeFiles.UniquePath(folder, "lakes-before-", stamp, ".txt");
         LakeFiles.WriteLakes(path, lakes!);
         output($"bc_lake {word}: the lakes as they were are in {path}.");
       }
       if (mask != null)
       {
-        var path = Path.Combine(folder, $"clearmask-before-{stamp}.bin");
+        var path = LakeFiles.UniquePath(folder, "clearmask-before-", stamp, ".bin");
         LakeFiles.WriteClearing(path, mask);
         output($"bc_lake {word}: the clearing mask as it was is in {path}.");
       }
       return true;
     }
-    catch (Exception e) when (e is IOException or UnauthorizedAccessException or LakeFormatException)
+    catch (Exception e) when (e is IOException or UnauthorizedAccessException or LakeFormatException or ArgumentException or NotSupportedException)
     {
       output($"bc_lake {word}: the old lakes could not be written to the save folder ({e.Message}), so nothing was changed.");
       return false;
@@ -662,7 +691,21 @@ internal static class LakeCommands
 
   // ---- export -----------------------------------------------------------------------------------------------------------------------------------------
 
-  private static void Export(string? folder, Action<string> output)
+  // A path a player typed, made whole (relative to the game's folder it would be anywhere): null, and the words, when the system will not take it.
+  private static string? FullPath(string word, string typed, Action<string> output)
+  {
+    try
+    {
+      return Path.GetFullPath(typed.Trim());
+    }
+    catch (Exception e) when (e is ArgumentException or NotSupportedException or PathTooLongException or System.Security.SecurityException)
+    {
+      output($"bc_lake {word}: '{typed}' is not a path ({e.Message}).");
+      return null;
+    }
+  }
+
+  private static void Export(string? folder, bool confirm, Action<string> output)
   {
     if (Seams.ExportRefusal() is { } why)
     {
@@ -677,7 +720,31 @@ internal static class LakeCommands
       output("bc_lake export: this world has no lakes and no clearing mask.");
       return;
     }
-    var dir = string.IsNullOrWhiteSpace(folder) ? Path.Combine(Seams.SaveFolder(), "lakes-" + Seams.Now().ToString("yyyy-MM-dd-HHmmss", CultureInfo.InvariantCulture)) : folder!.Trim();
+    // No folder: a new one in the world's save folder, which nobody has used. A folder: whole path; never inside the game's world saves (as a world export), and never
+    // over a file already there without 'confirm' (the map maker's own lakes.txt may be the very thing in it).
+    string? dir = string.IsNullOrWhiteSpace(folder) ? FullPath("export", LakeFiles.UniquePath(Seams.SaveFolder(), "lakes-", Stamp(), ""), output) : FullPath("export", folder!, output);
+    if (dir == null)
+      return;
+    if (Seams.InsideWorldSaves(dir))
+    {
+      output($"bc_lake export: {dir} is inside the game's world saves; a file there can be taken for a world save. Nothing was written.");
+      return;
+    }
+    if (File.Exists(dir))
+    {
+      output($"bc_lake export: {dir} is a file, not a folder. Nothing was written.");
+      return;
+    }
+    var existing = new List<string>();
+    if (lakes != null && File.Exists(Path.Combine(dir, LakeFiles.LakesFileName)))
+      existing.Add(LakeFiles.LakesFileName);
+    if (mask != null && File.Exists(Path.Combine(dir, LakeFiles.ClearFileName)))
+      existing.Add(LakeFiles.ClearFileName);
+    if (existing.Count > 0 && !confirm)
+    {
+      output($"bc_lake export: {dir} already holds {string.Join(" and ", existing)}. Nothing was written. Add 'confirm' to replace {(existing.Count == 1 ? "it" : "them")} with the world's, or name another folder.");
+      return;
+    }
     var written = new List<string>();
     if (lakes != null)
     {
@@ -692,7 +759,7 @@ internal static class LakeCommands
     output($"bc_lake export: wrote {string.Join(" and ", written)} to {dir}, in Tarn's formats. Setting Directory to the folder (or 'bc_lake load {dir}') gives a world the same.");
   }
 
-  private static void MaskExport(string file, Action<string> output)
+  private static void MaskExport(string file, bool confirm, Action<string> output)
   {
     if (Seams.ExportRefusal() is { } why)
     {
@@ -705,9 +772,23 @@ internal static class LakeCommands
       output("bc_lake mask export: this world has no clearing mask.");
       return;
     }
-    var path = file.Trim();
+    var path = FullPath("mask export", file, output);
+    if (path == null)
+      return;
+    // A folder takes clearmask.bin; anything else is the file itself. Not inside the game's world saves, and not over a file that is there without 'confirm'.
     if (Directory.Exists(path))
       path = Path.Combine(path, LakeFiles.ClearFileName);
+    var dir = Path.GetDirectoryName(path) ?? path;
+    if (Seams.InsideWorldSaves(dir))
+    {
+      output($"bc_lake mask export: {dir} is inside the game's world saves; a file there can be taken for a world save. Nothing was written.");
+      return;
+    }
+    if (File.Exists(path) && !confirm)
+    {
+      output($"bc_lake mask export: {path} already exists. Nothing was written. Add 'confirm' to replace it with the world's mask, or name another file.");
+      return;
+    }
     LakeFiles.WriteClearing(path, mask);
     output($"bc_lake mask export: wrote the clearing mask ({mask.Size} x {mask.Size}) to {path}, in Tarn's .clear format.");
   }
