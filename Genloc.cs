@@ -126,7 +126,7 @@ internal static class Genloc
   internal static string StartLine(Tally before) =>
     $"Genloc: starting. {before.Total} location(s) now: {before.Placed} placed (kept, with every zone that is generated), {before.Unplaced} not placed (cleared, then rolled again in the zones that are not generated yet)"
     + (before.UnplacedInGeneratedZones > 0 ? $"; {before.UnplacedInGeneratedZones} of those stand in zones that are generated already and cannot be placed again there" : "")
-    + ". The new ones are placed as players reach their zones.";
+    + ". The new ones are placed as players reach their zones. Stay in the world until it says it is done: a save in the middle keeps only the placed ones.";
 
   /// <summary>One line per type, for the log: total, kept, to be rolled again.</summary>
   internal static IEnumerable<string> Table(Tally before) =>
@@ -296,7 +296,9 @@ internal static class Genloc
   {
     if (running)
     {
-      say($"Genloc: a run started by this command is in progress ({(Stopwatch.GetTimestamp() - startedAt) / (double)Stopwatch.Frequency:0} s, {zs.GenerateLocationsProgress:P0}); not starting a second one. It says when it ends.");
+      // the game's progress is still the last run's 100 % until its first slice has run, so a run that has just begun reports none
+      double elapsed = (Stopwatch.GetTimestamp() - startedAt) / (double)Stopwatch.Frequency;
+      say($"Genloc: a run started by this command is in progress ({elapsed:0} s{(elapsed < 2 ? ", just begun" : $", {zs.GenerateLocationsProgress:P0}")}); not starting a second one. It says when it ends.");
       return;
     }
     var slot = zs.m_generateLocationsCoroutine;

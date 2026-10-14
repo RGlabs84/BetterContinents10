@@ -103,6 +103,7 @@ internal static partial class Program
     Check(start.Contains("18 location(s)") && start.Contains("13 placed") && start.Contains("5 not placed") && start.Contains("1 of those stand in zones that are generated already"),
       $"the start line: {start}");
     Check(!Genloc.StartLine(Genloc.Tally.From(Instances(("A", 2, 2, 0)))).Contains("generated already"), "(the generated-zone remark only when there is one)");
+    Check(start.Contains("Stay in the world until it says it is done"), "the start line asks to stay in the world until the end (a save in the middle keeps only the placed ones)");
     var table = Genloc.Table(before).ToList();
     Check(table.Count == 3 && table[0].Contains("Crypt4: 14 (kept 10, rolled again 4)") && table[2].Contains("Vendor_BlackForest: 1 (kept 0, rolled again 1)"), "the table has one line per type, sorted: total, kept, rolled again");
 
