@@ -1,0 +1,10 @@
+# Tarn lakes: name;x;z;level;minX;minZ;maxX;maxZ;depth (world metres, absolute heights; x, z = a point in the water)
+Vikedal1;-4210.5;3190.25;92;-4420;3050;-4010;3330;11.4
+Vikedal2;-3900;3000.125;88.5;-4100;2900;-3700;3100;6.7
+
+# a short line, an extra field, and a bad number follow
+Tarn;1;2;3
+Extra;10;20;60;0;0;40;40;5;ignored;fields
+Bad;10;20;sixty;0;0;40;40;5
+Low;10;20;29;0;0;40;40;5
+Flat;10;20;60;0;0;0;40;5

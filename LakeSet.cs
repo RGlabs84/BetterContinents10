@@ -2,15 +2,22 @@
 
 using System;
 using System.Collections.Generic;
+using System.Globalization;
+using System.IO;
+using System.Linq;
+using System.Text;
 
 namespace BetterContinents;
 
 // THE CONTRACT of the lakes work (BUILD-SPEC-TARN.md 2.1), written by the lead before the data agent (A) and the engine agent (B) started: the types the two
-// share. A fills in the bodies marked "A:"; B reads Lakes, DepthScale and the Lake records and needs nothing else of A to begin.
+// share. A filled in the bodies; B reads Lakes, DepthScale and the Lake records and needs nothing else of A.
 
 // One lake of the world's list: where Tarn's flood starts (X, Z, Level), the box it may not leave (MinX..MaxZ), and the depth of its water over the ground
 // at the deepest. Level is the water's height in metres above the world's zero; the sea is at 30 m.
 internal sealed record Lake(string Name, float X, float Z, float Level, float MinX, float MinZ, float MaxX, float MaxZ, float Depth);
+
+// What a lake list or a clearing mask in a file or a settings blob could not be read for. Its message says what is wrong in words for a person.
+internal sealed class LakeFormatException(string message) : Exception(message);
 
 // The world's lakes, immutable: a change is a new set (settings.Lakes is swapped whole). Revision counts the changes of this session and is not saved.
 internal sealed class LakeSet
@@ -18,7 +25,19 @@ internal sealed class LakeSet
   public static readonly LakeSet Empty = new(Array.Empty<Lake>(), DefaultDepthScale, 0);
 
   public const float DefaultDepthScale = 0.5f;
+  public const float MaxDepthScale = 3f;
   public const int MaxLakes = 5000;
+  // A lake's name: at most this many characters, no ';' (the text format's separator) and no line breaks.
+  public const int MaxNameLength = 64;
+  // The format of blob 72 (DataKey.Lakes). The first int32 of the blob; a newer one is kept as it was read (Serialize).
+  public const int BlockVersion = 1;
+  // The sea's height plus half a metre: a lake lower than this sits in the sea's own waves [BUILD-SPEC-TARN.md 3.6].
+  public const float LowestLevel = 30.5f;
+
+  // The file's first line when Better Continents writes one (Tarn writes this very line [T: Plugin.cs SaveLakes]); a '#' line is a comment to the reader.
+  public const string FileHeader = "# Tarn lakes: name;x;z;level;minX;minZ;maxX;maxZ;depth (world metres, absolute heights; x, z = a point in the water)";
+
+  private static readonly CultureInfo C = CultureInfo.InvariantCulture;
 
   public IReadOnlyList<Lake> Lakes { get; }
   public float DepthScale { get; }
@@ -33,13 +52,189 @@ internal sealed class LakeSet
 
   public bool IsEmpty => Lakes.Count == 0;
 
-  // A: Tarn's text format (T: LakeFile.cs), one lake a line, with a warning naming the line for one that does not read.
-  public static LakeSet ParseLines(IEnumerable<string> lines, Action<string> warn) => throw new NotImplementedException("A");
+  // ---- changes: each one a new set, one revision on --------------------------------------------------------------------------------------------
 
-  // A: the lines again, the numbers in the round-trip form.
-  public IEnumerable<string> ToLines() => throw new NotImplementedException("A");
+  // The same set with these lakes (and, when given, this depth scale).
+  public LakeSet Changed(IReadOnlyList<Lake> lakes, float? depthScale = null) => new(lakes, depthScale ?? DepthScale, Revision + 1);
 
-  // A: blob 72 (DataKey.Lakes), the first int32 the format version.
-  public byte[] ToBlock() => throw new NotImplementedException("A");
-  public static LakeSet FromBlock(byte[] block) => throw new NotImplementedException("A");
+  public LakeSet WithDepthScale(float depthScale) => new(Lakes, depthScale, Revision + 1);
+
+  public LakeSet Added(Lake lake) => new(Lakes.Append(lake).ToList(), DepthScale, Revision + 1);
+
+  // The set without the lakes of this name ("all" is every one), and how many went.
+  public LakeSet Removed(string name, out int removed)
+  {
+    var kept = name == "all" ? new List<Lake>() : Lakes.Where(l => l.Name != name).ToList();
+    removed = Lakes.Count - kept.Count;
+    return removed == 0 ? this : new LakeSet(kept, DepthScale, Revision + 1);
+  }
+
+  // The lake with the first name "lake<k>" nobody has (Tarn's `here` counter [T: Plugin.cs Here]).
+  public string NextName()
+  {
+    var names = new HashSet<string>(Lakes.Select(l => l.Name));
+    int k = 1;
+    while (names.Contains("lake" + k))
+      k++;
+    return "lake" + k;
+  }
+
+  // ---- Tarn's text format [T: Plugin.cs Lake.Parse / ToLine / LoadLakes] ----------------------------------------------------------------------
+  // One lake a line, nine fields separated by ';': name;x;z;level;minX;minZ;maxX;maxZ;depth. Floats are invariant culture. Lines starting with '#' and
+  // blank lines are skipped. Fields past the ninth are ignored. Tarn dropped a line with fewer fields without a word and logged a malformed number;
+  // here each of those is a warning that names the line ("line 7: ..."; the caller puts the file's name before it).
+
+  public static LakeSet ParseLines(IEnumerable<string> lines, Action<string> warn)
+  {
+    var list = new List<Lake>();
+    int number = 0;
+    foreach (var raw in lines)
+    {
+      number++;
+      if (raw == null)
+        continue;
+      var text = raw.Trim().TrimStart('﻿').Trim();
+      if (text.Length == 0 || text[0] == '#')
+        continue;
+      if (list.Count >= MaxLakes)
+      {
+        warn($"line {number}: a world holds at most {MaxLakes:N0} lakes: this line and the ones after it are left out");
+        break;
+      }
+      var p = text.Split(';');
+      if (p.Length < 9)
+      {
+        warn($"line {number}: {p.Length} field{(p.Length == 1 ? "" : "s")} where a lake has 9 (name;x;z;level;minX;minZ;maxX;maxZ;depth): left out");
+        continue;
+      }
+      var v = new float[8];
+      string? bad = null;
+      for (int i = 0; i < 8 && bad == null; i++)
+      {
+        if (!float.TryParse(p[i + 1], NumberStyles.Float, C, out v[i]))
+          bad = $"field {i + 2} '{p[i + 1].Trim()}' is not a number";
+        else if (float.IsNaN(v[i]) || float.IsInfinity(v[i]))
+          bad = $"field {i + 2} '{p[i + 1].Trim()}' is not a finite number";
+      }
+      if (bad != null)
+      {
+        warn($"line {number}: {bad}: left out");
+        continue;
+      }
+      var name = Clean(p[0]);
+      if (name.Length == 0)
+      {
+        name = "lake" + (list.Count + 1);
+        warn($"line {number}: the lake has no name: called '{name}'");
+      }
+      else if (name.Length > MaxNameLength)
+      {
+        name = name.Substring(0, MaxNameLength);
+        warn($"line {number}: the lake's name is longer than {MaxNameLength} characters: cut to '{name}'");
+      }
+      var lake = new Lake(name, v[0], v[1], v[2], v[3], v[4], v[5], v[6], v[7]);
+      // Kept, with a word (the map maker may know better).
+      if (lake.MaxX <= lake.MinX || lake.MaxZ <= lake.MinZ)
+        warn($"line {number}: '{name}' has an empty box ({lake.MinX} {lake.MinZ} to {lake.MaxX} {lake.MaxZ}): the flood has nowhere to go");
+      else if (lake.X < lake.MinX || lake.X > lake.MaxX || lake.Z < lake.MinZ || lake.Z > lake.MaxZ)
+        warn($"line {number}: '{name}' has its point ({lake.X}, {lake.Z}) outside its box");
+      if (lake.Level < LowestLevel)
+        warn($"line {number}: '{name}' has its level at {lake.Level} m, under {LowestLevel} m (the sea is at 30 m): the water would sit in the sea's waves");
+      list.Add(lake);
+    }
+    return new LakeSet(list, DefaultDepthScale, 0);
+  }
+
+  // A name the text format can carry: no ';' (the separator), no line breaks, no surrounding space.
+  public static string Clean(string? name) => (name ?? "").Replace(';', '_').Replace('\r', ' ').Replace('\n', ' ').Trim();
+
+  // The lake lines again, the numbers in the round-trip form (Tarn's own ToLine wrote three decimals [T: Plugin.cs]; it reads this form too).
+  public IEnumerable<string> ToLines() => Lakes.Select(Line);
+
+  public static string Line(Lake l) => string.Join(";", Clean(l.Name), Num(l.X), Num(l.Z), Num(l.Level), Num(l.MinX), Num(l.MinZ), Num(l.MaxX), Num(l.MaxZ), Num(l.Depth));
+
+  // The file's lines: Tarn's header comment, then the lakes.
+  public IEnumerable<string> ToFileLines() => new[] { FileHeader }.Concat(ToLines());
+
+  public static string Num(float v) => v.ToString("R", C);
+
+  // ---- blob 72 ---------------------------------------------------------------------------------------------------------------------------------
+  // int version = 1; float depthScale; int count; then per lake: string name (BinaryWriter's: UTF-8, a 7-bit length first); float x, z, level, minX, minZ,
+  // maxX, maxZ, depth. The first int32 is the format version, so the settings' BlockVersionOf reads it. Exact floats: the text file's decimals are not kept.
+
+  public byte[] ToBlock()
+  {
+    if (Lakes.Count > MaxLakes)
+      throw new LakeFormatException($"a world holds at most {MaxLakes:N0} lakes, this set has {Lakes.Count:N0}");
+    using var ms = new MemoryStream(16 + Lakes.Count * 72);
+    using (var w = new BinaryWriter(ms, new UTF8Encoding(false), true))
+    {
+      w.Write(BlockVersion);
+      w.Write(DepthScale);
+      w.Write(Lakes.Count);
+      foreach (var l in Lakes)
+      {
+        w.Write(l.Name ?? "");
+        w.Write(l.X);
+        w.Write(l.Z);
+        w.Write(l.Level);
+        w.Write(l.MinX);
+        w.Write(l.MinZ);
+        w.Write(l.MaxX);
+        w.Write(l.MaxZ);
+        w.Write(l.Depth);
+      }
+    }
+    return ms.ToArray();
+  }
+
+  public static LakeSet FromBlock(byte[] block)
+  {
+    try
+    {
+      using var r = new BinaryReader(new MemoryStream(block), new UTF8Encoding(false, true));
+      int version = r.ReadInt32();
+      if (version > BlockVersion)
+        throw new LakeFormatException($"the lakes are format {version}, made by a newer Better Continents than this one (it reads up to {BlockVersion})");
+      if (version < 1)
+        throw new LakeFormatException($"the lakes' format number is {version}");
+      float scale = r.ReadSingle();
+      if (float.IsNaN(scale) || float.IsInfinity(scale))
+        throw new LakeFormatException("the lakes' depth scale is not a number");
+      int count = r.ReadInt32();
+      if (count < 0 || count > MaxLakes)
+        throw new LakeFormatException($"the lakes' count is {count} (a world holds at most {MaxLakes:N0})");
+      var list = new List<Lake>(count);
+      var v = new float[8];
+      for (int i = 0; i < count; i++)
+      {
+        var name = r.ReadString();
+        for (int k = 0; k < 8; k++)
+        {
+          v[k] = r.ReadSingle();
+          if (float.IsNaN(v[k]) || float.IsInfinity(v[k]))
+            throw new LakeFormatException($"lake {i + 1} has a number that is not finite");
+        }
+        list.Add(new Lake(name, v[0], v[1], v[2], v[3], v[4], v[5], v[6], v[7]));
+      }
+      if (r.BaseStream.Position != r.BaseStream.Length)
+        throw new LakeFormatException($"{r.BaseStream.Length - r.BaseStream.Position} bytes follow the last lake");
+      return new LakeSet(list, scale, 0);
+    }
+    catch (EndOfStreamException)
+    {
+      throw new LakeFormatException("the lakes end too soon (the blob is cut short)");
+    }
+    catch (ArgumentException e)
+    {
+      throw new LakeFormatException("a lake's name does not read (" + e.Message + ")");
+    }
+    catch (IOException e)
+    {
+      throw new LakeFormatException("the lakes do not read (" + e.Message + ")");
+    }
+  }
+
+  // The first int32 of a blob, or 0 when it has none (the settings' BlockVersionOf).
+  public static int VersionOf(byte[] block) => block.Length >= 4 ? BitConverter.ToInt32(block, 0) : 0;
 }
