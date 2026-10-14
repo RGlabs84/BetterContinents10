@@ -408,9 +408,13 @@ internal static class SeaDraw
   {
     if (renderer == null || bcShader == null || Swapped.ContainsKey(renderer))
       return;
+    // Only the sea's: looked at without making an instance of anything else's material.
+    var shared = renderer.sharedMaterial;
+    if (shared == null || !IsSea(shared))
+      return;
     // .material: the game made an instance for a zone's water in SetupMaterial; the far sea gets its own now (one renderer).
     var material = renderer.material;
-    if (material == null || !IsSea(material))
+    if (material == null)
       return;
     var shader = material.shader;
     if (shader == bcShader)

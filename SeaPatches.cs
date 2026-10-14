@@ -133,7 +133,8 @@ internal static class SeaPatches
   {
     if (depthPending)
       StartDepth(null);
-    if (!pending && !RadiusMoved(BetterContinents.Settings))
+    // The world's edge is looked at twice a second or so, not every frame.
+    if (!pending && (++ticks % 30 != 0 || !RadiusMoved(BetterContinents.Settings)))
       return;
     var net = ZNet.instance;
     bool dedicated = net != null && net.IsDedicated();
@@ -144,6 +145,7 @@ internal static class SeaPatches
 
   // The radius the field in flight, or ready, was started for.
   private static float builtRadius;
+  private static int ticks;
 
   /// <summary>Expand World Size sends its size after a world's settings are loaded (BetterContinents.SetSize), which can be after DynamicPatch: a
   /// field started for the radius the settings alone gave covers the wrong edge. When the world's edge is not what the field was started for, it is

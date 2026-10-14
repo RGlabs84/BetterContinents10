@@ -155,6 +155,25 @@ internal static partial class Program
       }
     Check(wrongTexels == 0, $"calm and hot of {cases} random masks (every size, empty, full, sparse, dense, discs and stripes) are the exact distances ({texels} texels, {wrongTexels} wrong){(first != null ? "; first: " + first : "")}");
 
+    // The same at a size where the lower envelope's stack grows long (600 x 600), at texels picked over the whole field.
+    {
+      int big = 600;
+      var bigDeep = RandomMask(random, big, 0, true);
+      var bigHot = RandomMask(random, big, 0.02, false);
+      var bigField = SeaField.Build(Blob(big, bigDeep, bigHot, 6), true, CancellationToken.None);
+      int wrongBig = 0, sampled = 0;
+      for (int k = 0; k < 1500; k++)
+      {
+        int i = random.Next(big), j = random.Next(big), at = j * big + i;
+        sampled++;
+        int calm = bigDeep[at] ? ExpectedMetres(NearestOther(bigDeep, big, i, j), 8.0, 255) : 0;
+        int signed = ExpectedMetres(NearestOther(bigHot, big, i, j), 8.0, 127) * (bigHot[at] ? 1 : -1);
+        if (bigField.Calm[at] != calm || bigField.Hot[at] != 128 + signed)
+          wrongBig++;
+      }
+      Check(wrongBig == 0, $"and at 600 x 600 texels, with blobs and with a sprinkle of hot texels: {sampled} texels picked over the field, {wrongBig} wrong");
+    }
+
     // The bytes are as the contract says on the simplest border: a straight line between texels, Deep North on one side.
     int m = 20;
     var half = new bool[m * m];
