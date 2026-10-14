@@ -144,6 +144,10 @@ internal static partial class Tests
     C(fx.Clock.Events.Count == events && dry.Contains("bc_bake load placements.bcp: a dry run, nothing changes. 'bc_bake load placements.bcp confirm' loads it.") && dry.Contains("File: revision 1, 44 records in"), "a dry run says what the file holds and changes nothing: " + dry);
     C(dry.Contains("It replaces the layer's 43 compiler records with its 44") && dry.Contains("the 0 records baked in game stay.") && dry.Contains("kept in the undo folder first"), "and what it replaces");
 
+    C(dry.Contains("The layer after it: revision 2, 44 records, ") && dry.Contains("The live pieces would follow: ") && fx.Reconcile.Previews == 1,
+      "the dry run builds the merged layer and has the live pieces' planner say what it would do (B's Gather and Plan in the game): " + dry);
+    C(fx.Layer.Revision == 1 && fx.Clock.Events.Count == events, "and the layer it built for that is dropped");
+
     // The line that loads it must be the command that was meant: with no file typed, the Directory's own file (a bare name would be a relative path);
     // with a path typed, that path in full, and 'convert' where it was given.
     fx.Said.Clear();
@@ -152,10 +156,6 @@ internal static partial class Tests
     fx.Said.Clear();
     BakeDrive(BakeRunner.Load(fx.Ctx, "placements.bcp", bytes, BakeWordsOf("convert"), "/maps/town one/placements.bcp"), fx, "a load");
     C(fx.Said.Any(l => l.Contains("'bc_bake load /maps/town one/placements.bcp convert confirm' loads it.")), "a typed path (spaces and all) is echoed in full, 'convert' after it: " + string.Join(" | ", fx.Said));
-
-    C(dry.Contains("The layer after it: revision 2, 44 records, ") && dry.Contains("The live pieces would follow: ") && fx.Reconcile.Previews == 1,
-      "the dry run builds the merged layer and has the live pieces' planner say what it would do (B's Gather and Plan in the game): " + dry);
-    C(fx.Layer.Revision == 1 && fx.Clock.Events.Count == events, "and the layer it built for that is dropped");
 
     fx.Said.Clear();
     BakeDrive(BakeRunner.Load(fx.Ctx, "placements.bcp", bytes, BakeWordsOf("confirm"), "placements.bcp"), fx, "a load");
