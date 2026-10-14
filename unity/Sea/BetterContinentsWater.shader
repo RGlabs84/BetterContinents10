@@ -82,7 +82,7 @@ Shader "BetterContinents/Water"
         Offset 0, 10
         Stencil { Ref 2 Comp NotEqual }
         CGPROGRAM
-        #pragma surface BCSurf BCStd vertex:BCVert tessellate:BCTess finalcolor:BCFin alpha:fade nofog nometa nolightmap nodynlightmap nodirlightmap noshadowmask exclude_path:deferred exclude_path:prepass
+        #pragma surface BCSurf BCStd vertex:BCVert tessellate:BCTess finalcolor:BCFin alpha:fade nofog nometa noshadow nolightmap nodynlightmap nodirlightmap noshadowmask exclude_path:deferred exclude_path:prepass
         #pragma target 4.6
         #pragma multi_compile __ TESSELATION_ON
         #define BC_WATER_TESS
@@ -119,7 +119,7 @@ Shader "BetterContinents/Water"
         Offset 0, 10
         Stencil { Ref 2 Comp NotEqual }
         CGPROGRAM
-        #pragma surface BCSurf BCStd vertex:BCVert finalcolor:BCFin alpha:fade nofog nometa nolightmap nodynlightmap nodirlightmap noshadowmask exclude_path:deferred exclude_path:prepass
+        #pragma surface BCSurf BCStd vertex:BCVert finalcolor:BCFin alpha:fade nofog nometa noshadow nolightmap nodynlightmap nodirlightmap noshadowmask exclude_path:deferred exclude_path:prepass
         #pragma target 3.5
         #define BC_BRDF BRDF3_Unity_PBS
         #include "BCWaterSurface.hlsl"
