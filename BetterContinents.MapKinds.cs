@@ -74,6 +74,8 @@ public partial class BetterContinents
         s => s.ForestMap, (s, m) => s.ForestMap = m, (s, path) => ImageMapFloat.Create(path, false, s.CompactMaps), true, (_, m) => m.CreateMap(false));
       public static readonly MapKind Heat = new MapKind<ImageMapFloat>("Heatmap", "heatmap.png", SettingsSchema.HeatmapFile, "heat", "heat",
         s => s.HeatMap, (s, m) => s.HeatMap = m, (s, path) => ImageMapFloat.Create(path, false, s.CompactMaps), true, (_, m) => m.CreateMap(false));
+      public static readonly MapKind Cold = new MapKind<ImageMapFloat>("Coldmap", "coldmap.png", SettingsSchema.ColdmapFile, "cold", "cold",
+        s => s.ColdMap, (s, m) => s.ColdMap = m, (s, path) => ImageMapFloat.Create(path, false, s.CompactMaps), true, (_, m) => m.CreateMap(false));
       public static readonly MapKind Paint = new MapKind<ImageMapPaint>("Paintmap", "paintmap.png", SettingsSchema.PaintmapFile, "paint", "paint",
         s => s.PaintMap, (s, m) => s.PaintMap = m, (s, path) => ImageMapPaint.Create(path, s.CompactMaps), true, (_, m) => m.CreateMap());
       public static readonly MapKind Lava = new MapKind<ImageMapFloat>("Lavamap", "lavamap.png", SettingsSchema.LavamapFile, "lava", "lava",
@@ -85,10 +87,11 @@ public partial class BetterContinents
       public static readonly MapKind Spawn = new MapKind<ImageMapSpawn>("Spawnmap", "spawnmap.png", SettingsSchema.SpawnmapFile, "spawn", "spawn",
         s => s.SpawnMap, (s, m) => s.SpawnMap = m, (s, path) => ImageMapSpawn.Create(path, s.CompactMaps), false, (_, m) => m.CreateMap());
       public static readonly MapKind AltBiome = new AltBiomeMapKind();
+      public static readonly MapKind LocationExclusion = new LocationExclusionMapKind();
 
-      public static readonly MapKind[] All = [Height, Biome, Terrain, Location, Rough, Flat, Forest, Heat, Paint, Lava, Moss, Vegetation, Spawn, AltBiome];
+      public static readonly MapKind[] All = [Height, Biome, Terrain, Location, Rough, Flat, Forest, Heat, Cold, Paint, Lava, Moss, Vegetation, Spawn, AltBiome];
       // The order a new world has always read its maps in: their log lines, and the legends they write, come in this order.
-      internal static readonly MapKind[] LoadOrder = [Height, Biome, Location, Rough, Forest, Terrain, Paint, Lava, Moss, Vegetation, Heat, Spawn, AltBiome];
+      internal static readonly MapKind[] LoadOrder = [Height, Biome, Location, Rough, Forest, Terrain, Paint, Lava, Moss, Vegetation, Heat, Cold, Spawn, AltBiome];
     }
 
     // A map kind whose map is a T in one of the settings' fields. releasable: a world import (CreateForImport, lean)
@@ -185,5 +188,26 @@ public partial class BetterContinents
           base.Reload(settings);
       }
     }
+
+    // A location exclusion mask (no_spawns_mask.png, or fallback nospawns.png): non-black pixels exclude default locations.
+    private sealed class LocationExclusionMapKind() : MapKind<ImageMapFloat>("LocationExclusion", "no_spawns_mask.png", SettingsSchema.LocationExclusionFile, "nospawn", "nospawn",
+        s => s.LocationExclusionMap, (s, m) => s.LocationExclusionMap = m, (s, path) => ImageMapFloat.Create(path, false, s.CompactMaps), true, (_, m) => m.CreateMap(false))
+    {
+      internal override void Load(BetterContinentsSettings settings, ConfigValues c, string dir, bool lean)
+      {
+        string path = GetPath(dir, "no_spawns_mask.png", c.Get(FileSetting!.Entry));
+        if (!File.Exists(path) && !string.IsNullOrEmpty(dir))
+        {
+          string alt = Path.Combine(dir, "nospawns.png");
+          if (File.Exists(alt))
+            path = alt;
+        }
+        var map = ImageMapFloat.Create(path, false, settings.CompactMaps);
+        if (lean)
+          map?.ReleasePixels();
+        settings.LocationExclusionMap = map;
+      }
+    }
   }
 }
+

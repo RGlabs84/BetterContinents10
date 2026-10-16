@@ -15,7 +15,7 @@ at build time; FastNoiseLite (3) is compiled into it from source.
 2. System.Buffers 4.6.1, System.Memory 4.6.3, System.Numerics.Vectors 4.6.1
    and System.Runtime.CompilerServices.Unsafe 6.1.2
    https://github.com/dotnet/maintenance-packages
-   System.Text.Encoding.CodePages 10.0.3
+   System.Text.Encoding.CodePages 8.0.0
    https://github.com/dotnet/dotnet
    Copyright (c) .NET Foundation and Contributors
    License: MIT, section C.
@@ -325,7 +325,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ================================================================================
-E. Third-party notices shipped with System.Text.Encoding.CodePages 10.0.3
+E. Third-party notices shipped with System.Text.Encoding.CodePages 8.0.0
 ================================================================================
 
 .NET Runtime uses third-party libraries or other resources that may be

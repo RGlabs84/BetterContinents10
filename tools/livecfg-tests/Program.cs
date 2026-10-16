@@ -383,10 +383,13 @@ internal static class Program
     if (on && !s.DeepNorthGapEnabled) r.Add("WorldGenerator.CreateDeepNorthGap");
     if (on && s.HasHeatMap && s.HeatMapScale > 0f) r.Add("WorldGenerator.IsAshlands");
     if (on && s.HasBiomeMap && (!s.HasHeatMap || s.HeatMapScale == 0f)) r.Add("WorldGenerator.IsAshlands (no heat map)");
-    if (on && s.HasBiomeMap) r.Add("WorldGenerator.IsDeepnorth");
+    if (on && s.HasColdMap && s.ColdMapScale > 0f) r.Add("WorldGenerator.IsDeepnorth");
+    if (on && s.HasBiomeMap && (!s.HasColdMap || s.ColdMapScale == 0f)) r.Add("WorldGenerator.IsDeepnorth (no cold map)");
+    if (on && s.DeepNorthWater && (s.HasColdMap || s.HasBiomeMap)) r.Add("WorldGenerator.DeepNorthWaveFade");
     if (on && (s.HasPaintMap || s.HasLavaMap)) r.Add("WorldGenerator.GetAshlandsHeight");
     // Every Better Continents world since the twin guard (0.9.4: with a vegetation map only).
     if (on) r.Add("ZoneSystem.PlaceVegetation (vegetation map, twin guard)");
+    if (on && s.HasLocationExclusionMap) r.Add("ZoneSystem.GenerateLocationsTimeSliced (location exclusion map)");
     if (on && s.HasSpawnMap) r.Add("SpawnSystem.UpdateSpawnList");
     return r;
   }
@@ -400,7 +403,9 @@ internal static class Program
       ("PaintMap", typeof(ImageMapPaint)), ("LavaMap", typeof(ImageMapFloat)), ("MossMap", typeof(ImageMapFloat)),
       ("VegetationMap", typeof(ImageMapSpawn)), ("LocationMap", typeof(ImageMapLocation)), ("RoughMap", typeof(ImageMapFloat)),
       ("FlatMap", typeof(ImageMapFloat)), ("ForestMap", typeof(ImageMapFloat)), ("HeatMap", typeof(ImageMapFloat)),
+      ("ColdMap", typeof(ImageMapFloat)),
       ("SpawnMap", typeof(ImageMapSpawn)), ("AltBiomeMap", typeof(ImageMapAltBiome)),
+      ("LocationExclusionMap", typeof(ImageMapFloat)),
     };
     var fields = maps.Select(m => (Field: typeof(BC.BetterContinentsSettings).GetField(m.Field, BindingFlags.NonPublic | BindingFlags.Instance)!, m.Type)).ToArray();
     var rng = new System.Random(4);
@@ -417,6 +422,9 @@ internal static class Program
         ForestScale = rng.Next(3) == 0 ? 0.5f + (float)rng.NextDouble() : 1f,
         ForestAmountOffset = rng.Next(3) == 0 ? (float)rng.NextDouble() - 0.5f : 0f,
         HeatMapScale = rng.Next(3) == 0 ? 0f : 10f * (float)rng.NextDouble(),
+        ColdMapScale = rng.Next(3) == 0 ? 0f : 10f * (float)rng.NextDouble(),
+        DeepNorthWater = rng.Next(2) == 0,
+        AshlandsWater = rng.Next(2) == 0,
         AshlandsGapEnabled = rng.Next(2) == 0,
         DeepNorthGapEnabled = rng.Next(2) == 0,
       };

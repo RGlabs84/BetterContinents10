@@ -1,4 +1,4 @@
-﻿// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0), and on 2026-10-04 for the unifying refactor (0.10.0), and on 2026-10-06 for 16k worlds (0.10.3), and on 2026-10-07 for baked placements (0.10.4).
+// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0), and on 2026-10-04 for the unifying refactor (0.10.0), and on 2026-10-06 for 16k worlds (0.10.3), and on 2026-10-07 for baked placements (0.10.4).
 
 using System.Collections.Generic;
 using System.Linq;
@@ -113,15 +113,81 @@ public partial class BetterContinents
         }
 
 
+        public static float ComputeProceduralBiomeNoise(WorldGenerator instance, Heightmap.Biome biome, float wx, float wy, float smoothHeight)
+        {
+            if (biome == Heightmap.Biome.None)
+            {
+                var overrideBiome = Settings.GetBiomeOverride(Normalize(wx), Normalize(wy));
+                biome = overrideBiome != Heightmap.Biome.None ? overrideBiome : instance.GetBiome(wx, wy);
+            }
+
+            if (biome == Heightmap.Biome.Mountain || biome == Heightmap.Biome.DeepNorth)
+            {
+                float scale = Settings.MountainNoise;
+                if (scale <= 0.0001f)
+                    return 0f;
+
+                float altitudeFade = Mathf.Clamp01((smoothHeight - 30f) / 20f);
+                if (altitudeFade <= 0f)
+                    return 0f;
+
+                double nx = (double)wx + 100000.0 + instance.m_offset3;
+                double ny = (double)wy + 100000.0 + instance.m_offset3;
+
+                float p1 = Mathf.PerlinNoise((float)(nx * 0.01), (float)(ny * 0.01));
+                float p2 = Mathf.PerlinNoise((float)(nx * 0.02), (float)(ny * 0.02));
+                float p3 = Mathf.PerlinNoise((float)(nx * 0.05), (float)(ny * 0.05));
+                float p4 = Mathf.PerlinNoise((float)(nx * 0.1), (float)(ny * 0.1));
+
+                float n5 = p1 * p2;
+                n5 += p3 * p4 * n5 * 0.5f;
+
+                float micro = Mathf.PerlinNoise((float)(nx * 0.1), (float)(ny * 0.1)) * 0.01f
+                            + Mathf.PerlinNoise((float)(nx * 0.4), (float)(ny * 0.4)) * 0.003f;
+
+                float tilt = instance.BaseHeightTilt(wx, wy);
+                float ridgeTilt = Mathf.PerlinNoise((float)(nx * 0.2), (float)(ny * 0.2)) * 2f * tilt;
+
+                return (0.2f * n5 + micro + ridgeTilt) * 200f * scale * altitudeFade;
+            }
+            else if (biome == Heightmap.Biome.Mistlands)
+            {
+                float scale = Settings.MistlandsNoise;
+                if (scale <= 0.0001f)
+                    return 0f;
+
+                float altitudeFade = Mathf.Clamp01((smoothHeight - 10f) / 15f);
+                if (altitudeFade <= 0f)
+                    return 0f;
+
+                double nx = (double)wx + 100000.0 + instance.m_offset4;
+                double ny = (double)wy + 100000.0 + instance.m_offset4;
+
+                float m1 = Mathf.PerlinNoise((float)(nx * 0.02 * 0.7), (float)(ny * 0.02 * 0.7))
+                         * Mathf.PerlinNoise((float)(nx * 0.04 * 0.7), (float)(ny * 0.04 * 0.7));
+                m1 += Mathf.PerlinNoise((float)(nx * 0.03 * 0.7), (float)(ny * 0.03 * 0.7))
+                    * Mathf.PerlinNoise((float)(nx * 0.05 * 0.7), (float)(ny * 0.05 * 0.7))
+                    * m1 * 0.5f;
+
+                return 0.4f * Mathf.Pow(Mathf.Max(0f, m1), 1.5f) * 200f * scale * altitudeFade;
+            }
+            return 0f;
+        }
+
 #pragma warning disable IDE0060
         public static float GetBiomeHeightWithHeightPaint(float result, WorldGenerator __instance, Heightmap.Biome biome, ref Color mask, float wx, float wy)
         {
             Settings.ApplyPaintMap(wx, wy, biome, ref mask);
-            return __instance.GetBaseHeight(wx, wy, false) * 200f;
+            var smoothHeight = __instance.GetBaseHeight(wx, wy, false) * 200f;
+            return smoothHeight + ComputeProceduralBiomeNoise(__instance, biome, wx, wy, smoothHeight);
         }
         public static float GetBiomeHeightWithHeight(float result, WorldGenerator __instance, float wx, float wy)
         {
-            return __instance.GetBaseHeight(wx, wy, false) * 200f;
+            var smoothHeight = __instance.GetBaseHeight(wx, wy, false) * 200f;
+            var biome = Settings.GetBiomeOverride(Normalize(wx), Normalize(wy));
+            if (biome == Heightmap.Biome.None)
+                biome = __instance.GetBiome(wx, wy);
+            return smoothHeight + ComputeProceduralBiomeNoise(__instance, biome, wx, wy, smoothHeight);
         }
 #pragma warning restore IDE0060
         public static float GetBiomeHeightWithRoughPaint(float result, WorldGenerator __instance, Heightmap.Biome biome, ref Color mask, float wx, float wy)
@@ -145,8 +211,11 @@ public partial class BetterContinents
         // them. Void ones writing __result: Harmony runs every void postfix before any that returns a value, whatever their
         // order says. Its paint, GetBiomeHeightWithPaint's, comes after Expand World Data's ground colours, as on an older
         // world, from a postfix ordered so (an older world's is after them by the order the patches were added).
-        public static void GetBiomeHeightBeforeEwdWithHeight(WorldGenerator __instance, float wx, float wy, ref float __result) =>
-            __result = __instance.GetBaseHeight(wx, wy, false) * 200f;
+        public static void GetBiomeHeightBeforeEwdWithHeight(WorldGenerator __instance, Heightmap.Biome biome, float wx, float wy, ref float __result)
+        {
+            var smoothHeight = __instance.GetBaseHeight(wx, wy, false) * 200f;
+            __result = smoothHeight + ComputeProceduralBiomeNoise(__instance, biome, wx, wy, smoothHeight);
+        }
         public static void GetBiomeHeightBeforeEwdWithRough(WorldGenerator __instance, float wx, float wy, ref float __result)
         {
             var smoothHeight = __instance.GetBaseHeight(wx, wy, false) * 200f;
@@ -381,11 +450,47 @@ public partial class BetterContinents
         // gets its terrain but keeps the wrong weather and the wrong terrain-paint behaviour.
         public static bool IsDeepnorthPrefix(float x, float y, ref bool __result)
         {
+            if (Settings.HasColdMap && Settings.ColdMapScale > 0f)
+            {
+                var cold = Settings.ApplyColdmap(Normalize(x), Normalize(y));
+                __result = cold > 0f;
+                return false;
+            }
             var biome = Settings.GetBiomeOverride(Normalize(x), Normalize(y));
             if (biome == Heightmap.Biome.None)
                 return true;
             __result = biome == Heightmap.Biome.DeepNorth;
             return false;
+        }
+
+        public static bool IsDeepnorthFallbackPrefix(float x, float y, ref bool __result)
+        {
+            var biome = Settings.GetBiomeOverride(Normalize(x), Normalize(y));
+            if (biome == Heightmap.Biome.None)
+                return true;
+            __result = biome == Heightmap.Biome.DeepNorth;
+            return false;
+        }
+
+        public static bool DeepNorthWaveFadePrefix(float wx, float wy, ref double __result)
+        {
+            if (!Settings.DeepNorthWater)
+                return true;
+            if (Settings.HasColdMap && Settings.ColdMapScale > 0f)
+            {
+                var cold = Settings.ApplyColdmap(Normalize(wx), Normalize(wy));
+                __result = (double)Mathf.Clamp01(cold);
+                return false;
+            }
+            if (Settings.HasBiomeMap)
+            {
+                var biome = Settings.GetBiomeOverride(Normalize(wx), Normalize(wy));
+                if (biome == Heightmap.Biome.None && WorldGenerator.instance != null)
+                    biome = WorldGenerator.instance.GetBiome(wx, wy);
+                __result = (biome == Heightmap.Biome.DeepNorth) ? 1.0 : 0.0;
+                return false;
+            }
+            return true;
         }
     }
 }

@@ -15,7 +15,7 @@ public partial class BetterContinents
   // biome map (which IsDeepnorth then reads), and on a high world, where the camera's height itself puts the game's test
   // inside the Deep North's circle from about 8000 m, wherever it is.
   internal static bool DeepNorthWeatherUsesZ(BetterContinentsSettings settings) =>
-    settings.ShapesWorld && (settings.HasBiomeMap || HighTerrain.Wanted(settings));
+    settings.ShapesWorld && (settings.HasBiomeMap || settings.HasColdMap || HighTerrain.Wanted(settings));
 
   // DynamicPatch's first step: the state the patched game code reads, then each group on or off. One that fails is logged and the
   // others go on: the world loads either way, as vanilla's heights would. It comes first, and nothing in it depends on another

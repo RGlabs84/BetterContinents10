@@ -1,4 +1,4 @@
-﻿// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and alt-biome planting (0.8.1), and on 2026-09-24 for world export and import (0.9.0), and on 2026-09-29 for Expand World Data biomes (0.9.3), and on 2026-10-02 for export folders used as the Directory (0.9.4), and on 2026-10-04 for the unifying refactor (0.10.0), and on 2026-10-06 for 16k worlds (0.10.3), and on 2026-10-07 for baked placements (0.10.4).
+// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and alt-biome planting (0.8.1), and on 2026-09-24 for world export and import (0.9.0), and on 2026-09-29 for Expand World Data biomes (0.9.3), and on 2026-10-02 for export folders used as the Directory (0.9.4), and on 2026-10-04 for the unifying refactor (0.10.0), and on 2026-10-06 for 16k worlds (0.10.3), and on 2026-10-07 for baked placements (0.10.4).
 
 using System;
 using System.Collections.Generic;
@@ -48,11 +48,16 @@ public partial class BetterContinents
     public bool MountainsAllowedAtCenter;
     public bool ForestFactorOverrideAllTrees;
     public bool HeightmapOverrideAll = true;
+    public float MountainNoise = 0f;
+    public float MistlandsNoise = 0f;
     // High Terrain (SettingsSchema.HighTerrain): which worlds get the patches of the game's height rules (HighTerrain.Wanted). Auto unless the
     // world says otherwise; saved only when it is not Auto (DataKey.HighTerrain), and a world without the key is Auto.
     public HighTerrainMode HighTerrainMode = HighTerrainMode.Auto;
     public float HeightmapMask;
     public float HeatMapScale = 10f;
+    public float ColdMapScale = 10f;
+    public bool DeepNorthWater = true;
+    public bool AshlandsWater = true;
     public float WorldSize = 10000f;
     public float EdgeSize = 500f;
     public bool FixWaterColor = true;
@@ -118,7 +123,9 @@ public partial class BetterContinents
     private ImageMapFloat? FlatMap;
     private ImageMapFloat? ForestMap;
     private ImageMapFloat? HeatMap;
+    private ImageMapFloat? ColdMap;
     private ImageMapSpawn? SpawnMap;
+    private ImageMapFloat? LocationExclusionMap;
     // Baked alt-biome map (class per pixel, legend classes, point plants); serialized under DataKey.AltBiomeMap.
     private ImageMapAltBiome? AltBiomeMap;
     // The DataKey.AltBiomeMap block as read, kept only when a newer Better Continents wrote it (or it could not be
@@ -136,6 +143,7 @@ public partial class BetterContinents
     // Before the alt-biome grid is built: says which of the map's biomes the world cannot use now (BiomeRegistry.Usable).
     internal void WarnUnusableBiomes() => BiomeMap?.WarnUnusable();
     public bool HasLocationMap => LocationMap != null;
+    public bool HasLocationExclusionMap => LocationExclusionMap != null;
     public bool HasRoughMap => RoughMap != null;
     public bool HasFlatMap => FlatMap != null;
     public bool HasForestMap => ForestMap != null;
@@ -145,6 +153,7 @@ public partial class BetterContinents
     public bool HasMossMap => MossMap != null;
     public bool HasVegetationMap => VegetationMap != null;
     public bool HasHeatMap => HeatMap != null;
+    public bool HasColdMap => ColdMap != null;
     public bool HasSpawnMap => SpawnMap != null;
 
 
@@ -253,6 +262,7 @@ public partial class BetterContinents
       CompactForLargeMaps(c, dir);
       foreach (var kind in MapKind.LoadOrder)
         kind.Load(this, c, dir, lean);
+      ReadLocationExclusionFile(c, dir, lean);
       AltBiomes = AltBiomeSettings.FromConfig(c);
       ReadLayerFile(dir);
     }
@@ -615,6 +625,13 @@ public partial class BetterContinents
         }
         else output($"Heatmap disabled");
 
+        if (ColdMap != null)
+        {
+          output($"Coldmap file {ColdMap.FilePath}");
+          output($"Coldmap size {ColdMap.Size}x{ColdMap.Size}");
+          output($"Coldmap scale {ColdMapScale}");
+        }
+
         if (SpawnMap != null)
           output($"Spawnmap file ({SpawnMap.Size}) {SpawnMap.FilePath}");
         else output($"Spawnmap disabled");
@@ -882,6 +899,7 @@ public partial class BetterContinents
       return Mathf.Lerp(height, flatHeight, f * FlatmapBlend);
     }
     public float ApplyHeatmap(float x, float y) => HeatMapScale * (HeatMap?.GetValue(x, y) ?? 0);
+    public float ApplyColdmap(float x, float y) => ColdMapScale * (ColdMap?.GetValue(x, y) ?? 0);
 
     public float ApplyForest(float x, float y, float forest)
     {
@@ -904,6 +922,46 @@ public partial class BetterContinents
     public Heightmap.Biome GetBiomeOverride(float mapX, float mapY) => BiomeMap?.GetValue(mapX, mapY) ?? 0;
 
     public IEnumerable<Vector2> GetAllSpawns(string spawn) => LocationMap?.GetAllSpawns(spawn) ?? [];
+
+    public bool IsLocationExcluded(float wx, float wy) =>
+      LocationExclusionMap != null && LocationExclusionMap.GetValue(Normalize(wx), Normalize(wy)) > 0.01f;
+
+    private void ReadLocationExclusionFile(ConfigValues c, string dir, bool lean)
+    {
+      string path = GetPath(dir, "no_spawns_mask.png", c.Get(SettingsSchema.LocationExclusionFile.Entry));
+      if (!File.Exists(path) && !string.IsNullOrEmpty(dir))
+      {
+        string alt = Path.Combine(dir, "nospawns.png");
+        if (File.Exists(alt))
+          path = alt;
+      }
+      var map = ImageMapFloat.Create(path, false, CompactMaps);
+      if (lean)
+        map?.ReleasePixels();
+      LocationExclusionMap = map;
+    }
+
+    public void ReloadLocationExclusionMap()
+    {
+      if (LocationExclusionMap == null) return;
+      if (!LocationExclusionMap.LoadSourceImage())
+      {
+        string dir = ConfigMapSourceDir.Value;
+        string configPath = GetPath(dir, "no_spawns_mask.png", ConfigLocationExclusionFile.Value);
+        if (!File.Exists(configPath) && !string.IsNullOrEmpty(dir))
+        {
+          string alt = Path.Combine(dir, "nospawns.png");
+          if (File.Exists(alt))
+            configPath = alt;
+        }
+        if (!File.Exists(configPath) || File.Exists(LocationExclusionMap.FilePath)) return;
+        LogWarning($"Cannot find image {LocationExclusionMap.FilePath}: Using default path from config.");
+        LocationExclusionMap.FilePath = configPath;
+        if (!LocationExclusionMap.LoadSourceImage()) return;
+      }
+      LocationExclusionMap.CreateMap(false);
+      Log("Location exclusion mask reloaded.");
+    }
 
     // bc reload bm: reads the picture and legend again into a new map, which replaces the world's only if both read
     // cleanly (before 0.9.3 a legend error reloaded the picture with the default colours, and the next save kept it).

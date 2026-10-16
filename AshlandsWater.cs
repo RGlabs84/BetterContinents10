@@ -107,7 +107,7 @@ internal static class AshlandsWater
           FarDone.Remove(water!);
   }
 
-  private static bool Active => BetterContinents.Settings is { ShapesWorld: true } && WorldGenerator.instance != null;
+  private static bool Active => BetterContinents.Settings is { ShapesWorld: true, AshlandsWater: true } && WorldGenerator.instance != null;
 
   private static void Apply(WaterVolume volume)
   {

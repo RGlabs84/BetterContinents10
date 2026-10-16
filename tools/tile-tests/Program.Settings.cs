@@ -26,7 +26,7 @@ internal static partial class Program
   private static FieldInfo Field(string name) =>
     typeof(BC.BetterContinentsSettings).GetField(name, BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance)!;
 
-  private static readonly string[] FloatFields = ["HeightMap", "RoughMap", "FlatMap", "ForestMap", "HeatMap", "LavaMap", "MossMap"];
+  private static readonly string[] FloatFields = ["HeightMap", "RoughMap", "FlatMap", "ForestMap", "HeatMap", "ColdMap", "LavaMap", "MossMap"];
 
   // A spawn or vegetation picture: white (index 0, "none"), red (-Boar), green (+Neck) and black (nothing).
   private static byte[] SpawnPicture(int size, int seed) =>
@@ -317,7 +317,7 @@ internal static partial class Program
     var s = new BC.BetterContinentsSettings { EnabledForThisWorld = true, Version = 12, CompactMaps = true };
     long before = GC.GetTotalMemory(true);
     long oldBytes = 0;
-    var floats = new[] { ("heightmap.png", "HeightMap"), ("roughmap.png", "RoughMap"), ("flatmap.png", "FlatMap"), ("forestmap.png", "ForestMap"), ("heatmap.png", "HeatMap"), ("lavamap.png", "LavaMap"), ("mossmap.png", "MossMap") };
+    var floats = new[] { ("heightmap.png", "HeightMap"), ("roughmap.png", "RoughMap"), ("flatmap.png", "FlatMap"), ("forestmap.png", "ForestMap"), ("heatmap.png", "HeatMap"), ("coldmap.png", "ColdMap"), ("lavamap.png", "LavaMap"), ("mossmap.png", "MossMap") };
     var loaded = new List<(string file, object map, int size)>();
     foreach (var (file, field) in floats)
     {
@@ -382,7 +382,7 @@ internal static partial class Program
     long before = GC.GetTotalMemory(true);
     var s = new BC.BetterContinentsSettings { EnabledForThisWorld = true, Version = 12 };
     var sw = Stopwatch.StartNew();
-    foreach (var (file, field) in new[] { ("heightmap.png", "HeightMap"), ("roughmap.png", "RoughMap"), ("flatmap.png", "FlatMap"), ("forestmap.png", "ForestMap"), ("heatmap.png", "HeatMap"), ("lavamap.png", "LavaMap"), ("mossmap.png", "MossMap") })
+    foreach (var (file, field) in new[] { ("heightmap.png", "HeightMap"), ("roughmap.png", "RoughMap"), ("flatmap.png", "FlatMap"), ("forestmap.png", "ForestMap"), ("heatmap.png", "HeatMap"), ("coldmap.png", "ColdMap"), ("lavamap.png", "LavaMap"), ("mossmap.png", "MossMap") })
       if (File.Exists(Path.Combine(folder, file)))
         Field(field).SetValue(s, ImageMapFloat.Create(Path.Combine(folder, file), ImageMapFloat.HeightAlpha.None));
     if (File.Exists(Path.Combine(folder, "biomemap.png")))

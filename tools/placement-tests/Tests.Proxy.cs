@@ -220,7 +220,7 @@ internal static partial class Tests
     C(cn.All(n => ProxyNear(n, Vector3.forward)) && ci.SequenceEqual([0, 1, 2]), "the normals face +z and the winding is as it was");
     C(ProxyNear(new Vector3(chunk.MinX, chunk.MinY, chunk.MinZ), new Vector3(10, 2, 20)) && ProxyNear(new Vector3(chunk.MaxX, chunk.MaxY, chunk.MaxZ), new Vector3(11, 3, 20)),
       "the chunk's box is that of its vertices");
-    C(built.KindCovered.SequenceEqual([true]) && built.Triangles == 1 && built.Vertices == 3 && built.Bytes == 3 * 12 + 3 * 2, "the kind is covered; triangles, vertices and bytes are counted (a 12 byte vertex, a 16 bit index)");
+    C(built.KindCovered.SequenceEqual([true]) && built.Triangles == 1 && built.Vertices == 3 && built.Bytes == 3 * ProxyMerge.Layout.Stride + 3 * 2, $"the kind is covered; triangles, vertices and bytes are counted (a {ProxyMerge.Layout.Stride} byte vertex, a 16 bit index)");
 
     // a turn of 90 degrees about y carries x to -z and the normal to +x
     var turned = BakedZoneBuild.Build(ClientKit.Zone(0, 0, (0, 5.0, 1.0, 5.0, 90.0, null)), [kind], 1);
@@ -598,7 +598,7 @@ internal static partial class Tests
     book.Submit(ProxyKit.Frame(ring, 1, Vector3.zero));
     C(fake.Drawn.Count == 2 && fake.Drawn.Contains(home.Proxy.Near.Chunks[0]) && fake.Drawn.Contains(distant.Proxy.Far.Chunks[0]), $"one mesh a zone is drawn ({fake.Drawn.Count})");
     var numbers = book.Numbers(2);
-    C(numbers.ZonesWithProxy == 2 && numbers.Near == 1 && numbers.Far == 2 && numbers.Triangles == 24 && numbers.Vertices == 36 && numbers.Bytes == 36 * 12L + 72 * 2L,
+    C(numbers.ZonesWithProxy == 2 && numbers.Near == 1 && numbers.Far == 2 && numbers.Triangles == 24 && numbers.Vertices == 36 && numbers.Bytes == 36 * (long)ProxyMerge.Layout.Stride + 72 * 2L,
       $"the numbers: {numbers.Line()}");
 
     // the second proxy of a zone waits to be drawn until a job that knows the narrower coverage has been adopted
@@ -1050,7 +1050,7 @@ internal static partial class Tests
   {
     Section("proxy: compact vertices");
     var compact = VertexLayout.Compact;
-    C(compact.Stride == 12 && compact.Quantised && !VertexLayout.Plain.Quantised && ProxyMerge.Layout == compact && ProxyMerge.MaxChunkVertices == 65_535,
+    C(compact.Stride == 12 && compact.Quantised && !VertexLayout.Plain.Quantised && ProxyMerge.Layout == (ProxyMerge.PlainFormat ? VertexLayout.Plain : compact) && ProxyMerge.MaxChunkVertices == 65_535,
       "the proxy's vertex is 12 bytes: four 16 bit fractions and four signed bytes; a chunk takes 65,535 vertices at most");
 
     // the box: a tight box is kept, a side that is too thin is widened about the centre
@@ -1227,7 +1227,7 @@ internal static partial class Tests
     C(n.TopKinds.Select(k => k.Name).SequenceEqual(["kind8", "kind7", "kind6", "kind5", "kind4", "kind3"]) && n.TopKinds.Zip(n.TopKinds.Skip(1), (a, b) => a.Bytes > b.Bytes).All(x => x),
       $"...the biggest first ({string.Join(", ", n.TopKinds.Select(k => k.Name))})");
     var k8 = n.TopKinds[0];
-    C(k8.Vertices == 2 * 82 && k8.Bytes == 2 * (82L * 12 + 80 * 3 * 2), $"...with its vertices and bytes over both proxies ({k8.Vertices} vertices, {k8.Bytes} bytes)");
+    C(k8.Vertices == 2 * 82 && k8.Bytes == 2 * (82L * ProxyMerge.Layout.Stride + 80 * 3 * 2), $"...with its vertices and bytes over both proxies ({k8.Vertices} vertices, {k8.Bytes} bytes)");
     var line = n.KindsLine();
     C(line.StartsWith("Shadow proxy memory by kind") && line.Contains("kind8") && line.Contains("MB") && line.Contains("vertices") && !line.Contains("kind2"), $"the line says it ({line})");
     C(n.Line().Contains("MB near") && n.Line().Contains("MB far"), "the proxies line gives the near and far memory");

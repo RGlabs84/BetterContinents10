@@ -58,11 +58,11 @@ all/dump/049	Alt biomes: neighbour fix on, mean sector height on, min sector thi
 all/dump/050	Alt biome overrides: *Mistlands: chance=0.3, min=2; Wolf Mountain: enabled=false
 all/dump/count	50
 all/loaded-maps	heightmap.png, biomemap.png, terrainmap.png, locationmap.png, roughmap.png, forestmap.png, heatmap.png, paintmap.png, lavamap.png, mossmap.png, vegetationmap.png, spawnmap.png, altbiomemap.png
-all/v11/disk	len=52342 sha=5a659540f7ea26806c2baa24
-all/v11/network	len=52018 sha=b2c663993d84feb658718990
-all/v11/network-no-alt	len=50669 sha=04e1631054ca697d444ae713
-all/v11/config-version	len=52342 sha=c5fc01b16361b1a306a02bb7
-all/cache-id	4083b515314ab169b4c1299484f0e581
+all/v11/disk	len=52358 sha=419f4e4d2a127dcc48040a57
+all/v11/network	len=52034 sha=56f1063bf07f50d4cf7673be
+all/v11/network-no-alt	len=50685 sha=a70dbd06f077b20764a74694
+all/v11/config-version	len=52358 sha=ae4b8765a192e3f007354ee4
+all/cache-id	347a7beb742ab17c515ff595a593ac6a
 all/v11/disk-roundtrip	same
 all/v11/network-roundtrip	same
 all/v11/dump-after-load	n=49 sha=13ec5496cf89ce0e0747036b
@@ -150,11 +150,11 @@ all-defaults/dump/045	Alt biomes: chance x1, amount x1, region size x1, distance
 all-defaults/dump/046	Alt biomes: neighbour fix off, mean sector height off, min sector thickness 0
 all-defaults/dump/count	46
 all-defaults/loaded-maps	heightmap.png, biomemap.png, terrainmap.png, locationmap.png, roughmap.png, forestmap.png, heatmap.png, paintmap.png, lavamap.png, mossmap.png, vegetationmap.png, spawnmap.png, altbiomemap.png
-all-defaults/v11/disk	len=52091 sha=64f042c4335659c1e65ba287
-all-defaults/v11/network	len=51767 sha=9e401804817c87420af7aadb
-all-defaults/v11/network-no-alt	len=50513 sha=c9616d7c0699401598187a91
-all-defaults/v11/config-version	len=52091 sha=6e9d92b0d4aca6bfc69bd80f
-all-defaults/cache-id	4084823a9c319c86b7c3d8bc86f4e157
+all-defaults/v11/disk	len=52107 sha=7c32667de0a98088664027c6
+all-defaults/v11/network	len=51783 sha=acd13011c4434e65a3b5892a
+all-defaults/v11/network-no-alt	len=50529 sha=4a0092a503b156234ccda4ab
+all-defaults/v11/config-version	len=52107 sha=54f5f24b8d34252b1661ad83
+all-defaults/cache-id	35aed8fbcb5e8372efc4d908b2a0ce8a
 all-defaults/v11/disk-roundtrip	same
 all-defaults/v11/network-roundtrip	same
 all-defaults/v11/dump-after-load	n=44 sha=b20eb85050a9de18905505bc
@@ -224,11 +224,11 @@ heightonly/dump/032	Alt biomes: chance x1, amount x1, region size x1, distance x
 heightonly/dump/033	Alt biomes: neighbour fix off, mean sector height off, min sector thickness 0
 heightonly/dump/count	33
 heightonly/loaded-maps	heightmap.png
-heightonly/v11/disk	len=13383 sha=283d7df933e0a30a8e167ad3
-heightonly/v11/network	len=13351 sha=b18a518fd92c80382f163a31
-heightonly/v11/network-no-alt	len=13351 sha=b18a518fd92c80382f163a31
-heightonly/v11/config-version	len=13383 sha=a5882455ae0fb5b6d2b2c042
-heightonly/cache-id	6a1e67a8340f51ce7e6693d19e27598f
+heightonly/v11/disk	len=13399 sha=7604a7f3022a2b00af0814aa
+heightonly/v11/network	len=13367 sha=0b7b58a4ec879178cf31ac19
+heightonly/v11/network-no-alt	len=13367 sha=0b7b58a4ec879178cf31ac19
+heightonly/v11/config-version	len=13399 sha=f2f9a453cc04c9858e95926a
+heightonly/cache-id	e0e103ea9bebe61a99c8aa8e92984b2e
 heightonly/v11/disk-roundtrip	same
 heightonly/v11/network-roundtrip	same
 heightonly/v11/dump-after-load	n=31 sha=db8d5a2424fb467852c85a67
@@ -299,11 +299,11 @@ high-terrain-on/dump/033	Alt biomes: chance x1, amount x1, region size x1, dista
 high-terrain-on/dump/034	Alt biomes: neighbour fix off, mean sector height off, min sector thickness 0
 high-terrain-on/dump/count	34
 high-terrain-on/loaded-maps	heightmap.png
-high-terrain-on/v11/disk	len=13391 sha=a5ed8ccefdfbd4642060a30e
-high-terrain-on/v11/network	len=13359 sha=abb695635f090e95f1f1d4f6
-high-terrain-on/v11/network-no-alt	len=13359 sha=abb695635f090e95f1f1d4f6
-high-terrain-on/v11/config-version	len=13391 sha=905c01236eca077540fa09a1
-high-terrain-on/cache-id	cf3906662cde0ee487224326158f6e94
+high-terrain-on/v11/disk	len=13407 sha=5ca8ca32b3d3a74591602920
+high-terrain-on/v11/network	len=13375 sha=c73ca040cf78a13c8d71df6a
+high-terrain-on/v11/network-no-alt	len=13375 sha=c73ca040cf78a13c8d71df6a
+high-terrain-on/v11/config-version	len=13407 sha=897e49a047d9c7a8e925ae18
+high-terrain-on/cache-id	3a7be0748da98420095e55672ecce00f
 high-terrain-on/v11/disk-roundtrip	same
 high-terrain-on/v11/network-roundtrip	same
 high-terrain-on/v11/dump-after-load	n=32 sha=66d883b62c0ed4f55dd630cd
@@ -374,11 +374,11 @@ high-terrain-off/dump/033	Alt biomes: chance x1, amount x1, region size x1, dist
 high-terrain-off/dump/034	Alt biomes: neighbour fix off, mean sector height off, min sector thickness 0
 high-terrain-off/dump/count	34
 high-terrain-off/loaded-maps	heightmap.png
-high-terrain-off/v11/disk	len=13399 sha=da1cdabe9d865f7b422f7795
-high-terrain-off/v11/network	len=13367 sha=4b5c587cfd0873795d5423ae
-high-terrain-off/v11/network-no-alt	len=13367 sha=4b5c587cfd0873795d5423ae
-high-terrain-off/v11/config-version	len=13399 sha=ce11702ea4dc01290dc8867a
-high-terrain-off/cache-id	a56aacd6b88ffa64b31cff574b74d76d
+high-terrain-off/v11/disk	len=13415 sha=6bd2b12e05aed2cd20d1183e
+high-terrain-off/v11/network	len=13383 sha=27a3621c93bb33288784e189
+high-terrain-off/v11/network-no-alt	len=13383 sha=27a3621c93bb33288784e189
+high-terrain-off/v11/config-version	len=13415 sha=5f1db8812713a25e795a2ecd
+high-terrain-off/cache-id	d586d5859d79284af7fff6f6fadb96a3
 high-terrain-off/v11/disk-roundtrip	same
 high-terrain-off/v11/network-roundtrip	same
 high-terrain-off/v11/dump-after-load	n=32 sha=a4c122acaacfe761230227d6
@@ -448,11 +448,11 @@ alpha/dump/032	Alt biomes: chance x1, amount x1, region size x1, distance x1
 alpha/dump/033	Alt biomes: neighbour fix off, mean sector height off, min sector thickness 0
 alpha/dump/count	33
 alpha/loaded-maps	heightmap.png
-alpha/v11/disk	len=16645 sha=4122198511edf996a16b68a0
-alpha/v11/network	len=16618 sha=ae5eba03c1feb73ce7e1c407
-alpha/v11/network-no-alt	len=16618 sha=ae5eba03c1feb73ce7e1c407
-alpha/v11/config-version	len=16645 sha=c6fc4c061a97590ccef09180
-alpha/cache-id	ae3b6200264752b26c83436f63087d18
+alpha/v11/disk	len=16661 sha=ee639c37d80f8abec50f0836
+alpha/v11/network	len=16634 sha=26373e5322f258c90729bb43
+alpha/v11/network-no-alt	len=16634 sha=26373e5322f258c90729bb43
+alpha/v11/config-version	len=16661 sha=a20570970346b81373b781ae
+alpha/cache-id	e708c8b40a637b571105552a3b9d4063
 alpha/v11/disk-roundtrip	same
 alpha/v11/network-roundtrip	same
 alpha/v11/dump-after-load	n=31 sha=81f9bf9a6d066154968cdc6a
@@ -526,11 +526,11 @@ files/dump/034	Alt biomes: chance x1, amount x1, region size x1, distance x1
 files/dump/035	Alt biomes: neighbour fix off, mean sector height off, min sector thickness 0
 files/dump/count	35
 files/loaded-maps	heightmap.png, biomemap.png, forestmap.png
-files/v11/disk	len=22876 sha=54a685bfab4f178bfe6bc46e
-files/v11/network	len=22809 sha=0999e26b1dc040fe7a987ab7
-files/v11/network-no-alt	len=22809 sha=0999e26b1dc040fe7a987ab7
-files/v11/config-version	len=22876 sha=5e551322f88a8fac730df5cd
-files/cache-id	2a3e6cb27c362f7ae5b5ac2edb6cea7b
+files/v11/disk	len=22892 sha=7390be85020bbb09f1b7e1c4
+files/v11/network	len=22825 sha=0071d196b45f1598fd772263
+files/v11/network-no-alt	len=22825 sha=0071d196b45f1598fd772263
+files/v11/config-version	len=22892 sha=2df915f4a4e98797f3efc093
+files/cache-id	59505a57320df47c0136664f0720b3fc
 files/v11/disk-roundtrip	same
 files/v11/network-roundtrip	same
 files/v11/dump-after-load	n=33 sha=9037e1d004980b17e8f87b4a
@@ -601,11 +601,11 @@ scalars/dump/033	Alt biomes: chance x1, amount x1, region size x1, distance x1
 scalars/dump/034	Alt biomes: neighbour fix off, mean sector height off, min sector thickness 0
 scalars/dump/count	34
 scalars/loaded-maps	
-scalars/v11/disk	len=117 sha=fe8d70ab6dc604b8c6b3dbc1
-scalars/v11/network	len=117 sha=fe8d70ab6dc604b8c6b3dbc1
-scalars/v11/network-no-alt	len=72 sha=031e3f499093e7913651f3a3
-scalars/v11/config-version	len=117 sha=85ff7dee78a954157a7d7764
-scalars/cache-id	5eed445dfcae461fa6739de535823bd1
+scalars/v11/disk	len=133 sha=fd3c84fd0e2bff35a114c113
+scalars/v11/network	len=133 sha=fd3c84fd0e2bff35a114c113
+scalars/v11/network-no-alt	len=88 sha=6e1089381260f34b03ccd38c
+scalars/v11/config-version	len=133 sha=b50a2ad9d3dd3b013db650a2
+scalars/cache-id	457eef85819f1eee0e4de93548ed84ed
 scalars/v11/disk-roundtrip	same
 scalars/v11/network-roundtrip	same
 scalars/v11/dump-after-load	n=33 sha=d3e15545f49ca230b5f970e0
@@ -674,11 +674,11 @@ legacy-spawnmap/dump/030	Alt biomes: chance x1, amount x1, region size x1, dista
 legacy-spawnmap/dump/031	Alt biomes: neighbour fix off, mean sector height off, min sector thickness 0
 legacy-spawnmap/dump/count	31
 legacy-spawnmap/loaded-maps	
-legacy-spawnmap/v11/disk	len=20 sha=91a943be89175fca8770ede9
-legacy-spawnmap/v11/network	len=20 sha=91a943be89175fca8770ede9
-legacy-spawnmap/v11/network-no-alt	len=20 sha=91a943be89175fca8770ede9
-legacy-spawnmap/v11/config-version	len=20 sha=3c7e6c7521ec4a9134c9ed79
-legacy-spawnmap/cache-id	d92d00713f668ede3c3dba281d0adcfd
+legacy-spawnmap/v11/disk	len=36 sha=0c48297169cfc070707a111b
+legacy-spawnmap/v11/network	len=36 sha=0c48297169cfc070707a111b
+legacy-spawnmap/v11/network-no-alt	len=36 sha=0c48297169cfc070707a111b
+legacy-spawnmap/v11/config-version	len=36 sha=ec41a4364c69e9cd050880cd
+legacy-spawnmap/cache-id	d5ef0644d6ecdede8d85a00ca88a3d5f
 legacy-spawnmap/v11/disk-roundtrip	same
 legacy-spawnmap/v11/network-roundtrip	same
 legacy-spawnmap/v11/dump-after-load	n=29 sha=191fb3e7ca3fa206a51a5033
@@ -765,11 +765,11 @@ legacy-flat/dump/044	Alt biomes: chance x1, amount x1, region size x1, distance 
 legacy-flat/dump/045	Alt biomes: neighbour fix off, mean sector height off, min sector thickness 0
 legacy-flat/dump/count	45
 legacy-flat/loaded-maps	heightmap.png, biomemap.png, terrainmap.png, locationmap.png, roughmap.png, flatmap.png, forestmap.png, heatmap.png, paintmap.png, lavamap.png, mossmap.png, vegetationmap.png, spawnmap.png, altbiomemap.png
-legacy-flat/v11/disk	len=59502 sha=31918ba3d2172f93283f2ea9
-legacy-flat/v11/network	len=59153 sha=b65d6cb3f27872fb9f3a2e7b
-legacy-flat/v11/network-no-alt	len=57899 sha=4868d3bac5238a6262990946
-legacy-flat/v11/config-version	len=59502 sha=0aa7336179c4bc7ba97fa259
-legacy-flat/cache-id	ea1b41a5aa987344fd891f1145bf6736
+legacy-flat/v11/disk	len=59518 sha=7a7d59ad6b1e27ea696b892f
+legacy-flat/v11/network	len=59169 sha=dc7c27143b579a33a1d9d6a9
+legacy-flat/v11/network-no-alt	len=57915 sha=62cd02cce5a70811524bdbdd
+legacy-flat/v11/config-version	len=59518 sha=62042b3570c1650cea97f2fe
+legacy-flat/cache-id	46f362c5f8467e156d3565e87ba65aa8
 legacy-flat/v11/disk-roundtrip	same
 legacy-flat/v11/network-roundtrip	same
 legacy-flat/v11/dump-after-load	n=43 sha=ecf3768d9906be09a25eb477

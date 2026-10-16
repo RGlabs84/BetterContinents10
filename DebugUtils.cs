@@ -1,4 +1,4 @@
-﻿// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and alt-biome planting (0.8.1), and on 2026-09-24 for world export and import (0.9.0), and on 2026-09-29 for Expand World Data biomes (0.9.3), and on 2026-10-04 for the unifying refactor and the vegetation twin guard (0.10.0), and on 2026-10-06 for 16k worlds (0.10.3), and on 2026-10-07 for baked placements (0.10.4).
+// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and alt-biome planting (0.8.1), and on 2026-09-24 for world export and import (0.9.0), and on 2026-09-29 for Expand World Data biomes (0.9.3), and on 2026-10-04 for the unifying refactor and the vegetation twin guard (0.10.0), and on 2026-10-06 for 16k worlds (0.10.3), and on 2026-10-07 for baked placements (0.10.4).
 
 using System;
 using System.Collections.Generic;
@@ -234,6 +234,11 @@ public partial class DebugUtils
             {
                 AddMapFile(group, MapKind.Heat);
                 AddSettings(group, "heat");
+            });
+            bc.AddGroup("cold", "Coldmap", "Coldmap settings, get more info with 'bc cold help'", group =>
+            {
+                AddMapFile(group, MapKind.Cold);
+                AddSettings(group, "cold");
             });
             bc.AddGroup("fo", "Forest", "Forest settings, get more info with 'bc fo help'", group =>
             {

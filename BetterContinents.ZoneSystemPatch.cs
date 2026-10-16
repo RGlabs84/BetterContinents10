@@ -1,8 +1,9 @@
-﻿// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0), and on 2026-10-04 for the vegetation twin guard (0.10.0), and on 2026-10-04 for the unifying refactor (0.10.0), and on 2026-10-07 for baked placements (0.10.4).
+// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0), and on 2026-10-04 for the vegetation twin guard (0.10.0), and on 2026-10-04 for the unifying refactor (0.10.0), and on 2026-10-07 for baked placements (0.10.4).
 
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Reflection.Emit;
 using HarmonyLib;
 using UnityEngine;
@@ -37,22 +38,32 @@ public partial class BetterContinents
       PlaceLocations(__instance, locs, Settings, (x, z) => WorldGenerator.instance.GetHeight(x, z));
     }
 
+    internal static bool PlacingExplicitLocationMapPin = false;
+
     // The location map's pins and the start position override. A world made since 0.10 places the start first, so no
     // pin can take its zone (StartBeforeLocationPins); an older one places it last, as it always has. The game keeps
     // one location per 64 m zone and drops a second with only "Location already exist in zone": here a location that
     // is not placed says which one holds its zone, the start loudly.
     internal static void PlaceLocations(ZoneSystem zones, List<ZoneSystem.ZoneLocation> locs, BetterContinentsSettings settings, Func<float, float, float> height)
     {
-      bool startFirst = settings.StartBeforeLocationPins;
-      if (settings.OverrideStartPosition && startFirst)
-        OverrideStart(zones, locs, settings, height);
-      if (settings.HasLocationMap)
+      PlacingExplicitLocationMapPin = true;
+      try
       {
-        foreach (var loc in locs)
-          HandleLocation(zones, loc, settings, height);
+        bool startFirst = settings.StartBeforeLocationPins;
+        if (settings.OverrideStartPosition && startFirst)
+          OverrideStart(zones, locs, settings, height);
+        if (settings.HasLocationMap)
+        {
+          foreach (var loc in locs)
+            HandleLocation(zones, loc, settings, height);
+        }
+        if (settings.OverrideStartPosition && !startFirst)
+          OverrideStart(zones, locs, settings, height);
       }
-      if (settings.OverrideStartPosition && !startFirst)
-        OverrideStart(zones, locs, settings, height);
+      finally
+      {
+        PlacingExplicitLocationMapPin = false;
+      }
     }
 
     private static void OverrideStart(ZoneSystem zones, List<ZoneSystem.ZoneLocation> locs, BetterContinentsSettings settings, Func<float, float, float> height)
@@ -101,6 +112,40 @@ public partial class BetterContinents
       holder = "";
       zones.RegisterLocation(loc, position, false);
       return true;
+    }
+
+    [HarmonyPrefix, HarmonyPatch(nameof(ZoneSystem.RegisterLocation))]
+    private static bool RegisterLocationPrefix(ZoneSystem.ZoneLocation location, Vector3 pos)
+    {
+      if (PlacingExplicitLocationMapPin) return true;
+      if (!Settings.ShapesWorld || !Settings.HasLocationExclusionMap) return true;
+      if (location.m_prefabName == "StartTemple") return true;
+      return !Settings.IsLocationExcluded(pos.x, pos.z);
+    }
+
+    public static Heightmap.Biome GetBiomeForLocation(WorldGenerator generator, Vector3 point)
+    {
+      if (Settings.ShapesWorld && Settings.HasLocationExclusionMap && Settings.IsLocationExcluded(point.x, point.z))
+        return Heightmap.Biome.None;
+      return generator.GetBiome(point);
+    }
+
+    public static IEnumerable<CodeInstruction> FilterLocationExclusionTranspiler(IEnumerable<CodeInstruction> instructions)
+    {
+      var targetVec3 = AccessTools.Method(typeof(WorldGenerator), nameof(WorldGenerator.GetBiome), [typeof(Vector3)]);
+      var replacement = AccessTools.Method(typeof(ZoneSystemPatch), nameof(GetBiomeForLocation));
+
+      foreach (var code in instructions)
+      {
+        if (targetVec3 != null && (code.opcode == OpCodes.Callvirt || code.opcode == OpCodes.Call) && code.operand is MethodInfo m && m == targetVec3)
+        {
+          yield return new CodeInstruction(OpCodes.Call, replacement);
+        }
+        else
+        {
+          yield return code;
+        }
+      }
     }
 
 

@@ -1,12 +1,10 @@
 # 🗺️ Better Continents
 
-![Better Continents — Shaping the Tenth Realm](icon.png)
-
 ![Valheim Mod](https://img.shields.io/badge/Valheim-World_Generation_Overhaul-orange.svg)
 [![Multiplayer Compatible](https://img.shields.io/badge/Multiplayer-Server_Synced-blue.svg)]()
 [![Framework](https://img.shields.io/badge/Requires-BepInEx-red.svg)]()
 [![Compatibility](https://img.shields.io/badge/Target-Valheim_1.0-brightgreen.svg)]()
-[![Version](https://img.shields.io/badge/Version-0.10.3-lightgrey.svg)]()
+[![Version](https://img.shields.io/badge/Version-0.10.7-lightgrey.svg)]()
 
 > *"The Allfather did not carve the Tenth Realm in a single stroke. With hammer and chisel, the jagged peaks were raised, deep fjords torn open, and ancient oceans poured into the abyss. Take up the chisel, Viking, and shape the continents to your will."*
 
@@ -14,15 +12,54 @@
 
 Whether you want to import a real-world map of Earth, recreate Middle-earth, sculpt realistic mountain ranges, or carve an unforgiving archipelago for a hardcore survival campaign, Better Continents makes it possible.
 
-## What's new in 0.10.4
+<a id="whats-new-in-0107"></a>
+## What's new in 0.10.7
 
-* 🧱 **Baked buildings.** Better Continents can bake what players built into the world itself. Walls, floors, roofs and beams stop being game objects: every player's game draws them from the world's layer, and they stay solid to walk on. The objects a town costs go with them, and so does what the world saves and sends piece by piece. In a test village, the objects within 128 m went from 7,984 to 2,472 (5,512 pieces baked). Britain's densest block of a 700,000-piece town runs at 81 fps baked against 45 fps as real pieces (measured on one machine). Open the export window (F7) and its new **Bake buildings** tab, or use `bc_bake` in the console. Every bake shows a dry run first and can be undone; `bc_bake unbake world` turns every baked piece back into a real one. The *Baked buildings* guide (PDF) has the details.
-* 🚪 **What stays real.** Doors, chests, stations, beds, cooking fires, portals, and any mod part that Better Continents does not know, stay real objects. With the **Town** option the bake also takes the decor (tables, banners, rugs, plants; chairs and benches stay sit-able) and the torches and lanterns: the nearest 24 burn, never need fuel, and the rest are drawn unlit. The pieces that stay become protected.
-* 🍄 **Nothing that gives items is baked.** Bushes, mushrooms, flax and planted crops stay the game's own.
-* 🏘️ **Town files.** A `placements.bcp` that a town compiler wrote, put in the maps folder, builds its towns into a new world. `bc_bake load` brings a newer file into a running world and keeps what players put in chests and stations.
-* 🛡️ **Safe in a crash.** Every bake writes its undo file before it changes anything. A crash or a cut save is finished or taken back at the next load, and no piece is ever lost or doubled.
-* 🌑 **Fast shadows.** Near you, the shadows of baked pieces come from a few merged shadow-only shapes per zone, built in the background on your other cores, and they look the same. In the busiest view of a test town of 33 blueprint buildings, 38 fps became 63 fps (measured on one machine).
-* ⚙️ **New settings** in `[10 BetterContinents.BakedPlacements]`: how far baked pieces are drawn and in how much detail, their shadows, and how many baked lights burn and cast shadows. Each player sets their own.
+### 🏔️ Per-Biome Procedural Height Noise (Selective Mountain Jaggedness)
+* **The Problem:** Previously, running `Heightmap Override All = true` meant every meter of terrain elevation was sampled strictly from static PNG pixels. At 4 m or 8 m per pixel, mountains lost all of Valheim's natural jaggedness—appearing as smooth mounds or clay pyramids unless heavy offline micro-gully synthesis was baked into massive 16k textures. Conversely, disabling `Heightmap Override All` slapped procedural octave noise indiscriminately across the entire world, corrupting town squares, harbors, and canals.
+* **The Solution:** Better Continents now supports runtime procedural height noise gated strictly by biome:
+  * **Lowlands, Meadows, Plains, Towns & Canals:** Remain **100% faithful** to the PNG heightmap (zero procedural noise).
+  * **Mountain & Deep North Biomes:** Automatically blend Valheim's multi-octave alpine fractal noise, couloirs/micro-gullies (10 m and 2.5 m frequencies), and slope tilt. Configured via `Mountain Noise` (`[01 BetterContinents.Global]`, console `bc g mn <scale>`, default `1.0`).
+  * **Mistlands Biomes:** Synthesize stepped terrace crags and sharp ridges, configured via `Mistlands Noise` (`[01 BetterContinents.Global]`, console `bc g msn <scale>`, default `1.0`).
+  * **Altitude Attenuation:** Smooth altitude fade guarantees coastal and low-lying elevations are completely untouched by procedural mountain jitter.
+
+### 🚫 Location Exclusion Mask (`no_spawns_mask.png` / `nospawns.png`)
+* **Precision World Spawning:** Allows map authors to designate protected regions (town centers, roads, player settlement zones, historical ruins) where random location candidate placement (burial chambers, sunken crypts, goblin camps, boss altars) is strictly prohibited.
+* **Non-Consuming Candidate Rejection:** Unlike binary `Skip Default Locations = true` (which nukes all locations globally), the exclusion mask transpiles `ZoneSystem.GenerateLocationsTimeSliced` to return non-matching biome signals for excluded pixels. The candidate point fails without incrementing the location placed counter—allowing the game engine to cleanly retry and place the quota of dungeons elsewhere on eligible terrain.
+* **Explicit Pins Preserved:** Manual pins loaded from `locationmap.png` remain completely unblocked.
+* **Usage:** Drop `no_spawns_mask.png` (or `nospawns.png`) into your world directory, or configure `Location Exclusion File` under `[06 BetterContinents.Maps]`. Non-black pixels mark excluded areas.
+
+### 📐 Detailed Bake Meshes (32-bit Float Positions & Normals)
+* **Full-Precision Proxy Geometry:** Switched the default proxy merge geometry format (`BakedProxyMerge`) to uncompressed 32-bit float positions and normals (`VertexLayout.Plain`).
+* **Maximum Visual Sharpness:** Delivers razor-sharp silhouette edges, pristine geometric planes, and smooth normal shading across dense baked towns and custom structures while retaining high-efficiency background GPU draw calls. (Optional compact half-precision format remains available via `BC_SHADOW_PROXY_FORMAT=compact`).
+
+### ❄️ Deep North Cold Map (`coldmap.png`) & Water Decoupling
+* **The Problem:** In vanilla Valheim, environmental cold, snow-vs-cultivate terrain painting, and Deep North freezing weather are hardcoded to geographic coordinates (`WorldGenerator.IsDeepnorth`), ignoring custom biome maps. Furthermore, the game flattens ocean waves strictly in the north (`WorldGenerator.DeepNorthWaveFade`), meaning custom Deep North seas elsewhere suffered from rough ocean waves, while non-cold regions near the northern map edge had their waves unnaturally suppressed.
+* **The Solution:**
+  * **Custom Cold Map (`coldmap.png` / `Coldmap File`):** World authors can provide a grayscale image map defining exactly where Deep North cold, freezing blizzards, snow cover, and calm waters occur (anything above black). Multiplied by `Coldmap Scale` (`[06 BetterContinents.Maps]`, console `bc cold sc <scale>`, default `10.0`).
+  * **Dynamic Biome Fallback:** When no cold map is present, Better Continents automatically switches Deep North weather and environmental conditions to follow your custom Deep North biomes from `biomemap.png`.
+  * **Decoupled Wave Physics (`Deep North Water`):** Decouples `WorldGenerator.DeepNorthWaveFade` so that calm sea surface calculations cleanly follow your custom Deep North biome or cold map. Enabled by default via `Deep North Water = true` (`[01 BetterContinents.Global]`, console `bc g dnw <on|off>`).
+  * **Ashlands Water Decoupling (`Ashlands Water`):** Configurable toggle (`[01 BetterContinents.Global]`, console `bc g aw <on|off>`, default `true`) ensuring the Ashlands boiling red sea rendering dynamically tracks your custom Ashlands biomes and heat maps rather than vanilla's hardcoded south circle.
+
+<a id="previous-releases"></a>
+## Previous Releases
+
+### 0.10.6 — Assembly Reflection & HarmonyX Compatibility
+* 🔨 Fixed `System.Reflection.ReflectionTypeLoadException` on player spawn by downgrading `System.Text.Encoding.CodePages` to 8.0.0 LTS, restoring full compatibility with Infinity Hammer and World Edit Commands.
+
+### 0.10.5 — Water, Waves & Tarn Lakes
+* 🌊 **Full-World Waves:** Procedural wave geometry and whitecaps now extend cleanly out to the world's edge on large worlds (>10 km), matching native ocean shaders.
+* 🏞️ **Lakes Above Sea Level (Experimental):** Ported from *Tarn*, allows placing inland freshwater lakes at custom elevations (`bc_lake here` or `lakes.txt`).
+* 🛤️ **Clearing Bitmasks (`clearmask.bin`):** Suppresses vegetation, trees, and rocks from roads, settlements, and custom map features.
+* 🗺️ **`bc genloc` Diagnostic Command:** Safely re-runs location distribution with reporting and frees stuck vanilla generation loops.
+* 🧱 **Baking Quality-of-Life:** Instant paint application on teleportation, robust undo handling across world renames, and cleaner `bc_bake load` confirmation syntax.
+
+### 0.10.4 — Baked Placements & Performance Architecture
+* 🧱 **Baked Placements (`bc_bake`):** Bakes player-built structures (walls, roofs, floors) into the static terrain layer, cutting active GameObject counts by thousands and boosting FPS in heavy settlements (e.g., 38 fps ➔ 63 fps in dense towns).
+* 🚪 **Protected Real Pieces:** Retains interactive objects (doors, chests, stations, beds, portals) as live, protected GameObjects.
+* 🏘️ **Town Files (`placements.bcp`):** Automatic town compilation and generation from map folders into new or existing worlds.
+* 🌑 **Background Shadow Proxies:** Merged background shadow geometry keeps high FPS even with vast baked settlements.
+* 🛡️ **Atomic Undo Safety:** Every bake creates an undo log before touching world data, guaranteeing crash safety and clean rollbacks.
 
 ## Before you update
 
@@ -39,7 +76,8 @@ Whether you want to import a real-world map of Earth, recreate Middle-earth, scu
 <details>
 <summary>📜 <b>Contents</b></summary>
 
-- [What's new in 0.10.4](#whats-new-in-0104)
+- [What's new in 0.10.6](#whats-new-in-0106)
+- [Previous Releases (0.10.5 & 0.10.4)](#previous-releases)
 - [Before you update](#before-you-update)
 - [⬆️ Upgrading from 0.9: existing worlds and new worlds](#upgrading-from-09)
   - [Which version is my world?](#which-version-is-my-world)

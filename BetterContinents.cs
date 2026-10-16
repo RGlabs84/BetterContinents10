@@ -40,6 +40,8 @@ public partial class BetterContinents : BaseUnityPlugin
     public static ConfigEntry<float> ConfigEdgeSize;
 
     public static ConfigEntry<bool> ConfigDeepNorthGapEnabled;
+    public static ConfigEntry<bool> ConfigAshlandsWater;
+    public static ConfigEntry<bool> ConfigDeepNorthWater;
 
     public static ConfigEntry<bool> ConfigRiversEnabled;
     public static ConfigEntry<bool> ConfigMapEdgeDropoff;
@@ -55,6 +57,9 @@ public partial class BetterContinents : BaseUnityPlugin
     public static ConfigEntry<bool> ConfigHeightmapOverrideAll;
     public static ConfigEntry<bool> ConfigHeightmapAlpha;
     public static ConfigEntry<HighTerrainMode> ConfigHighTerrain;
+    public static ConfigEntry<float> ConfigMountainNoise;
+    public static ConfigEntry<float> ConfigMistlandsNoise;
+    public static ConfigEntry<string> ConfigLocationExclusionFile;
 
     public static ConfigEntry<int> ConfigBiomePrecision;
     public static ConfigEntry<string> ConfigBiomeFile;
@@ -91,6 +96,8 @@ public partial class BetterContinents : BaseUnityPlugin
 
     public static ConfigEntry<float> ConfigHeatScale;
     public static ConfigEntry<string> ConfigHeatFile;
+    public static ConfigEntry<float> ConfigColdScale;
+    public static ConfigEntry<string> ConfigColdFile;
 
     // Alt biomes (new-world defaults; baked into the world's settings when it is created, see
     // AltBiomeSettings.FromConfig and ALTBIOMES.md)

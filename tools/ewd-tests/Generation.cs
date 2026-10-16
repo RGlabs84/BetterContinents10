@@ -117,6 +117,12 @@ internal static class Generation
   public static void LoadBetterContinents() =>
     LoadRewritten(typeof(Generation).Assembly.GetCustomAttributes<AssemblyMetadataAttribute>().First(a => a.Key == "BcDll").Value!, [AppContext.BaseDirectory], (module, method, il) =>
     {
+      if (il.Operand is MethodReference perlin && perlin.Name == "PerlinNoise" && perlin.DeclaringType.FullName == "UnityEngine.Mathf")
+      {
+        il.Operand = module.ImportReference(typeof(PerlinStub).GetMethod(nameof(PerlinStub.Noise))!);
+        rewrittenNoise++;
+        return;
+      }
       if (il.Operand is not MethodReference call || call.Name != "Patch" || call.DeclaringType.FullName != "HarmonyLib.Harmony" || call.Parameters.Count != 6)
         return;
       if (il.Previous.OpCode != OpCodes.Ldnull)

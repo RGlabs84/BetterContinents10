@@ -1,4 +1,4 @@
-﻿// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and alt-biome planting (0.8.1), and on 2026-09-24 for world export and import (0.9.0), and on 2026-09-25 for version-agnostic wording (0.9.1), and on 2026-09-29 for Expand World Data biomes (0.9.3), and on 2026-10-04 for the vegetation twin guard and the unifying refactor (0.10.0), and on 2026-10-06 for 16k worlds (0.10.3), and on 2026-10-07 for baked placements (0.10.4).
+// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and alt-biome planting (0.8.1), and on 2026-09-24 for world export and import (0.9.0), and on 2026-09-25 for version-agnostic wording (0.9.1), and on 2026-09-29 for Expand World Data biomes (0.9.3), and on 2026-10-04 for the vegetation twin guard and the unifying refactor (0.10.0), and on 2026-10-06 for 16k worlds (0.10.3), and on 2026-10-07 for baked placements (0.10.4).
 
 using System;
 using System.Collections;
@@ -322,15 +322,20 @@ public partial class BetterContinents
     // Valheim 1.0 made Deep North a real biome with its own terrain, weather and snow behaviour, but vanilla still
     // decides where it IS from a hardcoded geographic test (WorldGenerator.IsDeepnorth). That test feeds EnvMan's
     // weather selection, TerrainComp's snow-vs-cultivate painting, stream placement and vanilla's own GetBiome
-    // fallback - none of which consult the biome map. Without this, a biome map that moves Deep North produces Deep
-    // North terrain that still has the wrong weather and paints the wrong ground when cultivated. This mirrors the
-    // IsAshlands fallback; there is no heat-map condition because heat is Ashlands-only.
+    // fallback - none of which consult the biome map.
+    // Driven by a cold map (coldmap.png, mirroring the Ashlands heat map) or falling back to the biome map.
     new("WorldGenerator.IsDeepnorth",
-      s => s.ShapesWorld && s.HasBiomeMap,
+      s => s.ShapesWorld && s.HasColdMap && s.ColdMapScale > 0f,
       OnWorldGenerator(nameof(WorldGenerator.IsDeepnorth), null, nameof(WorldGeneratorPatch.IsDeepnorthPrefix), HookKind.Prefix, Priority.VeryHigh)),
-    // Not WorldGenerator.DeepNorthWaveFade (patched from 0.8.0 to 0.10.2): it floats boats and fish on the waves, and the water
-    // shader draws them calm by the game's own circle whatever the biome map says, so the boats must follow that circle too
-    // (AshlandsWater).
+    new("WorldGenerator.IsDeepnorth (no cold map)",
+      s => s.ShapesWorld && s.HasBiomeMap && (!s.HasColdMap || s.ColdMapScale == 0f),
+      OnWorldGenerator(nameof(WorldGenerator.IsDeepnorth), null, nameof(WorldGeneratorPatch.IsDeepnorthFallbackPrefix), HookKind.Prefix, Priority.VeryHigh)),
+    // The calm sea of the Deep North: floats boats and fish on calm waves when DeepNorthWater is enabled, following
+    // the cold map or biome map rather than vanilla's hardcoded north circle.
+    new("WorldGenerator.DeepNorthWaveFade",
+      s => s.ShapesWorld && s.DeepNorthWater && (s.HasColdMap || s.HasBiomeMap),
+      OnWorldGenerator(nameof(WorldGenerator.DeepNorthWaveFade), [typeof(float), typeof(float)],
+        nameof(WorldGeneratorPatch.DeepNorthWaveFadePrefix), HookKind.Prefix)),
     // Mossmap is not needed as it doesn't apply to Ashlands.
     new("WorldGenerator.GetAshlandsHeight",
       s => s.ShapesWorld && (s.HasPaintMap || s.HasLavaMap),
@@ -348,6 +353,13 @@ public partial class BetterContinents
       new Hook(() => AccessTools.Method(typeof(ZoneSystem), nameof(ZoneSystem.InsideClearArea)), "ZoneSystem.InsideClearArea",
         typeof(ZoneSystemPatch), nameof(ZoneSystemPatch.InsideClearAreaPostfix), HookKind.Postfix))
     { FailureMessage = "Could not patch ZoneSystem.PlaceVegetation, so the vegetation map and the twin guard are off: " },
+    new("ZoneSystem.GenerateLocationsTimeSliced (location exclusion map)",
+      s => s.ShapesWorld && s.HasLocationExclusionMap,
+      new Hook(() => AccessTools.EnumeratorMoveNext(AccessTools.Method(typeof(ZoneSystem), nameof(ZoneSystem.GenerateLocationsTimeSliced),
+          [typeof(ZoneSystem.ZoneLocation), typeof(System.Diagnostics.Stopwatch), typeof(ZPackage)])),
+        "ZoneSystem.GenerateLocationsTimeSliced",
+        typeof(ZoneSystemPatch), nameof(ZoneSystemPatch.FilterLocationExclusionTranspiler), HookKind.Transpiler))
+    { FailureMessage = "Could not patch ZoneSystem.GenerateLocationsTimeSliced for location exclusion map: " },
     new("SpawnSystem.UpdateSpawnList",
       s => s.ShapesWorld && s.HasSpawnMap,
       new Hook(() => AccessTools.Method(typeof(SpawnSystem), nameof(SpawnSystem.UpdateSpawnList)), "SpawnSystem.UpdateSpawnList",

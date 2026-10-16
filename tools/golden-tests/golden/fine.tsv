@@ -42,12 +42,12 @@
 8-bit/dump/count	37
 8-bit/fine-bits	8
 8-bit/compact	True
-8-bit/v12/disk	len=85069 sha=48e17de02d285d04b23a90c4
-8-bit/v12/network	len=85042 sha=cdde0260452b2df6b16ce835
-8-bit/cache-id	f9f47759913fd0efe6b3aa35afeeabaf
+8-bit/v12/disk	len=85085 sha=4682a5dccb592daf007e8967
+8-bit/v12/network	len=85058 sha=c513cb18e46e537a0b6bfe76
+8-bit/cache-id	2cf125eb7fb7784248003b3f5c8fb6a8
 8-bit/v12/disk-roundtrip	same
 8-bit/v12/dump-after-load	n=35 sha=54d0b4a49c28f064bd4868be
-8-bit/v11/disk	len=14975 sha=1113853e58631a6fdbcb989a
+8-bit/v11/disk	len=14991 sha=edf112124d2d70e9fe56a91a
 8-bit/v11/log/001	[Warning] [BetterContinents] Fine heights: the world is saved in settings version 11 (Override version), which has no room for them, so its heightmap is saved without them. The world reads them until it is loaded again.
 8-bit/v11/log/count	1
 8-bit/heightmap	n=4010 min=0.25000125 max=2.3589957 sha=41f20a085d87098658b34a46
@@ -123,12 +123,12 @@
 4-bit/dump/count	37
 4-bit/fine-bits	4
 4-bit/compact	True
-4-bit/v12/disk	len=34788 sha=b2f6fed7c440a5bbc35c5c7b
-4-bit/v12/network	len=34761 sha=df94506594259a8459685e98
-4-bit/cache-id	b2bdf749aadb6ad24f58d97e42efb7c3
+4-bit/v12/disk	len=34804 sha=2d7135189cf0be1c553075d7
+4-bit/v12/network	len=34777 sha=272ea585c664b9cb34b7562a
+4-bit/cache-id	88772c6d1de649692376ffde89453d37
 4-bit/v12/disk-roundtrip	same
 4-bit/v12/dump-after-load	n=35 sha=e668bdf368aa45fbbd62fe37
-4-bit/v11/disk	len=14975 sha=26eda3ac922f415ad401f4ce
+4-bit/v11/disk	len=14991 sha=66db300f14d3250a16ef23aa
 4-bit/v11/log/001	[Warning] [BetterContinents] Fine heights: the world is saved in settings version 11 (Override version), which has no room for them, so its heightmap is saved without them. The world reads them until it is loaded again.
 4-bit/v11/log/count	1
 4-bit/heightmap	n=4010 min=0.24966812 max=2.3590856 sha=d2c38072bb1e41204b0e29a7
@@ -205,12 +205,12 @@ blend/dump/038	Alt biomes: neighbour fix off, mean sector height off, min sector
 blend/dump/count	38
 blend/fine-bits	8
 blend/compact	True
-blend/v12/disk	len=89043 sha=a41d08a8caec1d33f45f3c61
-blend/v12/network	len=89010 sha=641d5fb4fbbbb7ff6a9f22fd
-blend/cache-id	79e4d911632df579359d947de8e350ce
+blend/v12/disk	len=89059 sha=f798dd2275317b372e038167
+blend/v12/network	len=89026 sha=96ab29527f57da867582a3a5
+blend/cache-id	e895cedd5549cf834acad3a82bd40c31
 blend/v12/disk-roundtrip	same
 blend/v12/dump-after-load	n=36 sha=6725c75f275c8bd93d96d792
-blend/v11/disk	len=33000 sha=6995f5b09ede33c59be754cd
+blend/v11/disk	len=33016 sha=e7fd6fa29035f48bfa3ae177
 blend/v11/log/001	[Warning] [BetterContinents] Fine heights: the world is saved in settings version 11 (Override version), which has no room for them, so its heightmap is saved without them. The world reads them until it is loaded again.
 blend/v11/log/count	1
 blend/heightmap	n=4010 min=0.25000125 max=2.3589957 sha=41f20a085d87098658b34a46
@@ -282,12 +282,12 @@ no-file/dump/035	Alt biomes: neighbour fix off, mean sector height off, min sect
 no-file/dump/count	35
 no-file/fine-bits	0
 no-file/compact	False
-no-file/v12/disk	len=21012 sha=81c79ece6c00aad32ae7baf9
-no-file/v12/network	len=20981 sha=ed4e7610bb4c5f13fc246301
-no-file/cache-id	0e557b51cb823d0fb2e7a7304659d385
+no-file/v12/disk	len=21028 sha=166355702e6ec983bf146083
+no-file/v12/network	len=20997 sha=3bdfd67ba0f268dd0919684e
+no-file/cache-id	e4f15b7f35c4bea537aba83caebde14a
 no-file/v12/disk-roundtrip	same
 no-file/v12/dump-after-load	n=33 sha=16528a74fe38675213fb6a3b
-no-file/v11/disk	len=21012 sha=6d2bdeee62ef859259f45285
+no-file/v11/disk	len=21028 sha=2ae0c6c2034c8babf302e177
 no-file/v11/log/count	0
 no-file/heightmap	n=4010 min=0.24966812 max=2.3590856 sha=ad939d5a8444ed0bf2622057
 no-file/roughmap	n=4010 min=0.5 max=0.6 sha=e83d4a6b0db80ddf69cc1644
@@ -360,12 +360,12 @@ compact-off/dump/036	Alt biomes: neighbour fix off, mean sector height off, min 
 compact-off/dump/count	36
 compact-off/fine-bits	0
 compact-off/compact	False
-compact-off/v12/disk	len=21008 sha=bc6e3933bbacd8de771e56ee
-compact-off/v12/network	len=20981 sha=ed4e7610bb4c5f13fc246301
-compact-off/cache-id	0e557b51cb823d0fb2e7a7304659d385
+compact-off/v12/disk	len=21024 sha=78cc5653079857e16cffd8cd
+compact-off/v12/network	len=20997 sha=3bdfd67ba0f268dd0919684e
+compact-off/cache-id	e4f15b7f35c4bea537aba83caebde14a
 compact-off/v12/disk-roundtrip	same
 compact-off/v12/dump-after-load	n=33 sha=4e7330bcdb0e2691c279bb40
-compact-off/v11/disk	len=21008 sha=4e4b2c13769a8b485e90f600
+compact-off/v11/disk	len=21024 sha=41a2ab71555d5b8d8c932694
 compact-off/v11/log/count	0
 compact-off/heightmap	n=4010 min=0.24966812 max=2.3590856 sha=ad939d5a8444ed0bf2622057
 compact-off/roughmap	n=4010 min=0.5 max=0.6 sha=e83d4a6b0db80ddf69cc1644
@@ -437,12 +437,12 @@ compact-on/dump/036	Alt biomes: neighbour fix off, mean sector height off, min s
 compact-on/dump/count	36
 compact-on/fine-bits	0
 compact-on/compact	True
-compact-on/v12/disk	len=12226 sha=d868aa7ecd976a3ec0c96a88
-compact-on/v12/network	len=12195 sha=a701e0c3c42a58404cdca773
-compact-on/cache-id	bea8b051144a80552836a440a77905f0
+compact-on/v12/disk	len=12242 sha=3329833544bc495004a81366
+compact-on/v12/network	len=12211 sha=46ca9ca3f293f5251881317e
+compact-on/cache-id	90bc9cdf126cd2ae152817e1ec111456
 compact-on/v12/disk-roundtrip	same
 compact-on/v12/dump-after-load	n=34 sha=18bf769f11e675d73397278e
-compact-on/v11/disk	len=14979 sha=65bf94e5ffbb07c82af16d5c
+compact-on/v11/disk	len=14995 sha=3fc264c0368bcc222d7810e3
 compact-on/v11/log/count	0
 compact-on/heightmap	n=4010 min=0.24966812 max=2.3590856 sha=ad939d5a8444ed0bf2622057
 compact-on/roughmap	n=4010 min=0.5 max=0.6 sha=e83d4a6b0db80ddf69cc1644
@@ -515,12 +515,12 @@ version-11/dump/036	Alt biomes: neighbour fix off, mean sector height off, min s
 version-11/dump/count	36
 version-11/fine-bits	0
 version-11/compact	False
-version-11/v12/disk	len=21008 sha=bc6e3933bbacd8de771e56ee
-version-11/v12/network	len=20981 sha=ed4e7610bb4c5f13fc246301
-version-11/cache-id	0e557b51cb823d0fb2e7a7304659d385
+version-11/v12/disk	len=21024 sha=78cc5653079857e16cffd8cd
+version-11/v12/network	len=20997 sha=3bdfd67ba0f268dd0919684e
+version-11/cache-id	e4f15b7f35c4bea537aba83caebde14a
 version-11/v12/disk-roundtrip	same
 version-11/v12/dump-after-load	n=33 sha=4e7330bcdb0e2691c279bb40
-version-11/v11/disk	len=21008 sha=4e4b2c13769a8b485e90f600
+version-11/v11/disk	len=21024 sha=41a2ab71555d5b8d8c932694
 version-11/v11/log/count	0
 version-11/heightmap	n=4010 min=0.24966812 max=2.3590856 sha=ad939d5a8444ed0bf2622057
 version-11/roughmap	n=4010 min=0.5 max=0.6 sha=e83d4a6b0db80ddf69cc1644

@@ -99,10 +99,16 @@ public partial class BetterContinents
     // players an empty one ("this world has a layer, sent apart": the layer goes to a player in a transfer of its own, so a change of the layer
     // leaves the package, its id and every cached copy alone). Written only by a world that has a layer, after every other key.
     Placements = 70,
-    // 0.10.4 (71): a flag: the world's terrain is the game's own (settings.GameTerrain; a world made without Better Continents' maps that
-    // carries a layer). Written before Placements. 72 and up are for the water work (U6): whichever branch merges second takes the next free
-    // number, written explicitly as these are.
     GameTerrain = 71,
+    MountainNoise = 72,
+    LocationExclusionMap = 73,
+    LocationExclusionMapPath = 74,
+    MistlandsNoise = 75,
+    ColdMap = 76,
+    ColdMapPath = 77,
+    ColdMapScale = 78,
+    DeepNorthWater = 79,
+    AshlandsWater = 80,
   }
   public partial class BetterContinentsSettings
   {
@@ -528,6 +534,16 @@ public partial class BetterContinents
         pkg.Write((int)DataKey.HeightMapMask);
         pkg.Write(HeightmapMask);
       }
+      if (MountainNoise != 0f)
+      {
+        pkg.Write((int)DataKey.MountainNoise);
+        pkg.Write(MountainNoise);
+      }
+      if (MistlandsNoise != 0f)
+      {
+        pkg.Write((int)DataKey.MistlandsNoise);
+        pkg.Write(MistlandsNoise);
+      }
       // Only a keyed version (11 and up) holds it: an older one has fixed fields, and a world saved in it is Auto when it is read.
       if (HighTerrainMode != HighTerrainMode.Auto)
       {
@@ -633,6 +649,44 @@ public partial class BetterContinents
         }
       }
 
+      if (LocationExclusionMap != null)
+      {
+        if (tiled && LocationExclusionMap.Compact)
+          WriteTiled(pkg, DataKey.LocationExclusionMap, LocationExclusionMap.WriteBlock, "the location exclusion map");
+        else
+        {
+          pkg.Write((int)DataKey.LocationExclusionMap);
+          WriteBytes(pkg, LocationExclusionMap.SourceBytes(), "the location exclusion map");
+        }
+        if (!network)
+        {
+          pkg.Write((int)DataKey.LocationExclusionMapPath);
+          pkg.Write(LocationExclusionMap.FilePath);
+        }
+      }
+
+      if (ColdMap != null)
+      {
+        if (tiled && ColdMap.Compact)
+          WriteTiled(pkg, DataKey.ColdMap, ColdMap.WriteBlock, "the cold map");
+        else
+        {
+          pkg.Write((int)DataKey.ColdMap);
+          WriteBytes(pkg, ColdMap.SourceBytes(), "the cold map");
+        }
+        if (!network)
+        {
+          pkg.Write((int)DataKey.ColdMapPath);
+          pkg.Write(ColdMap.FilePath);
+        }
+
+        if (ColdMapScale != 10f)
+        {
+          pkg.Write((int)DataKey.ColdMapScale);
+          pkg.Write(ColdMapScale);
+        }
+      }
+
       if (AshlandsGapEnabled)
         pkg.Write((int)DataKey.AshlandGapEnabled);
       if (DeepNorthGapEnabled)
@@ -649,6 +703,10 @@ public partial class BetterContinents
       }
       if (!FixWaterColor)
         pkg.Write((int)DataKey.FixWaterColor);
+      if (!AshlandsWater)
+        pkg.Write((int)DataKey.AshlandsWater);
+      if (!DeepNorthWater)
+        pkg.Write((int)DataKey.DeepNorthWater);
       if (WideSectors)
         pkg.Write((int)DataKey.WideSectors);
 
@@ -789,6 +847,8 @@ public partial class BetterContinents
         case DataKey.LavaMap: LavaMap = ImageMapFloat.FromBlock(block); return true;
         case DataKey.MossMap: MossMap = ImageMapFloat.FromBlock(block); return true;
         case DataKey.HeatMap: HeatMap = ImageMapFloat.FromBlock(block); return true;
+        case DataKey.LocationExclusionMap: LocationExclusionMap = ImageMapFloat.FromBlock(block); return true;
+        case DataKey.ColdMap: ColdMap = ImageMapFloat.FromBlock(block); return true;
         default: return false;
       }
     }
@@ -945,6 +1005,12 @@ public partial class BetterContinents
           case DataKey.HeightMapMask:
             HeightmapMask = pkg.ReadSingle();
             break;
+          case DataKey.MountainNoise:
+            MountainNoise = pkg.ReadSingle();
+            break;
+          case DataKey.MistlandsNoise:
+            MistlandsNoise = pkg.ReadSingle();
+            break;
           case DataKey.HighTerrain:
             var mode = pkg.ReadInt();
             HighTerrainMode = HighTerrainModes.Of(mode);
@@ -1048,6 +1114,31 @@ public partial class BetterContinents
             path = pkg.ReadString();
             if (SpawnMap != null)
               SpawnMap.FilePath = path;
+            break;
+          case DataKey.LocationExclusionMap:
+            LocationExclusionMap = ImageMapFloat.Create(pkg.ReadByteArray(), false);
+            break;
+          case DataKey.LocationExclusionMapPath:
+            path = pkg.ReadString();
+            if (LocationExclusionMap != null)
+              LocationExclusionMap.FilePath = path;
+            break;
+          case DataKey.ColdMap:
+            ColdMap = ImageMapFloat.Create(pkg.ReadByteArray(), false);
+            break;
+          case DataKey.ColdMapPath:
+            path = pkg.ReadString();
+            if (ColdMap != null)
+              ColdMap.FilePath = path;
+            break;
+          case DataKey.ColdMapScale:
+            ColdMapScale = pkg.ReadSingle();
+            break;
+          case DataKey.DeepNorthWater:
+            DeepNorthWater = false;
+            break;
+          case DataKey.AshlandsWater:
+            AshlandsWater = false;
             break;
           case DataKey.AltBiomes:
             var altBiomeBlob = pkg.ReadByteArray();
@@ -1270,6 +1361,13 @@ public partial class BetterContinents
       HeightmapOverrideAll = false;
       HeightmapMask = 0;
       BiomePrecision = 0;
+      MountainNoise = 0f;
+      MistlandsNoise = 0f;
+      LocationExclusionMap = null;
+      ColdMap = null;
+      ColdMapScale = 10f;
+      DeepNorthWater = true;
+      AshlandsWater = true;
 
       if (Version >= 2)
       {

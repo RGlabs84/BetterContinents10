@@ -365,13 +365,13 @@ internal static class ProxyMerge
   internal const int MaxChunkVertices = 65_535;
 
   /// <summary>
-  /// How the proxy's vertices are packed: compact, or (BC_SHADOW_PROXY_FORMAT=plain in the environment when the game starts) as three floats each, which tells
-  /// whether a shadow problem is the compact format. Both layouts are drawn the same way; there is no setting.
+  /// How the proxy's vertices are packed: plain (32-bit float positions and normals, 24 bytes) for maximum geometric sharpness,
+  /// or compact (UNorm16/SNorm8, 12 bytes) if BC_SHADOW_PROXY_FORMAT=compact is set in the environment.
   /// </summary>
   internal static VertexLayout Layout => PlainFormat ? VertexLayout.Plain : VertexLayout.Compact;
 
-  /// <summary>Whether the plain layout was asked for through the environment.</summary>
-  internal static readonly bool PlainFormat = string.Equals(Environment.GetEnvironmentVariable("BC_SHADOW_PROXY_FORMAT"), "plain", StringComparison.OrdinalIgnoreCase);
+  /// <summary>Whether the plain layout is used: true by default for maximum detail in 0.10.7+.</summary>
+  internal static bool PlainFormat = !string.Equals(Environment.GetEnvironmentVariable("BC_SHADOW_PROXY_FORMAT"), "compact", StringComparison.OrdinalIgnoreCase);
 
   private delegate void PartVisitor(int kindIndex, ProxyShape shape, in Matrix4x4 m);
 
