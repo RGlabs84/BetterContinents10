@@ -32,6 +32,9 @@ internal static class BakedPaint
   private static readonly List<Heightmap> Near = [];
   private static readonly List<(ZoneKey Zone, byte[]? Cells, uint Revision)> Finished = [];
   private static int reading;
+  // zones in reach still to read: MostReads were out when their turn came. They are asked on the next frames, not only when the player enters
+  // another zone (until 2026-10-12 they waited for that: after a teleport onto a dirt road, only four zones round the player were painted)
+  private static bool pending;
   private static uint layerRevision;
   private static BakedLayer? layerInHand;
   private static ZoneKey lastRef = new(int.MinValue, int.MinValue);
@@ -48,6 +51,7 @@ internal static class BakedPaint
       Finished.Clear();
     layerInHand = null;
     lastRef = new ZoneKey(int.MinValue, int.MinValue);
+    pending = false;
   }
 
   /// <summary>
@@ -71,17 +75,23 @@ internal static class BakedPaint
       lastRef = new ZoneKey(int.MinValue, int.MinValue);
     }
     Take();
-    if (reference != lastRef)
+    if (reference != lastRef || pending)
     {
       lastRef = reference;
-      for (int dz = -Reach; dz <= Reach; dz++)
-        for (int dx = -Reach; dx <= Reach; dx++)
-        {
-          var key = new ZoneKey(reference.X + dx, reference.Z + dz);
-          if (Asked.Contains(key) || !layer.TryGetZoneRow(key, out var row) || !row.HasPaint)
-            continue;
-          Ask(layer, row);
-        }
+      pending = false;
+      // nearest first: the zone the player stands in, then each ring round it
+      for (int ring = 0; ring <= Reach; ring++)
+        for (int dz = -ring; dz <= ring; dz++)
+          for (int dx = -ring; dx <= ring; dx++)
+          {
+            if (Math.Max(Math.Abs(dx), Math.Abs(dz)) != ring)
+              continue;
+            var key = new ZoneKey(reference.X + dx, reference.Z + dz);
+            if (Asked.Contains(key) || !layer.TryGetZoneRow(key, out var row) || !row.HasPaint)
+              continue;
+            if (!Ask(layer, row))
+              pending = true;
+          }
       Forget(reference);
     }
   }
@@ -134,10 +144,11 @@ internal static class BakedPaint
       }
   }
 
-  private static void Ask(BakedLayer layer, ZoneRow row)
+  // false when MostReads are out already: the zone is not marked, and Tick asks again on a later frame
+  private static bool Ask(BakedLayer layer, ZoneRow row)
   {
     if (Volatile.Read(ref reading) >= MostReads)
-      return;
+      return false;
     Asked.Add(row.Key);
     Interlocked.Increment(ref reading);
     uint revision = layer.Revision;
@@ -156,6 +167,7 @@ internal static class BakedPaint
         Finished.Add((row.Key, cells, revision));
       Interlocked.Decrement(ref reading);
     });
+    return true;
   }
 
   private static void Take()

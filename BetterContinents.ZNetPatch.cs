@@ -1,4 +1,4 @@
-﻿// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and alt-biome planting (0.8.1), and on 2026-09-24 for world export and import (0.9.0), and on 2026-10-06 for 16k worlds (0.10.3), and on 2026-10-07 for baked placements (0.10.4).
+﻿// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and alt-biome planting (0.8.1), and on 2026-09-24 for world export and import (0.9.0), and on 2026-10-06 for 16k worlds (0.10.3), and on 2026-10-07 for baked placements (0.10.4), and on 2026-10-13 for lakes and clearing (0.10.5).
 
 using System;
 using System.Collections;
@@ -68,6 +68,15 @@ public partial class BetterContinents
             {
                 var settings = ResolveWorldSettingsPath(world);
                 Settings = BetterContinentsSettings.LoadFromSource(settings.path, settings.source);
+                // A live world of Raven Iron's Tarn keeps its lakes and its mask when this takes Tarn's place: its files are read once (LakeFiles).
+                try
+                {
+                    LakeFiles.ImportTarnOnce(Settings, world.m_name);
+                }
+                catch (Exception e)
+                {
+                    LogError($"Importing Tarn's files failed: {e.Message}");
+                }
                 Settings.Dump();
             }
             else
@@ -439,6 +448,8 @@ public partial class BetterContinents
                 BakedTransfer.RegisterClient(peer.m_rpc, new BakedTransfer.ZRpcLink(peer.m_rpc), reason => FailForLayer(peer, reason));
                 peer.m_rpc.Register(BakedTransfer.RpcSettingsUpdate, (ZRpc rpc, ZPackage settings) =>
                     __instance.StartCoroutine(ReceivedSettingsUpdate(settings)));
+                // 0.10.5: the world's lakes, pushed when a command on the machine that runs the world changes them (LakeTransfer).
+                LakeTransfer.RegisterClient(peer.m_rpc);
             }
         }
 
@@ -844,6 +855,8 @@ public partial class BetterContinents
 
                 var settingsPackage = new ZPackage();
                 Settings.Serialize(settingsPackage, true);
+                // The lakes this package holds: a change made while the client joins is sent to it when the join is over (LakeTransfer.CatchUp).
+                LakeTransfer.NoteSerialized(bcClientInfo.layer);
                 // The package's own buffer (0.10.3: no copy of it), hashed once (it was twice, each time over a copy).
                 var settingsData = PackageBytes.Buffer(settingsPackage, out int settingsLength);
                 string cacheId = WorldCache.PackageID(settingsData, settingsLength);
@@ -913,7 +926,10 @@ public partial class BetterContinents
 
             // The join is over: pushes of the baked layer reach this client from now.
             if (bcClientInfo != null)
+            {
                 BakedTransfer.JoinFinished(bcClientInfo.layer);
+                LakeTransfer.CatchUp(bcClientInfo.layer);
+            }
             call_RPC_PeerInfo();
         }
 

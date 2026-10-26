@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Added by Wubarrk on 2026-10-04 for the unifying refactor and the vegetation twin guard (0.10.0), and modified on 2026-10-06 for the Forest Scale default (0.10.2) and for 16k worlds (0.10.3), and on 2026-10-07 for baked placements (0.10.4).
+# Added by Wubarrk on 2026-10-04 for the unifying refactor and the vegetation twin guard (0.10.0), and modified on 2026-10-06 for the Forest Scale default (0.10.2) and for 16k worlds (0.10.3), and on 2026-10-07 for baked placements (0.10.4), and on 2026-10-13 for BC's own water (0.10.5), and for the forced genloc (0.10.5), and for lakes and clearing (0.10.5).
 #
 # Builds the plugin (Release) and runs every offline suite against it, one after another, memory-capped and niced:
 #   golden-tests      the reference recordings (tools/golden-tests/golden): any difference fails
@@ -31,6 +31,17 @@
 #                     world's settings (DataKeys 70 and 71, a 0.10.3 reader's stop), edits, merges and patches, and the tests each slice adds
 #                     (Tests.<Slice>.cs: every static method named *Test of the partial class Tests runs). "dotnet run -c Release -- <part of a
 #                     test's name>" runs some
+#   water-tests       BC's own sea: the waves against the game's CalcWave and the shader's weights, the sea field (exact distances against brute force,
+#                     the same bytes whatever the threads, the sampler, the world's own rules with the layout patched for real, the red mask,
+#                     whether the world's sea is the game's, the cost of a field for VALtima's size), and the two felt toggles on the game's
+#                     methods (the candidate worlds, what the prefixes answer, the field's life, other mods' patches on the waves)
+#                     and 'bc genloc' (the words, the refusals, a live or dead run, the counts and lines, the game's code it relies on)
+#   lake-tests        lakes and the clearing mask (ported from Tarn): Tarn's lake lines and .clear file read and written, blobs 72 and 73, the mask's Covers against a
+#                     transcription of Tarn's areas and the game's loop, the settings' keys 72 and 73 and what the released Better Continents does with them, the Directory's
+#                     files and Tarn's own folder, the postfix on the game's InsideClearArea, the push, the bc_lake words; and the lake engine's flood, spill and tiles
+#                     (Tests.<Part>.cs: every static method named *Test of the partial class Tests runs). The old-reader test needs the released package: BC_RELEASES names
+#                     the folder with BetterContinents-v0.10.4-hexium.zip (HexiumDist, and the main checkout's, are looked in too); when it is found this script sets
+#                     BC_REQUIRE_RELEASES=1, so that a test that then cannot find a zip fails (BC_REQUIRE_RELEASES=0 turns that off)
 # Usage: tools/run-tests.sh [suite ...]   (default: all). Exit code 1 when the build or any suite fails.
 set -u
 cd "$(dirname "$0")/.."
@@ -38,9 +49,20 @@ export PATH="$HOME/.dotnet:$PATH"
 export DOTNET_ROOT="${DOTNET_ROOT:-$HOME/.dotnet}"
 # ulimit -v breaks CoreCLR's heap reservation; a hard GC heap limit caps it instead.
 export DOTNET_GCHeapHardLimit="${DOTNET_GCHeapHardLimit:-0xC0000000}"
+# The old-reader tests need the released packages (BetterContinents-v<version>-hexium.zip): with the zips on this machine a test that cannot find one is a failure, not
+# a SKIPPED that passes. They are looked for in BC_RELEASES, this repository's HexiumDist, and (for a worktree under .work/) the main checkout's.
+if [ "${BC_REQUIRE_RELEASES:-}" != "0" ]; then
+  for d in "${BC_RELEASES:-}" HexiumDist ../../HexiumDist; do
+    if [ -n "$d" ] && [ -f "$d/BetterContinents-v0.10.4-hexium.zip" ]; then
+      export BC_RELEASES="$(cd "$d" && pwd)"
+      export BC_REQUIRE_RELEASES=1
+      break
+    fi
+  done
+fi
 logs="$(mktemp -d "${TMPDIR:-/tmp}/bc-tests-XXXXXX")"
 suites=("$@")
-[ ${#suites[@]} -eq 0 ] && suites=(golden-tests altbiome-harness export-tests import-tests livecfg-tests ewd-tests twin-tests size-tests sector-tests tile-tests zone-tests high-tests placement-tests)
+[ ${#suites[@]} -eq 0 ] && suites=(golden-tests altbiome-harness export-tests import-tests livecfg-tests ewd-tests twin-tests size-tests sector-tests tile-tests zone-tests high-tests placement-tests water-tests lake-tests)
 
 echo "== building the plugin"
 if ! nice -n 10 dotnet build -c Release BetterContinents.csproj > "$logs/build.log" 2>&1; then

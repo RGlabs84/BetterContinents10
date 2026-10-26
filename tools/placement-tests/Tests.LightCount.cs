@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-10-08 for baked placements (0.10.4).
+// Added by Wubarrk on 2026-10-08 for baked placements (0.10.4), and modified on 2026-10-13 for BC's own water (0.10.5).
 //
 // Light Count (BakedLightCount): only the nearest N baked lights burn, every other Copy record is drawn unlit. Offline: the ranking (pure) with its
 // hysteresis, when it is made, the cull-and-LOD job's skip of the records whose lit copy stands, and the whole flow of a zone's props with the game's
@@ -100,7 +100,7 @@ internal static partial class Tests
     C(BakedLightCount.Default == 24 && BakedLightCount.Highest == 128, "the class says the same");
     C(s.Description.Contains("Light Distance") && s.Description.Contains("drawn unlit") && s.Description.Contains("0 = none burns") && s.Description.Contains("Applies at once"), "its description says what it counts, what the rest are and what 0 does");
     C(SettingsSchema.BakedLightDistance.Description.Contains("Light Count") && SettingsSchema.BakedLightDistance.Description.Contains("drawn unlit"), "Light Distance's description no longer says the rest are not shown");
-    var keys = SettingsSchema.Groups[^1].Settings.Select(x => x.Key).ToList();
+    var keys = SettingsSchema.Groups.Single(g => g.Name == "BetterContinents.BakedPlacements").Settings.Select(x => x.Key).ToList();
     C(keys.IndexOf("Light Count") > keys.IndexOf("Light Distance") && keys.IndexOf("Light Count") == keys.IndexOf("Light Shadows") - 1, "it stands between Light Distance and Light Shadows");
   }
 

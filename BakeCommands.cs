@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-10-07 for baked placements (0.10.4).
+// Added by Wubarrk on 2026-10-07 for baked placements (0.10.4), and on 2026-10-13 for the 0.10.5 bake fixes.
 
 using System;
 using System.Collections;
@@ -365,7 +365,7 @@ internal static class BakeCommands
       output($"bc_bake load: {path} cannot be read ({e.Message}).");
       return;
     }
-    Start(BakeRunner.Load(ctx, Path.GetFileName(path), bytes, command.Words), "a load", output);
+    Start(BakeRunner.Load(ctx, Path.GetFileName(path), bytes, command.Words, command.Text), "a load", output);
   }
 
   private static void Check(BakeContext ctx, BakeCommand command, Action<string> output)

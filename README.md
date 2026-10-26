@@ -268,6 +268,12 @@ On a version 12 world, `World Size` and `Edge Size` (in `[01 BetterContinents.Gl
 * ℹ️ `bc info` says when a world's maps follow World Size.
 
 <a id="multi-layer-fastnoiselite-procedural-engine"></a>
+### 🌊 Waves at Any Size (new in 0.10.5)
+The game's water shader knows two circles of a 10 km world, written into its code: a calm Deep North sea and a red Ashlands sea. Better Continents' own water reads the world's own rules instead, so a big world's sea has waves and crests to its edge, is calm only in its own Deep North, and is red only where its own hot sea is. It keeps the game's look (colours, glare, foam), works in place on existing worlds, and the waves boats and swimmers feel are the waves that are drawn. It is on only in a world that Better Continents shapes and whose sea is not the game's; a vanilla world, and a world made without maps at the game's own size, keep the game's water exactly. `Own Water` and `Soft Far Sea` are in `[11 BetterContinents.Water]`; `bc_water` explains what is drawn.
+
+### 🏞️ Lakes and Clearing (new in 0.10.5, experimental)
+Valheim has one water level, so every lake above the sea is a dry hollow. A world can now carry a list of lakes, each with its own height, and Better Continents fills each with the game's own water as you come near: you can swim in it, sail on it, and see it on the minimap and the large map. A `clearmask.bin` keeps trees, rocks and bushes off marked ground such as roads and lake beds. Both come from **Tarn**, by Raven Iron (Wubarrk and NomadicWar), and both are **experimental for now**: they work in the tests and on test worlds, but details may still change, so try them on a copy of a world first. Settings are in `[12 BetterContinents.Lakes]`; `bc_lake` makes and manages lakes; the guide *Water and lakes* has the whole story.
+
 ### ⚡ Multi-Layer FastNoiseLite Procedural Engine
 Under the hood, Better Continents integrates a high-performance [FastNoiseLite](https://github.com/Auburn/FastNoiseLite) layer system:
 * 🧩 Stack unlimited noise layers (Perlin, Simplex, Cellular/Voronoi, Value).
@@ -381,7 +387,7 @@ Valheim 1.0 saves each world as a folder, `worlds_local/<WorldName>/`. Better Co
 <a id="configuration--console-commands"></a>
 ## ⚙️ Configuration & Console Commands
 
-Better Continents has seven console commands (open the console with F5). `bc` is for building worlds: it is a cheat command, so it needs `devcommands`, and it is registered for the host only. The Server Devcommands mod lets any player with `devcommands` type it on their own machine, but on a joined player's machine a `bc` change alters only that player's copy of the settings and their own view of the ground, never the world or the other players, and the zone regeneration refuses there ("it runs on the machine that runs the world"). Make `bc` changes on the host or in single player. `bc info` on a joined player's machine shows the settings the server sent. `bc_altbiomes`, `bc_export`, `bc_import`, `bc_cache` and `bc_twins` work for every player, and so do `bc_bake`'s read-only words, and `bc_import` and `bc_cache` work in the main menu too. `bc <group> help` lists a group, for example `bc h help`. When an admin sends a command to a dedicated server (`bc_export server ...`, `bc_twins server ...`), its answer comes back to the admin's own console as well as the server's log.
+Better Continents has these console commands (open the console with F5). `bc` is for building worlds: it is a cheat command, so it needs `devcommands`, and it is registered for the host only. The Server Devcommands mod lets any player with `devcommands` type it on their own machine, but on a joined player's machine a `bc` change alters only that player's copy of the settings and their own view of the ground, never the world or the other players, and the zone regeneration refuses there ("it runs on the machine that runs the world"). Make `bc` changes on the host or in single player. `bc info` on a joined player's machine shows the settings the server sent. `bc_altbiomes`, `bc_export`, `bc_import`, `bc_cache` and `bc_twins` work for every player, and so do `bc_bake`'s read-only words, and `bc_import` and `bc_cache` work in the main menu too. `bc <group> help` lists a group, for example `bc h help`. When an admin sends a command to a dedicated server (`bc_export server ...`, `bc_twins server ...`), its answer comes back to the admin's own console as well as the server's log.
 
 * ⌨️ `bc info` — Prints the current world's settings, including whether its maps span World Size and the record in an export's heightmap.
 * ⌨️ `bc regen` — Regenerates the zones now, the way every change does: every generated zone is reset and generates again with the current settings when someone comes near, except the zones that hold something to keep: what players built or worked, a tombstone, other players, or you inside a dungeon. Players, what players built, tombstones and tamed animals are never removed, and the loaded terrain is left as it is (see [Debug Mode & Zone Regeneration](#debug-mode--zone-regeneration)).
@@ -393,6 +399,9 @@ Better Continents has seven console commands (open the console with F5). `bc` is
 * ⌨️ `bc import run [what] [config]`, `bc import list`, `bc import status` — The same as `bc_import`, in the `bc` tree.
 * ⌨️ `bc cache [export | import <file or folder> | list | help]`, `bc twins [radius | remove [confirm] [radius] | server ... | help]` — The same as `bc_cache` and `bc_twins`, in the `bc` tree.
 * ⌨️ `bc show [filter]`, `bc hide [filter]`, `bc bosses` — Pins locations on the map, or removes those pins (your own pins stay).
+* ⌨️ `bc_water`, `bc_water force on|off`, `bc_water probe` — Whether Better Continents' own sea is on in this world and why, the sea field, and what draws the water. With Debug Mode: force it on where it would be off, and probe the drawn waves against the felt ones.
+* ⌨️ `bc genloc`, `bc genloc alt` — Runs the game's location generation again with a report of what it found and what changed, and sends the new icons to the players; it frees the game's `genloc` first when a run that threw left it stuck. Placed locations stay; stay in the world until it says it is done. `alt` passes to the game's alt-biome branch.
+* ⌨️ `bc_lake ...` (experimental) — Lakes: `here`, `at <x> <z>`, `list`, `info`, `remove <name|all>`, `depth [scale]`, `load`, `import`, `export`, `mask at|load|export`, `regen`, `server ...`. The words that replace or remove data need `confirm`; on a server the words that change lakes need an admin.
 * ⌨️ `bc_bake ...` — Bakes what players built into the world's layer (`area <radius>`, `box ...`, words `town`, `any`, `convert`), takes it back (`undo`, `unbake`), loads or exports a town file, and lists and checks the layer. Every change is a dry run until `confirm`. Any player can use `info`, `stats`, `hide` and `show`; on a server, admins put `server` first. `bc_bake help` lists it all.
 * ⌨️ `bc savepreset [name]` — Saves the current settings as a preset, named after the world if you give no name.
 * ⌨️ `bc ab info`, `bc ab list [filter]`, `bc ab here` — Shows what each alt biome did in this world, which regions have alt biomes, and the region you stand in.
@@ -453,6 +462,7 @@ These settings apply at once. Better Continents reads `BetterContinents.cfg` aga
 ## 📚 Documentation & Guides
 
 For deep dives, tutorials, and configuration references:
+* 🌊 **Water and lakes, the easy guide (PDF)** — `BetterContinents-Water-Guide.pdf`, in the [Hexium package](https://valheim.hexium.gg/mods/Wubarrk/BetterContinents): the waves of a big world, the settings and the commands, then lakes and clearing (experimental), step by step.
 * 📗 **Export & Import, the easy guide (PDF)** — `BetterContinents-Export-Guide.pdf`, in the [Hexium package](https://valheim.hexium.gg/mods/Wubarrk/BetterContinents): illustrated, step-by-step instructions written for first-timers: exporting a world, editing the pictures, cutting and pasting between worlds, Biome precision, and making new worlds from an export (GPL-3.0; its Markdown source is attached inside the PDF).
 * 🧱 **Baked buildings, the easy guide (PDF)** — `BetterContinents-Baking-Guide.pdf`, in the [Hexium package](https://valheim.hexium.gg/mods/Wubarrk/BetterContinents): baking a base or a town, undo and unbake, town files, servers and the settings, step by step (GPL-3.0; its Markdown source is attached inside the PDF).
 * 📖 **Better Continents Guide (PDF)** — the full guide, updated for Valheim 1.0 and Better Continents 0.10.x: every map type and setting, the height scale and waterline maths, alt biomes and planting them with colours, and world export/import. It ships as `BetterContinents-Guide.pdf` inside the [Hexium package](https://valheim.hexium.gg/mods/Wubarrk/BetterContinents) (GPL-3.0; its Markdown source is attached inside the PDF).
@@ -470,6 +480,7 @@ For deep dives, tutorials, and configuration references:
 * 👑 Originally created by **billw2012** — the pioneer of Valheim heightmap and custom continent generation.
 * 🛠️ Maintained and expanded by **JereKuusela**.
 * ⚡ Modernized for Valheim 1.0 by **Wubarrk**.
+* 🏞️ Lakes and clearing come from **Tarn**, by **Raven Iron** (Wubarrk and NomadicWar), contributed to Better Continents under the LGPL-2.1.
 
 ---
 

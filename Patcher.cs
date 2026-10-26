@@ -1,4 +1,4 @@
-// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and alt-biome planting (0.8.1), and on 2026-09-24 for world export and import (0.9.0), and on 2026-09-25 for version-agnostic wording (0.9.1), and on 2026-09-29 for Expand World Data biomes (0.9.3), and on 2026-10-04 for the vegetation twin guard and the unifying refactor (0.10.0), and on 2026-10-06 for 16k worlds (0.10.3), and on 2026-10-07 for baked placements (0.10.4).
+// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and alt-biome planting (0.8.1), and on 2026-09-24 for world export and import (0.9.0), and on 2026-09-25 for version-agnostic wording (0.9.1), and on 2026-09-29 for Expand World Data biomes (0.9.3), and on 2026-10-04 for the vegetation twin guard and the unifying refactor (0.10.0), and on 2026-10-06 for 16k worlds (0.10.3), and on 2026-10-07 for baked placements (0.10.4), and on 2026-10-13 for BC's own water (0.10.5), and on 2026-10-13 for lakes and clearing (0.10.5).
 
 using System;
 using System.Collections;
@@ -33,6 +33,9 @@ public partial class BetterContinents
     foreach (var toggle in TogglesAfterWorldSize)
       toggle.Update(Settings);
     UpdateLayerToggles();
+    UpdateClearingToggles();
+    // The world's lakes (LakeWater.Toggles.cs): the water volumes' patches and the map's.
+    UpdateLakeToggles();
     // The sectors a world past the game's 16 km gets: its own, out to 65 km (WorldSectors).
     WorldSectors.Update(HarmonyInstance, Settings, ExpandWorldSizeGeometry);
     // WorldGenerator caches GetBiome/GetBiomeArea results per grid cell for the lifetime of the
@@ -40,8 +43,9 @@ public partial class BetterContinents
     // above (GetBiome, IsAshlands, IsAshlands without a heat map) can leave already-queried cells
     // returning their pre-patch answer for the rest of the session unless we clear the caches here.
     ClearWorldGeneratorBiomeCaches();
-    // The water's colours follow the hot sea the patches above make (AshlandsWater).
-    AshlandsWater.Refresh();
+    // BC's own sea: the field it is drawn and felt from is built again for the world as it is now (SeaPatches), what draws the water is looked at
+    // again (SeaDraw), and the colours of the game's water follow the hot sea the patches above make (AshlandsWater, the fallback).
+    SeaDraw.Refresh();
     // EnvMan's Deep North weather test reads the biome map at the camera's x and z exactly when IsDeepnorth
     // reads the biome map at all (the IsDeepnorth toggle); every other world keeps vanilla's (x, height) call. A
     // high world asks at x and z too: the game's (x, height) is inside the Deep North's circle once the camera is
@@ -366,6 +370,19 @@ public partial class BetterContinents
         typeof(SpawnSystemPatch), nameof(SpawnSystemPatch.UpdateSpawnListEnable), HookKind.Prefix),
       new Hook(() => AccessTools.Method(typeof(SpawnSystem), nameof(SpawnSystem.UpdateSpawnList)), "SpawnSystem.UpdateSpawnList",
         typeof(SpawnSystemPatch), nameof(SpawnSystemPatch.UpdateSpawnListDisable), HookKind.Postfix)),
+    // BC's own sea (SeaPatches): the waves that boats, swimmers and fish feel follow the world's own Deep North instead of the game's circle, the
+    // way the water BC draws does. Both run the game's code until the sea field is ready, and are on while the world's sea is a candidate for
+    // BC's own (a client's Own Water setting only decides what it draws). After the world size: the field is built from the layout's IsDeepnorth.
+    new("WorldGenerator.DeepNorthWaveFade (BC's sea)",
+      SeaPatches.Candidate,
+      new Hook(() => AccessTools.Method(typeof(WorldGenerator), nameof(WorldGenerator.DeepNorthWaveFade), [typeof(float), typeof(float)]),
+        "WorldGenerator.DeepNorthWaveFade(float,float)", typeof(SeaPatches), nameof(SeaPatches.DeepNorthWaveFadePrefix), HookKind.Prefix))
+    { ViaProcessor = true, FailureMessage = "Could not patch WorldGenerator.DeepNorthWaveFade, so boats and fish feel the game's calm sea: " },
+    new("WaterVolume.CalcWave (BC's sea)",
+      SeaPatches.Candidate,
+      new Hook(SeaPatches.CalcWaveTarget, "WaterVolume.CalcWave(Vector3,float,Vector4,float,float,float)", typeof(SeaPatches),
+        nameof(SeaPatches.CalcWavePrefix), HookKind.Prefix))
+    { ViaProcessor = true, FailureMessage = "Could not patch WaterVolume.CalcWave, so boats and fish feel the game's waves: " },
   ];
 
   // The layer's two toggles (spec 4.2, 7.4, 8.1): they follow the world's baked layer, not its maps, so a GameTerrain world has them too.
@@ -383,6 +400,40 @@ public partial class BetterContinents
       new Hook(() => AccessTools.Method(typeof(WorldGenerator), nameof(WorldGenerator.GetBiomeHeight)), "WorldGenerator.GetBiomeHeight",
         typeof(BakedGround), nameof(BakedGround.GetBiomeHeightPostfix), HookKind.Postfix, Priority.Last, after: [EWD.GUID])),
   ];
+
+  // The clearing mask's toggle (0.10.5, ported from Tarn; ClearVegetation): it follows the world's mask, not its maps, so a GameTerrain world has it too, and it
+  // stays off while the Tarn mod is installed (TarnCompat: Tarn then does the clearing from its own files). Its postfix runs FIRST (Priority.First, whatever order the
+  // toggles were switched in): the twin guard's postfix on the same method records every spot it lets through as placed, so a spot the mask clears must be answered
+  // before it, or a later entry of the same prefab within a metre would be skipped as the twin of a plant that is not there.
+  private static readonly Toggle[] ClearingToggles =
+  [
+    new("ZoneSystem.InsideClearArea, clearing mask",
+      s => s.EnabledForThisWorld && s.HasClearing && !TarnCompat.Installed,
+      new Hook(() => AccessTools.Method(typeof(ZoneSystem), "InsideClearArea"), "ZoneSystem.InsideClearArea",
+        typeof(ClearVegetation), nameof(ClearVegetation.InsideClearAreaPostfix), HookKind.Postfix, Priority.First))
+    { ViaProcessor = true, FailureMessage = "Could not patch ZoneSystem.InsideClearArea, so the clearing mask is off: " },
+  ];
+
+  internal static void UpdateClearingToggles()
+  {
+    foreach (var toggle in ClearingToggles)
+      toggle.Update(Settings);
+  }
+
+  // The mask was replaced (bc_lake mask load, a push): the rest of DynamicPatch has no reason to run. A patch that fails is logged, and does not stop whoever
+  // replaced the mask.
+  internal static void PatchClearingToggles()
+  {
+    try
+    {
+      UpdateClearingToggles();
+      ClearVegetation.Forget();
+    }
+    catch (Exception e)
+    {
+      LogError("Could not switch the patch that follows the clearing mask: " + e);
+    }
+  }
 
   // The toggles that follow the layer, switched to what the settings want now (DynamicPatch, and the layer being replaced).
   internal static void UpdateLayerToggles()
@@ -408,7 +459,7 @@ public partial class BetterContinents
   // The toggles these settings want on, by name (the offline tests compare it with the rules as they were written
   // out one by one before the unifying refactor).
   internal static IEnumerable<string> WantedToggles(BetterContinentsSettings settings) =>
-    new[] { BiomeColor, BiomeColorAfterTerritories }.Concat(TogglesBeforeWorldSize).Concat(TogglesAfterWorldSize).Concat(LayerToggles).Concat(HighTerrainToggles)
+    new[] { BiomeColor, BiomeColorAfterTerritories }.Concat(TogglesBeforeWorldSize).Concat(TogglesAfterWorldSize).Concat(LayerToggles).Concat(ClearingToggles).Concat(HighTerrainToggles).Concat(LakeToggles)
       .Where(t => t.Wanted(settings)).Select(t => t.Name);
 
   // ---- the three that are more than on or off -------------------------------------------------------------------------

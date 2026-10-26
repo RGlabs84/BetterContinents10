@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-10-07 for baked placements (0.10.4).
+// Added by Wubarrk on 2026-10-07 for baked placements (0.10.4), and on 2026-10-13 for the 0.10.5 bake fixes.
 //
 // Offline checks of bc_bake (BakeCommandLine.cs, BakeCommands.cs, BakeRunner.Load.cs): what a line means, who may run it, what info and list say,
 // a load of a compiler's file, the checks of a layer, and the way a world's layer is dropped from the main menu.
@@ -139,7 +139,7 @@ internal static partial class Tests
     var bytes = other.Bytes.Take(other.Length).ToArray();
     fx.Said.Clear();
     int events = fx.Clock.Events.Count;
-    BakeDrive(BakeRunner.Load(fx.Ctx, "placements.bcp", bytes, BakeWordsOf("")), fx, "a load");
+    BakeDrive(BakeRunner.Load(fx.Ctx, "placements.bcp", bytes, BakeWordsOf(""), "placements.bcp"), fx, "a load");
     var dry = string.Join("\n", fx.Said);
     C(fx.Clock.Events.Count == events && dry.Contains("bc_bake load placements.bcp: a dry run, nothing changes. 'bc_bake load placements.bcp confirm' loads it.") && dry.Contains("File: revision 1, 44 records in"), "a dry run says what the file holds and changes nothing: " + dry);
     C(dry.Contains("It replaces the layer's 43 compiler records with its 44") && dry.Contains("the 0 records baked in game stay.") && dry.Contains("kept in the undo folder first"), "and what it replaces");
@@ -148,8 +148,17 @@ internal static partial class Tests
       "the dry run builds the merged layer and has the live pieces' planner say what it would do (B's Gather and Plan in the game): " + dry);
     C(fx.Layer.Revision == 1 && fx.Clock.Events.Count == events, "and the layer it built for that is dropped");
 
+    // The line that loads it must be the command that was meant: with no file typed, the Directory's own file (a bare name would be a relative path);
+    // with a path typed, that path in full, and 'convert' where it was given.
     fx.Said.Clear();
-    BakeDrive(BakeRunner.Load(fx.Ctx, "placements.bcp", bytes, BakeWordsOf("confirm")), fx, "a load");
+    BakeDrive(BakeRunner.Load(fx.Ctx, "placements.bcp", bytes, BakeWordsOf(""), null), fx, "a load");
+    C(fx.Said.Any(l => l.Contains("'bc_bake load confirm' loads it.")) && !fx.Said.Any(l => l.Contains("load placements.bcp")), "a dry run of the default file echoes 'bc_bake load confirm', not the file's bare name: " + string.Join(" | ", fx.Said));
+    fx.Said.Clear();
+    BakeDrive(BakeRunner.Load(fx.Ctx, "placements.bcp", bytes, BakeWordsOf("convert"), "/maps/town one/placements.bcp"), fx, "a load");
+    C(fx.Said.Any(l => l.Contains("'bc_bake load /maps/town one/placements.bcp convert confirm' loads it.")), "a typed path (spaces and all) is echoed in full, 'convert' after it: " + string.Join(" | ", fx.Said));
+
+    fx.Said.Clear();
+    BakeDrive(BakeRunner.Load(fx.Ctx, "placements.bcp", bytes, BakeWordsOf("confirm"), "placements.bcp"), fx, "a load");
     var run = fx.Clock.Events.Skip(events).ToList();
     C(run.SequenceEqual(["layer", "push r2", "reconcile r2"]), "the layer, the push and the reconciliation of the live pieces: " + string.Join(" > ", run));
     C(fx.Layer.Revision == 2 && fx.Layer.Placements == 44 && fx.Layer.Registry.Operations.Single().Kind == OperationKind.Load && fx.Layer.Registry.Operations.Single().Added == 44 && fx.Layer.Registry.Operations.Single().Removed == 43,
@@ -163,7 +172,7 @@ internal static partial class Tests
     fx.Said.Clear();
     BakeRunner.Reset();
     var back = File.ReadAllBytes(Path.Combine(fx.Folder, "layer-r1.bcp"));
-    BakeDrive(BakeRunner.Load(fx.Ctx, "layer-r1.bcp", back, BakeWordsOf("confirm")), fx, "a load");
+    BakeDrive(BakeRunner.Load(fx.Ctx, "layer-r1.bcp", back, BakeWordsOf("confirm"), "layer-r1.bcp"), fx, "a load");
     C(fx.Layer.Placements == 43 && fx.Layer.Revision == 3 && fx.Layer.Registry.Operations.Count == 2, "loading the kept file goes back: 43 records, revision 3, two loads in the registry");
 
     Section("load: in-game records stay, and what a load refuses");
@@ -174,7 +183,7 @@ internal static partial class Tests
     var keysBefore = BakeKeysOfSource(gx.Port, 1);
     gx.Said.Clear();
     var variant = CompilerFile([Wall(), Door(), Roof(), Gate(), Beam()], 1);
-    BakeDrive(BakeRunner.Load(gx.Ctx, "b.bcp", variant.Bytes.Take(variant.Length).ToArray(), BakeWordsOf("confirm")), gx, "a load");
+    BakeDrive(BakeRunner.Load(gx.Ctx, "b.bcp", variant.Bytes.Take(variant.Length).ToArray(), BakeWordsOf("confirm"), "b.bcp"), gx, "a load");
     C(BakeKeysOfSource(gx.Port, 1).SequenceEqual(keysBefore) && gx.Layer.RecordsOfSource(0) == variant.RecordsOfSource(0) && gx.Layer.Placements == variant.Placements + baked,
       $"the {baked} records baked in the game are as they were; the compiler's are the file's");
     C(gx.Layer.Registry.Operations.Count == 2 && gx.Layer.Registry.Operations[0].State == OperationState.InLayer && gx.Layer.Registry.Operations[0].ValueSets.Length > 0, "the bake is in the registry with its value sets, and the load beside it");
@@ -182,28 +191,28 @@ internal static partial class Tests
     // A file that holds in-game records: they are left out, said.
     gx.Said.Clear();
     BakeRunner.Reset();
-    BakeDrive(BakeRunner.Load(gx.Ctx, "exported.bcp", withBakes.Bytes.Take(withBakes.Length).ToArray(), BakeWordsOf("")), gx, "a load");
+    BakeDrive(BakeRunner.Load(gx.Ctx, "exported.bcp", withBakes.Bytes.Take(withBakes.Length).ToArray(), BakeWordsOf(""), "exported.bcp"), gx, "a load");
     C(gx.Said.Any(l => l.Contains($"{baked} records baked in game are in this file; load replaces only the compiler's records.")), "a file with records baked in game says they are left out: " + string.Join(" | ", gx.Said));
 
     gx.Said.Clear();
     int before = gx.Clock.Events.Count;
     BakeRunner.Reset();
-    BakeDrive(BakeRunner.Load(gx.Ctx, "junk.bcp", [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40], BakeWordsOf("confirm")), gx, "a load");
+    BakeDrive(BakeRunner.Load(gx.Ctx, "junk.bcp", [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40], BakeWordsOf("confirm"), "junk.bcp"), gx, "a load");
     C(gx.Said.Single().StartsWith("bc_bake: junk.bcp is not a layer this version can read") && gx.Clock.Events.Count == before, "a file that is not a layer changes nothing: " + string.Join(" | ", gx.Said));
     gx.Said.Clear();
     gx.Transport.Unavailable = "sending a changed layer to the players is not available in this build";
-    BakeDrive(BakeRunner.Load(gx.Ctx, "b.bcp", variant.Bytes.Take(variant.Length).ToArray(), BakeWordsOf("confirm")), gx, "a load");
+    BakeDrive(BakeRunner.Load(gx.Ctx, "b.bcp", variant.Bytes.Take(variant.Length).ToArray(), BakeWordsOf("confirm"), "b.bcp"), gx, "a load");
     C(gx.Clock.Events.Count == before && gx.Said.Single().EndsWith("Nothing is changed."), "without a transport it changes nothing: " + string.Join(" | ", gx.Said));
     gx.Transport.Unavailable = null;
 
     var vanilla = BakeNewFx("load-vanilla", BakeStandardWorld, out _);
     vanilla.Convert.Kind = BakeWorldKind.Vanilla;
     BakeRunner.Reset();
-    BakeDrive(BakeRunner.Load(vanilla.Ctx, "a.bcp", bytes, BakeWordsOf("confirm")), vanilla, "a load");
+    BakeDrive(BakeRunner.Load(vanilla.Ctx, "a.bcp", bytes, BakeWordsOf("confirm"), "a.bcp"), vanilla, "a load");
     C(vanilla.Clock.Count == 0 && vanilla.Said.Any(l => l.Contains("Add 'convert' to go ahead.")), "a world that is not a Better Continents world needs 'convert'");
     vanilla.Said.Clear();
     BakeRunner.Reset();
-    BakeDrive(BakeRunner.Load(vanilla.Ctx, "a.bcp", bytes, BakeWordsOf("confirm convert")), vanilla, "a load");
+    BakeDrive(BakeRunner.Load(vanilla.Ctx, "a.bcp", bytes, BakeWordsOf("confirm convert"), "a.bcp"), vanilla, "a load");
     C(vanilla.Convert.Converted == 1 && vanilla.Layer != null && vanilla.Layer.Placements == 44 && vanilla.Layer.Revision == 1, "and with it the world is converted and gets the file's layer (revision 1)");
     BakeRunner.Reset();
   }

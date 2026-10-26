@@ -1,4 +1,4 @@
-// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and alt-biome planting (0.8.1), and on 2026-09-24 for world export and import (0.9.0), and on 2026-09-29 for Expand World Data biomes (0.9.3), and on 2026-10-02 for export folders used as the Directory (0.9.4), and on 2026-10-04 for the unifying refactor (0.10.0), and on 2026-10-06 for 16k worlds (0.10.3), and on 2026-10-07 for baked placements (0.10.4).
+// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and alt-biome planting (0.8.1), and on 2026-09-24 for world export and import (0.9.0), and on 2026-09-29 for Expand World Data biomes (0.9.3), and on 2026-10-02 for export folders used as the Directory (0.9.4), and on 2026-10-04 for the unifying refactor (0.10.0), and on 2026-10-06 for 16k worlds (0.10.3), and on 2026-10-07 for baked placements (0.10.4), and on 2026-10-13 for lakes and clearing (0.10.5).
 
 using System;
 using System.Collections.Generic;
@@ -93,6 +93,53 @@ public partial class BetterContinents
     // does for an alt-biome map that cannot be read. Its bytes are kept as they were, and saved back unchanged (Serialize).
     internal string? LayerError;
     private byte[]? LayerBytesAsRead;
+
+    // ---- lakes and clearing (0.10.5, ported from Tarn) -----------------------------------------------------------------------------
+    // The world's lakes and its clearing mask: immutable objects, each a reference swapped whole by whoever changes it (as Layer is); WithLayer's copy
+    // shares them, which is right. Null in a world without them. LakesError / ClearingError: the blob in the world's settings could not be read (a newer
+    // format, or damaged); the world then plays without lakes, or the load stops for a mask (the data agent's code, Serialize.cs).
+    internal volatile LakeSet? Lakes;
+    internal volatile ClearMask? Clearing;
+    internal string? LakesError;
+    internal string? ClearingError;
+    // A world with at least one lake has lakes; one with a mask has clearing. An empty set (every lake removed) has none, and is kept: the world remembers that
+    // its lakes were taken out, so that Tarn's own files are not imported into it again (LakeFiles.ImportTarnOnce).
+    public bool HasLakes => Lakes is { IsEmpty: false };
+    public bool HasClearing => Clearing != null;
+    // The blobs of DataKey.Lakes and DataKey.Clearing as read, kept only when this Better Continents cannot read them (a newer format, or damaged): they are
+    // saved back unchanged until an edit replaces them, as AltBiomesBlobAsRead is. The mask also keeps its own bytes (ClearMask.ToBlock).
+    internal byte[]? LakesBlobAsRead, ClearingBlobAsRead;
+    // The lakes (or the clearing mask) replaced by whoever changes them: a command, a push from the machine that runs the world. What was kept unread, and its
+    // error, go with the old ones. Null takes them out. (The patches that follow are the caller's: Patcher.PatchClearingToggles; the lake engine notices a new set.)
+    internal void ReplaceLakes(LakeSet? lakes)
+    {
+      Lakes = lakes;
+      LakesBlobAsRead = null;
+      LakesError = null;
+    }
+
+    internal void ReplaceClearing(ClearMask? clearing)
+    {
+      Clearing = clearing;
+      ClearingBlobAsRead = null;
+      ClearingError = null;
+    }
+
+    // The depth scale changed in a running world: the lake set with the new scale (an empty one when the world had none, so that the scale is saved with the world).
+    internal LakeSet SetLakeDepthScale(float scale)
+    {
+      if (!LakeSet.Finite(scale) || scale < 0f || scale > LakeSet.MaxDepthScale)
+        throw new ArgumentOutOfRangeException(nameof(scale), scale, $"a depth scale is a number from 0 to {LakeSet.MaxDepthScale:0}");
+      LakeDepthScale = scale;
+      var set = (Lakes ?? LakeSet.Empty).WithDepthScale(scale);
+      ReplaceLakes(set);
+      return set;
+    }
+
+    // The world setting Lake Depth Scale as a new world took it from the config; the world's own is in its lake set (LakeSet.DepthScale) once it has one.
+    internal float LakeDepthScale = LakeSet.DefaultDepthScale;
+    // The depth scale the world has: its lake set's, else the one it took from the config.
+    internal float EffectiveLakeDepthScale => Lakes?.DepthScale ?? LakeDepthScale;
     // The world's terrain is the game's own (spec 4): a world made without Better Continents' maps, or with Better Continents off for it,
     // that carries a layer. Its settings hold nothing but this, a wide-sectors flag and the layer.
     public bool GameTerrain;
@@ -265,6 +312,24 @@ public partial class BetterContinents
       ReadLocationExclusionFile(c, dir, lean);
       AltBiomes = AltBiomeSettings.FromConfig(c);
       ReadLayerFile(dir);
+      ReadLakeFiles(dir);
+    }
+
+    // 0.10.5: lakes.txt and clearmask.bin in the Directory (or the names the Ravenrest pipeline writes, tarn-lakes.txt and tarn-clear.bin) are the new world's lakes
+    // and clearing mask, Tarn's formats unchanged (LakeFiles). A file that cannot be read makes a world without it, and an error line says which file and what is
+    // wrong; `bc_lake load` adds one later.
+    internal void ReadLakeFiles(string dir)
+    {
+      Lakes = null;
+      Clearing = null;
+      LakesBlobAsRead = ClearingBlobAsRead = null;
+      LakesError = ClearingError = null;
+      if (string.IsNullOrEmpty(dir))
+        return;
+      var files = LakeFiles.FromDirectory(dir);
+      if (files.Lakes != null)
+        Lakes = files.Lakes.WithDepthScale(LakeDepthScale);
+      Clearing = files.Clearing;
     }
 
     // The file a Directory holds the world's baked layer in (a compiler's, or a world export's: WorldExport writes it beside the maps).
@@ -472,6 +537,7 @@ public partial class BetterContinents
         if (WideSectors)
           output("Wide sectors: every zone out to 65504 m has a sector and save chunks of its own, where the game gives everything past 16.4 km one shared sector");
         DumpLayer(output);
+        DumpLakes(output);
       }
       else if (EnabledForThisWorld)
       {
@@ -643,6 +709,7 @@ public partial class BetterContinents
         else output($"Altbiomemap disabled");
         EffectiveAltBiomes.Dump(output, AltBiomes == null);
         DumpLayer(output);
+        DumpLakes(output);
       }
       else
       {
@@ -668,6 +735,12 @@ public partial class BetterContinents
     }
 
 
+
+    // The lakes and the clearing mask, when there are some (or were meant to be): what they hold, and whether this machine acts on them.
+    private void DumpLakes(Action<string> output)
+    {
+      LakeFiles.DumpLines(this, output);
+    }
 
     public static BetterContinentsSettings Load(ZPackage pkg)
     {

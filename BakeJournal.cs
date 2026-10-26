@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-10-07 for baked placements (0.10.4).
+// Added by Wubarrk on 2026-10-07 for baked placements (0.10.4), and on 2026-10-13 for the 0.10.5 bake fixes.
 
 using System;
 using System.Collections.Generic;
@@ -546,9 +546,29 @@ internal class BakeJournal
     Folder = folder;
   }
 
-  // The folder of a world: its name and uid, so that two worlds with one name keep apart.
-  internal static string FolderFor(string root, string worldName, long worldUid) =>
-    Path.Combine(root, "bakes", SafeName(worldName) + "-" + worldUid.ToString(CultureInfo.InvariantCulture));
+  // The folder of a world: its name and uid, so that two worlds with one name keep apart. A world that was renamed keeps the folder it made under its old
+  // name: when the folder for the current name is not there but one for the same uid is, that one is used (the newest, if there are several), so that
+  // 'bc_bake undo' and the settle at world load still find the journals.
+  internal static string FolderFor(string root, string worldName, long worldUid)
+  {
+    var suffix = "-" + worldUid.ToString(CultureInfo.InvariantCulture);
+    var bakes = Path.Combine(root, "bakes");
+    var wanted = Path.Combine(bakes, SafeName(worldName) + suffix);
+    if (Directory.Exists(wanted))
+      return wanted;
+    try
+    {
+      if (Directory.Exists(bakes))
+        return new DirectoryInfo(bakes).EnumerateDirectories("*" + suffix)
+          .Where(d => d.Name.EndsWith(suffix, StringComparison.Ordinal))
+          .OrderByDescending(d => d.LastWriteTimeUtc).Select(d => d.FullName).FirstOrDefault() ?? wanted;
+    }
+    catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+    {
+      // An unreadable folder of undo files: the folder for the current name, which is created when something is written.
+    }
+    return wanted;
+  }
 
   internal static string SafeName(string name)
   {
