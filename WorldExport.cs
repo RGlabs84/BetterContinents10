@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-09-24 for world export and import (0.9.0), and on 2026-09-29 for Expand World Data biomes (0.9.3), and on 2026-10-02 for export folders used as the Directory (0.9.4), and modified on 2026-10-04 for the unifying refactor (0.10.0), and on 2026-10-06 for 16k worlds (0.10.3), and on 2026-10-07 for baked placements (0.10.4), and on 2026-10-13 for lakes and clearing (0.10.5).
+// Added by Wubarrk on 2026-09-24 for world export and import (0.9.0), and on 2026-09-29 for Expand World Data biomes (0.9.3), and on 2026-10-02 for export folders used as the Directory (0.9.4), and modified on 2026-10-04 for the unifying refactor (0.10.0), and on 2026-10-06 for 16k worlds (0.10.3), and on 2026-10-07 for baked placements (0.10.4), and on 2026-10-13 for lakes and clearing (0.10.5), and on 2026-10-26 for the BetterWorlds-complete export and the editor pack (0.10.7).
 
 using System;
 using System.Collections;
@@ -235,6 +235,22 @@ public static class WorldExportMath
 
   /// <summary>The Ashlands ocean gradient Better Continents reads back from heat value v: s * v - 0.00001.</summary>
   public static float ValueToHeat(float value, float heatScale) => heatScale * value - HeatBias;
+
+  /// <summary>Heatmap value that is exact for IsAshlands: black where it is not Ashlands, else at least one grey step (so heat &gt; 0 holds) and
+  /// (g + 0.00001) / s, where the ocean gradient g can still be below 0 (IsAshlands and the gradient use slightly different lines).</summary>
+  public static float HeatToValue(bool ashlands, float gradient, float heatScale) =>
+    !ashlands || !(heatScale > 0f) ? 0f : Mathf.Max(1f / 65535f, (gradient + HeatBias) / heatScale);
+
+  /// <summary>The Coldmap Scale an export samples the cold map for (Better Continents' and BetterWorlds' default): white would be 10.</summary>
+  public const float ColdExportScale = 10f;
+
+  /// <summary>Coldmap value for a sampled point: black outside the Deep North, else the game's wave fade (0 to 1, a ramp over the 200 m at its
+  /// border) divided by the Coldmap Scale, and never below one grey step, so cold &gt; 0 holds wherever IsDeepnorth does.</summary>
+  public static float ColdToValue(bool deepNorth, double fade, float coldScale) =>
+    !deepNorth || !(coldScale > 0f) ? 0f : Mathf.Max(1f / 65535f, (float)(Math.Min(1.0, Math.Max(0.0, fade)) / coldScale));
+
+  /// <summary>The cold Better Continents reads back from coldmap value v: s * v (Deep North where above 0, the wave fade is Clamp01 of it).</summary>
+  public static float ValueToCold(float value, float coldScale) => coldScale * value;
 }
 
 // Dumps the LOADED world into a Better Continents map set that rebuilds it, plus the config lines that load it
@@ -245,7 +261,7 @@ public static class WorldExportMath
 //
 // Everything is written under <save data>/BetterContinents/<world>/, never inside worlds_local/<world>/: a file in
 // a world's save folder can be taken for a save (see BetterContinents.SaveSystemPatch.cs).
-public static class WorldExport
+public static partial class WorldExport
 {
   public const int MinSize = 128;
   public const int MaxSize = 16384;
@@ -297,7 +313,7 @@ public static class WorldExport
     Bits8,
   }
 
-  public sealed class Options
+  public sealed partial class Options
   {
     /// <summary>Pixels per side of every image (1024, 2048, 4096, 8192 or 16384 in the HUD). 2048 and up keep the alt-biome map
     /// exact on the game's 12 m grid; and every client that joins a world built from it downloads the maps.</summary>
@@ -319,6 +335,8 @@ public static class WorldExport
     public bool Forest = true;
     /// <summary>heatmap.png: the Ashlands heat (ocean gradient), read back with Heatmap Scale = HeatScale.</summary>
     public bool Heat = true;
+    /// <summary>coldmap.png: where the Deep North is (Coldmap Scale 10), sampled; a world's own active cold map is copied instead (with Sources).</summary>
+    public bool Cold = true;
     /// <summary>altbiomemap.png + altbiomemap.txt: the alt biomes exactly as placed, for Mode = PlantedOnly.</summary>
     public bool AltBiomes = true;
     /// <summary>lavamap.png: the Ashlands lava mask, so lava stays with the terrain whatever the new world's seed.</summary>
@@ -392,9 +410,9 @@ public static class WorldExport
         return $"the sea level must be 0 to 1 (got {Inv(SeaLevel)})";
       if (!(HeatScale > 0f && HeatScale <= 100f))
         return $"the heat scale must be above 0 and at most 100 (got {Inv(HeatScale)})";
-      if (!(NeedsTerrain || Biomes || Locations || Forest || Heat || AltBiomes || Sources))
+      if (!(NeedsTerrain || Biomes || Locations || Forest || Heat || Cold || AltBiomes || Sources || Editor))
         return "every map is switched off";
-      return null;
+      return ValidateEditor();
     }
 
     public override string ToString()
@@ -405,6 +423,7 @@ public static class WorldExport
       if (Locations) maps.Add("locations");
       if (Forest) maps.Add("forest");
       if (Heat) maps.Add("heat");
+      if (Cold) maps.Add("cold");
       if (AltBiomes) maps.Add("alt biomes");
       if (Lava) maps.Add("lava");
       if (Moss) maps.Add("moss");
@@ -414,7 +433,7 @@ public static class WorldExport
       return $"{Size} px, amount {Inv(HeightmapAmount)}, sea level {Inv(SeaLevel)}, {string.Join(", ", maps)}; "
              + $"{(ZoneBlend ? "zone blend" : "per-point heights")}, edge drop-off {edge}, forest {(ForestExact ? "exact" : "additive")}, heat scale {Inv(HeatScale)}"
              + (FineHeights == FineHeightsMode.Auto ? "" : FineHeights == FineHeightsMode.Off ? ", fine off" : $", fine {(FineHeights == FineHeightsMode.Bits4 ? 4 : 8)} bits")
-             + (Preset ? "; New World preset" : "; no preset");
+             + (Preset ? "; New World preset" : "; no preset") + EditorText();
     }
   }
 
@@ -902,7 +921,7 @@ public static class WorldExport
 
   // One export run: everything it samples, writes and reports. Constructed on the main thread (it snapshots the
   // world and settings); Run() is the coroutine body.
-  private sealed class Job
+  private sealed partial class Job
   {
     private readonly Options O;
     private readonly string Dir;
@@ -1054,6 +1073,10 @@ public static class WorldExport
       if (O.Sources)
         foreach (var step in SourcesPass())
           yield return step;
+      // After the sources: the world's own cold map, copied there, is not sampled again.
+      if (O.Cold)
+        foreach (var step in ColdPass())
+          yield return step;
       // Before the preset, which is built from this folder: it takes the layer with the maps.
       foreach (var step in LayerPass())
         yield return step;
@@ -1061,6 +1084,9 @@ public static class WorldExport
       foreach (var step in LakePass())
         yield return step;
       // The settings lines first: the preset is built from them, and export.cfg, written after it, says how it went.
+      if (O.Editor)
+        foreach (var step in EditorPass())
+          yield return step;
       var config = ConfigLines();
       foreach (var step in PresetPass(config))
         yield return step;
@@ -1090,6 +1116,8 @@ public static class WorldExport
         t += W(0.05, 0.1) + W(0.2);
       if (O.Sources)
         t += 0.5;
+      if (O.Cold && !ColdCarried)
+        t += W(0.2) + W(0.3);
       if (Settings.Layer != null)
         t += 0.05;
       if (Settings.Lakes is { IsEmpty: false })
@@ -1098,6 +1126,7 @@ public static class WorldExport
         t += 0.05;
       if (MakesPreset)
         t += W(0.8, 0.2);
+      t += EditorWeight();
       totalWeight = t;
     }
 
@@ -1707,7 +1736,7 @@ public static class WorldExport
                  {
                    float wx = WorldExportMath.PixelToWorld(col, n, Total);
                    float g = WorldGenerator.GetAshlandsOceanGradient(wx, wz);
-                   var p = WorldExportMath.ValueToUShort(WorldExportMath.HeatToValue(g, O.HeatScale), out int clip);
+                   var p = WorldExportMath.ValueToUShort(WorldExportMath.HeatToValue(WorldGenerator.IsAshlands(wx, wz), g, O.HeatScale), out int clip);
                    Put16(buffer, 2 * (r * n + col), p);
                    if (p > 0) rowHot++;
                    // The map square's corners lie past the world, where the gradient keeps climbing (about 20).
@@ -1719,10 +1748,6 @@ public static class WorldExport
         yield return step;
       HeatPixels = hot;
       HeatClipped = clipped;
-      if (!(BcWorld && Settings.HasHeatMap))
-        Notes.Add("Heat: the rebuilt world is Ashlands wherever the heat is above 0, i.e. along the ocean-gradient line. This world's own "
-                  + "Ashlands test (IsAshlands) uses a slightly different line, up to about 100 m away, so weather and lava damage can "
-                  + "move in that strip; the biome map keeps the Ashlands ground itself where it was.");
       if (clipped > 0)
         Notes.Add($"Heat: {clipped} pixel(s) inside the world were hotter than the heat scale ({Inv(O.HeatScale)}) and were clipped to it; export with a larger heat scale to keep them.");
       Complete(output);
@@ -2216,7 +2241,8 @@ public static class WorldExport
     // Maps that nothing sampled holds: the ground colours (terrain map) and which vegetation and creatures may appear
     // where (vegetation and spawn maps). They go into the folder itself as well, under the names Directory loads, so the
     // rebuilt world keeps them. Every other map is rebuilt from what was sampled; the heightmap already holds what the
-    // rough map did, and a new world ignores a rough map under Heightmap Override All anyway.
+    // rough map did, and a new world ignores a rough map under Heightmap Override All anyway. CarriesForward adds the location
+    // exclusion mask, and the world's own cold map when it is in use (WorldExport.Interop.cs).
     private static readonly string[] CarriedForward = ["terrainmap.png", "vegetationmap.png", "spawnmap.png"];
 
     // Worker thread (SourcesPass): only a PNG image counts, and a legend without its image is taken back out.
@@ -2225,7 +2251,7 @@ public static class WorldExport
       var copied = new List<string>();
       foreach (var (file, map) in maps)
       {
-        if (!CarriedForward.Contains(file))
+        if (!CarriesForward(file))
           continue;
         var stem = Path.GetFileNameWithoutExtension(file);
         var wrote = new List<string>();
@@ -2262,6 +2288,7 @@ public static class WorldExport
             Notes.Add($"Sources: {file} could not be copied into the folder ({e.Message}), so the rebuilt world does not load it.");
         }
       }
+      AfterCarryForward(copied);
       if (copied.Count > 0)
         lock (Notes)
           Notes.Add($"Sources: {string.Join(", ", copied)} {(copied.Count == 1 ? "was" : "were")} copied into the folder itself, so the rebuilt world keeps {(copied.Count == 1 ? "it" : "them")}.");
@@ -2478,11 +2505,12 @@ public static class WorldExport
     private IEnumerable TextPass(List<string> config)
     {
       Begin("Writing export.cfg, README.txt and manifest.json", 0.05);
+      NoteLargeFiles();
       var cfg = ConfigHeader();
       cfg.AddRange(config);
       var readme = ReadmeLines();
       // Tracked and listed before the manifest is built, so it lists itself and the other two.
-      foreach (var name in new[] { "export.cfg", "README.txt", "manifest.json" })
+      foreach (var name in new[] { "export.cfg", "world.json", "README.txt", "manifest.json" })
       {
         Tracked.Add(Path.Combine(Dir, name));
         Written.Add(name);
@@ -2491,6 +2519,7 @@ public static class WorldExport
       var task = Task.Run(() =>
       {
         WorldExportPng.WriteText(Path.Combine(Dir, "export.cfg"), cfg);
+        WorldExportPng.WriteText(Path.Combine(Dir, "world.json"), WorldJsonLines());
         WorldExportPng.WriteText(Path.Combine(Dir, "README.txt"), readme);
         // Last: a folder with a manifest.json is a finished export.
         WorldExportPng.WriteText(Path.Combine(Dir, "manifest.json"), [manifest]);
@@ -2646,11 +2675,13 @@ public static class WorldExport
       Key(SettingsSchema.SkipDefaultLocations, B(fullLocations), fullLocations
         ? "The location map holds every location, so the game places no others."
         : "The location map (if any) is incomplete, so the game places the rest.");
+      WaterKeys(Key);
       if (HeightsWritten)
       {
         Key(SettingsSchema.SeaLevel, F(O.SeaLevel), "The sea level the heights are encoded for.");
         Key(SettingsSchema.Rivers, "false", "The heightmap overrides the biome height formulas, rivers included; the loaded world's rivers are in it.");
         Key(SettingsSchema.MountainsAllowedAtCenter, "true", "The loaded world's centre is already in the heightmap; no second clamp.");
+        NoisePinKeys(Key);
 
         Key(SettingsSchema.HeightmapAmount, F(O.HeightmapAmount), "metres = (pixel / 65535 * amount - 0.15 + Lerp(1, -1, sea level)) * 200.");
         Key(SettingsSchema.HeightmapBlend, "1", "The heightmap is the height, not blended with generated terrain.");
@@ -2659,9 +2690,9 @@ public static class WorldExport
         Key(SettingsSchema.HeightmapOverrideAll, "true", "Every biome takes its height from the heightmap.");
         Key(SettingsSchema.HeightmapAlpha, "false", "heightmap.png is plain 16-bit grey.");
       }
-      // Only when the loaded world chose one: Auto is every world's own, and the new world follows the config's.
-      if (Settings.ShapesWorld && Settings.HighTerrainMode != HighTerrainMode.Auto)
-        Key(SettingsSchema.HighTerrain, Settings.HighTerrainMode.ToString(), "As the loaded world: which worlds get Better Continents' patches of the game's height rules (Auto: those whose heightmap is read at an amount above 5).");
+      // Only when the loaded world chose one, or its state is not the one Auto gives at this export's amount: otherwise the new world follows the config's.
+      if (HighTerrainToWrite() is { } highTerrain)
+        Key(SettingsSchema.HighTerrain, highTerrain, "As the loaded world: which worlds get Better Continents' patches of the game's height rules (Auto: those whose heightmap is read at an amount above 5).");
 
       var precision = EffectiveBiomePrecision(Settings);
       Key(SettingsSchema.BiomePrecision, precision.ToString(CultureInfo.InvariantCulture), precision > 0
@@ -2694,6 +2725,7 @@ public static class WorldExport
 
       if (HeatWritten)
         Key(SettingsSchema.HeatmapScale, F(O.HeatScale), "heat = pixel / 65535 * scale; Ashlands where it is above 0.");
+      ColdConfigKey(Key);
 
       if (LakesExported != null)
         Key(SettingsSchema.LakeDepthScale, F(LakesExported.DepthScale), "As the loaded world: how deep the game's water shader takes its lakes to be (lakes.txt holds the lakes, not this).");
@@ -2760,9 +2792,12 @@ public static class WorldExport
       l.Add("  A world that already exists keeps the maps it was created with. With the same seed, vegetation, fine lava");
       l.Add("  detail and the random layout of things come out closest to the exported world.");
       l.Add("");
+      l.Add("  BetterWorlds, another mod, reads this folder as it is: type  bw_import newest  in the console, or use Import project in its");
+      l.Add("  Utilities & Layers, or run  python3 tools/betterworlds.py --migrate <this folder> --output <folder>.");
+      l.Add("");
       l.Add("WHAT EACH FILE IS");
       // The names are 17 wide; heightmap-fine.png needs 18.
-      int w = Written.Contains("heightmap-fine.png") ? 18 : 17;
+      int w = Written.Contains("heightmap-fine.png") || Written.Contains("no_spawns_mask.png") ? 18 : 17;
       void Entry(string name, string what)
       {
         if (Written.Contains(name))
@@ -2783,6 +2818,9 @@ public static class WorldExport
         ? "How dense the forest is (16-bit grey): density = value x (the game's own density + 1)."
         : "Forest added to the game's own (16-bit grey): black keeps the game's forest, lighter adds trees.");
       Entry("heatmap.png", $"The Ashlands heat (16-bit grey): heat = value x {Inv(O.HeatScale)}; Ashlands wherever it is above black.");
+      Entry("coldmap.png", ColdCopied
+        ? $"The Deep North's cold map (grey), this world's own, copied: cold = value x {Inv(ColdScaleWritten)} (Coldmap Scale in export.cfg); Deep North wherever it is above black."
+        : $"Where the Deep North is (16-bit grey): cold = value x {Inv(ColdScaleWritten)} (Coldmap Scale in export.cfg); Deep North wherever it is above black.");
       Entry("altbiomemap.png", "The alt biomes (Dark Meadows, Wolf Mountain...) exactly as placed (altbiomemap.txt names them).");
       Entry("lavamap.png", "Where Ashlands lava is (8-bit grey).");
       Entry("mossmap.png", "The Mistlands ground cover (8-bit grey).");
@@ -2790,13 +2828,16 @@ public static class WorldExport
       Entry("terrainmap.png", "This world's own ground colour map, copied so the rebuilt world keeps it (terrainmap.txt).");
       Entry("vegetationmap.png", "This world's own vegetation map: which plants may grow where (vegetationmap.txt).");
       Entry("spawnmap.png", "This world's own spawn map: which creatures may appear where (spawnmap.txt).");
+      Entry("no_spawns_mask.png", "This world's location exclusion mask, copied so the rebuilt world keeps it: no location is placed where it is above black.");
       Entry("placements.bcp", "The loaded world's baked layer: the buildings baked into it, its ground and paint, and the record of who baked what. A world made from this folder has it too.");
       Entry(LakeFiles.LakesFileName, "The loaded world's lakes, one a line (name;x;z;level;minX;minZ;maxX;maxZ;depth; heights are absolute, the sea is 30), in Tarn's format. A world made from this folder has them too.");
       Entry(LakeFiles.ClearFileName, "The loaded world's clearing mask, in Tarn's .clear format (TARNCLR1, a size, a half-extent, then a bit a pixel, north first): the ground where no tree, rock or bush grows. A world made from this folder has it too.");
       if (Written.Any(x => x.StartsWith("sources/")))
         l.Add($"  {"sources/".PadRight(w)} The loaded world's own Better Continents maps as its settings keep them (not loaded).");
+      EditorReadmeEntry(l, w);
       l.Add($"  {"export.cfg".PadRight(w)} The settings that load this folder (way C). It keeps the world's Biome precision ({EffectiveBiomePrecision(Settings)}):");
       l.Add($"  {"".PadRight(w)} how closely the ground follows the biome map inside each 64 m terrain zone.");
+      l.Add($"  {"world.json".PadRight(w)} The world's size for BetterWorlds: radius, edge and layout (the same size export.cfg sets here).");
       l.Add($"  {"manifest.json".PadRight(w)} Every number about this export, for tools.");
       l.Add("  Delete a map from the folder, then remake the preset (B), to let the game make that part itself.");
       l.Add("");
@@ -2964,6 +3005,8 @@ public static class WorldExport
         m.Insert(at, new KeyValuePair<string, object?>("fineBits", FineBitsWritten));
         m.Insert(at + 1, new KeyValuePair<string, object?>("fineEncoding", "signed offset, 1/256 step, format 1"));
       }
+      AddInteropManifest(m);
+      AddEditorManifest(m);
       return WorldExportJson.Write(m);
     }
 
@@ -2990,6 +3033,7 @@ public static class WorldExport
       // Files still open (a map the failure or the cancel came before the end of) close, and so go, before the rest are deleted.
       foreach (var writer in Writers)
         writer.Dispose();
+      DisposeEditorSinks();
       DeletePartial();
       if (failure == null)
       {
@@ -3031,10 +3075,12 @@ public static class WorldExport
       }
       else if (O.Locations)
         lines.Add("no location map (no locations known here): the game places them in the new world.");
+      ColdSummary(lines);
       if (AltBiomesWritten)
         lines.Add($"alt biomes: {AltRegions} region(s) in {AltClassCount} colour(s){(AltDropped > 0 ? $", {AltDropped} left out" : "")}.");
       if (ForestWritten && ForestClippedLow > 0)
         lines.Add($"forest: {ForestClippedLow} pixel(s) had less forest than the game makes there and come back at its density (the exact forest encoding keeps them).");
+      AddEditorSummary(lines);
       if (PresetMade)
         lines.Add($"New World preset \"{PresetName}\" is ready: pick it under Better Continents when you create a world.");
       else if (PresetTooBig)
@@ -3064,6 +3110,7 @@ public static class WorldExport
           }
         }
       }
+      DeleteEditorDirs();
       TryRemoveEmpty(Path.Combine(Dir, "sources"), CreatedSources);
       TryRemoveEmpty(Dir, CreatedDir);
     }

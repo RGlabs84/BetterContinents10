@@ -1,4 +1,4 @@
-// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and alt-biome planting (0.8.1), and on 2026-09-24 for world export and import (0.9.0), and on 2026-09-29 for Expand World Data biomes (0.9.3), and on 2026-10-04 for the unifying refactor and the vegetation twin guard (0.10.0), and on 2026-10-06 for 16k worlds (0.10.3), and on 2026-10-07 for baked placements (0.10.4), and on 2026-10-13 for BC's own water (0.10.5), and on 2026-10-13 for the forced genloc (0.10.5), and on 2026-10-13 for lakes and clearing (0.10.5).
+// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and alt-biome planting (0.8.1), and on 2026-09-24 for world export and import (0.9.0), and on 2026-09-29 for Expand World Data biomes (0.9.3), and on 2026-10-04 for the unifying refactor and the vegetation twin guard (0.10.0), and on 2026-10-06 for 16k worlds (0.10.3), and on 2026-10-07 for baked placements (0.10.4), and on 2026-10-13 for BC's own water (0.10.5), and on 2026-10-13 for the forced genloc (0.10.5), and on 2026-10-13 for lakes and clearing (0.10.5), and on 2026-10-26 for Upgrade World compatibility (0.10.7).
 
 using System;
 using System.Collections.Generic;
@@ -154,8 +154,12 @@ public partial class DebugUtils
                 + "except zones within one zone of something a player built or worked on (a field, a path, levelled ground), a tombstone, a player connected from another machine "
                 + "(as far as their game keeps zones loaded around them), or you inside a dungeon. A location that reaches into one of those zones is kept whole. "
                 + "Players, what players built, tombstones and tamed animals are never removed, and the loaded terrain is left as it is. A console command in Debug Reset Command runs instead. "
-                + "'bc reset' does this after redrawing the minimap and rebuilding the alt-biome grid and the loaded terrain",
-                args => ZoneRegen.RunCommand(args, line => Console.instance.Print(line), GameUtils.RegenerateZones));
+                + "'bc reset' does this after redrawing the minimap and rebuilding the alt-biome grid and the loaded terrain. "
+                + "Words after it reset only part of the world, and every rule above still holds: 'dry' counts the zones that would be reset, by biome, and changes nothing; "
+                + "'biome=<names>' (comma between: Meadows,BlackForest) the zones where any corner is one of those biomes; 'min=<m>' and 'max=<m>' (or 'radius=<m>') the zones that far "
+                + "from 'pos=<x>,<z>' (the world's centre when there is none); 'zone=<x>,<z>' one zone; 'chance=<0..1>' each of those zones with that chance. "
+                + "For example 'bc regen dry biome=AshLands min=3000', then the same without 'dry'",
+                args => ZoneRegen.RunCommand(args, line => Console.instance.Print(line), GameUtils.RegenerateZonesWith));
             bc.AddCommand("scr", "Save map screenshot",
                 "Saves the minimap to a png, optionally pass resolution, default is 2048", arg =>
                 {

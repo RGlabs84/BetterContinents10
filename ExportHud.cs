@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-09-24 for world export and import (0.9.0), and modified on 2026-10-06 for 16k worlds (0.10.3), and on 2026-10-07 for baked placements (0.10.4).
+// Added by Wubarrk on 2026-09-24 for world export and import (0.9.0), and modified on 2026-10-06 for 16k worlds (0.10.3), and on 2026-10-07 for baked placements (0.10.4), and on 2026-10-26 for the BetterWorlds-complete export and the editor pack (0.10.7).
 
 using System;
 using System.Collections.Generic;
@@ -362,6 +362,7 @@ public static partial class ExportHud
       o.HeatScale = heatScale;
     else
       problem ??= "the Heat Scale is not a number";
+    problem ??= EditorCapture(o);
     problem ??= o.Validate();
     bool can = WorldExport.CanExport(out var reason);
     canStart = can && problem == null;
@@ -411,7 +412,7 @@ public static partial class ExportHud
   private static string Estimate(WorldExport.Options o)
   {
     double mpx = (double)o.Size * o.Size / 1e6;
-    int grey16 = (o.Heightmap ? 1 : 0) + (o.Forest ? 1 : 0) + (o.Heat ? 1 : 0);
+    int grey16 = (o.Heightmap ? 1 : 0) + (o.Forest ? 1 : 0) + (o.Heat ? 1 : 0) + (o.Cold ? 1 : 0);
     int colour = (o.Biomes ? 1 : 0) + (o.AltBiomes ? 1 : 0) + (o.Locations ? 1 : 0) + (o.Paint ? 1 : 0);
     int fine = o.FineBits > 0 ? 1 : 0;
     int grey8 = (o.Lava ? 1 : 0) + (o.Moss ? 1 : 0) + fine;
@@ -513,6 +514,8 @@ public static partial class ExportHud
       "forestmap.png: the forest density, added to the game's own (or exact, below), so trees stand where they stood.", s);
     o.Heat = MapToggle(o.Heat, "Heat", "the Ashlands heat (16-bit)",
       "heatmap.png: the Ashlands heat along the south, read back with the Heat Scale below. It decides where the Ashlands' weather and lava damage are.", s);
+    o.Cold = MapToggle(o.Cold, "Cold", "where the Deep North is (16-bit)",
+      "coldmap.png: the Deep North along the north, read back with Coldmap Scale 10. It decides the Deep North's weather, snow and calm sea. A world's own cold map is copied instead (with Sources).", s);
     o.AltBiomes = MapToggle(o.AltBiomes, "Alt biomes", "Dark Meadows, Wolf Mountain... as placed",
       "altbiomemap.png and .txt: every alt biome exactly where the game put it; the new world plants these and no random ones.", s);
     o.Lava = MapToggle(o.Lava, "Lava", "where Ashlands lava is (8-bit)",
@@ -576,6 +579,7 @@ public static partial class ExportHud
       o.EdgeDropoff = false;
     GUILayout.FlexibleSpace();
     GUILayout.EndHorizontal();
+    DrawEditorPack(s, o);
     GUILayout.Label(estimate, s.Dim);
     if (notes.Length > 0)
       GUILayout.Label(notes, s.Dim);
@@ -720,6 +724,7 @@ public static partial class ExportHud
     else if (importResult != null)
       GUILayout.Label(importResult, importFailed ? s.Error : s.Text);
     GUILayout.Label("The console's 'bc_import' does the same, also in the main menu ('bc_import help').", s.Dim);
+    DrawEditorReturn(s);
   }
 
   private static string SafeRoot()
@@ -763,6 +768,7 @@ public static partial class ExportHud
     amountText = Inv(o.HeightmapAmount);
     seaLevelText = Inv(o.SeaLevel);
     heatScaleText = Inv(o.HeatScale);
+    ResetEditorFields(o);
     return o;
   }
 

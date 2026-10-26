@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-10-04 for the unifying refactor (0.10.0), and modified on 2026-10-06 for 16k worlds (0.10.3), and on 2026-10-07 for baked placements (0.10.4).
+// Added by Wubarrk on 2026-10-04 for the unifying refactor (0.10.0), and modified on 2026-10-06 for 16k worlds (0.10.3), and on 2026-10-07 for baked placements (0.10.4), and on 2026-10-26 for Upgrade World compatibility (0.10.7).
 
 using System;
 using System.Collections;
@@ -65,21 +65,32 @@ internal static class ZoneRegen
   /// <summary>Whether the Debug Reset Command setting leaves the regeneration to Better Continents: when it is empty.</summary>
   internal static bool RunsOwn(string? command) => string.IsNullOrWhiteSpace(command);
 
-  /// <summary>"bc regen": no arguments (its help is answered by the command tree itself). It removes objects, so a mistyped word
-  /// must not start it.</summary>
-  internal static void RunCommand(string? args, Action<string> output, Action start)
+  /// <summary>"bc regen" and its words (RegenFilter): none for the whole world, "dry" to count what would be reset and change nothing,
+  /// and filters (biome=, min=, max=, pos=, zone=, chance=) to reset part of it. It removes objects, so a word that is not understood
+  /// starts nothing. A console command in the Debug Reset Command setting is what 'bc regen' runs when it is not empty, and takes no filters:
+  /// asked for any, it says so and starts nothing.</summary>
+  internal static void RunCommand(string? args, Action<string> output, Action<RegenFilter?> start)
   {
-    if (!string.IsNullOrWhiteSpace(args))
+    var filter = RegenFilter.Parse(args, out var error);
+    if (error.Length > 0)
     {
-      output($"bc regen takes no arguments ('{args!.Trim()}'). 'bc regen help' says what it does.");
+      output(error);
       return;
     }
-    start();
+    if (filter != null && !RunsOwn(BetterContinents.ConfigDebugResetCommand?.Value))
+    {
+      output($"bc regen: the Debug Reset Command setting holds a console command ('{BetterContinents.ConfigDebugResetCommand!.Value.Trim()}'), which 'bc regen' runs, and a console command takes no filters. "
+        + "Empty that setting to use them.");
+      return;
+    }
+    start(filter);
   }
 
   internal sealed class Job(Action<string> output)
   {
     public readonly Action<string> Output = output;
+    /// <summary>What the request asked for, when it asked for less than the whole world (and "dry": only count).</summary>
+    public RegenFilter? Filter;
     public readonly ZoneReset.Progress Progress = new();
     public readonly Stopwatch Clock = Stopwatch.StartNew();
     public Coroutine? Coroutine;
@@ -124,7 +135,7 @@ internal static class ZoneRegen
 
   /// <summary>Starts the regeneration, or starts it over when one is running. Says what it does, and why not, to
   /// <paramref name="output"/> (default: the console and the log; a server does not run the "bc" commands for an admin).</summary>
-  internal static void Request(Action<string>? output = null)
+  internal static void Request(Action<string>? output = null, RegenFilter? filter = null)
   {
     output ??= ConsoleTools.Output(Console.instance);
     if (!CanRun(out var why))
@@ -132,11 +143,42 @@ internal static class ZoneRegen
       output("Zone regeneration: " + why);
       return;
     }
+    if (filter != null && filter.Dry)
+    {
+      RequestDry(output, filter);
+      return;
+    }
     if (job != null)
       Stop(job, "starting over");
-    var mine = new Job(output);
+    if (dryJob != null)
+    {
+      // A dry run changes nothing and a real request takes its place.
+      if (dryJob.Coroutine != null)
+        StopRoutine(dryJob.Coroutine);
+      dryJob = null;
+      UI.Remove(UiKey);
+    }
+    var mine = new Job(output) { Filter = filter };
+    if (filter != null && filter.Narrows)
+      BetterContinents.Log($"Zone regeneration: only {filter.Describe()}.");
     job = mine;
     // The first frame's work runs inside StartCoroutine, and a small world may be done in it.
+    mine.Coroutine = StartRoutine(Run(mine));
+  }
+
+  // A dry run: the scan and the plan of a request, told and left at that. It never touches a run that is going on (it waits for none:
+  // a run in progress is the answer), and the work it leaves nothing of.
+  private static Job? dryJob;
+
+  private static void RequestDry(Action<string> output, RegenFilter filter)
+  {
+    if (job != null || dryJob != null)
+    {
+      output("Zone regeneration: " + (job != null ? "a regeneration is under way; a dry run counts the zones when it has finished." : "a dry run is under way."));
+      return;
+    }
+    var mine = new Job(output) { Filter = filter };
+    dryJob = mine;
     mine.Coroutine = StartRoutine(Run(mine));
   }
 
@@ -239,12 +281,14 @@ internal static class ZoneRegen
     ? "Better Continents: preparing to regenerate the zones ..."
     : $"Better Continents: regenerating the zones, {progress.Percent}% ...";
 
+  internal static string DryProgressText = "Better Continents: counting the zones to regenerate ...";
+
   // The coroutine Unity runs. Unity does not run an abandoned coroutine's finally, so a run that is stopped is cleaned up by Stop.
   private static IEnumerator Run(Job mine)
   {
     try
     {
-      UI.Add(UiKey, () => UI.DisplayMessage(ProgressText(mine.Progress)));
+      UI.Add(UiKey, () => UI.DisplayMessage(mine.Filter is { Dry: true } ? DryProgressText : ProgressText(mine.Progress)));
       var steps = Steps(mine);
       while (true)
       {
@@ -257,8 +301,12 @@ internal static class ZoneRegen
         {
           BetterContinents.LogError($"Zone regeneration stopped: {e}");
           mine.Output("Zone regeneration stopped by an error, see the log.");
-          FinishInFlight(mine);
-          FinishPending(mine);
+          // (A dry run has emptied nothing.)
+          if (mine.Filter is not { Dry: true })
+          {
+            FinishInFlight(mine);
+            FinishPending(mine);
+          }
           yield break;
         }
         if (!more)
@@ -269,6 +317,8 @@ internal static class ZoneRegen
     finally
     {
       UI.Remove(UiKey);
+      if (dryJob == mine)
+        dryJob = null;
       if (job == mine)
       {
         job = null;
@@ -285,7 +335,9 @@ internal static class ZoneRegen
     var zones = ZoneSystem.instance;
     var net = ZNet.instance;
     var remembered = MemoryFor(zones);
-    placedDuringRun.Clear();
+    bool dry = mine.Filter is { Dry: true };
+    if (!dry)
+      placedDuringRun.Clear();
     var world = new GameWorld(mine);
     var budget = new ZoneReset.Budget(ObjectsPerFrameNow, MillisecondsPerFrame, FrameClock);
     budget.NewFrame();
@@ -305,8 +357,18 @@ internal static class ZoneRegen
     foreach (var zdo in net.GetAllCharacterZDOS())
       focus.Add(ZoneSystem.GetZone(zdo.GetPosition()));
     focus.AddRange(Peers(net).Select(peer => ZoneSystem.GetZone(peer.GetRefPos())));
-    var plan = ZoneReset.MakePlan(zones.m_generatedZones, protectors, focus.Distinct().ToList(), PlacedLocations(zones), remembered.Pending);
+    var eligible = mine.Filter is { Narrows: true } filtered ? (Func<Vector2s, bool>)filtered.Eligible : null;
+    var plan = ZoneReset.MakePlan(zones.m_generatedZones, protectors, focus.Distinct().ToList(), PlacedLocations(zones), remembered.Pending, eligible);
     mine.Progress.Total = plan.Reset.Count;
+    if (dry)
+    {
+      // Said and done: nothing was emptied, queued or remembered.
+      foreach (var line in ZoneReset.DryRunLines(plan, mine.Filter!, mine.Filter!.BiomeAt))
+        mine.Output(line);
+      if (plan.Reset.Count > 8)
+        BetterContinents.Log(ZoneReset.ZoneListLine(plan));
+      yield break;
+    }
     mine.Output(ZoneReset.StartLine(plan));
     // Making the plan of a big world takes a while: the first resets wait for the next frame.
     yield return null;
@@ -314,7 +376,7 @@ internal static class ZoneRegen
     // empties then may wait in its turn: one the plan does not carry would be dropped by the new work and left empty and generated. Plan again.
     if (world.Alive && remembered.Pending.Any(zone => !plan.Carried.Contains(zone) && zones.m_generatedZones.Contains(zone)))
     {
-      plan = ZoneReset.MakePlan(zones.m_generatedZones, protectors, focus.Distinct().ToList(), PlacedLocations(zones), remembered.Pending);
+      plan = ZoneReset.MakePlan(zones.m_generatedZones, protectors, focus.Distinct().ToList(), PlacedLocations(zones), remembered.Pending, eligible);
       mine.Progress.Total = plan.Reset.Count;
     }
 

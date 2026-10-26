@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-09-24 for world export and import (0.9.0), and modified on 2026-10-02 for export folders used as the Directory (0.9.4), and modified on 2026-10-04 for the unifying refactor (0.10.0), and on 2026-10-06 for 16k worlds (0.10.3).
+// Added by Wubarrk on 2026-09-24 for world export and import (0.9.0), and modified on 2026-10-02 for export folders used as the Directory (0.9.4), and modified on 2026-10-04 for the unifying refactor (0.10.0), and on 2026-10-06 for 16k worlds (0.10.3), and on 2026-10-26 for the BetterWorlds-complete export and the editor pack (0.10.7).
 
 // Offline checks of Better Continents 0.9.0's world import (WorldImport). A synthetic export folder is written with
 // ImageSharp and made into a New World preset by the real builder, on a worker thread as in the game, then read back with
@@ -95,6 +95,13 @@ internal static partial class Program
         System.Console.WriteLine($"{checks} checks, {failures} failures");
         return failures == 0 ? 0 : 1;
       }
+      // BCIMPORT_ONLY=editor with BCIMPORT_BIG=<size>: the editor return at that size alone (BCIMPORT_EDITOR_ARGS: its options).
+      if (Environment.GetEnvironmentVariable("BCIMPORT_ONLY") == "editor" && int.TryParse(Environment.GetEnvironmentVariable("BCIMPORT_BIG"), out var editorOnly) && editorOnly > 0)
+      {
+        BigEditorIngest(editorOnly);
+        System.Console.WriteLine($"{checks} checks, {failures} failures");
+        return failures == 0 ? 0 : 1;
+      }
       Parsing();
       Names();
       var folder = Path.Combine(root, "Test World", "export-2026-09-24-12-00-00");
@@ -109,6 +116,7 @@ internal static partial class Program
       DirectoryWay(folder, preset);
       Listing(folder);
       ExportStep();
+      BetterWorldsFolder();
       WorldSizeVersions();
       NewWorlds();
       Amount81();
@@ -119,6 +127,7 @@ internal static partial class Program
       FineImport();
       FineWithEachValue();
       Beforehand();
+      EditorImport();
       // Past the usual sizes: BCIMPORT_BIG=<size> makes an export folder of that size into a preset (the heightmap alone, or with
       // every map when BCIMPORT_ALL=1, but the paint map when BCIMPORT_NOPAINT=1), with its memory measured.
       if (int.TryParse(Environment.GetEnvironmentVariable("BCIMPORT_BIG"), out var big) && big > 0)
@@ -284,6 +293,49 @@ internal static partial class Program
     if (manifest is { } m)
       File.WriteAllText(Path.Combine(dir, "manifest.json"),
         $"{{\n  \"format\": \"bc-export/1\",\n  \"modVersion\": \"0.9.0\",\n  \"exportedAt\": \"{m.At}\",\n  \"worldName\": \"{m.World}\",\n  \"size\": {m.Size},\n  \"files\": []\n}}");
+  }
+
+  // 0.10.7: an export that carries the Deep North's cold map (Coldmap Scale 10), the location exclusion mask and the noise pins (Mountain Noise and Mistlands
+  // Noise 0) makes a preset that has all of it; the same folder without them is the preset it always was.
+  static void BetterWorldsFolder()
+  {
+    Section("a BetterWorlds-complete export: cold map, exclusion mask and noise pins in the preset");
+    var plainDir = Path.Combine(root, "Plain World", "export-2026-10-26-11-00-00");
+    MakeFolder(plainDir, withConfig: true, manifest: ("Plain World", N, "2026-10-26T11:00:00"));
+    var plainPlan = WorldImport.MakePlan(plainDir);
+    var plainOutcome = Task.Run(() => WorldImport.BuildPreset(plainPlan)).Result;
+    var plain = BC.BetterContinentsSettings.Load(plainPlan.PresetPath);
+    C(plainOutcome.Error == null && !plain.HasColdMap && !plain.HasLocationExclusionMap && plain.MountainNoise > 0f && plain.MistlandsNoise > 0f && !plain.LoadedImageMaps().Any(m => m.FileName is "coldmap.png" or "no_spawns_mask.png"),
+      $"a folder without them: no cold map, no mask, and the player's own noise ({plainOutcome.Error ?? "no error"})");
+
+    var dir = Path.Combine(root, "BW World", "export-2026-10-26-12-00-00");
+    MakeFolder(dir, withConfig: true, manifest: ("BW World", N, "2026-10-26T12:00:00"));
+    var png16 = new PngEncoder { ColorType = PngColorType.Grayscale, BitDepth = PngBitDepth.Bit16 };
+    using (var cold = new Image<L16>(N, N))
+    using (var mask = new Image<L16>(N, N))
+    {
+      for (int y = 0; y < N; y++)
+        for (int x = 0; x < N; x++)
+        {
+          cold[x, y] = new L16((ushort)(y < N / 5 ? 1000 + 10 * y : 0));
+          mask[x, y] = new L16((ushort)(x > N / 2 && y > N / 2 ? 65535 : 0));
+        }
+      cold.SaveAsPng(Path.Combine(dir, "coldmap.png"), png16);
+      mask.SaveAsPng(Path.Combine(dir, "no_spawns_mask.png"), png16);
+    }
+    File.WriteAllText(Path.Combine(dir, "world.json"), "{ \"WorldRadius\": 9000, \"EdgeSize\": 400, \"Layout\": \"scaled\" }\n");
+    File.AppendAllLines(Path.Combine(dir, "export.cfg"), ["[01 BetterContinents.Global]", "Mountain Noise = 0", "Mistlands Noise = 0", "[06 BetterContinents.Maps]", "Coldmap Scale = 10"]);
+    var plan = WorldImport.MakePlan(dir);
+    var outcome = Task.Run(() => WorldImport.BuildPreset(plan)).Result;
+    C(outcome.Error == null && outcome.Warnings.Count == 0 && !plan.Ignored.Any(l => l.Contains("Coldmap") || l.Contains("Noise")), $"the preset is made, and nothing in export.cfg is ignored ({outcome.Error ?? "no error"}; {string.Join("; ", plan.Ignored)})");
+    var s = BC.BetterContinentsSettings.Load(plan.PresetPath);
+    C(s.HasColdMap && s.ColdMapScale == 10f && s.HasLocationExclusionMap, "the preset has the cold map at Coldmap Scale 10, and the exclusion mask");
+    C(s.MountainNoise == 0f && s.MistlandsNoise == 0f, $"and Mountain Noise and Mistlands Noise are 0 ({s.MountainNoise}, {s.MistlandsNoise}): the heights hold them already");
+    var names = s.LoadedImageMaps().Select(m => m.FileName).ToList();
+    C(names.Contains("coldmap.png") && names.Contains("no_spawns_mask.png") && names.Last() == "no_spawns_mask.png", "the mask is listed among the loaded maps after the others (it is not in MapKind.All)");
+    var cm = Map<ImageMapFloat>(s, "coldmap.png");
+    C(cm != null && cm.GetValue(0.5f, 0.95f) > 0f && cm.GetValue(0.5f, 0.2f) == 0f, "the cold map reads back: above black along the top of the picture (the north), black below");
+    C(s.IsLocationExcluded(5000f, -5000f) && !s.IsLocationExcluded(-5000f, 5000f), "and the mask excludes the south-east corner and not the north-west one");
   }
 
   static Dictionary<ConfigEntryBase, object> ConfigState() => cfg.ToDictionary(kv => kv.Value, kv => kv.Value.BoxedValue);

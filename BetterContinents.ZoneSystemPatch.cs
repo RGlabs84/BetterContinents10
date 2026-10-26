@@ -1,4 +1,4 @@
-// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0), and on 2026-10-04 for the vegetation twin guard (0.10.0), and on 2026-10-04 for the unifying refactor (0.10.0), and on 2026-10-07 for baked placements (0.10.4), and on 2026-10-13 for the forced genloc (0.10.5).
+// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0), and on 2026-10-04 for the vegetation twin guard (0.10.0), and on 2026-10-04 for the unifying refactor (0.10.0), and on 2026-10-07 for baked placements (0.10.4), and on 2026-10-13 for the forced genloc (0.10.5), and on 2026-10-26 for Upgrade World compatibility (0.10.7).
 
 using System;
 using System.Collections.Generic;
@@ -12,6 +12,11 @@ namespace BetterContinents;
 
 public partial class BetterContinents
 {
+  // The location map's pins and the start override, put into the registry (ZoneSystemPatch.ReassertLocationPins).
+  internal static void ReassertLocationPins(ZoneSystem zones) => ZoneSystemPatch.ReassertLocationPins(zones);
+  // The ground's height where a pin is put (the offline tests stand in for the world generator).
+  internal static Func<float, float, float> LocationGroundHeight = (x, z) => WorldGenerator.instance.GetHeight(x, z);
+
   [HarmonyPatch(typeof(ZoneSystem))]
   private class ZoneSystemPatch
   {
@@ -26,19 +31,26 @@ public partial class BetterContinents
           __instance.m_locationsGenerated = true;
         }
         Settings.LoadPrefabs(ZNetScene.instance);
+        // Upgrade World's World radius, if it is installed (UW.cs).
+        UW.OnWorldLoaded();
       }
     }
     // Changes to location type spawn placement (this is the functional part of the mod)
     [HarmonyPostfix, HarmonyPatch(nameof(ZoneSystem.ClearNonPlacedLocations), []), HarmonyPriority(Priority.Low)]
-    private static void ClearNonPlacedLocationsPostfix(ZoneSystem __instance)
-    {
-      if (!Settings.ShapesWorld) return;
-      if (!Settings.HasLocationMap && !Settings.OverrideStartPosition) return;
-      List<ZoneSystem.ZoneLocation> locs = [.. __instance.m_locations.Where(loc => loc.m_enable && loc.m_quantity != 0).OrderByDescending(x => x.m_prioritized)];
-      PlaceLocations(__instance, locs, Settings, (x, z) => WorldGenerator.instance.GetHeight(x, z));
-    }
+    private static void ClearNonPlacedLocationsPostfix(ZoneSystem __instance) => ReassertLocationPins(__instance);
 
     internal static bool PlacingExplicitLocationMapPin = false;
+
+    // The location map's pins and the start position override, put into the registry of locations: what the postfix above does after
+    // the game has cleared the locations that are not placed, "bc genloc pins" on demand, and Upgrade World's locations_restore
+    // once it has emptied the registry (UW.cs). A pin that is already there, the same location at the same place, is left as it is.
+    internal static void ReassertLocationPins(ZoneSystem zones)
+    {
+      if (ReferenceEquals(zones, null) || !Settings.ShapesWorld) return;
+      if (!Settings.HasLocationMap && !Settings.OverrideStartPosition) return;
+      List<ZoneSystem.ZoneLocation> locs = [.. zones.m_locations.Where(loc => loc.m_enable && loc.m_quantity != 0).OrderByDescending(x => x.m_prioritized)];
+      PlaceLocations(zones, locs, Settings, LocationGroundHeight);
+    }
 
     // The location map's pins and the start position override. A world made since 0.10 places the start first, so no
     // pin can take its zone (StartBeforeLocationPins); an older one places it last, as it always has. The game keeps
@@ -108,11 +120,17 @@ public partial class BetterContinents
     }
 
     // ZoneSystem.RegisterLocation, unless the zone already holds a location, which the game would keep (dropping this
-    // one with only "Location already exist in zone"): then false, and that location's name.
+    // one with only "Location already exist in zone"): then false, and that location's name. When the zone already holds this
+    // very pin (the same location, within a metre), it is there already: true, and nothing is registered a second time.
     internal static bool TryRegister(ZoneSystem zones, ZoneSystem.ZoneLocation loc, Vector3 position, out string holder)
     {
       if (zones.m_locationInstances.TryGetValue(ZoneSystem.GetZone(position), out var there))
       {
+        if (SamePin(there, loc, position))
+        {
+          holder = "";
+          return true;
+        }
         holder = there.m_location?.m_prefabName ?? "another location";
         return false;
       }
@@ -120,6 +138,10 @@ public partial class BetterContinents
       zones.RegisterLocation(loc, position, false);
       return true;
     }
+
+    private static bool SamePin(ZoneSystem.LocationInstance there, ZoneSystem.ZoneLocation loc, Vector3 position) =>
+      there.m_location != null && (ReferenceEquals(there.m_location, loc) || there.m_location.m_prefabName == loc.m_prefabName)
+      && Mathf.Abs(there.m_position.x - position.x) < 1f && Mathf.Abs(there.m_position.z - position.z) < 1f;
 
     [HarmonyPrefix, HarmonyPatch(nameof(ZoneSystem.RegisterLocation))]
     private static bool RegisterLocationPrefix(ZoneSystem.ZoneLocation location, Vector3 pos)

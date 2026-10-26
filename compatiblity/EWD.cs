@@ -1,4 +1,4 @@
-// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0), and on 2026-09-29 for Expand World Data biomes (0.9.3), and on 2026-10-04 for the unifying refactor (0.10.0).
+// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0), and on 2026-09-29 for Expand World Data biomes (0.9.3), and on 2026-10-04 for the unifying refactor (0.10.0), and on 2026-10-26 to follow the types Expand World Data 1.79 moved (0.10.7).
 
 using System;
 using System.Linq.Expressions;
@@ -30,16 +30,58 @@ public class EWD
   // its yaml's `terrain`; the biome itself when it has none).
   private static volatile Func<Heightmap.Biome>? LavaBiomesFunc;
   private static volatile Func<Heightmap.Biome, Heightmap.Biome>? TerrainFunc;
+  // Expand World Data 1.79 moved WorldInfo to ExpandWorldData.Compatibility and BiomeManager to ExpandWorldData.Biome (the
+  // members are the same; Api stayed put). Ask for the type under each namespace it has had, newest first, and if a later
+  // release moves it again, take the one type of that name that has the member Better Continents needs.
+  internal static Type? FindType(Assembly? assembly, string name, string member, params string[] namespaces)
+  {
+    if (assembly == null) return null;
+    foreach (var space in namespaces)
+    {
+      var type = assembly.GetType(space + "." + name);
+      if (type != null) return type;
+    }
+    try
+    {
+      Type? found = null;
+      foreach (var type in assembly.GetTypes())
+      {
+        if (type.Name != name || !type.IsClass || type.GetMember(member, BindingFlags.Public | BindingFlags.Static).Length == 0) continue;
+        if (found != null) return null;
+        found = type;
+      }
+      return found;
+    }
+    catch (ReflectionTypeLoadException)
+    {
+      return null;
+    }
+  }
+
+  private static Type? FindWorldInfo(Assembly? assembly) =>
+    FindType(assembly, "WorldInfo", "Set", "ExpandWorldData.Compatibility", "ExpandWorldData");
+
+  private static Type? FindBiomeManager(Assembly? assembly) =>
+    FindType(assembly, "BiomeManager", "TryGetBiome", "ExpandWorldData.Biome", "ExpandWorldData");
+
   public static void Run()
   {
     if (!Chainloader.PluginInfos.TryGetValue(GUID, out var info)) return;
     Assembly = info.Instance.GetType().Assembly;
     BindBiomeNames();
-    var type = Assembly.GetType("ExpandWorldData.WorldInfo");
+    if (!BindSize()) return;
+    BetterContinents.Log($"\"Expand World Data\" {info.Metadata.Version} detected. Applying compatibility: {BindingSummary()}.");
+  }
+
+  // WorldInfo.Set, which tells Expand World Data the world's size. False (with a warning) when it is not found. Internal for the offline tests.
+  internal static bool BindSize()
+  {
+    SetSize = null;
+    var type = FindWorldInfo(Assembly);
     if (type == null)
     {
-      BetterContinents.LogWarning("EWD compatibility: type \"ExpandWorldData.WorldInfo\" not found; skipping (Expand World Data may have changed its API).");
-      return;
+      BetterContinents.LogWarning("EWD compatibility: type \"WorldInfo\" not found; skipping, so Expand World Data does not learn the world's size (Expand World Data may have changed its API).");
+      return false;
     }
     // AccessTools.Method can itself throw AmbiguousMatchException when the name resolves to more
     // than one overload upstream; catch it so an optional integration can never take BC down.
@@ -51,14 +93,14 @@ public class EWD
     {
       SetSize = null;
       BetterContinents.LogWarning($"EWD compatibility: failed to resolve WorldInfo.Set ({ex.Message}); skipping.");
-      return;
+      return false;
     }
     if (SetSize == null)
     {
       BetterContinents.LogWarning("EWD compatibility: method \"WorldInfo.Set\" not found; skipping (Expand World Data may have changed its API).");
-      return;
+      return false;
     }
-    BetterContinents.Log("\"Expand World Data\" detected. Applying compatibility.");
+    return true;
   }
 
   // Internal for the offline tests, which load Expand World Data's assembly without BepInEx's chainloader.
@@ -73,7 +115,7 @@ public class EWD
     TryGetBiomeByName = null;
     TryGetBiomeDisplayName = null;
     MinimapHeightFunc = null;
-    var manager = Assembly?.GetType("ExpandWorldData.BiomeManager");
+    var manager = FindBiomeManager(Assembly);
     BindBiomeData(manager);
     try
     {
@@ -133,6 +175,11 @@ public class EWD
     if (LavaBiomesFunc == null || TerrainFunc == null)
       BetterContinents.LogWarning("EWD compatibility: BiomeManager.LavaBiomes or GetTerrain not found (Expand World Data may have changed its API); its lava biomes are not hot on a biome map.");
   }
+
+  // What Run bound, for the one log line that says which parts of Expand World Data Better Continents reaches.
+  private static string BindingSummary() =>
+    "size " + (SetSize != null ? "yes" : "no") + ", biome names " + (TryGetBiomeByName != null && TryGetBiomeDisplayName != null ? "yes" : "no")
+    + ", lava and terrain " + (LavaBiomesFunc != null && TerrainFunc != null ? "yes" : "no") + ", minimap height " + (MinimapHeightFunc != null ? "yes" : "no");
 
   // Whether Expand World Data gives this biome lava (its yaml's `lava: true`); false when it is not installed.
   public static bool IsLavaBiome(Heightmap.Biome biome)

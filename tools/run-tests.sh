@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Added by Wubarrk on 2026-10-04 for the unifying refactor and the vegetation twin guard (0.10.0), and modified on 2026-10-06 for the Forest Scale default (0.10.2) and for 16k worlds (0.10.3), and on 2026-10-07 for baked placements (0.10.4), and on 2026-10-13 for BC's own water (0.10.5), and for the forced genloc (0.10.5), and for lakes and clearing (0.10.5).
+# Added by Wubarrk on 2026-10-04 for the unifying refactor and the vegetation twin guard (0.10.0), and modified on 2026-10-06 for the Forest Scale default (0.10.2) and for 16k worlds (0.10.3), and on 2026-10-07 for baked placements (0.10.4), and on 2026-10-13 for BC's own water (0.10.5), and for the forced genloc (0.10.5), and for lakes and clearing (0.10.5), and on 2026-10-26 for Upgrade World compatibility (0.10.7).
 #
 # Builds the plugin (Release) and runs every offline suite against it, one after another, memory-capped and niced:
 #   golden-tests      the reference recordings (tools/golden-tests/golden): any difference fails
@@ -27,6 +27,13 @@
 #   high-tests        terrain up to 16 km: when a world is a high world (the High Terrain setting: Auto, On, Off), heights at Heightmap Amount 81,
 #                     what is inside a dungeon, the patches of the game's height rules on the client's and the dedicated server's IL, an
 #                     inventory of the game's numbers, what a world saves of the setting, DynamicPatch's patches on and off on the game's methods
+#   uw-tests          Upgrade World's side (compatiblity/UW.cs): the names looked up in the real UpgradeWorld.dll 1.87, its config bound for real, its
+#                     locations_restore merge with and without Better Continents' safeguard, ClearNonPlacedLocations under its skip, the warning for
+#                     "upgrade ashlands"
+#   ews-tests         Expand World Size 1.45's bridge to Better Continents: the names its lookup holds (read from its IL) resolved in the plugin, and
+#                     what it calls (SetSize, SetStretch, the enabled flag)
+#   jere-names        (not a suite: tools/check-jere-names.sh) every name of Expand World Data, Expand World Size and Upgrade World that the source
+#                     looks up, resolved in their DLLs (EWD 1.73 and 1.79, EWS 1.45, UW 1.87); exit code 1 on a missing name
 #   placement-tests   baked placements: format 1 read and written (the checks of the spec's 2.2 each by name), VALtima's real file, the layer in the
 #                     world's settings (DataKeys 70 and 71, a 0.10.3 reader's stop), edits, merges and patches, and the tests each slice adds
 #                     (Tests.<Slice>.cs: every static method named *Test of the partial class Tests runs). "dotnet run -c Release -- <part of a
@@ -62,7 +69,7 @@ if [ "${BC_REQUIRE_RELEASES:-}" != "0" ]; then
 fi
 logs="$(mktemp -d "${TMPDIR:-/tmp}/bc-tests-XXXXXX")"
 suites=("$@")
-[ ${#suites[@]} -eq 0 ] && suites=(golden-tests altbiome-harness export-tests import-tests livecfg-tests ewd-tests twin-tests size-tests sector-tests tile-tests zone-tests high-tests placement-tests water-tests lake-tests)
+[ ${#suites[@]} -eq 0 ] && suites=(golden-tests altbiome-harness export-tests import-tests livecfg-tests ewd-tests twin-tests size-tests sector-tests tile-tests zone-tests high-tests placement-tests water-tests lake-tests uw-tests ews-tests jere-names)
 
 echo "== building the plugin"
 if ! nice -n 10 dotnet build -c Release BetterContinents.csproj > "$logs/build.log" 2>&1; then
@@ -76,10 +83,11 @@ md5sum obj/Release/net4.8/BetterContinents.dll dist/plugins/BetterContinents.dll
 failed=()
 for s in "${suites[@]}"; do
   echo "== $s"
-  if (cd "tools/$s" && nice -n 10 dotnet run -c Release > "$logs/$s.log" 2>&1); then
+  if [ "$s" = jere-names ]; then run="tools/check-jere-names.sh"; else run="cd tools/$s && nice -n 10 dotnet run -c Release"; fi
+  if (eval "$run" > "$logs/$s.log" 2>&1); then
     tail -n 2 "$logs/$s.log"
   else
-    grep -E "FAIL|CRASH|error" "$logs/$s.log" | head -20
+    grep -E "FAIL|CRASH|error|MISSING|UNLISTED" "$logs/$s.log" | head -20
     tail -n 2 "$logs/$s.log"
     failed+=("$s")
   fi

@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-10-04 for the unifying refactor (0.10.0).
+// Added by Wubarrk on 2026-10-04 for the unifying refactor (0.10.0), and on 2026-10-26 for Upgrade World compatibility (0.10.7).
 
 // What a mutation run found the other checks let through. Every line of ZoneReset.cs, ZoneRegen.cs, GameUtils.ResetZones and the
 // patches was broken one way at a time, and the breaks no check noticed are covered here: which of the two regenerations
@@ -105,6 +105,7 @@ internal static partial class Program
     public readonly Action sendQueue = ZoneRegen.SendDestroyQueue;
     public readonly Action<string> runCommand = GameUtils.RunConsoleCommand;
     public readonly Action requestRegeneration = GameUtils.RequestRegeneration;
+    public readonly Action<RegenFilter> requestFilteredRegeneration = GameUtils.RequestFilteredRegeneration;
     public readonly Action<Heightmap> pokeHeightmap = GameUtils.PokeHeightmap;
     // (The configuration is not declared yet when the defaults are taken.)
     private readonly string? command = BC.ConfigDebugResetCommand?.Value;
@@ -126,6 +127,7 @@ internal static partial class Program
       ZoneRegen.SendDestroyQueue = sendQueue;
       GameUtils.RunConsoleCommand = runCommand;
       GameUtils.RequestRegeneration = requestRegeneration;
+      GameUtils.RequestFilteredRegeneration = requestFilteredRegeneration;
       GameUtils.PokeHeightmap = pokeHeightmap;
       if (command != null)
         BC.ConfigDebugResetCommand.Value = command;
@@ -1293,7 +1295,7 @@ internal static partial class Program
     var migrate = new List<string>();
     foreach (var method in typeof(SettingsSchema).GetMethods(AnyDeclared).Where(m => m.Name == nameof(SettingsSchema.Migrate)))
       migrate.AddRange(StringsOf(method));
-    var gameUtils = new[] { nameof(GameUtils.ResetZones), nameof(GameUtils.RegenerateZones), "StartReset", nameof(GameUtils.PokeHeightmaps) }
+    var gameUtils = new[] { nameof(GameUtils.ResetZones), nameof(GameUtils.RegenerateZones), "RegenerateZonesWith", "StartReset", nameof(GameUtils.PokeHeightmaps) }
       .SelectMany(name => StringsOf(typeof(GameUtils).GetMethod(name, AnyDeclared)!)).ToList();
 
     // (The scan reads what it should: lines known to be in each are found.)

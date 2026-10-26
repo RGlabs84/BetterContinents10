@@ -1,0 +1,20 @@
+<!-- Added by Wubarrk on 2026-10-26 for Upgrade World compatibility (0.10.7). -->
+<!-- Lists every type and member of Jere Kuusela's mods that Better Continents looks up by name (compatiblity/*.cs), and resolves each
+     against the DLLs of Expand World Data 1.73 and 1.79, Expand World Size 1.45 and Upgrade World 1.87 in libs-Tools, by reading their
+     metadata only (nothing of them runs). Exit code 1 when a name is missing from a DLL, or when Better Continents' source holds a name
+     the list does not know. Run from tools/check-jere-names.sh. -->
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <AssemblyName>JereNames</AssemblyName>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <NoWarn>$(NoWarn);NU1701;CS8632</NoWarn>
+    <LibsTools>$(MSBuildThisFileDirectory)../../../libs-Tools/</LibsTools>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="Mono.Cecil"><HintPath>$(LibsTools)Mono.Cecil.dll</HintPath></Reference>
+  </ItemGroup>
+</Project>

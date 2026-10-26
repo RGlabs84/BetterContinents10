@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-10-06 for 16k worlds (0.10.3).
+// Added by Wubarrk on 2026-10-06 for 16k worlds (0.10.3), and on 2026-10-26 for Expand World Size's save grid (0.10.7).
 //
 // When the wide sectors are on (a world's settings, a machine's Wide Sectors, the chunks of a save), switching them on and off with
 // Harmony, one failed hook, the sector array's width, the save's chunks that force them, zone regeneration on them, and
@@ -172,6 +172,7 @@ internal static partial class Program
     Guarded("MigrationTests", () => MigrationTests(harmony));
     Guarded("GuardTests", () => GuardTests(harmony));
     Guarded("FailClosedTests", () => FailClosedTests(harmony));
+    Guarded("EwsGridTests", () => EwsGridTests(harmony));
     Guarded("CallSiteTests", () => CallSiteTests(harmony));
     Guarded("ZoneRegenTests", () => ZoneRegenTests(harmony));
     Guarded("SmallPositionTests", () => SmallPositionTests(harmony));

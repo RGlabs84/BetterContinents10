@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-09-24 for world export and import (0.9.0), and modified on 2026-10-04 for the unifying refactor (0.10.0), and on 2026-10-06 for 16k worlds (0.10.3).
+// Added by Wubarrk on 2026-09-24 for world export and import (0.9.0), and modified on 2026-10-04 for the unifying refactor (0.10.0), and on 2026-10-06 for 16k worlds (0.10.3), and on 2026-10-26 for the BetterWorlds-complete export and the editor pack (0.10.7).
 
 using System;
 using System.Collections.Generic;
@@ -47,7 +47,7 @@ public static class WorldExportCommands
 {
     public const string OptionsUsage =
         "[size] [amount=1] [sealevel=0.5] [heatscale=10] [edge=auto|on|off] [forest=additive|exact] [fine=auto|off|4|8] "
-        + "[noheight] [nobiomes] [nolocations] [noforest] [noheat] [noaltbiomes] [nolava] [nomoss] [nopaint] [nosources] [nopreset] [perpoint]";
+        + "[noheight] [nobiomes] [nolocations] [noforest] [noheat] [nocold] [noaltbiomes] [nolava] [nomoss] [nopaint] [nosources] [nopreset] [perpoint]";
 
     public const string Usage = "bc_export [status | cancel | server <options> | <options>] - options: " + OptionsUsage;
 
@@ -58,7 +58,7 @@ public static class WorldExportCommands
             "[status | cancel | server ... | size and options] - Better Continents: export the loaded world as a map set that rebuilds it (bc_export help)",
             args => Run(args),
             isCheat: false, isNetwork: false, onlyServer: false,
-            optionsFetcher: () => ["status", "cancel", "server", "help", .. new[] { 1024, 2048, 4096, 8192, 16384 }.Where(size => size <= WorldExport.SizeLimit).Select(size => size.ToString(CultureInfo.InvariantCulture))]);
+            optionsFetcher: () => ["status", "cancel", "server", "help", "editor", .. new[] { 1024, 2048, 4096, 8192, 16384 }.Where(size => size <= WorldExport.SizeLimit).Select(size => size.ToString(CultureInfo.InvariantCulture))]);
     }
 
     private static void Run(Terminal.ConsoleEventArgs args)
@@ -75,6 +75,9 @@ public static class WorldExportCommands
                 output("and a New World preset \"<world> <time>\": pick it in the New World screen to make a world from the export.");
                 output($"size: {WorldExport.MinSize} to {WorldExport.SizeLimit} pixels a side (powers of two from 1024 are the usual ones{(WorldExport.SizeLimit < WorldExport.MaxSize ? $"; Largest Size in the config stops at {WorldExport.SizeLimit}" : "")}); amount: the Heightmap Amount the heights are encoded for, above 0 and up to {WorldExport.MaxHeightmapAmount:0}.");
                 output("fine: heightmap-fine.png beside heightmap.png, 4 bits (a sixteenth of one of its steps) or 8 bits (a 256th) more of height; auto (the default) makes it with 4 bits where a step is above 1.5 cm, from a Heightmap Amount of about 5.");
+                output("Editor pack: [editor | editoronly] [eformat=tif,r32] [eunit=v|metres] [eamount=auto|<n>] [esize=<n>] [emasks=default|all|none|<list>]");
+                output("editor: also writes editor/, the ground as 32-bit floats (TIFF, .r32) and masks for Gaea and other terrain editors; bc_import edited brings the result back (bc_import help).");
+                output("  eformat=tif,r32 the float files; eunit=metres adds height-metres.tif; eamount the editor's Heightmap Amount (auto: at least 2); esize its size; emasks=default|all|none|water,inland,slope,forest,biomes,index,soft,protect; editoronly: little else.");
                 output("After editing the PNGs, bc_import makes the preset again (bc_import help).");
                 output($"Defaults, from [09 BetterContinents.Export] in BetterContinents.cfg: {WorldExport.Options.Default()}");
                 output("The same section's Hud turns on the export HUD: a status box (Hud Hotkey, F9) and an export window (Window Hotkey, F7).");
@@ -222,8 +225,17 @@ public static class WorldExportCommands
                         else ok = false;
                         break;
                     default:
-                        error = $"unknown option '{raw}'";
-                        return false;
+                        if (!WorldExport.Options.TryEditorKey(options, key, value, out var problem))
+                        {
+                            error = $"unknown option '{raw}'";
+                            return false;
+                        }
+                        if (problem != null)
+                        {
+                            error = problem;
+                            return false;
+                        }
+                        break;
                 }
                 if (!ok)
                 {
@@ -239,6 +251,8 @@ public static class WorldExportCommands
                 case "nolocations": case "nolocation": options.Locations = false; break;
                 case "noforest": options.Forest = false; break;
                 case "noheat": options.Heat = false; break;
+                case "cold": options.Cold = true; break;
+                case "nocold": options.Cold = false; break;
                 case "noaltbiomes": case "noaltbiome": options.AltBiomes = false; break;
                 case "nolava": options.Lava = false; break;
                 case "nomoss": options.Moss = false; break;
@@ -249,6 +263,8 @@ public static class WorldExportCommands
                 case "nopreset": options.Preset = false; break;
                 case "perpoint": options.ZoneBlend = false; break;
                 default:
+                    if (WorldExport.Options.TryEditorSwitch(options, token))
+                        break;
                     error = $"unknown option '{raw}'";
                     return false;
             }
@@ -404,7 +420,7 @@ public static class WorldImportCommands
 {
     public const string ArgsUsage = "[<number> | <folder> | <world>] [config]";
 
-    public const string Usage = "bc_import [list | status | help | <number> | <folder> | <world>] [config]";
+    public const string Usage = "bc_import [list | status | help | edited | <number> | <folder> | <world>] [config]";
 
     public static void Register()
     {
@@ -413,7 +429,7 @@ public static class WorldImportCommands
             "[list | <number> | <folder> | <world>] [config] - Better Continents: make a New World preset (or the config) from an export folder (bc_import help)",
             args => Run(args),
             isCheat: false, isNetwork: false, onlyServer: false,
-            optionsFetcher: () => ["list", "status", "help", "config"]);
+            optionsFetcher: () => ["list", "status", "help", "config", "edited"]);
     }
 
     private static void Run(Terminal.ConsoleEventArgs args)
@@ -434,6 +450,8 @@ public static class WorldImportCommands
                 PrintStatus(output);
                 break;
             default:
+                if (EditorIngest.TryRunLine(rest, output))
+                    break;
                 Import(rest, output);
                 break;
         }
@@ -450,6 +468,8 @@ public static class WorldImportCommands
         output("  bc_import <folder>      any folder of Better Continents maps: a full path, or one under BetterContinents/.");
         output("  ... config              instead of a preset: puts export.cfg into BetterContinents.cfg (the old file is kept");
         output("                          beside it) and selects \"From Config\", so every new world reads the PNGs as they are then.");
+        output("  bc_import edited [<export>] [options]   brings back the ground an outside editor (Gaea...) made from an export's editor/ folder as a");
+        output("                          new folder <export>-edited; 'bc_import edited help' says how.");
         output("  bc_import status        what the import is doing, and how the last one went.");
         output($"Exports are in {SafeRoot()}/<world>/export-<time>/; presets in {SafePresets()}.");
     }
@@ -480,6 +500,8 @@ public static class WorldImportCommands
     public static void PrintStatus(Action<string> output)
     {
         foreach (var line in WorldImport.StatusLines())
+            output(line);
+        foreach (var line in EditorIngest.StatusLines())
             output(line);
     }
 

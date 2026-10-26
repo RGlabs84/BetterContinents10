@@ -1,4 +1,4 @@
-﻿// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and alt-biome planting (0.8.1), and on 2026-10-04 for the unifying refactor (0.10.0), and on 2026-10-06 for 16k worlds (0.10.3).
+﻿// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and alt-biome planting (0.8.1), and on 2026-10-04 for the unifying refactor (0.10.0), and on 2026-10-06 for 16k worlds (0.10.3), and on 2026-10-26 for Upgrade World compatibility (0.10.7).
 
 using System;
 using System.Collections;
@@ -28,6 +28,8 @@ public static class GameUtils
     // and Better Continents' regeneration is requested.
     internal static Action<string> RunConsoleCommand = command => Console.instance.TryRunCommand(command);
     internal static Action RequestRegeneration = () => ZoneRegen.Request();
+    // The same with the words of "bc regen" (a filter, or a dry run: ZoneRegenFilter.cs).
+    internal static Action<RegenFilter> RequestFilteredRegeneration = filter => ZoneRegen.Request(null, filter);
     // Poke takes the amount of frames to delay by, 1 matches the old "delayed" flag.
     internal static Action<Heightmap> PokeHeightmap = hm => hm.Poke(1);
 
@@ -38,8 +40,10 @@ public static class GameUtils
     // "bc regen": the settings are as they were, so the loaded terrain is left as it was built. Building every loaded chunk
     // again (the distant terrain too) happens in one frame and stalls the game for most of a second, for nothing here.
     public static void RegenerateZones() => StartReset(rebuildTerrain: false);
+    // ... with the words of "bc regen" (a filter, or a dry run: ZoneRegenFilter.cs).
+    internal static void RegenerateZonesWith(RegenFilter? filter) => StartReset(rebuildTerrain: false, filter);
 
-    private static void StartReset(bool rebuildTerrain)
+    private static void StartReset(bool rebuildTerrain, RegenFilter? filter = null)
     {
         var command = BetterContinents.ConfigDebugResetCommand.Value;
         bool own = ZoneRegen.RunsOwn(command);
@@ -48,7 +52,12 @@ public static class GameUtils
         if (rebuildTerrain)
             PokeHeightmaps();
         if (own)
-            RequestRegeneration();
+        {
+            if (filter != null)
+                RequestFilteredRegeneration(filter);
+            else
+                RequestRegeneration();
+        }
     }
 
     // The terrain that is loaded was built from the settings before the change.

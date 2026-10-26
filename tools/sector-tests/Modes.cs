@@ -238,8 +238,8 @@ internal static partial class Program
       var config = BC.ConfigEnabled.ConfigFile;
       var entry = BC.ConfigWideSectors;
       Check(entry != null && entry.Value == WideSectorsMode.Auto && SettingsSchema.WideSectors.Section == "07 BetterContinents.Misc" && SettingsSchema.WideSectors.Scope == SettingScope.Live
-            && SettingsSchema.Groups.Single(g => g.Name == "BetterContinents.Misc").Settings.Last() == SettingsSchema.WideSectors && !SettingsSchema.WideSectors.ReadsIntoSettings,
-        "Wide Sectors is in [07 BetterContinents.Misc], last in its list, Auto by default, a machine's own setting (no world, export or import carries it)");
+            && SettingsSchema.Groups.Single(g => g.Name == "BetterContinents.Misc").Settings is var misc && misc[^2] == SettingsSchema.WideSectors && misc[^1] == SettingsSchema.UpgradeWorldRadius && !SettingsSchema.WideSectors.ReadsIntoSettings,
+        "Wide Sectors is in [07 BetterContinents.Misc], second last in its list (Upgrade World Radius follows), Auto by default, a machine's own setting (no world, export or import carries it)");
       Check(WorldImport.IsWorldSetting(entry) == false, "export.cfg never carries it (it is not a world setting)");
 
       BC.ConfigEnabled.Value = true;

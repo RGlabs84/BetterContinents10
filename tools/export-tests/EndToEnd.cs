@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-09-24 for world export and import (0.9.0), and modified on 2026-10-04 for the unifying refactor (0.10.0), and on 2026-10-06 for 16k worlds (0.10.3).
+// Added by Wubarrk on 2026-09-24 for world export and import (0.9.0), and modified on 2026-10-04 for the unifying refactor (0.10.0), and on 2026-10-06 for 16k worlds (0.10.3), and on 2026-10-26 for the BetterWorlds-complete export (0.10.7).
 
 using System;
 using System.Collections;
@@ -191,7 +191,7 @@ internal static class EndToEnd
       System.Console.WriteLine("    log " + line);
     Program.C(!WorldExport.IsRunning && WorldExport.Phase == "Done" && WorldExport.LastError == null && WorldExport.LastExportDir == dir, $"the export finishes: phase {WorldExport.Phase}, error {WorldExport.LastError ?? "none"}");
     Program.C(monotonic && WorldExport.Overall == 100f, "overall progress only rises, and ends at 100");
-    var expected = new[] { "altbiomemap.png", "altbiomemap.txt", "heightmap.png", "biomemap.png", "biomemap.txt", "forestmap.png", "heatmap.png", "lavamap.png", "mossmap.png", "paintmap.png", "paintmap.txt", "export.cfg", "README.txt", "manifest.json" };
+    var expected = new[] { "altbiomemap.png", "altbiomemap.txt", "heightmap.png", "biomemap.png", "biomemap.txt", "forestmap.png", "heatmap.png", "lavamap.png", "mossmap.png", "paintmap.png", "paintmap.txt", "coldmap.png", "export.cfg", "world.json", "README.txt", "manifest.json" };
     var present = Directory.Exists(dir) ? Directory.GetFiles(dir).Select(Path.GetFileName).ToHashSet() : new HashSet<string>();
     var missing = expected.Where(f => !present.Contains(f)).ToList();
     Program.C(missing.Count == 0, "every map, legend and text file is written" + (missing.Count > 0 ? ": missing " + string.Join(", ", missing) : ""));
@@ -199,6 +199,8 @@ internal static class EndToEnd
     Program.C(!present.Contains("locationmap.png"), "no location map without locations");
     Program.C(!present.Contains("heightmap-fine.png"), "no fine heights file at Heightmap Amount 2 (fine=auto leaves it out: a grey step is 0.61 cm)");
     if (missing.Count > 0) return;
+    // Before any ConfigFile binds to it (a bind can save the file over, without its comments).
+    var cfgText = File.ReadAllText(Path.Combine(dir, "export.cfg"));
 
     // Alt biomes through ImageMapAltBiome, at the game's own grid points.
     var ab = ImageMapAltBiome.Create(Path.Combine(dir, "altbiomemap.png"))!;
@@ -278,6 +280,40 @@ internal static class EndToEnd
     float g = WorldGenerator.GetAshlandsOceanGradient(0f, -10400f);
     float back = M.ValueToHeat(heat.GetValue(0.5f, (-10400f) / T + 0.5f), 10f);
     Program.C(g > 0f && Mathf.Abs(back - g) < 0.01f, $"the heat map rebuilds the Ashlands gradient at the southern rim ({g:0.###} vs {back:0.###})");
+    // The heat map is exact for IsAshlands: heat above black exactly where the game's own test says Ashlands (the gradient's line differs from it).
+    int heatBad = 0, heatChecked = 0;
+    var heatGrey = FineTest.ReadGrey(Path.Combine(dir, "heatmap.png"), n);
+    for (int r = 0; r < n; r += 5)
+      for (int c = 0; c < n; c += 5)
+      {
+        float wx = M.PixelToWorld(c, n, T), wz = M.FileRowToWorldZ(r, n, T);
+        heatChecked++;
+        if ((heatGrey[r * n + c] > 0) != WorldGenerator.IsAshlands(wx, wz)) heatBad++;
+      }
+    Program.C(heatBad == 0, $"the heat map is above black exactly where IsAshlands says so ({heatChecked - heatBad} of {heatChecked} samples)");
+
+    // The cold map: 16-bit grey, above black exactly where IsDeepnorth says so, and the wave fade (the game's 200 m ramp) / 10 inside.
+    var coldBytes = File.ReadAllBytes(Path.Combine(dir, "coldmap.png"));
+    Program.C(coldBytes[24] == 16 && coldBytes[25] == 0, "coldmap.png is a 16-bit grey PNG");
+    var coldGrey = FineTest.ReadGrey(Path.Combine(dir, "coldmap.png"), n);
+    int coldBad = 0, coldChecked = 0, coldNorth = 0;
+    float fadeWorst = 0f;
+    for (int r = 0; r < n; r += 5)
+      for (int c = 0; c < n; c += 5)
+      {
+        float wx = M.PixelToWorld(c, n, T), wz = M.FileRowToWorldZ(r, n, T);
+        float v = M.UShortToValue(coldGrey[r * n + c]);
+        bool north = WorldGenerator.IsDeepnorth(wx, wz);
+        coldChecked++;
+        if ((v > 0f) != north) coldBad++;
+        if (north)
+        {
+          coldNorth++;
+          fadeWorst = Mathf.Max(fadeWorst, Mathf.Abs(Mathf.Clamp01(M.ValueToCold(v, 10f)) - (float)WorldGenerator.DeepNorthWaveFade(wx, wz)));
+        }
+      }
+    Program.C(coldNorth > 100 && coldBad == 0, $"the cold map is above black exactly where IsDeepnorth says so ({coldChecked - coldBad} of {coldChecked} samples, {coldNorth} in the Deep North)");
+    Program.C(fadeWorst < 2e-3f, $"and inside it holds the wave fade divided by 10 (worst {fadeWorst:g3})");
     Program.C(ImageMapFloat.Create(File.ReadAllBytes(Path.Combine(dir, "lavamap.png")), false) != null
       && ImageMapFloat.Create(File.ReadAllBytes(Path.Combine(dir, "mossmap.png")), false) != null
       && ImageMapPaint.Create(Path.Combine(dir, "paintmap.png")) != null, "lava, moss and paint maps load");
@@ -287,10 +323,24 @@ internal static class EndToEnd
     Program.C(cf.Bind("00 BetterContinents.Debug", "Directory", "").Value == dir.Replace('\\', '/'), "export.cfg points Directory at the export");
     Program.C(cf.Bind("01 BetterContinents.Global", "Skip Default Locations", true).Value == false, "without a location map the game places the locations");
     Program.C(cf.Bind("05 BetterContinents.StartPosition", "Override Start Position", true).Value == false, "no start position override");
+    Program.C(cf.Bind("06 BetterContinents.Maps", "Coldmap Scale", -1f).Value == 10f, "export.cfg binds Coldmap Scale 10 for the cold map");
+    Program.C(cf.Bind("01 BetterContinents.Global", "Mountain Noise", 1f).Value == 0f && cf.Bind("01 BetterContinents.Global", "Mistlands Noise", 1f).Value == 0f,
+      "export.cfg pins Mountain Noise and Mistlands Noise to 0 (the heights hold them already)");
+    Program.C(cfgText.StartsWith("## Better Continents world export of \"") && Directory.GetFiles(dir, "*.cfg").Length == 1, "export.cfg keeps its header line and is the only *.cfg in the folder");
+    var worldJson = File.ReadAllText(Path.Combine(dir, "world.json")).Trim();
+    Program.C(worldJson == "{ \"WorldRadius\": 10000, \"EdgeSize\": 500, \"Layout\": \"scaled\" }", $"world.json holds the world's radius, edge and layout, and no Sectors ({worldJson})");
     using (var doc = System.Text.Json.JsonDocument.Parse(File.ReadAllText(Path.Combine(dir, "manifest.json"))))
     {
       var files = doc.RootElement.GetProperty("files").EnumerateArray().Select(e => e.GetString()).ToList();
       Program.C(expected.All(files.Contains), "manifest.json lists every file, itself included");
+      var root = doc.RootElement;
+      Program.C(root.GetProperty("settingsVersion").GetInt32() == 12 && root.GetProperty("exportRevision").GetInt32() == 2 && root.GetProperty("format").GetString() == "bc-export/1",
+        "manifest.json: settingsVersion 12 and exportRevision 2, and the format is still bc-export/1");
+      Program.C(root.GetProperty("worldSize").GetSingle() == 10000f && root.GetProperty("edgeSize").GetSingle() == 500f && root.GetProperty("layout").GetString() == "scaled"
+        && !root.GetProperty("wideSectors").GetBoolean() && root.GetProperty("highTerrain").GetInt32() == 0, "and the size, layout, wide sectors and high terrain");
+      var coldInfo = root.GetProperty("cold");
+      Program.C(coldInfo.GetProperty("scale").GetSingle() == 10f && coldInfo.GetProperty("source").GetString() == "sampled" && coldInfo.GetProperty("deepNorthPixels").GetInt64() > 0, "and the cold map: scale 10, sampled, its pixel count");
+      Program.C(root.GetProperty("fileBytes").GetProperty("coldmap.png").GetInt64() == new FileInfo(Path.Combine(dir, "coldmap.png")).Length && root.GetProperty("fileBytes").GetProperty("heightmap.png").GetInt64() > 0, "and the byte count of the maps");
       // No game config is bound here, so the New World preset cannot be built: the export must finish anyway and say so.
       var preset = doc.RootElement.GetProperty("preset");
       Program.C(!preset.GetProperty("made").GetBoolean() && (preset.GetProperty("error").GetString() ?? "").Contains("config"),

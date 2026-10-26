@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-10-07 for baked placements (0.10.4).
+// Added by Wubarrk on 2026-10-07 for baked placements (0.10.4), and modified on 2026-10-26 for the BetterWorlds-complete export (0.10.7).
 
 using System;
 using System.Collections.Generic;
@@ -41,6 +41,7 @@ internal static class LayerExport
     o.Biomes = false;
     o.Forest = false;
     o.Heat = false;
+    o.Cold = false;
     o.AltBiomes = false;
     o.Lava = false;
     o.Moss = false;

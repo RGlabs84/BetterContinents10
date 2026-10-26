@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-10-04 for the unifying refactor (0.10.0), and modified on 2026-10-06 for the Forest Scale default (0.10.2).
+// Added by Wubarrk on 2026-10-04 for the unifying refactor (0.10.0), and modified on 2026-10-06 for the Forest Scale default (0.10.2), and on 2026-10-26 for Upgrade World compatibility (0.10.7).
 //
 // The Debug Reset Command setting and its migration, the Forest Scale default and its migration, the "bc regen" command and what it is wired to, and the game's own code
 // that the regeneration depends on, read from the installed game's IL: who sets a creator, how a destroyed object reaches
@@ -201,7 +201,7 @@ internal static partial class Program
           // Not every method decodes offline.
         }
       }
-    C(readers.SequenceEqual(["GameUtils.StartReset"]), "only GameUtils.StartReset reads Debug Reset Command: " + string.Join(", ", readers));
+    C(readers.OrderBy(r => r, StringComparer.Ordinal).SequenceEqual(["GameUtils.StartReset", "ZoneRegen.RunCommand"]), "only GameUtils.StartReset (which regeneration to start) and ZoneRegen.RunCommand (a console command takes no filters) read Debug Reset Command: " + string.Join(", ", readers));
 
     // The alt-biome rebuild comes first, and the zones are reset when it is done: GameUtils.Reset hands ResetZones to it.
     var resetCalls = PatchProcessor.GetOriginalInstructions(typeof(GameUtils).GetMethod(nameof(GameUtils.Reset))!).ToList();
@@ -232,19 +232,20 @@ internal static partial class Program
     BC.ConfigDebugResetCommand.Value = "";
     var lines = LogHandler.During(() => root.GetType().GetMethod("Run")!.Invoke(root, ["bc regen"]));
     C(lines.Any(l => l.Contains("Zone regeneration: load a world first.")), "bc regen without a world says to load one: " + string.Join(" | ", lines));
-    // Anything after the word is a mistake, and nothing is started.
+    // A word that is not understood is a mistake, and nothing is started; none starts the whole world's regeneration.
     int started = 0;
     var said = new List<string>();
-    ZoneRegen.RunCommand("hlp", said.Add, () => started++);
-    ZoneRegen.RunCommand("now please", said.Add, () => started++);
-    C(started == 0 && said.Count == 2 && said[0].Contains("takes no arguments ('hlp')") && said[0].Contains("bc regen help"), "bc regen with a word after it does not start the regeneration; it says so: " + said.FirstOrDefault());
-    ZoneRegen.RunCommand("", said.Add, () => started++);
-    ZoneRegen.RunCommand(null, said.Add, () => started++);
-    ZoneRegen.RunCommand("  ", said.Add, () => started++);
-    C(started == 3 && said.Count == 2, "bc regen alone starts it");
+    ZoneRegen.RunCommand("hlp", said.Add, _ => started++);
+    ZoneRegen.RunCommand("now please", said.Add, _ => started++);
+    C(started == 0 && said.Count == 2 && said[0].Contains("does not know 'hlp'") && said[0].Contains("bc regen help"), "bc regen with a word it does not know does not start the regeneration; it says so: " + said.FirstOrDefault());
+    RegenFilter? given = null;
+    ZoneRegen.RunCommand("", said.Add, f => { started++; given = f; });
+    ZoneRegen.RunCommand(null, said.Add, f => { started++; given = f; });
+    ZoneRegen.RunCommand("  ", said.Add, f => { started++; given = f; });
+    C(started == 3 && said.Count == 2 && given == null, "bc regen alone starts it, with no filter");
     var wired = PatchProcessor.GetOriginalInstructions(typeof(DebugUtils).GetNestedType("<>c", Any)!.GetMethods(Any).First(m => m.Name.Contains("b__") && Callees(m).Any(c => c.Name == "RunCommand")));
-    C(wired.Any(i => i.opcode == OpCodes.Ldftn && i.operand is MethodInfo m && m.Name == "RegenerateZones") && !wired.Any(i => i.opcode == OpCodes.Ldftn && i.operand is MethodInfo r && r.Name == "ResetZones"),
-      "and the command hands GameUtils.RegenerateZones to it (the zones, not the loaded terrain, which nothing changed)");
+    C(wired.Any(i => i.opcode == OpCodes.Ldftn && i.operand is MethodInfo m && m.Name == "RegenerateZonesWith") && !wired.Any(i => i.opcode == OpCodes.Ldftn && i.operand is MethodInfo r && r.Name == "ResetZones"),
+      "and the command hands GameUtils.RegenerateZonesWith to it (the zones, not the loaded terrain, which nothing changed)");
 
     static bool banned(string text) => new[] { "replace", "obsolete", "no longer need", "Upgrade World", "Expand World" }.All(w => !text.Contains(w, StringComparison.OrdinalIgnoreCase));
   }

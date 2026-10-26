@@ -21,6 +21,27 @@
     - Controlled via `Deep North Water` (`[01 BetterContinents.Global]`, console `bc g dnw <on|off>`, default `true`).
   - Ashlands Water Decoupling Toggle (`Ashlands Water`):
     - Added configurable toggle `Ashlands Water` (`[01 BetterContinents.Global]`, console `bc g aw <on|off>`, default `true`) to control whether Ashlands hot sea water coloring follows Better Continents' custom heat maps and Ashlands biomes rather than vanilla's hardcoded southern boundary.
+  - Export for BetterWorlds (the export folder now holds what BetterWorlds needs to rebuild the same world):
+    - Changed: `bc_export` now writes `coldmap.png`, the Deep North's cold map (16-bit grey, `Coldmap Scale` 10), so a world made from the export keeps the Deep North's weather, snow and calm sea. A world whose own cold map is in use gets that map copied byte for byte, with its own `Coldmap Scale`. `nocold` leaves it out; the export window has a Cold switch.
+    - Changed: the location exclusion mask of a world (`no_spawns_mask.png`) is now exported, in `sources/` and at the top of the folder, so a rebuilt world keeps it.
+    - Changed: `export.cfg` pins `Mountain Noise` and `Mistlands Noise` to 0 (the heights hold the noise already, so a rebuilt world no longer adds it a second time) and writes the world's `Ashlands Water` and `Deep North Water`. `High Terrain` is written when the rebuilt world would not get the loaded world's state from Auto at the export's Heightmap Amount.
+    - Changed: `heatmap.png` is exact for the game's own Ashlands test: it is above black exactly where the world is Ashlands (the old gradient line differed from it by up to about 100 m at the border).
+    - Added: `world.json` (World Radius, Edge Size, Layout) and the manifest's `settingsVersion`, so BetterWorlds reads a folder's size and layout instead of guessing them. The manifest also gains `exportRevision` (2), `worldSize`, `edgeSize`, `layout`, `wideSectors`, `highTerrain`, `cold`, `fileBytes` and `locations.pinGrid`. The format is still `bc-export/1`: every key is new, none changed.
+    - Added: a note in `README.txt` and the manifest when a map file is over 256 MiB (BetterWorlds takes at most that per file).
+  - Editor pack for Gaea and other terrain editors:
+    - Added: an optional editor pack (`bc_export ... editor`): the ground as a 32-bit float TIFF (and `.r32`) plus masks (water, slope, forest density, biomes, protected locations), `editor.json`, `README-editor.txt` and a `probe.tif` orientation test, and `bc_import edited` to bring the edited height back as a normal export folder (`<export>-edited`). Options: `editoronly`, `eformat=`, `eunit=`, `eamount=`, `esize=`, `emasks=`, `eprotectpad=`, `eprotectfeather=`. An export without `editor` is unchanged.
+    - Added: an Editor pack block in the export window's Export tab and an Editor return section in its Import tab.
+    - Tested with Better Continents' own loaders; not yet tried with a real Gaea round trip (its row order, pixel registration and TIFF compression are unconfirmed).
+  - Upgrade World:
+    - Added: the setting `Upgrade World Radius` (`[07 BetterContinents.Misc]`, Off by default) raises Upgrade World's `World radius` to cover a big world; it is never lowered.
+    - Changed: `locations_restore` keeps the location map's pins and the start position; the log says once when `upgrade ashlands` or `upgrade deepnorth` is given on a world with its own biome map or size (they choose zones by distance, not by biome).
+    - Fixed: a location map pin that is already in the registry is no longer reported as not placed when the pins are put in a second time.
+    - Checked offline against Upgrade World's DLL (names, config, the `locations_restore` merge); not yet run in a game.
+  - `bc regen` takes words: `dry` (count what would be reset), `biome=`, `min=`, `max=` (`radius=`), `pos=`, `zone=` and `chance=`. Plain `bc regen` is unchanged.
+  - Added: `bc genloc pins` puts only the location map's pins and the start position back into the registry and generates nothing, for a registry that something else emptied (Upgrade World's `locations_restore`, for example).
+  - Fixed: Expand World Data 1.79 and later work with Better Continents again (the world's size, its biome names, lava and terrain). Better Continents now finds Expand World Data's types wherever its releases put them, and the log says which parts it reached.
+  - Fixed: Expand World Size 1.44 and later and Wide Sectors no longer both change the game's save grid. While Expand World Size's grid is the wider one, Wide Sectors stays out of the way, and a save made with wide sectors is refused with a message instead of being read with the wrong layout.
+  - Updated AI doc to v0.10.7
 - v0.10.6
   - HarmonyX and assembly reflection fix: resolves `System.Reflection.ReflectionTypeLoadException`
     (`Could not load type of field 'System.Text.EncodingTable:s_codePageToItemCache' due to missing

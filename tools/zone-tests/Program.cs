@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-10-04 for the unifying refactor (0.10.0), and modified on 2026-10-07 for baked placements (0.10.4).
+// Added by Wubarrk on 2026-10-04 for the unifying refactor (0.10.0), and modified on 2026-10-07 for baked placements (0.10.4), and on 2026-10-26 for Upgrade World compatibility (0.10.7).
 //
 // Offline checks of zone regeneration (ZoneReset.cs, ZoneRegen.cs): the rules for what protects a zone and what is never
 // destroyed, which zones a plan resets and in what order, the work against a made-up world (what is destroyed, in what order,
@@ -82,7 +82,9 @@ internal static partial class Program
     // BetterContinents.dll asks for BepInEx's HarmonyX 0Harmony (2.9), which cannot start on .NET 8; Lib.Harmony has the
     // same name and the API it touches. The game's and BepInEx's assemblies resolve from libs-Tools, read only.
     var libs = Path.Combine(AppContext.BaseDirectory, "../../../../../../libs-Tools");
-    var dirs = new[] { AppContext.BaseDirectory, Path.Combine(libs, "1.0", "client"), libs, Path.Combine(libs, "BepInEx", "core"), Path.Combine(libs, "1.0", "server") };
+    var dirs = new[] { AppContext.BaseDirectory, Path.Combine(libs, "1.0", "client"), libs, Path.Combine(libs, "BepInEx", "core"), Path.Combine(libs, "1.0", "server"),
+      // Last: Vector3's ToString lives in a module libs-Tools does not hold (a log line that shows a position needs it).
+      "/home/rohan/.local/share/Steam/steamapps/common/Valheim/valheim_Data/Managed" };
     AssemblyLoadContext.Default.Resolving += (context, name) =>
     {
       // The game's Steam wrapper is the file steamworks.net.dll and the assembly com.rlabrecque.steamworks.net.
@@ -126,6 +128,7 @@ internal static partial class Program
       ReviewTests();
       PolishTests();
       BakedTests();
+      RegenWordsTests();
     }
     finally
     {

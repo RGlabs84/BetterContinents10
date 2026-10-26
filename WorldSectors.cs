@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-10-06 for 16k worlds (0.10.3), and on 2026-10-07 for baked placements (0.10.4).
+// Added by Wubarrk on 2026-10-06 for 16k worlds (0.10.3), and on 2026-10-07 for baked placements (0.10.4), and on 2026-10-26 to stay out of the way of Expand World Size's save grid (0.10.7).
 
 using System;
 using System.Collections;
@@ -144,7 +144,8 @@ internal static class WorldSectors
   // follows the settings it was sent, whatever its own Wide Sectors says. A world whose save holds chunks of the wider area needs it too
   // (ForcedBySave), which Update adds.
   internal static bool Wanted(BetterContinents.BetterContinentsSettings settings, WorldGeometry? expandWorldSize, WideSectorsMode mode, bool hosted) =>
-    settings.EnabledForThisWorld && Reach(settings, expandWorldSize) > VanillaReach && (settings.WideSectors || (mode == WideSectorsMode.On && hosted));
+    settings.EnabledForThisWorld && Reach(settings, expandWorldSize) > VanillaReach && (settings.WideSectors || (mode == WideSectorsMode.On && hosted))
+    && !EWS.GridActive;
 
   // A new world takes its settings (BetterContinentsSettings.FromConfig, and a preset's world when it is made): Auto and On make a world that
   // reaches past the game's sectors a wide one, which its settings say for good (WideSectors); Off leaves it on the game's, and a world that is
@@ -156,6 +157,11 @@ internal static class WorldSectors
     var reach = Reach(settings, expandWorldSize);
     if (reach <= VanillaReach)
       return false;
+    if (EWS.GridActive)
+    {
+      BetterContinents.Log($"Sectors: this new world reaches {reach:0} m, and Expand World Size's save grid ({EWS.GridWidth} zones a side) files its objects, so it is not made with wide sectors.");
+      return false;
+    }
     if (mode == WideSectorsMode.Off)
     {
       BetterContinents.Log($"Sectors: Wide Sectors is Off, so this new world, which reaches {reach:0} m, has the game's own sectors: what lies beyond 16.4 km shares one sector, "
@@ -278,6 +284,12 @@ internal static class WorldSectors
     foreach (var chunk in chunks)
       if (SectorMap.IsWideChunk(chunk.Chunk))
       {
+        if (EWS.GridActive)
+        {
+          RefuseToLoad(chunk, $"Expand World Size's save grid ({EWS.GridWidth} zones a side) is in use, and the two lay a save out differently: with both, objects would be filed twice or lost. "
+            + "Remove Expand World Size, or set its save grid to the game's (Save system size 0 with a world no bigger than 16,384 m) to keep these sectors");
+          return;
+        }
         ForcedBySave = true;
         BetterContinents.Log($"Sectors: the save has a chunk ({chunk.Chunk & 0xFF}, {chunk.Chunk >> 8}) beyond the game's 64 x 64, so it was saved with the wide sectors.");
         Switch(harmony, true, null, null);
@@ -294,11 +306,13 @@ internal static class WorldSectors
   // error (ZNet.m_loadError): the game then saves nothing ("Skipping world save"), and a game that runs the world goes back to the menu
   // (Game.FixedUpdate: "World load failed, exiting without save"), where the error is shown. A dedicated server does not stop by itself:
   // it would run a world nobody could save, so it stops here, as it does for a failed alt-biome planting (AltBiomeControl.FailLoad).
-  private static void RefuseToLoad(ZoneSystem.ChunkIndex chunk)
+  private static void RefuseToLoad(ZoneSystem.ChunkIndex chunk, string? because = null)
   {
     var world = ZNet.World?.m_name ?? "?";
     var message = $"Better Continents: the world '{world}' was saved with wide sectors (its save has a chunk ({chunk.Chunk & 0xFF}, {chunk.Chunk >> 8}) beyond the game's 64 x 64), "
-      + "which could not be turned on, so it is not loaded, and nothing is saved over it: on the game's own sectors every object beyond 16.4 km would be saved twice. The log names the patch that failed.";
+      + (because != null
+        ? $"which cannot be turned on: {because}. It is not loaded, and nothing is saved over it."
+        : "which could not be turned on, so it is not loaded, and nothing is saved over it: on the game's own sectors every object beyond 16.4 km would be saved twice. The log names the patch that failed.");
     BetterContinents.LogError(message);
     BetterContinents.LastConnectionError = message;
     ZNet.m_loadError = true;

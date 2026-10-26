@@ -1,4 +1,4 @@
-// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and alt-biome planting (0.8.1), and on 2026-09-24 for world export and import (0.9.0), and on 2026-09-29 for Expand World Data biomes (0.9.3), and on 2026-10-02 for export folders used as the Directory (0.9.4), and on 2026-10-04 for the unifying refactor (0.10.0), and on 2026-10-06 for 16k worlds (0.10.3), and on 2026-10-07 for baked placements (0.10.4), and on 2026-10-13 for lakes and clearing (0.10.5).
+// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and alt-biome planting (0.8.1), and on 2026-09-24 for world export and import (0.9.0), and on 2026-09-29 for Expand World Data biomes (0.9.3), and on 2026-10-02 for export folders used as the Directory (0.9.4), and on 2026-10-04 for the unifying refactor (0.10.0), and on 2026-10-06 for 16k worlds (0.10.3), and on 2026-10-07 for baked placements (0.10.4), and on 2026-10-13 for lakes and clearing (0.10.5), and on 2026-10-26 for the BetterWorlds-complete export (0.10.7).
 
 using System;
 using System.Collections.Generic;
@@ -292,6 +292,9 @@ public partial class BetterContinents
       foreach (var kind in MapKind.All)
         if (kind.Listed(this) is { } map)
           maps.Add((kind.FileName, map));
+      // Not in MapKind.All (it is no map of the terrain): listed last, so the export carries it and a preset's loaded maps name it.
+      if (LocationExclusionMap != null)
+        maps.Add((MapKind.LocationExclusion.FileName, LocationExclusionMap));
       return maps;
     }
 
@@ -697,6 +700,9 @@ public partial class BetterContinents
           output($"Coldmap size {ColdMap.Size}x{ColdMap.Size}");
           output($"Coldmap scale {ColdMapScale}");
         }
+
+        if (LocationExclusionMap != null)
+          output($"Location exclusion mask file ({LocationExclusionMap.Size}) {LocationExclusionMap.FilePath}");
 
         if (SpawnMap != null)
           output($"Spawnmap file ({SpawnMap.Size}) {SpawnMap.FilePath}");

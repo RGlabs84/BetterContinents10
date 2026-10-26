@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-09-24 for world export and import (0.9.0), and modified on 2026-10-04 for the unifying refactor (0.10.0), and on 2026-10-06 for 16k worlds (0.10.3), and on 2026-10-07 for baked placements (0.10.4), and on 2026-10-13 for lakes and clearing (0.10.5).
+// Added by Wubarrk on 2026-09-24 for world export and import (0.9.0), and modified on 2026-10-04 for the unifying refactor (0.10.0), and on 2026-10-06 for 16k worlds (0.10.3), and on 2026-10-07 for baked placements (0.10.4), and on 2026-10-13 for lakes and clearing (0.10.5), and on 2026-10-26 for the BetterWorlds-complete export and the editor pack (0.10.7).
 
 using System;
 using System.Collections.Generic;
@@ -79,6 +79,21 @@ internal static class Program
         System.Console.WriteLine($"{checks} checks, {failures} failures");
         return failures == 0 ? 0 : 1;
       }
+      // BCEXPORT_ONLY=editor: the editor pack's tests alone (the terrain test whose generator stubs the exports use, then the pack).
+      if (Environment.GetEnvironmentVariable("BCEXPORT_ONLY") == "editorbig" && int.TryParse(Environment.GetEnvironmentVariable("BCEXPORT_BIG"), out var editorBig) && editorBig > 0)
+      {
+        TerrainTest.Run();
+        EditorTest.Big(work, editorBig);
+        System.Console.WriteLine($"{checks} checks, {failures} failures");
+        return failures == 0 ? 0 : 1;
+      }
+      if (Environment.GetEnvironmentVariable("BCEXPORT_ONLY") == "editor")
+      {
+        TerrainTest.Run();
+        EditorTest.Run(work);
+        System.Console.WriteLine($"{checks} checks, {failures} failures");
+        return failures == 0 ? 0 : 1;
+      }
       if (Environment.GetEnvironmentVariable("BCEXPORT_ONLY") == "fine")
       {
         Tests.Commands();
@@ -102,6 +117,7 @@ internal static class Program
       Tests.LocationMath();
       Tests.LocationColours();
       Tests.Commands();
+      BwSurfaceTest.Run();
       Tests.HudText();
       Tests.Json();
       Tests.ConfigAndReadme(work);
@@ -109,7 +125,9 @@ internal static class Program
       EndToEnd.Run(work);
       LayerExport.Run(work);
       LakeExport.Run(work);
+      SourcesExport.Run(work);
       FineTest.Run(work);
+      EditorTest.Run(work);
       // Past the usual sizes: BCEXPORT_BIG=8192 (or 16384) runs the whole export there, with its memory measured.
       if (int.TryParse(Environment.GetEnvironmentVariable("BCEXPORT_BIG"), out var big) && big > 0)
       {

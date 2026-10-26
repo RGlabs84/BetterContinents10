@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-10-04 for the unifying refactor (0.10.0), and modified on 2026-10-06 for 16k worlds (0.10.3), and on 2026-10-07 for baked placements (0.10.4).
+// Added by Wubarrk on 2026-10-04 for the unifying refactor (0.10.0), and modified on 2026-10-06 for 16k worlds (0.10.3), and on 2026-10-07 for baked placements (0.10.4), and on 2026-10-26 for Upgrade World compatibility (0.10.7).
 
 using System;
 using System.Collections;
@@ -291,6 +291,8 @@ internal static class ZoneReset
     public int KeptForLocations;
     /// <summary>The zones an earlier run emptied and did not finish: they are in Reset whatever protects them now.</summary>
     public readonly HashSet<Vector2s> Carried = new(Comparer);
+    /// <summary>Of the zones left alone, those the request's filters left out (RegenFilter), not counting those something protects anyway.</summary>
+    public int Filtered;
     /// <summary>Every generated zone at the time of the plan.</summary>
     internal HashSet<Vector2s> GeneratedZones = new(Comparer);
     internal readonly Dictionary<Vector2s, int> GroupOf = new(Comparer);
@@ -420,15 +422,23 @@ internal static class ZoneReset
   /// centre); <paramref name="locations"/> are the locations that are placed: a group of zones that share one is kept whole when
   /// any zone of it is covered, and otherwise reset whole, its zones that are not generated being planned as strays;
   /// <paramref name="carried"/> are zones an earlier run emptied and did not finish, which are reset
-  /// whatever protects them now (nothing is left in them, and kept they would stay bare).</summary>
+  /// whatever protects them now (nothing is left in them, and kept they would stay bare); <paramref name="eligible"/> says which generated
+  /// zones the request asks to reset (none: all): a zone it leaves out is treated as a zone something protects, apart from the
+  /// zones around it (it protects only itself and the location groups it belongs to).</summary>
   internal static Plan MakePlan(IEnumerable<Vector2s> generated, IEnumerable<Protector> protectors, IReadOnlyList<Vector2s> focus,
-    IEnumerable<PlacedLocation>? locations = null, IEnumerable<Vector2s>? carried = null)
+    IEnumerable<PlacedLocation>? locations = null, IEnumerable<Vector2s>? carried = null, Func<Vector2s, bool>? eligible = null)
   {
     var plan = new Plan();
     var all = new HashSet<Vector2s>(generated, Comparer);
     plan.GeneratedZones = all;
     var covered = Dilate(protectors);
     plan.Covered = covered;
+    if (eligible != null)
+    {
+      foreach (var zone in all)
+        if (!eligible(zone) && covered.Add(zone))
+          plan.Filtered++;
+    }
     if (locations != null)
       LinkLocations(plan, locations);
 
@@ -1210,12 +1220,60 @@ internal static class ZoneReset
   private static string Count(long n, string one, string many) => (n == 1 ? "1 " + one : n.ToString("N0", CultureInfo.InvariantCulture) + " " + many);
 
   internal static string StartLine(Plan plan) =>
-    plan.Reset.Count == 0
+    plan.Filtered > 0 ? FilteredStartLine(plan)
+    : plan.Reset.Count == 0
       ? $"Zone regeneration: no generated zone to reset ({Count(plan.Kept.Count, "generated zone is", "generated zones are")} left alone)."
       : $"Zone regeneration: resetting {plan.Reset.Count.ToString("N0", CultureInfo.InvariantCulture)} of {Count(plan.Generated, "generated zone", "generated zones")}; "
         + $"{plan.Kept.Count.ToString("N0", CultureInfo.InvariantCulture)} left alone (near something a player built or worked on, a tombstone, or a player"
         + (plan.KeptForLocations > 0 ? $"; {plan.KeptForLocations.ToString("N0", CultureInfo.InvariantCulture)} of them to keep a location whole" : "")
         + ").";
+
+  /// <summary>What a dry run says (bc regen dry): the plan's counts, the biomes of the zones that would be reset (at their middle), the nearest
+  /// of them, and that nothing was changed. <paramref name="biomeAt"/> is the world's biome at a place.</summary>
+  internal static List<string> DryRunLines(Plan plan, RegenFilter filter, Func<float, float, Heightmap.Biome> biomeAt)
+  {
+    var lines = new List<string>();
+    var start = StartLine(plan)
+      .Replace("Zone regeneration: resetting", "Zone regeneration, dry run: would reset")
+      .Replace("Zone regeneration: no generated zone", "Zone regeneration, dry run: no generated zone");
+    lines.Add(start);
+    if (filter.Narrows)
+      lines.Add("Asked for: " + filter.Describe() + ".");
+    if (plan.Reset.Count > 0)
+    {
+      var byBiome = new Dictionary<string, int>();
+      foreach (var zone in plan.Reset)
+      {
+        var name = BiomeRegistry.Name(biomeAt((float)(zone.x * RegenFilter.ZoneSize), (float)(zone.y * RegenFilter.ZoneSize)));
+        byBiome[name] = byBiome.TryGetValue(name, out var n) ? n + 1 : 1;
+      }
+      lines.Add("Zones to reset, by the biome at their middle: "
+        + string.Join(", ", byBiome.OrderByDescending(p => p.Value).ThenBy(p => p.Key, StringComparer.Ordinal).Take(12).Select(p => $"{p.Key} {p.Value.ToString("N0", CultureInfo.InvariantCulture)}")) + ".");
+      lines.Add("Nearest first (zone, metres from the centre): "
+        + string.Join(", ", plan.Reset.Take(8).Select(z => $"{z.x},{z.y} ({Math.Round(Math.Sqrt((double)z.x * z.x + (double)z.y * z.y) * RegenFilter.ZoneSize).ToString("0", CultureInfo.InvariantCulture)} m)"))
+        + (plan.Reset.Count > 8 ? ", ... The whole list is in the log." : "."));
+    }
+    lines.Add("Nothing was changed. 'bc regen" + (filter.Narrows ? " " + string.Join(" ", filter.Text.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries).Where(w => !w.Equals("dry", StringComparison.OrdinalIgnoreCase))) : "") + "' does it.");
+    return lines;
+  }
+
+  /// <summary>The zones of a plan to reset, one line for the log: at most <paramref name="limit"/> of them.</summary>
+  internal static string ZoneListLine(Plan plan, int limit = 5000) =>
+    "Zone regeneration, dry run: zones to reset" + (plan.Reset.Count > limit ? $" (the first {limit} of {plan.Reset.Count})" : "") + ": "
+    + string.Join(" ", plan.Reset.Take(limit).Select(z => $"{z.x},{z.y}"));
+
+  // The same, when the request's filters left zones out (RegenFilter): what they left out is told apart from the zones something protects.
+  private static string FilteredStartLine(Plan plan)
+  {
+    long protectedKept = Math.Max(0, plan.Kept.Count - plan.Filtered);
+    string others = protectedKept > 0
+      ? $"; {protectedKept.ToString("N0", CultureInfo.InvariantCulture)} more near something a player built or worked on, a tombstone, or a player" + (plan.KeptForLocations > 0 ? ", or to keep a location whole" : "")
+      : "";
+    string left = $"{plan.Kept.Count.ToString("N0", CultureInfo.InvariantCulture)} left alone ({plan.Filtered.ToString("N0", CultureInfo.InvariantCulture)} outside what was asked for{others})";
+    return plan.Reset.Count == 0
+      ? $"Zone regeneration: no generated zone to reset of {Count(plan.Generated, "generated zone", "generated zones")}; {left}."
+      : $"Zone regeneration: resetting {plan.Reset.Count.ToString("N0", CultureInfo.InvariantCulture)} of {Count(plan.Generated, "generated zone", "generated zones")}; {left}.";
+  }
 
   internal static string ProgressLine(Progress progress) =>
     $"Zone regeneration: {progress.Done.ToString("N0", CultureInfo.InvariantCulture)} of {Count(progress.Total, "zone", "zones")} ({progress.Percent}%), {Count(progress.Destroyed, "object", "objects")} removed.";

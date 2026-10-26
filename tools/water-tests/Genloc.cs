@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-10-13 for the forced genloc (0.10.5).
+// Added by Wubarrk on 2026-10-13 for the forced genloc (0.10.5), and modified on 2026-10-26 for the pins word (0.10.7).
 //
 // bc genloc (Genloc.cs): the words, when it refuses, what a taken slot is (a live run, a dead one), the counts and the lines it says, the sign of life
 // that both iterators of the game's generation give (the postfix on the installed game's IL), and the facts about the game's code it relies on, read
@@ -30,9 +30,9 @@ internal static partial class Program
     if (!running) return;
     bool words = Genloc.Parse("") == Genloc.Mode.Force && Genloc.Parse("   ") == Genloc.Mode.Force && Genloc.Parse("alt") == Genloc.Mode.Alt && Genloc.Parse("ALT") == Genloc.Mode.Alt
                  && Genloc.Parse("help") == Genloc.Mode.Help && Genloc.Parse("?") == Genloc.Mode.Help && Genloc.Parse("alt now") == Genloc.Mode.Bad
-                 && Genloc.Parse("wipe") == Genloc.Mode.Bad && Genloc.Parse("force") == Genloc.Mode.Bad;
+                 && Genloc.Parse("pins") == Genloc.Mode.Pins && Genloc.Parse("pins now") == Genloc.Mode.Bad && Genloc.Parse("wipe") == Genloc.Mode.Bad && Genloc.Parse("force") == Genloc.Mode.Bad;
     Check(words, "'bc genloc' forces a run, 'alt' is the game's alt-biome branch, 'help' says more, anything else is the usage");
-    Check(Genloc.Usage == "bc genloc [alt]" && Genloc.Help.Length == 3 && Genloc.Help.All(l => !l.Contains("replace", StringComparison.OrdinalIgnoreCase)),
+    Check(Genloc.Usage == "bc genloc [alt | pins]" && Genloc.Help.Length == 4 && Genloc.Help.All(l => !l.Contains("replace", StringComparison.OrdinalIgnoreCase)),
       "the help is calm: it never says 'replace', and has no patch version of the game in it");
     Check(Genloc.Help.All(l => !System.Text.RegularExpressions.Regex.IsMatch(l, @"\b1\.0\.\d+\b")), "(no patch version)");
     Check(Genloc.Refusal(false, false, false) == "no world is loaded" && Genloc.Refusal(true, false, true) == "no world is loaded" && Genloc.Refusal(false, true, true) == "no world is loaded",

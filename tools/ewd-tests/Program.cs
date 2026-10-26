@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-09-29 for Expand World Data biomes (0.9.3), and modified on 2026-10-04 for the unifying refactor (0.10.0).
+// Added by Wubarrk on 2026-09-29 for Expand World Data biomes (0.9.3), and modified on 2026-10-04 for the unifying refactor (0.10.0), and on 2026-10-26 for the Expand World Data 1.79 bridge modes (0.10.7).
 
 // Offline checks of Better Continents' support for the biomes Expand World Data adds, against the real
 // ExpandWorldData.dll 1.73.0 (the Hexium package, kept in libs-Tools/1.0/thirdparty/expand-world-data-2026-09-29):
@@ -67,7 +67,7 @@ internal static class Program
     if (args.Length == 0)
     {
       int failed = 0;
-      foreach (var mode in new[] { "vanilla", "ewd" })
+      foreach (var mode in new[] { "vanilla", "ewd", "bridge173", "bridge179" })
       {
         using var child = Process.Start(new ProcessStartInfo(Environment.ProcessPath!, mode) { UseShellExecute = false })!;
         child.WaitForExit();
@@ -85,6 +85,7 @@ internal static class Program
       "/home/rohan/WubarrkCODING/libs-Tools/BepInEx/core",
       "/home/rohan/.local/share/Steam/steamapps/common/Valheim/valheim_Data/Managed",
       Path.GetDirectoryName(EwdDll)!,
+      Path.GetDirectoryName(Bridge.Releases["bridge179"].Dll)!,
     };
     AssemblyLoadContext.Default.Resolving += (ctx, name) =>
     {
@@ -113,6 +114,8 @@ internal static class Program
         Vanilla(work);
       else if (mode == "ewd")
         WithEwd(work);
+      else if (Bridge.Releases.ContainsKey(mode))
+        Bridge.Run(mode, work);
       else
         throw new ArgumentException("unknown mode " + mode);
     }

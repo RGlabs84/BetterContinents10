@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-10-13 for the forced genloc (0.10.5).
+// Added by Wubarrk on 2026-10-13 for the forced genloc (0.10.5), and modified on 2026-10-26 for the pins word (0.10.7).
 
 using System;
 using System.Collections.Generic;
@@ -44,9 +44,9 @@ internal static class Genloc
 {
   // ---- the parts that need no engine ---------------------------------------------------------------------------------------
 
-  internal enum Mode { Force, Alt, Help, Bad }
+  internal enum Mode { Force, Alt, Pins, Help, Bad }
 
-  /// <summary>The words after "genloc": nothing (a forced run), "alt", or "help".</summary>
+  /// <summary>The words after "genloc": nothing (a forced run), "alt", "pins", or "help".</summary>
   internal static Mode Parse(string text)
   {
     var words = text.Split([' '], StringSplitOptions.RemoveEmptyEntries);
@@ -57,6 +57,7 @@ internal static class Genloc
     return words[0].ToLowerInvariant() switch
     {
       "alt" => Mode.Alt,
+      "pins" => Mode.Pins,
       "help" or "?" => Mode.Help,
       _ => Mode.Bad,
     };
@@ -157,13 +158,14 @@ internal static class Genloc
     return text.ToString();
   }
 
-  internal const string Usage = "bc genloc [alt]";
+  internal const string Usage = "bc genloc [alt | pins]";
 
   internal static readonly string[] Help =
   [
     "bc genloc: makes the world's locations again. Every location that is not placed yet is cleared and rolled again, in the zones that are not generated yet; placed ones, and every zone that is generated, stay as they are.",
     "It does what genloc does, also when the game's own run is stuck or the world was loaded with its locations marked as made: it says what it found, and when the run ends it says what changed and sends the new location icons to the clients.",
     "It runs where the world runs (single player, the host, or the dedicated server), and does not start a second run while one is going. 'bc genloc alt' passes to the game's alt-biome branch, exactly as 'genloc alt' does.",
+    "'bc genloc pins' only puts the location map's pins and the start position into the registry, and generates nothing: for a registry that something else emptied (a command of another mod that restores the locations, for example).",
   ];
 
   // ---- what Better Continents says about its own placements while a run goes (ZoneSystemPatch.PlaceLocations) -------------------
@@ -273,8 +275,24 @@ internal static class Genloc
     }
     if (mode == Mode.Alt)
       RunAlt(say);
+    else if (mode == Mode.Pins)
+      RunPins(zs!, say);
     else
       RunForced(zs!, say);
+  }
+
+  // Only the location map's pins and the start override, into the registry (what ClearNonPlacedLocations' postfix does when the game empties it).
+  private static void RunPins(ZoneSystem zs, Action<string> say)
+  {
+    if (!BetterContinents.Settings.HasLocationMap && !BetterContinents.Settings.OverrideStartPosition)
+    {
+      say("Genloc pins: this world has no location map and no start position override, so there are no pins.");
+      return;
+    }
+    int before = zs.m_locationInstances.Count;
+    ReassertLocationPins(zs);
+    int added = Math.Max(zs.m_locationInstances.Count - before, 0);
+    say($"Genloc pins: the location map's pins and the start position are in the registry: {added.ToString("N0", CultureInfo.InvariantCulture)} put in, the rest were there already.");
   }
 
   // The game's own branch: Terminal.cs:515-523, genloc alt.

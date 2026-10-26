@@ -1,4 +1,4 @@
-// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and alt-biome planting (0.8.1), and on 2026-09-24 for world export and import (0.9.0), and on 2026-09-25 for version-agnostic wording (0.9.1), and on 2026-09-27 for map mod compatibility (0.9.2), and on 2026-09-29 for Expand World Data biomes (0.9.3), and on 2026-10-04 for the unifying refactor (0.10.0), and on 2026-10-06 for 16k worlds (0.10.3), and on 2026-10-07 for baked placements (0.10.4), and on 2026-10-13 for BC's own water (0.10.5), and on 2026-10-13 for the forced genloc (0.10.5), and on 2026-10-13 for lakes and clearing (0.10.5).
+// Modified by Wubarrk on 2026-09-22 for Valheim 1.0.15 support (0.8.0) and alt-biome planting (0.8.1), and on 2026-09-24 for world export and import (0.9.0), and on 2026-09-25 for version-agnostic wording (0.9.1), and on 2026-09-27 for map mod compatibility (0.9.2), and on 2026-09-29 for Expand World Data biomes (0.9.3), and on 2026-10-04 for the unifying refactor (0.10.0), and on 2026-10-06 for 16k worlds (0.10.3), and on 2026-10-07 for baked placements (0.10.4), and on 2026-10-13 for BC's own water (0.10.5), and on 2026-10-13 for the forced genloc (0.10.5), and on 2026-10-13 for lakes and clearing (0.10.5), and on 2026-10-26 for Upgrade World compatibility (0.10.7).
 
 using System;
 using System.Collections;
@@ -29,6 +29,7 @@ public partial class BetterContinents : BaseUnityPlugin
     public static ConfigEntry<int> ConfigMapMemory;
     public static ConfigEntry<int> ConfigMaxMapSize;
     public static ConfigEntry<WideSectorsMode> ConfigWideSectors;
+    public static ConfigEntry<bool> ConfigUpgradeWorldRadius;
     public static ConfigEntry<int> ConfigFileVersion;
 
     public static ConfigEntry<bool> ConfigEnabled;
@@ -345,6 +346,14 @@ public partial class BetterContinents : BaseUnityPlugin
         catch (Exception e)
         {
             LogError($"Tarn compatibility failed: {e}");
+        }
+        try
+        {
+            UW.Run();
+        }
+        catch (Exception e)
+        {
+            LogError($"Upgrade World compatibility failed: {e}");
         }
         try
         {

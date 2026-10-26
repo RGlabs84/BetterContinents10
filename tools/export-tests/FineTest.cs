@@ -1,4 +1,4 @@
-// Added by Wubarrk on 2026-10-06 for 16k worlds (0.10.3).
+// Added by Wubarrk on 2026-10-06 for 16k worlds (0.10.3), and modified on 2026-10-26 for the BetterWorlds-complete export (0.10.7).
 
 using System;
 using System.Collections.Generic;
@@ -304,7 +304,7 @@ internal static class FineTest
     var wg = (WorldGenerator)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(typeof(WorldGenerator));
     typeof(WorldGenerator).GetField("m_world")!.SetValue(wg, world);
     BC.Settings = new BC.BetterContinentsSettings();
-    o.Biomes = o.Locations = o.Forest = o.Heat = o.AltBiomes = o.Lava = o.Moss = o.Paint = o.Sources = o.Preset = false;
+    o.Biomes = o.Locations = o.Forest = o.Heat = o.Cold = o.AltBiomes = o.Lava = o.Moss = o.Paint = o.Sources = o.Preset = false;
     tweak?.Invoke(o);
     var dir = Path.Combine(work, name);
     TerrainTest.HeightOverride = height;
@@ -340,7 +340,7 @@ internal static class FineTest
     return o;
   }
 
-  static ushort[] ReadGrey(string path, int n)
+  internal static ushort[] ReadGrey(string path, int n)
   {
     using var image = Image.Load<L16>(path);
     var pixels = new L16[n * n];
@@ -383,7 +383,7 @@ internal static class FineTest
 
     var a = Export(work, "fine-auto-81", Options(n, 81f, WorldExport.FineHeightsMode.Auto), Terraces);
     C(a.Phase == "Done" && a.Error == null, $"the export at Heightmap Amount 81 finishes ({a.Phase} {a.Error})");
-    var expected = new[] { "heightmap.png", "heightmap-fine.png", "export.cfg", "README.txt", "manifest.json" };
+    var expected = new[] { "heightmap.png", "heightmap-fine.png", "export.cfg", "world.json", "README.txt", "manifest.json" };
     C(expected.All(a.Files.Contains) && a.Files.Count == expected.Length, $"it writes heightmap.png and heightmap-fine.png beside it ({string.Join(", ", a.Files.OrderBy(f => f))})");
     var heightmapBytes = File.ReadAllBytes(Path.Combine(a.Dir, "heightmap.png"));
     var fineBytes = File.ReadAllBytes(Path.Combine(a.Dir, "heightmap-fine.png"));
